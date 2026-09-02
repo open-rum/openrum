@@ -18,6 +18,12 @@ export default defineConfig({
   server: {
     host: "0.0.0.0",
     allowedHosts: ["terminal.local"],
+    proxy: {
+      "/api": {
+        target: process.env.OPENRUM_API_PROXY ?? "http://127.0.0.1:8080",
+        changeOrigin: false,
+      },
+    },
     warmup: {
       clientFiles: ["./src/main.tsx"],
     },

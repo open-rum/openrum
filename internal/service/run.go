@@ -10,6 +10,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/rs/zerolog"
+
 	"openrum/internal/config"
 	"openrum/internal/health"
 	"openrum/internal/httpx"
@@ -22,7 +24,13 @@ type Hooks struct {
 	Errors   <-chan error
 }
 
+type RouteRegistrar func(context.Context, *httpx.Router, config.Config, zerolog.Logger) (func() error, error)
+
 func Main(service config.Service) error {
+	return MainWithRoutes(service, nil)
+}
+
+func MainWithRoutes(service config.Service, register RouteRegistrar) error {
 	configuration, err := config.Load(service)
 	if err != nil {
 		return fmt.Errorf("load %s configuration: %w", service, err)
@@ -41,6 +49,13 @@ func Main(service config.Service) error {
 	router.Handle("GET /health/live", healthManager.LiveHandler())
 	router.Handle("GET /health/ready", healthManager.ReadyHandler())
 	router.Handle("GET /metrics", observability.NewMetricsHandler(string(configuration.Service), configuration.AppEnv))
+	var cleanup func() error
+	if register != nil {
+		cleanup, err = register(ctx, router, configuration, logger)
+		if err != nil {
+			return fmt.Errorf("register %s routes: %w", configuration.Service, err)
+		}
+	}
 
 	server := &http.Server{
 		Addr:              configuration.ListenAddress,
@@ -61,8 +76,14 @@ func Main(service config.Service) error {
 			}()
 			return nil
 		},
-		Shutdown: server.Shutdown,
-		Errors:   serverErrors,
+		Shutdown: func(shutdownCtx context.Context) error {
+			shutdownErr := server.Shutdown(shutdownCtx)
+			if cleanup != nil {
+				shutdownErr = errors.Join(shutdownErr, cleanup())
+			}
+			return shutdownErr
+		},
+		Errors: serverErrors,
 	}
 	return Run(ctx, configuration, hooks)
 }

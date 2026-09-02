@@ -16,13 +16,21 @@ type Migration struct {
 }
 
 func load(source fs.FS, directory string) ([]Migration, error) {
+	return loadDirection(source, directory, ".up.sql")
+}
+
+func loadDown(source fs.FS, directory string) ([]Migration, error) {
+	return loadDirection(source, directory, ".down.sql")
+}
+
+func loadDirection(source fs.FS, directory, suffix string) ([]Migration, error) {
 	entries, err := fs.ReadDir(source, directory)
 	if err != nil {
 		return nil, err
 	}
 	migrations := make([]Migration, 0, len(entries))
 	for _, entry := range entries {
-		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".up.sql") {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), suffix) {
 			continue
 		}
 		prefix, _, ok := strings.Cut(entry.Name(), "_")

@@ -83,6 +83,19 @@ func TestLoadRejectsInvalidCommonValues(t *testing.T) {
 	}
 }
 
+func TestLoadRequiresHTTPSInProduction(t *testing.T) {
+	environment := map[string]string{
+		"APP_ENV":         "production",
+		"PUBLIC_BASE_URL": "http://rum.example.com",
+		"KAFKA_BROKERS":   "localhost:9092",
+		"REDIS_ADDR":      "localhost:6379",
+	}
+	_, err := load(ServiceIngest, mapLookup(environment))
+	if err == nil || !strings.Contains(err.Error(), "https") {
+		t.Fatalf("load() error=%v", err)
+	}
+}
+
 func mapLookup(values map[string]string) lookupEnv {
 	return func(key string) (string, bool) {
 		value, ok := values[key]

@@ -31,6 +31,7 @@ type Config struct {
 	RedisAddress    string
 	OSSEndpoint     string
 	OSSBucket       string
+	BootstrapToken  string
 }
 
 type lookupEnv func(string) (string, bool)
@@ -85,6 +86,9 @@ func load(service Service, lookup lookupEnv) (Config, error) {
 	if err != nil || publicBaseURL.Host == "" || (publicBaseURL.Scheme != "http" && publicBaseURL.Scheme != "https") {
 		return Config{}, fmt.Errorf("PUBLIC_BASE_URL must be an absolute http(s) URL")
 	}
+	if appEnv == "production" && publicBaseURL.Scheme != "https" {
+		return Config{}, fmt.Errorf("PUBLIC_BASE_URL must use https in production")
+	}
 
 	shutdownTimeout := 10 * time.Second
 	if raw := values("SHUTDOWN_TIMEOUT"); raw != "" {
@@ -117,6 +121,7 @@ func load(service Service, lookup lookupEnv) (Config, error) {
 		RedisAddress:    values("REDIS_ADDR"),
 		OSSEndpoint:     values("OSS_ENDPOINT"),
 		OSSBucket:       values("OSS_BUCKET"),
+		BootstrapToken:  values("BOOTSTRAP_TOKEN"),
 	}, nil
 }
 
