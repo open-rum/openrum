@@ -14,6 +14,7 @@ import (
 	"openrum/internal/config"
 	"openrum/internal/httpx"
 	"openrum/internal/metadata"
+	"openrum/internal/observability"
 	"openrum/internal/service"
 	"openrum/services/api/internal/handlers"
 )
@@ -24,7 +25,7 @@ func main() {
 	}
 }
 
-func registerRoutes(ctx context.Context, router *httpx.Router, configuration config.Config, logger zerolog.Logger) (func() error, error) {
+func registerRoutes(ctx context.Context, router *httpx.Router, configuration config.Config, logger zerolog.Logger, _ *observability.MetricsRegistry) (func() error, error) {
 	connectCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 	database, err := metadata.OpenPostgres(connectCtx, configuration.PostgresDSN)

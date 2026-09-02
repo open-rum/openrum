@@ -45,7 +45,7 @@ var serviceDefaults = map[Service]string{
 
 var serviceRequirements = map[Service][]string{
 	ServiceAPI:      {"POSTGRES_DSN", "CLICKHOUSE_DSN", "REDIS_ADDR"},
-	ServiceIngest:   {"KAFKA_BROKERS", "REDIS_ADDR"},
+	ServiceIngest:   {"POSTGRES_DSN", "KAFKA_BROKERS", "REDIS_ADDR"},
 	ServiceConsumer: {"CLICKHOUSE_DSN", "KAFKA_BROKERS"},
 	ServiceWorker:   {"POSTGRES_DSN", "CLICKHOUSE_DSN", "OSS_ENDPOINT", "OSS_BUCKET"},
 }

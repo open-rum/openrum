@@ -8,9 +8,14 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
-// NewMetricsHandler returns an isolated registry for one service process. Labels
-// are constant, low-cardinality deployment dimensions rather than request data.
-func NewMetricsHandler(service, environment string) http.Handler {
+type MetricsRegistry struct {
+	registry *prometheus.Registry
+}
+
+// NewMetricsRegistry returns an isolated registry for one service process.
+// Labels are constant, low-cardinality deployment dimensions rather than
+// request data. Service packages may register their bounded collectors here.
+func NewMetricsRegistry(service, environment string) *MetricsRegistry {
 	registry := prometheus.NewRegistry()
 	serviceInfo := prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: "openrum",
@@ -28,8 +33,24 @@ func NewMetricsHandler(service, environment string) http.Handler {
 		collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}),
 		serviceInfo,
 	)
+	return &MetricsRegistry{registry: registry}
+}
 
-	return promhttp.HandlerFor(registry, promhttp.HandlerOpts{
+func (metrics *MetricsRegistry) Register(collectors ...prometheus.Collector) error {
+	for _, collector := range collectors {
+		if err := metrics.registry.Register(collector); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (metrics *MetricsRegistry) Handler() http.Handler {
+	return promhttp.HandlerFor(metrics.registry, promhttp.HandlerOpts{
 		ErrorHandling: promhttp.HTTPErrorOnError,
 	})
+}
+
+func NewMetricsHandler(service, environment string) http.Handler {
+	return NewMetricsRegistry(service, environment).Handler()
 }

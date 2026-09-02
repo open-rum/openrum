@@ -202,7 +202,7 @@ ClickHouse 原始表 rum_events：
 | Metric/custom | metric_name/value/rating, custom_name, attributes Map(String,String) |
 | Context | bounded breadcrumbs array, ingest_flags |
 
-引擎为 ReplicatedMergeTree；PARTITION BY (toYYYYMM(timestamp), project_id)；ORDER BY (project_id, event_type, timestamp, event_id)；默认 raw TTL 14 天。生产以 local + Distributed 表部署。禁止任意 attributes 自动升列。
+引擎为 ReplicatedReplacingMergeTree(received_at)，以 Event ID 相同的重放数据最终收敛；PARTITION BY (toYYYYMM(timestamp), project_id)；ORDER BY (project_id, event_type, timestamp, event_id)；默认 raw TTL 14 天。生产以 local + Distributed 表部署。精确明细/核账查询使用 `FINAL` 或按 Event ID 去重，近似分析按 Event ID 聚合，禁止任意 attributes 自动升列。
 
 物化视图：
 

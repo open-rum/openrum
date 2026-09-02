@@ -24,7 +24,7 @@ type Hooks struct {
 	Errors   <-chan error
 }
 
-type RouteRegistrar func(context.Context, *httpx.Router, config.Config, zerolog.Logger) (func() error, error)
+type RouteRegistrar func(context.Context, *httpx.Router, config.Config, zerolog.Logger, *observability.MetricsRegistry) (func() error, error)
 
 func Main(service config.Service) error {
 	return MainWithRoutes(service, nil)
@@ -46,12 +46,13 @@ func MainWithRoutes(service config.Service, register RouteRegistrar) error {
 	}
 	healthManager := health.NewManager(checks, 2*time.Second)
 	router := httpx.NewRouter(logger)
+	metrics := observability.NewMetricsRegistry(string(configuration.Service), configuration.AppEnv)
 	router.Handle("GET /health/live", healthManager.LiveHandler())
 	router.Handle("GET /health/ready", healthManager.ReadyHandler())
-	router.Handle("GET /metrics", observability.NewMetricsHandler(string(configuration.Service), configuration.AppEnv))
+	router.Handle("GET /metrics", metrics.Handler())
 	var cleanup func() error
 	if register != nil {
-		cleanup, err = register(ctx, router, configuration, logger)
+		cleanup, err = register(ctx, router, configuration, logger, metrics)
 		if err != nil {
 			return fmt.Errorf("register %s routes: %w", configuration.Service, err)
 		}

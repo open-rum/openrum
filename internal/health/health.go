@@ -127,6 +127,9 @@ func ChecksForConfig(configuration config.Config) (map[string]Check, error) {
 		}
 		checks["redis"] = TCPCheck(configuration.RedisAddress)
 	case config.ServiceIngest:
+		if err := addURLCheck("postgres", configuration.PostgresDSN, "5432"); err != nil {
+			return nil, err
+		}
 		checks["kafka"] = AnyTCPCheck(configuration.KafkaBrokers)
 		checks["redis"] = TCPCheck(configuration.RedisAddress)
 	case config.ServiceConsumer:

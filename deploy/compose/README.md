@@ -10,7 +10,7 @@ docker compose --env-file deploy/compose/.env -f deploy/compose/docker-compose.y
 docker compose --env-file deploy/compose/.env -f deploy/compose/docker-compose.yml ps
 ```
 
-The stack exposes PostgreSQL on `5433`, ClickHouse HTTP/native on `8123`/`9000`, Kafka on `9092`, Redis on `6379`, and development object storage/API console on `9100`/`9101` by default. PostgreSQL intentionally avoids the common local `5432` port. Override host ports in `.env` when they conflict with existing services.
+The stack exposes PostgreSQL on `5433`, ClickHouse HTTP/native on `8123`/`9000`, Kafka on `9092`, Redis on `6379`, and development object storage/API console on `9100`/`9101` by default. PostgreSQL intentionally avoids the common local `5432` port. Override host ports in `.env` when they conflict with existing services. ClickHouse runs a single-node embedded Keeper and `openrum_cluster` topology so replicated-table migrations exercise their production engine locally; this is not a production quorum.
 
 Application connection values:
 
