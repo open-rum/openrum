@@ -1,0 +1,20 @@
+{
+  "schema_version": "1.0",
+  "sent_at": "2026-09-02T10:00:01.000Z",
+  "sdk": { "name": "@openrum/browser", "version": "0.1.0" },
+  "context": {
+    "environment": "production",
+    "session_id": "018f4d9c-6f21-7d33-8cae-91a48a9c7811",
+    "page_id": "018f4d9c-7b42-73aa-b6f7-e1119cf70622",
+    "anonymous_user_id": "anon",
+    "page": { "url": "https://example.com" }
+  },
+  "events": [
+    {
+      "event_id": "018f4d9c-83a1-76c9-81c2-3020ab667001",
+      "type": "api",
+      "timestamp": "2026-09-02T10:00:00.000Z",
+      "request": { "method": "GET", "url": "https://example.com/api", "duration_ms": -1 }
+    }
+  ]
+}

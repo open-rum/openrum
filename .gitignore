@@ -1,0 +1,13 @@
+.DS_Store
+.env
+.env.*
+!.env.example
+deploy/compose/.env
+node_modules/
+dist/
+coverage/
+bin/
+tmp/
+*.log
+.idea/
+.vscode/

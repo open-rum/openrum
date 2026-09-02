@@ -1,0 +1,74 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap");
+
+:root {
+  /* Typography */
+  --font-product-sans:
+    "Geist Variable", Inter, "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
+  --text-caption: 11px;
+  --text-table: 12px;
+  --text-control: 12px;
+  --text-body: 14px;
+  --text-section: 16px;
+  --text-title: 24px;
+  --text-kpi: 30px;
+  --leading-tight: 1.2;
+  --leading-body: 1.5;
+
+  /* Color */
+  --ds-canvas: #ffffff;
+  --ds-surface: #ffffff;
+  --ds-surface-subtle: #fcfbfd;
+  --ds-surface-hover: #f7f6fa;
+  --ds-surface-overlay: rgb(255 255 255 / 96%);
+  --ds-sidebar: rgb(255 255 255 / 92%);
+  --ds-text: #171829;
+  --ds-text-secondary: #5f6275;
+  --ds-text-muted: #7b7e91;
+  --ds-border: #e4e2e8;
+  --ds-border-soft: #efedf2;
+  --ds-brand: #635bff;
+  --ds-brand-soft: #f0efff;
+  --ds-success: #168f5d;
+  --ds-success-soft: #eefaf4;
+  --ds-danger: #e5484d;
+  --ds-danger-soft: #fff2f2;
+  --ds-warning: #e38b13;
+  --ds-warning-soft: #fff8e9;
+  --ds-info: #4f9cf9;
+
+  /* Spacing */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+
+  /* Shape, elevation, controls */
+  --radius-sm: 5px;
+  --radius-md: 7px;
+  --radius-lg: 9px;
+  --control-height-sm: 32px;
+  --control-height: 38px;
+  --table-row-height: 38px;
+  --shadow-control: 0 1px 2px rgba(27, 24, 55, 0.05);
+  --shadow-elevated: 0 14px 40px rgba(35, 30, 76, 0.12);
+
+  /* Motion */
+  --motion-fast: 120ms;
+  --motion-normal: 180ms;
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+
+  /* Compatibility aliases used by feature styles */
+  --brand: var(--ds-brand);
+  --brand-soft: var(--ds-brand-soft);
+  --text: var(--ds-text);
+  --text-muted: var(--ds-text-muted);
+  --line: var(--ds-border);
+  --border-soft: var(--ds-border-soft);
+  --green: var(--ds-success);
+  --red: var(--ds-danger);
+  --amber: var(--ds-warning);
+  --blue: var(--ds-info);
+}

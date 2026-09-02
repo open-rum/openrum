@@ -1,0 +1,22 @@
+{
+  "name": "@openrum/protocol",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./schema": "./schema/envelope-v1.json"
+  },
+  "scripts": {
+    "generate": "node scripts/generate-go-schema.mjs && gofmt -w ../../internal/event/schema_gen.go",
+    "test": "node --test tests/fixtures.test.mjs",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "ajv": "^8.17.1",
+    "ajv-formats": "^3.0.1"
+  },
+  "devDependencies": {
+    "typescript": "^6.0.3"
+  }
+}

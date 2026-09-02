@@ -1,0 +1,6 @@
+[
+  { "file": "valid-all-events.json", "valid": true },
+  { "file": "invalid-schema-version.json", "valid": false },
+  { "file": "invalid-api-duration.json", "valid": false },
+  { "file": "invalid-custom-attributes.json", "valid": false }
+]

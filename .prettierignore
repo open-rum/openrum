@@ -1,0 +1,8 @@
+node_modules/
+dist/
+coverage/
+output/
+work/
+pnpm-lock.yaml
+internal/event/model_gen.go
+internal/event/schema_gen.go

@@ -1,0 +1,251 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "OpenRUM Envelope V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "sent_at", "sdk", "context", "events"],
+  "properties": {
+    "schema_version": { "const": "1.0" },
+    "sent_at": { "type": "string", "format": "date-time" },
+    "sdk": { "$ref": "#/$defs/sdk" },
+    "context": { "$ref": "#/$defs/context" },
+    "events": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 100,
+      "items": {
+        "oneOf": [
+          { "$ref": "#/$defs/pageViewEvent" },
+          { "$ref": "#/$defs/errorEvent" },
+          { "$ref": "#/$defs/webVitalEvent" },
+          { "$ref": "#/$defs/apiEvent" },
+          { "$ref": "#/$defs/customEvent" }
+        ]
+      }
+    }
+  },
+  "$defs": {
+    "sdk": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "version"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "version": { "type": "string", "minLength": 1, "maxLength": 32 }
+      }
+    },
+    "context": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["environment", "session_id", "page_id", "anonymous_user_id", "page"],
+      "properties": {
+        "environment": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "release": { "type": "string", "maxLength": 128 },
+        "dist": { "type": "string", "maxLength": 64 },
+        "session_id": { "$ref": "#/$defs/id" },
+        "page_id": { "$ref": "#/$defs/id" },
+        "anonymous_user_id": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "user_id": { "type": "string", "maxLength": 128 },
+        "page": { "$ref": "#/$defs/page" },
+        "trace": { "$ref": "#/$defs/trace" },
+        "tags": { "$ref": "#/$defs/attributes" }
+      }
+    },
+    "id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "page": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["url"],
+      "properties": {
+        "url": { "type": "string", "format": "uri", "maxLength": 2048 },
+        "route": { "type": "string", "maxLength": 512 },
+        "title": { "type": "string", "maxLength": 512 },
+        "referrer": { "type": "string", "format": "uri", "maxLength": 2048 }
+      }
+    },
+    "trace": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["trace_id"],
+      "properties": {
+        "trace_id": { "type": "string", "pattern": "^[a-f0-9]{32}$" },
+        "span_id": { "type": "string", "pattern": "^[a-f0-9]{16}$" }
+      }
+    },
+    "attributes": {
+      "type": "object",
+      "maxProperties": 20,
+      "propertyNames": { "type": "string", "minLength": 1, "maxLength": 64 },
+      "additionalProperties": { "type": "string", "maxLength": 512 }
+    },
+    "measurements": {
+      "type": "object",
+      "maxProperties": 20,
+      "propertyNames": { "type": "string", "minLength": 1, "maxLength": 64 },
+      "additionalProperties": { "type": "number" }
+    },
+    "eventBase": {
+      "type": "object",
+      "required": ["event_id", "type", "timestamp"],
+      "properties": {
+        "event_id": { "$ref": "#/$defs/id" },
+        "type": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "sample_rate": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 }
+      }
+    },
+    "pageViewEvent": {
+      "allOf": [
+        { "$ref": "#/$defs/eventBase" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["event_id", "type", "timestamp", "navigation_type"],
+          "properties": {
+            "event_id": { "$ref": "#/$defs/id" },
+            "type": { "const": "page_view" },
+            "timestamp": { "type": "string", "format": "date-time" },
+            "sample_rate": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 },
+            "navigation_type": {
+              "enum": ["navigate", "reload", "back_forward", "prerender", "route_change"]
+            }
+          }
+        }
+      ]
+    },
+    "errorEvent": {
+      "allOf": [
+        { "$ref": "#/$defs/eventBase" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["event_id", "type", "timestamp", "error"],
+          "properties": {
+            "event_id": { "$ref": "#/$defs/id" },
+            "type": { "const": "error" },
+            "timestamp": { "type": "string", "format": "date-time" },
+            "sample_rate": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 },
+            "error": { "$ref": "#/$defs/error" },
+            "fingerprint": {
+              "type": "array",
+              "maxItems": 10,
+              "items": { "type": "string", "maxLength": 128 }
+            },
+            "breadcrumbs": {
+              "type": "array",
+              "maxItems": 50,
+              "items": { "$ref": "#/$defs/breadcrumb" }
+            }
+          }
+        }
+      ]
+    },
+    "error": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "message", "handled"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "message": { "type": "string", "maxLength": 2048 },
+        "stack": { "type": "string", "maxLength": 65536 },
+        "handled": { "type": "boolean" },
+        "mechanism": { "type": "string", "maxLength": 64 }
+      }
+    },
+    "breadcrumb": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["timestamp", "category", "message"],
+      "properties": {
+        "timestamp": { "type": "string", "format": "date-time" },
+        "category": { "type": "string", "maxLength": 64 },
+        "message": { "type": "string", "maxLength": 512 },
+        "level": { "enum": ["debug", "info", "warning", "error"] },
+        "data": { "$ref": "#/$defs/attributes" }
+      }
+    },
+    "webVitalEvent": {
+      "allOf": [
+        { "$ref": "#/$defs/eventBase" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["event_id", "type", "timestamp", "metric"],
+          "properties": {
+            "event_id": { "$ref": "#/$defs/id" },
+            "type": { "const": "web_vital" },
+            "timestamp": { "type": "string", "format": "date-time" },
+            "sample_rate": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 },
+            "metric": { "$ref": "#/$defs/webVital" }
+          }
+        }
+      ]
+    },
+    "webVital": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "value", "rating"],
+      "properties": {
+        "name": { "enum": ["LCP", "INP", "CLS", "FCP", "TTFB"] },
+        "value": { "type": "number", "minimum": 0 },
+        "delta": { "type": "number" },
+        "rating": { "enum": ["good", "needs-improvement", "poor"] },
+        "navigation_type": {
+          "enum": ["navigate", "reload", "back_forward", "prerender", "route_change"]
+        }
+      }
+    },
+    "apiEvent": {
+      "allOf": [
+        { "$ref": "#/$defs/eventBase" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["event_id", "type", "timestamp", "request"],
+          "properties": {
+            "event_id": { "$ref": "#/$defs/id" },
+            "type": { "const": "api" },
+            "timestamp": { "type": "string", "format": "date-time" },
+            "sample_rate": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 },
+            "request": { "$ref": "#/$defs/apiRequest" }
+          }
+        }
+      ]
+    },
+    "apiRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["method", "url", "duration_ms"],
+      "properties": {
+        "method": { "enum": ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"] },
+        "url": { "type": "string", "format": "uri", "maxLength": 2048 },
+        "status": { "type": "integer", "minimum": 0, "maximum": 599 },
+        "duration_ms": { "type": "number", "minimum": 0, "maximum": 3600000 },
+        "transfer_size": { "type": "integer", "minimum": 0 },
+        "failure": { "enum": ["network", "timeout", "abort", "http"] }
+      }
+    },
+    "customEvent": {
+      "allOf": [
+        { "$ref": "#/$defs/eventBase" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["event_id", "type", "timestamp", "name"],
+          "properties": {
+            "event_id": { "$ref": "#/$defs/id" },
+            "type": { "const": "custom" },
+            "timestamp": { "type": "string", "format": "date-time" },
+            "sample_rate": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 },
+            "name": { "type": "string", "minLength": 1, "maxLength": 80 },
+            "attributes": { "$ref": "#/$defs/attributes" },
+            "measurements": { "$ref": "#/$defs/measurements" }
+          }
+        }
+      ]
+    }
+  }
+}
