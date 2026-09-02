@@ -43,7 +43,7 @@ func TestLoadReportsAllMissingRequiredValues(t *testing.T) {
 	if err == nil {
 		t.Fatal("load() error = nil, want validation error")
 	}
-	for _, key := range []string{"APP_ENV", "KAFKA_BROKERS", "PUBLIC_BASE_URL", "REDIS_ADDR"} {
+	for _, key := range []string{"APP_ENV", "KAFKA_BROKERS", "POSTGRES_DSN", "PUBLIC_BASE_URL", "REDIS_ADDR"} {
 		if !strings.Contains(err.Error(), key) {
 			t.Errorf("error %q does not mention %s", err, key)
 		}
@@ -56,6 +56,7 @@ func TestLoadRejectsInvalidCommonValues(t *testing.T) {
 		"PUBLIC_BASE_URL": "http://localhost:8080",
 		"KAFKA_BROKERS":   "localhost:9092",
 		"REDIS_ADDR":      "localhost:6379",
+		"POSTGRES_DSN":    "postgres://openrum:test@localhost/openrum",
 	}
 	tests := []struct {
 		name  string
@@ -89,6 +90,7 @@ func TestLoadRequiresHTTPSInProduction(t *testing.T) {
 		"PUBLIC_BASE_URL": "http://rum.example.com",
 		"KAFKA_BROKERS":   "localhost:9092",
 		"REDIS_ADDR":      "localhost:6379",
+		"POSTGRES_DSN":    "postgres://openrum:test@localhost/openrum",
 	}
 	_, err := load(ServiceIngest, mapLookup(environment))
 	if err == nil || !strings.Contains(err.Error(), "https") {

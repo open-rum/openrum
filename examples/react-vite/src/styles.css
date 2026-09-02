@@ -1,0 +1,53 @@
+:root {
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  color: #1f2937;
+  background: #f7f7f8;
+}
+
+body {
+  margin: 0;
+}
+
+main {
+  max-width: 760px;
+  margin: 15vh auto;
+  padding: 48px;
+  border: 1px solid #e4e4e7;
+  border-radius: 20px;
+  background: white;
+  box-shadow: 0 20px 60px rgb(30 41 59 / 8%);
+}
+
+.eyebrow {
+  color: #635bff;
+  font-weight: 650;
+}
+
+h1 {
+  font-size: clamp(2rem, 5vw, 3.5rem);
+  line-height: 1.05;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 32px 0;
+}
+
+button {
+  padding: 12px 18px;
+  border: 1px solid #d4d4d8;
+  border-radius: 10px;
+  background: white;
+  font: inherit;
+  cursor: pointer;
+}
+
+button:hover {
+  border-color: #635bff;
+}
+
+button.danger {
+  color: #b42318;
+}

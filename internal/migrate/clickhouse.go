@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"io/fs"
+	"strings"
 
 	_ "github.com/ClickHouse/clickhouse-go/v2"
 )
@@ -63,12 +64,78 @@ func ClickHouseUp(ctx context.Context, database *sql.DB, source fs.FS) error {
 		if count > 0 {
 			continue
 		}
-		if _, err := database.ExecContext(ctx, migration.SQL); err != nil {
-			return fmt.Errorf("apply ClickHouse migration %s: %w", migration.Name, err)
+		for _, statement := range splitClickHouseStatements(migration.SQL) {
+			if _, err := database.ExecContext(ctx, statement); err != nil {
+				return fmt.Errorf("apply ClickHouse migration %s: %w", migration.Name, err)
+			}
 		}
 		if _, err := database.ExecContext(ctx, "INSERT INTO openrum_schema_migrations (version, name) VALUES (?, ?)", migration.Version, migration.Name); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+func splitClickHouseStatements(source string) []string {
+	statements := make([]string, 0, 4)
+	start := 0
+	quote := rune(0)
+	escaped := false
+	inLineComment := false
+	inBlockComment := false
+	runes := []rune(source)
+	for index, current := range runes {
+		next := rune(0)
+		if index+1 < len(runes) {
+			next = runes[index+1]
+		}
+		if inLineComment {
+			if current == '\n' {
+				inLineComment = false
+			}
+			continue
+		}
+		if inBlockComment {
+			if current == '*' && next == '/' {
+				inBlockComment = false
+			}
+			continue
+		}
+		if quote != 0 {
+			if escaped {
+				escaped = false
+				continue
+			}
+			if current == '\\' {
+				escaped = true
+				continue
+			}
+			if current == quote {
+				quote = 0
+			}
+			continue
+		}
+		if current == '-' && next == '-' {
+			inLineComment = true
+			continue
+		}
+		if current == '/' && next == '*' {
+			inBlockComment = true
+			continue
+		}
+		if current == '\'' || current == '"' || current == '`' {
+			quote = current
+			continue
+		}
+		if current == ';' {
+			if statement := strings.TrimSpace(string(runes[start:index])); statement != "" {
+				statements = append(statements, statement)
+			}
+			start = index + 1
+		}
+	}
+	if statement := strings.TrimSpace(string(runes[start:])); statement != "" {
+		statements = append(statements, statement)
+	}
+	return statements
 }

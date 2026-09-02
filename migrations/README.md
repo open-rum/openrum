@@ -1,6 +1,6 @@
 # Database migrations
 
-Migration files are embedded into `services/api/cmd/migrate`. PostgreSQL migrations run in a transaction under an advisory lock. ClickHouse migrations must contain idempotent DDL because ClickHouse does not provide transactional DDL.
+Migration files are embedded into `services/api/cmd/migrate`. PostgreSQL migrations run in a transaction under an advisory lock. ClickHouse migrations may contain multiple semicolon-separated idempotent DDL statements; each statement commits independently because ClickHouse does not provide transactional DDL.
 
 File names use a unique numeric version: `NNNN_description.up.sql`. PostgreSQL migrations that support rollback pair it with `NNNN_description.down.sql`. Existing applied files are immutable; create a new version for every schema change. `down postgres` reverts exactly the latest applied PostgreSQL migration and refuses to skip an irreversible migration.
 
@@ -13,3 +13,8 @@ go run ./services/api/cmd/migrate down postgres
 ```
 
 Application services only inspect `openrum_schema_migrations` for compatibility. They never apply schema changes during startup; production migrations run as a single pre-deployment job.
+
+The ClickHouse topology must expose a cluster named `openrum_cluster`, `{shard}`
+and `{replica}` macros, and ClickHouse Keeper. The local Compose configuration
+provides a single-node equivalent; production must use an external Keeper quorum
+and at least two replicas per shard.

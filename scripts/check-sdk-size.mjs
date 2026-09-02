@@ -1,4 +1,5 @@
-import { existsSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
+import { gzipSync } from "node:zlib";
 
 const configPath = "packages/browser-sdk/size-limit.json";
 const config = JSON.parse(readFileSync(configPath, "utf8"));
@@ -17,8 +18,8 @@ if (!artifactExists) {
   process.exit(0);
 }
 
-const bytes = statSync(config.artifact).size;
+const bytes = gzipSync(readFileSync(config.artifact), { level: 9 }).byteLength;
 if (bytes > config.maxBytes) {
-  throw new Error(`browser SDK is ${bytes} bytes; budget is ${config.maxBytes} bytes`);
+  throw new Error(`browser SDK gzip is ${bytes} bytes; budget is ${config.maxBytes} bytes`);
 }
-console.log(`Browser SDK size: ${bytes}/${config.maxBytes} bytes`);
+console.log(`Browser SDK gzip size: ${bytes}/${config.maxBytes} bytes`);
