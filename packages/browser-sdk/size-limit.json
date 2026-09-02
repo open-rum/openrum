@@ -1,0 +1,4 @@
+{
+  "artifact": "packages/browser-sdk/dist/index.js",
+  "maxBytes": 30720
+}

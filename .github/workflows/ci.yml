@@ -1,0 +1,62 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up pnpm and Node.js
+        uses: pnpm/setup@v2
+        with:
+          runtime: node@24
+          cache: true
+          require-lockfile: true
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+
+      - name: Check formatting
+        run: pnpm run format:check
+
+      - name: Lint TypeScript and vet Go
+        run: pnpm run lint
+
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v9
+        with:
+          version: v2.12.2
+
+      - name: Type-check workspaces
+        run: pnpm run typecheck
+
+      - name: Run unit and protocol fixture tests
+        run: pnpm run test
+
+      - name: Verify generated protocol contract
+        run: |
+          pnpm run protocol:check
+          git diff --exit-code -- internal/event/schema_gen.go
+
+      - name: Build all packages and services
+        run: pnpm run build
+
+      - name: Enforce browser SDK size budget
+        run: pnpm run sdk:size

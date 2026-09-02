@@ -1,0 +1,70 @@
+{
+  "schema_version": "1.0",
+  "sent_at": "2026-09-02T10:00:01.000Z",
+  "sdk": { "name": "@openrum/browser", "version": "0.1.0" },
+  "context": {
+    "environment": "production",
+    "release": "2.18.0",
+    "dist": "web",
+    "session_id": "018f4d9c-6f21-7d33-8cae-91a48a9c7811",
+    "page_id": "018f4d9c-7b42-73aa-b6f7-e1119cf70622",
+    "anonymous_user_id": "anon_6c7783",
+    "user_id": "user_1042",
+    "page": { "url": "https://shop.example.com/checkout", "route": "/checkout", "title": "结算" },
+    "trace": { "trace_id": "4bf92f3577b34da6a3ce929d0e0e4736", "span_id": "00f067aa0ba902b7" },
+    "tags": { "channel": "organic" }
+  },
+  "events": [
+    {
+      "event_id": "018f4d9c-83a1-76c9-81c2-3020ab667001",
+      "type": "page_view",
+      "timestamp": "2026-09-02T10:00:00.000Z",
+      "navigation_type": "navigate"
+    },
+    {
+      "event_id": "018f4d9c-83a1-76c9-81c2-3020ab667002",
+      "type": "error",
+      "timestamp": "2026-09-02T10:00:00.100Z",
+      "error": {
+        "name": "TypeError",
+        "message": "Cannot read properties of undefined",
+        "stack": "at checkout (app.js:1:42)",
+        "handled": false
+      },
+      "breadcrumbs": [
+        {
+          "timestamp": "2026-09-02T09:59:59.900Z",
+          "category": "ui.click",
+          "message": "checkout submit"
+        }
+      ]
+    },
+    {
+      "event_id": "018f4d9c-83a1-76c9-81c2-3020ab667003",
+      "type": "web_vital",
+      "timestamp": "2026-09-02T10:00:00.200Z",
+      "metric": { "name": "LCP", "value": 2134.2, "rating": "good" }
+    },
+    {
+      "event_id": "018f4d9c-83a1-76c9-81c2-3020ab667004",
+      "type": "api",
+      "timestamp": "2026-09-02T10:00:00.300Z",
+      "sample_rate": 0.2,
+      "request": {
+        "method": "POST",
+        "url": "https://shop.example.com/api/order/submit",
+        "status": 201,
+        "duration_ms": 182.4,
+        "transfer_size": 2048
+      }
+    },
+    {
+      "event_id": "018f4d9c-83a1-76c9-81c2-3020ab667005",
+      "type": "custom",
+      "timestamp": "2026-09-02T10:00:00.400Z",
+      "name": "checkout_submit",
+      "attributes": { "member_level": "gold" },
+      "measurements": { "cart_value": 499.5 }
+    }
+  ]
+}

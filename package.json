@@ -1,0 +1,29 @@
+{
+  "name": "openrum",
+  "version": "0.0.0",
+  "private": true,
+  "packageManager": "pnpm@11.11.0",
+  "devEngines": {
+    "runtime": {
+      "name": "node",
+      "version": "^24.0.0",
+      "onFail": "download"
+    }
+  },
+  "scripts": {
+    "dev": "pnpm --filter @openrum/web dev",
+    "build": "pnpm -r --if-present build && go build ./...",
+    "test": "pnpm -r --if-present test && go test ./...",
+    "typecheck": "pnpm -r --if-present typecheck",
+    "format": "prettier --write \"apps/web/src/**/*.{ts,tsx,css}\" \"packages/protocol/**/*.{ts,mjs,json}\" \".github/**/*.{yml,yaml}\" \"deploy/dashboards/**/*.json\" \"package.json\" \"apps/web/package.json\" \"packages/protocol/package.json\" && node scripts/check-go-format.mjs --write",
+    "format:check": "prettier --check \"apps/web/src/**/*.{ts,tsx,css}\" \"packages/protocol/**/*.{ts,mjs,json}\" \".github/**/*.{yml,yaml}\" \"deploy/dashboards/**/*.json\" \"package.json\" \"apps/web/package.json\" \"packages/protocol/package.json\" && node scripts/check-go-format.mjs",
+    "lint": "pnpm -r --if-present lint && go vet ./...",
+    "protocol:check": "pnpm --filter @openrum/protocol generate && pnpm --filter @openrum/protocol test",
+    "sdk:size": "node scripts/check-sdk-size.mjs",
+    "check": "pnpm run format:check && pnpm run lint && pnpm run typecheck && pnpm run test && pnpm run protocol:check && pnpm run build && pnpm run sdk:size",
+    "workspace:list": "pnpm -r list --depth -1"
+  },
+  "devDependencies": {
+    "prettier": "^3.9.6"
+  }
+}
