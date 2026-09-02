@@ -12,13 +12,16 @@ import (
 )
 
 func main() {
-	if len(os.Args) < 2 || (os.Args[1] != "up" && os.Args[1] != "status") {
-		log.Fatal("usage: migrate <up|status> [all|postgres|clickhouse]")
+	if len(os.Args) < 2 || (os.Args[1] != "up" && os.Args[1] != "down" && os.Args[1] != "status") {
+		log.Fatal("usage: migrate <up|down|status> [all|postgres|clickhouse]")
 	}
 	action := os.Args[1]
 	target := "all"
 	if len(os.Args) > 2 {
 		target = os.Args[2]
+	}
+	if action == "down" && target != "postgres" {
+		log.Fatal("down currently requires target postgres")
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
@@ -43,6 +46,11 @@ func runPostgres(ctx context.Context, action string) error {
 		return err
 	}
 	defer func() { _ = database.Close() }()
+	if action == "down" {
+		if err := migrate.PostgresDown(ctx, database, migrations.Files); err != nil {
+			return err
+		}
+	}
 	if action == "up" {
 		if err := migrate.PostgresUp(ctx, database, migrations.Files); err != nil {
 			return err
