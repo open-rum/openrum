@@ -1,0 +1,29 @@
+---
+const { lang = "en" } = Astro.props;
+const zh = lang === "zh";
+const release = import.meta.env.PUBLIC_OPENRUM_RELEASE || "Alpha / main";
+const commit = import.meta.env.PUBLIC_COMMIT_SHA || "local";
+const repository = import.meta.env.PUBLIC_REPOSITORY_URL || "https://github.com/openrum/openrum";
+---
+
+<footer class="site-footer">
+  <div class="site-container footer-grid">
+    <div>
+      <a class="site-brand" href={zh ? "/zh/" : "/"}>OpenRUM</a><p class="footer-meta">
+        {
+          zh
+            ? "开源、可自托管的前端监控平台，帮助你理解用户行为，快速定位并修复线上问题。"
+            : "Open-source, self-hosted frontend monitoring for user behavior and production issues."
+        }
+      </p><p class="footer-meta" data-openrum-build>
+        Release {release} · commit {commit.slice(0, 8)}
+      </p>
+    </div><div class="footer-links">
+      <a href={zh ? "/zh/docs/getting-started/quickstart/" : "/docs/getting-started/quickstart/"}
+        >{zh ? "快速开始" : "Quickstart"}</a
+      ><a href={`${repository}/issues`}>Issues</a><a href={`${repository}/security`}>Security</a><a
+        href={repository}>GitHub</a
+      >
+    </div>
+  </div>
+</footer>

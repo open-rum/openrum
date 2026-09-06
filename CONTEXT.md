@@ -4,6 +4,14 @@ OpenRUM observes real-user behavior and frontend reliability across monitored we
 
 ## Ownership and Delivery
 
+**Instance**:
+One self-hosted OpenRUM installation and its global operational policy boundary.
+_Avoid_: Tenant, cluster, workspace
+
+**Instance Administrator**:
+An operator who manages instance-wide configuration, data lifecycle, external dependencies, and maintenance independently of organization roles.
+_Avoid_: Super admin, organization admin
+
 **Organization**:
 A team boundary that owns monitored projects, members, and access policies.
 _Avoid_: Tenant, account, workspace
@@ -37,6 +45,14 @@ _Avoid_: Visit, replay
 **Issue**:
 A stable group of equivalent error events that can be investigated and resolved together.
 _Avoid_: Error, exception, incident
+
+**Fingerprint**:
+A versioned stable identity that determines which error events belong to the same issue.
+_Avoid_: Issue ID, hash, signature
+
+**Issue State**:
+The project-specific workflow state attached to an issue, independently of its immutable error events.
+_Avoid_: Error status, event status
 
 **Web Vital**:
 A user-experience measurement captured from a real page view, such as LCP, INP, or CLS.

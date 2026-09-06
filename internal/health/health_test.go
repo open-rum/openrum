@@ -62,12 +62,13 @@ func TestChecksForConfigUsesServiceDependencies(t *testing.T) {
 		Service:       config.ServiceAPI,
 		PostgresDSN:   "postgres://localhost:5433/openrum",
 		ClickHouseDSN: "clickhouse://localhost:9000/openrum",
+		KafkaBrokers:  []string{"localhost:9092"},
 		RedisAddress:  "localhost:6379",
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(checks) != 3 || checks["postgres"] == nil || checks["clickhouse"] == nil || checks["redis"] == nil {
+	if len(checks) != 4 || checks["postgres"] == nil || checks["clickhouse"] == nil || checks["kafka"] == nil || checks["redis"] == nil {
 		t.Fatalf("unexpected checks: %#v", checks)
 	}
 }

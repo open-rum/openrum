@@ -12,7 +12,7 @@ export interface FetchRuntime {
 }
 
 export function fetchIntegration(
-  endpoint: string,
+  endpoint: string | readonly string[],
   runtime: FetchRuntime | undefined = browserRuntime(),
 ): Integration {
   return {
@@ -29,7 +29,7 @@ export function fetchIntegration(
         init?: RequestInit,
       ): Promise<Response> {
         const details = readRequest(input, init, fetchRuntime.location?.href);
-        if (!details || isIngestURL(details.rawURL, endpoint, fetchRuntime.location?.href)) {
+        if (!details || excluded(details.rawURL, endpoint, fetchRuntime.location?.href)) {
           return originalFetch.apply(this, [input, init]);
         }
         const startedAt = now();
@@ -61,6 +61,16 @@ export function fetchIntegration(
       };
     },
   };
+}
+
+function excluded(
+  rawURL: string | URL,
+  endpoints: string | readonly string[],
+  base?: string,
+): boolean {
+  return (typeof endpoints === "string" ? [endpoints] : endpoints).some((endpoint) =>
+    isIngestURL(rawURL, endpoint, base),
+  );
 }
 
 interface RequestDetails {

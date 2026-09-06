@@ -11,6 +11,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"openrum/internal/config"
+	"openrum/internal/geo"
 	"openrum/internal/httpx"
 	"openrum/internal/ingest"
 	"openrum/internal/metadata"
@@ -32,9 +33,10 @@ func registerRoutes(ctx context.Context, router *httpx.Router, configuration con
 	if err != nil {
 		return nil, err
 	}
-	redisClient := redis.NewClient(&redis.Options{Addr: configuration.RedisAddress})
+	redisClient := redis.NewClient(&redis.Options{Addr: configuration.RedisAddress, ContextTimeoutEnabled: true})
 	authenticator := ingest.NewCachedAuthenticator(metadata.NewProjectKeyRepository(database))
 	limiter := ingest.NewRedisRateLimiter(redisClient)
+	connectionStatus := ingest.NewRedisConnectionStatus(redisClient)
 	producer := ingest.NewKafkaProducer(configuration.KafkaBrokers, configuration.KafkaEventTopic)
 	metrics, err := ingestservice.NewMetrics(registry)
 	if err != nil {
@@ -43,7 +45,22 @@ func registerRoutes(ctx context.Context, router *httpx.Router, configuration con
 		_ = database.Close()
 		return nil, err
 	}
-	handler := ingestservice.NewHandler(authenticator, limiter, ingestservice.NewKafkaAcceptor(producer), logger, ingestservice.WithMetrics(metrics))
+	// A development stack has no edge to declare, and the peer address of a
+	// request from the host to a published port differs by platform, so trust
+	// there is decided by the environment rather than by address.
+	countries := geo.NewForDevelopment(configuration.GeoCountryHeader)
+	if configuration.AppEnv != "development" {
+		countries, err = geo.New(configuration.GeoCountryHeader, configuration.GeoTrustedProxies)
+		if err != nil {
+			_ = producer.Close()
+			_ = redisClient.Close()
+			_ = database.Close()
+			return nil, err
+		}
+	}
+	handler := ingestservice.NewHandler(authenticator, limiter, ingestservice.NewKafkaAcceptor(producer), logger,
+		ingestservice.WithMetrics(metrics), ingestservice.WithConnectionStatus(connectionStatus),
+		ingestservice.WithGeoResolver(countries))
 	router.Handle("POST /ingest/v1/envelope", http.HandlerFunc(handler.ServeHTTP))
 	router.Handle("OPTIONS /ingest/v1/envelope", http.HandlerFunc(handler.ServeHTTP))
 	return func() error {

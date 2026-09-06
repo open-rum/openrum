@@ -1,0 +1,4 @@
+{
+  "entryHtml": "apps/web/dist/client/index.html",
+  "maxInitialJavaScriptGzipBytes": 256000
+}

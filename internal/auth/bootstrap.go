@@ -119,6 +119,11 @@ func (bootstrapper *Bootstrapper) bootstrap(ctx context.Context, input Bootstrap
 		return BootstrapResult{}, SessionCredentials{}, fmt.Errorf("create bootstrap owner membership: %w", err)
 	}
 	if _, err := transaction.ExecContext(ctx,
+		"INSERT INTO instance_members (user_id, role, created_by) VALUES ($1, 'instance_owner', $1)",
+		result.UserID); err != nil {
+		return BootstrapResult{}, SessionCredentials{}, fmt.Errorf("create bootstrap instance owner: %w", err)
+	}
+	if _, err := transaction.ExecContext(ctx,
 		"INSERT INTO audit_logs (organization_id, actor_user_id, action, resource_type, resource_id, metadata) VALUES ($1, $2, 'instance.bootstrapped', 'organization', $1, $3)",
 		result.OrganizationID, result.UserID, `{"source":"bootstrap"}`); err != nil {
 		return BootstrapResult{}, SessionCredentials{}, fmt.Errorf("record bootstrap audit log: %w", err)

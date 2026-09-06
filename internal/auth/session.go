@@ -24,6 +24,8 @@ const (
 
 var ErrUnauthenticated = errors.New("session is not authenticated")
 
+var ErrReauthenticationRequired = errors.New("recent reauthentication is required")
+
 type SessionCredentials struct {
 	Token     string
 	CSRFToken string
@@ -31,10 +33,11 @@ type SessionCredentials struct {
 }
 
 type Principal struct {
-	SessionID   uuid.UUID
-	UserID      uuid.UUID
-	Email       string
-	DisplayName string
+	SessionID    uuid.UUID
+	UserID       uuid.UUID
+	Email        string
+	DisplayName  string
+	InstanceRole string
 }
 
 type SessionManager struct {
@@ -90,13 +93,14 @@ func (manager *SessionManager) Authenticate(ctx context.Context, token string) (
 	tokenHash := sha256.Sum256([]byte(token))
 	var principal Principal
 	err := manager.database.QueryRowContext(ctx,
-		`SELECT sessions.id, users.id, users.email, users.display_name
+		`SELECT sessions.id, users.id, users.email, users.display_name, COALESCE(instance_members.role, '')
 		 FROM sessions JOIN users ON users.id = sessions.user_id
+		 LEFT JOIN instance_members ON instance_members.user_id = users.id
 		 WHERE sessions.token_hash=$1 AND sessions.revoked_at IS NULL
 		   AND sessions.expires_at > now() AND sessions.idle_expires_at > now()
 		   AND users.status='active'`,
 		tokenHash[:],
-	).Scan(&principal.SessionID, &principal.UserID, &principal.Email, &principal.DisplayName)
+	).Scan(&principal.SessionID, &principal.UserID, &principal.Email, &principal.DisplayName, &principal.InstanceRole)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Principal{}, ErrUnauthenticated
 	}
@@ -117,6 +121,65 @@ func (manager *SessionManager) Revoke(ctx context.Context, sessionID uuid.UUID) 
 	_, err := manager.database.ExecContext(ctx,
 		"UPDATE sessions SET revoked_at=COALESCE(revoked_at, now()) WHERE id=$1", sessionID)
 	return err
+}
+
+func (manager *SessionManager) Reauthenticate(ctx context.Context, userID uuid.UUID, currentPassword string) error {
+	if err := ValidatePassword(currentPassword); err != nil {
+		return ErrInvalidCredentials
+	}
+	var currentHash string
+	if err := manager.database.QueryRowContext(ctx,
+		"SELECT password_hash FROM users WHERE id=$1 AND auth_source='local' AND status='active'",
+		userID).Scan(&currentHash); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return ErrInvalidCredentials
+		}
+		return err
+	}
+	valid, err := VerifyPassword(currentPassword, currentHash)
+	if err != nil {
+		return err
+	}
+	if !valid {
+		return ErrInvalidCredentials
+	}
+	return nil
+}
+
+func (manager *SessionManager) Elevate(ctx context.Context, principal Principal, currentPassword string) error {
+	if err := manager.Reauthenticate(ctx, principal.UserID, currentPassword); err != nil {
+		return err
+	}
+	result, err := manager.database.ExecContext(ctx,
+		"UPDATE sessions SET elevated_at=$1 WHERE id=$2 AND user_id=$3 AND revoked_at IS NULL",
+		manager.now().UTC(), principal.SessionID, principal.UserID)
+	if err != nil {
+		return err
+	}
+	if rows, rowsErr := result.RowsAffected(); rowsErr != nil || rows != 1 {
+		return ErrUnauthenticated
+	}
+	return nil
+}
+
+func (manager *SessionManager) RequireRecentElevation(ctx context.Context, principal Principal, maximumAge time.Duration) error {
+	if maximumAge <= 0 || maximumAge > 5*time.Minute {
+		maximumAge = 5 * time.Minute
+	}
+	var elevatedAt sql.NullTime
+	err := manager.database.QueryRowContext(ctx,
+		"SELECT elevated_at FROM sessions WHERE id=$1 AND user_id=$2 AND revoked_at IS NULL",
+		principal.SessionID, principal.UserID).Scan(&elevatedAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return ErrUnauthenticated
+	}
+	if err != nil {
+		return err
+	}
+	if !elevatedAt.Valid || elevatedAt.Time.Before(manager.now().UTC().Add(-maximumAge)) {
+		return ErrReauthenticationRequired
+	}
+	return nil
 }
 
 func (manager *SessionManager) ChangePassword(ctx context.Context, principal Principal, currentPassword, newPassword string) error {

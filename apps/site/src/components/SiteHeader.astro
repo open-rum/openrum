@@ -1,0 +1,72 @@
+---
+import { ChartNoAxesCombined, Github, Languages, Menu, Moon } from "lucide-astro";
+import { docsBase, equivalentPath } from "../lib/site";
+const { lang = "en", path = "/" } = Astro.props;
+const zh = lang === "zh";
+const prefix = zh ? "/zh" : "";
+const equivalent = equivalentPath(path, zh ? "zh" : "en");
+const repository = import.meta.env.PUBLIC_REPOSITORY_URL || "https://github.com/openrum/openrum";
+const links = zh
+  ? [
+      ["产品", "/zh/product"],
+      ["自部署", "/zh/self-host"],
+      ["基准", "/zh/benchmarks"],
+      ["社区", "/zh/community"],
+      ["文档", `${docsBase("zh")}/`],
+    ]
+  : [
+      ["Product", "/product"],
+      ["Self-host", "/self-host"],
+      ["Benchmarks", "/benchmarks"],
+      ["Community", "/community"],
+      ["Docs", `${docsBase("en")}/`],
+    ];
+---
+
+<header class="site-header">
+  <nav class="site-container site-nav" aria-label={zh ? "公共导航" : "Public navigation"}>
+    <a class="site-brand" href={`${prefix}/`}
+      ><span class="brand-mark" aria-hidden="true"
+        ><ChartNoAxesCombined size={17} strokeWidth={2.5} /></span
+      >OpenRUM</a
+    ><div class="site-links">
+      {
+        links.map(([label, href]) => (
+          <a href={href} aria-current={path === href ? "page" : undefined}>
+            {label}
+          </a>
+        ))
+      }
+    </div><div class="site-actions">
+      <a
+        class="icon-action"
+        href={equivalent}
+        aria-label={zh ? "Switch to English" : "切换到简体中文"}><Languages size={17} /></a
+      ><button
+        class="icon-action"
+        id="theme-toggle"
+        type="button"
+        aria-label={zh ? "切换明暗主题" : "Toggle color theme"}><Moon size={17} /></button
+      ><a class="ui-button ui-button-outline" href={repository}><Github size={15} /> GitHub</a
+      ><details class="mobile-nav">
+        <summary class="icon-action" aria-label={zh ? "打开导航" : "Open navigation"}
+          ><Menu size={18} /></summary
+        ><div class="mobile-nav-panel">
+          {
+            links.map(([label, href]) => (
+              <a href={href} aria-current={path === href ? "page" : undefined}>
+                {label}
+              </a>
+            ))
+          }
+        </div>
+      </details>
+    </div>
+  </nav>
+</header>
+<script is:inline>
+  document.querySelector("#theme-toggle")?.addEventListener("click", () => {
+    const dark = document.documentElement.classList.toggle("dark");
+    localStorage.setItem("openrum-theme", dark ? "dark" : "light");
+  });
+</script>

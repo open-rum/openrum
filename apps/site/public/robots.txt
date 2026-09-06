@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://openrum.dev/sitemap-index.xml

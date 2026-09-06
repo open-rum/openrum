@@ -11,10 +11,11 @@ import (
 )
 
 var (
-	ErrNotFound  = errors.New("resource not found")
-	ErrLastOwner = errors.New("organization must retain an owner")
-	ErrForbidden = errors.New("operation is forbidden")
-	ErrConflict  = errors.New("resource already exists")
+	ErrNotFound          = errors.New("resource not found")
+	ErrLastOwner         = errors.New("organization must retain an owner")
+	ErrLastInstanceOwner = errors.New("instance must retain an owner")
+	ErrForbidden         = errors.New("operation is forbidden")
+	ErrConflict          = errors.New("resource already exists")
 )
 
 type OrganizationAccess struct {

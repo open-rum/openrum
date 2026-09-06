@@ -11,19 +11,39 @@
     }
   },
   "scripts": {
+    "openrum": "go run ./cmd/openrum",
     "dev": "pnpm --filter @openrum/web dev",
+    "site:dev": "pnpm --filter @openrum/site dev",
+    "site:build": "pnpm --filter @openrum/site build",
+    "site:test:e2e": "playwright test --config playwright.site.config.ts",
+    "site:lighthouse": "pnpm site:build && node scripts/site/check-lighthouse.mjs",
+    "site:spell": "cspell --no-progress --show-suggestions \"apps/site/src/**/*.{astro,md,mdx}\" \"docs/**/*.md\" README.md \"packages/*/README.md\" examples/react-vite/README.md",
+    "site:verify-demo": "node scripts/site/verify-demo.mjs",
+    "design:check": "node scripts/site/check-design-token-usage.mjs",
+    "site:check": "pnpm docs:check && pnpm design:check && pnpm site:spell && pnpm site:verify-demo && pnpm site:build && node scripts/site/check-built-links.mjs && node scripts/site/check-performance-budget.mjs && node scripts/site/check-lighthouse.mjs && pnpm site:test:e2e",
+    "docs:sync": "node scripts/docs/sync-content.mjs",
+    "docs:generate": "node scripts/docs/generate-reference.mjs",
+    "docs:check": "node scripts/docs/generate-reference.mjs --check",
     "build": "pnpm -r --if-present build && go build ./...",
     "test": "pnpm -r --if-present test && go test ./...",
+    "test:integration": "bash scripts/test-integration.sh",
+    "test:e2e": "playwright test",
     "typecheck": "pnpm -r --if-present typecheck",
-    "format": "prettier --write \"apps/web/src/**/*.{ts,tsx,css}\" \"packages/**/*.{ts,mjs,js,json}\" \".github/**/*.{yml,yaml}\" \"deploy/dashboards/**/*.json\" \"package.json\" \"apps/web/package.json\" && node scripts/check-go-format.mjs --write",
-    "format:check": "prettier --check \"apps/web/src/**/*.{ts,tsx,css}\" \"packages/**/*.{ts,mjs,js,json}\" \".github/**/*.{yml,yaml}\" \"deploy/dashboards/**/*.json\" \"package.json\" \"apps/web/package.json\" && node scripts/check-go-format.mjs",
+    "format": "prettier --write \"apps/web/src/**/*.{ts,tsx,css}\" \"apps/site/**/*.{astro,ts,tsx,css,mjs,json}\" \"packages/**/*.{ts,mjs,js,json}\" \"scripts/**/*.{mjs,js}\" \"tests/**/*.{ts,mjs,js}\" \".github/**/*.{yml,yaml}\" \"deploy/dashboards/**/*.json\" \"package.json\" \"apps/*/package.json\" \"playwright*.ts\" \"cspell.json\" && node scripts/check-go-format.mjs --write",
+    "format:check": "prettier --check \"apps/web/src/**/*.{ts,tsx,css}\" \"apps/site/**/*.{astro,ts,tsx,css,mjs,json}\" \"packages/**/*.{ts,mjs,js,json}\" \"scripts/**/*.{mjs,js}\" \"tests/**/*.{ts,mjs,js}\" \".github/**/*.{yml,yaml}\" \"deploy/dashboards/**/*.json\" \"package.json\" \"apps/*/package.json\" \"playwright*.ts\" \"cspell.json\" && node scripts/check-go-format.mjs",
     "lint": "pnpm -r --if-present lint && go vet ./...",
     "protocol:check": "pnpm --filter @openrum/protocol generate && pnpm --filter @openrum/protocol test",
     "sdk:size": "node scripts/check-sdk-size.mjs",
-    "check": "pnpm run format:check && pnpm run lint && pnpm run typecheck && pnpm run test && pnpm run protocol:check && pnpm run build && pnpm run sdk:size",
+    "console:size": "node --test tests/perf/budgets.test.mjs && node scripts/check-console-size.mjs",
+    "check": "pnpm run format:check && pnpm run design:check && pnpm run lint && pnpm run typecheck && pnpm run test && pnpm run protocol:check && pnpm run build && pnpm run sdk:size && pnpm run console:size",
     "workspace:list": "pnpm -r list --depth -1"
   },
   "devDependencies": {
-    "prettier": "^3.9.6"
+    "@axe-core/playwright": "^4.13.0",
+    "@playwright/test": "^1.62.1",
+    "cspell": "10.2.2",
+    "lighthouse": "13.4.1",
+    "prettier": "^3.9.6",
+    "prettier-plugin-astro": "^0.14.1"
   }
 }

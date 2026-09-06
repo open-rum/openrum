@@ -30,6 +30,11 @@ export function captureCustomEvent(
   }
   const attributes = sanitizeAttributes(input.attributes, diagnostics);
   const measurements = sanitizeMeasurements(input.measurements, diagnostics);
+  client.addBreadcrumb({
+    category: name === "ui.click" ? "ui.click" : "custom",
+    message: name,
+    ...(attributes ? { data: attributes } : {}),
+  });
   client.capture({
     type: "custom",
     name,

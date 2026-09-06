@@ -86,9 +86,23 @@ func (handler *SetupHandler) internalError(writer http.ResponseWriter, request *
 	httpx.WriteError(writer, request, http.StatusInternalServerError, "INTERNAL_ERROR", "An internal error occurred.")
 }
 
+// writeJSON serialises before touching the status line. Encoding straight into
+// the writer would commit a success status and then abort mid-body, so a
+// payload holding an unencodable value such as NaN would reach the client as a
+// truncated 200 instead of an error.
 func writeJSON(writer http.ResponseWriter, status int, payload any) {
+	body, err := json.Marshal(payload)
+	if err != nil {
+		writer.Header().Set("Content-Type", "application/json; charset=utf-8")
+		writer.Header().Set("Cache-Control", "no-store")
+		writer.WriteHeader(http.StatusInternalServerError)
+		_ = json.NewEncoder(writer).Encode(httpx.ErrorEnvelope{
+			Error: httpx.ErrorBody{Code: "INTERNAL_ERROR", Message: "An internal error occurred."},
+		})
+		return
+	}
 	writer.Header().Set("Content-Type", "application/json; charset=utf-8")
 	writer.Header().Set("Cache-Control", "no-store")
 	writer.WriteHeader(status)
-	_ = json.NewEncoder(writer).Encode(payload)
+	_, _ = writer.Write(append(body, '\n'))
 }

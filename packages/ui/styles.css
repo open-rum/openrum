@@ -1,0 +1,49 @@
+@layer components {
+  .ui-button {
+    display: inline-flex;
+    min-height: 2.25rem;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border: 1px solid transparent;
+    border-radius: var(--radius-md);
+    padding: 0.5rem 0.875rem;
+    font: 600 0.875rem/1 var(--font-product-sans);
+    text-decoration: none;
+    transition:
+      background var(--motion-fast) var(--ease-standard),
+      border-color var(--motion-fast) var(--ease-standard);
+  }
+  .ui-button-primary {
+    color: var(--ds-primary-foreground);
+    background: var(--ds-primary);
+  }
+  .ui-button-primary:hover {
+    background: color-mix(in oklch, var(--ds-primary), var(--ds-text) 8%);
+  }
+  .ui-button-outline {
+    color: var(--ds-text);
+    border-color: var(--ds-border);
+    background: var(--ds-surface);
+  }
+  .ui-button-outline:hover {
+    background: var(--ds-surface-subtle);
+  }
+  .ui-card {
+    border: 1px solid var(--ds-border);
+    border-radius: var(--radius-lg);
+    background: var(--ds-surface);
+    box-shadow: var(--shadow-control);
+  }
+  .ui-badge {
+    display: inline-flex;
+    align-items: center;
+    border: 1px solid var(--ds-border);
+    border-radius: 999px;
+    padding: 0.2rem 0.5rem;
+    color: var(--ds-text-muted);
+    background: var(--ds-surface);
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+}

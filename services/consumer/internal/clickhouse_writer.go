@@ -11,27 +11,30 @@ import (
 
 	"github.com/ClickHouse/clickhouse-go/v2"
 	"github.com/ClickHouse/clickhouse-go/v2/lib/driver"
+	"github.com/google/uuid"
 
 	"openrum/internal/event"
+	"openrum/internal/ingest"
 )
 
 const insertEventsQuery = `INSERT INTO rum_events (
-project_id,event_id,event_type,timestamp,received_at,environment,release,dist,session_id,anonymous_user_id,user_id,page_id,
+project_id,event_id,event_type,timestamp,received_at,raw_expires_at,aggregate_expires_at,environment,release,dist,session_id,anonymous_user_id,user_id,page_id,
 page_url,page_url_normalized,route,referrer,title,navigation_type,sdk_name,sdk_version,schema_version,sample_rate,
 browser,browser_version,os,os_version,device_type,country,trace_id,span_id,error_type,error_message,error_stack,
-error_mechanism,fingerprint,handled,api_method,api_url_normalized,api_status,api_failure,duration_ms,transfer_size,
+error_mechanism,fingerprint,fingerprint_version,handled,api_method,api_url_normalized,api_status,api_failure,duration_ms,transfer_size,
 metric_name,metric_value,metric_delta,metric_rating,custom_name,attributes,measurements,breadcrumbs,ingest_flags
 )`
 
 var ErrClickHouseWriterClosed = errors.New("ClickHouse writer is closed")
 
 type ClickHouseWriterOptions struct {
-	MaxRows        int
-	MaxBytes       int
-	FlushInterval  time.Duration
-	MaxAttempts    int
-	AttemptTimeout time.Duration
-	Observer       ClickHouseBatchObserver
+	MaxRows          int
+	MaxBytes         int
+	FlushInterval    time.Duration
+	MaxAttempts      int
+	AttemptTimeout   time.Duration
+	Observer         ClickHouseBatchObserver
+	ConnectionStatus ingest.ConnectionStatusRecorder
 }
 
 type ClickHouseBatchObserver interface {
@@ -217,6 +220,7 @@ func (writer *BufferedClickHouseWriter) insertWithRetry(parent context.Context, 
 			if writer.options.Observer != nil {
 				writer.options.Observer.ObserveClickHouseBatch(len(events), time.Since(started), nil)
 			}
+			writer.markQueryable(parent, events)
 			return nil
 		}
 		if attempt < writer.options.MaxAttempts {
@@ -230,6 +234,21 @@ func (writer *BufferedClickHouseWriter) insertWithRetry(parent context.Context, 
 	return err
 }
 
+func (writer *BufferedClickHouseWriter) markQueryable(ctx context.Context, events []event.CanonicalEvent) {
+	if writer.options.ConnectionStatus == nil {
+		return
+	}
+	latestByProject := make(map[uuid.UUID]time.Time)
+	for _, current := range events {
+		if latest, ok := latestByProject[current.ProjectID]; !ok || current.ReceivedAt.After(latest) {
+			latestByProject[current.ProjectID] = current.ReceivedAt
+		}
+	}
+	for projectID, receivedAt := range latestByProject {
+		_ = writer.options.ConnectionStatus.MarkEventQueryable(ctx, projectID, receivedAt)
+	}
+}
+
 func (writer *BufferedClickHouseWriter) insert(ctx context.Context, events []event.CanonicalEvent) error {
 	batch, err := writer.connection.PrepareBatch(ctx, insertEventsQuery)
 	if err != nil {
@@ -239,11 +258,12 @@ func (writer *BufferedClickHouseWriter) insert(ctx context.Context, events []eve
 	for _, current := range events {
 		if err := batch.Append(
 			current.ProjectID, current.EventID, string(current.EventType), current.Timestamp, current.ReceivedAt,
+			current.RawExpiresAt, current.AggregateExpiresAt,
 			current.Environment, current.Release, current.Dist, current.SessionID, current.AnonymousUserID, current.UserID, current.PageID,
 			current.PageURL, current.PageURLNormalized, current.Route, current.Referrer, current.Title, current.NavigationType,
 			current.SDKName, current.SDKVersion, current.SchemaVersion, current.SampleRate, current.Browser, current.BrowserVersion,
 			current.OS, current.OSVersion, current.DeviceType, current.Country, current.TraceID, current.SpanID,
-			current.ErrorType, current.ErrorMessage, current.ErrorStack, current.ErrorMechanism, current.Fingerprint, current.Handled,
+			current.ErrorType, current.ErrorMessage, current.ErrorStack, current.ErrorMechanism, current.Fingerprint, current.FingerprintVersion, current.Handled,
 			current.APIMethod, current.APIURLNormalized, current.APIStatus, current.APIFailure, current.DurationMS, current.TransferSize,
 			current.MetricName, current.MetricValue, current.MetricDelta, current.MetricRating, current.CustomName,
 			current.Attributes, current.Measurements, current.Breadcrumbs, current.IngestFlags,

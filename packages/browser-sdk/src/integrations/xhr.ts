@@ -25,7 +25,7 @@ interface XHRRequest {
 }
 
 export function xhrIntegration(
-  endpoint: string,
+  endpoint: string | readonly string[],
   runtime: XHRRuntime | undefined = browserRuntime(),
 ): Integration {
   return {
@@ -53,7 +53,9 @@ export function xhrIntegration(
         if (
           !details?.method ||
           !details.url ||
-          isIngestURL(details.rawURL, endpoint, xhrRuntime.location?.href)
+          (typeof endpoint === "string" ? [endpoint] : endpoint).some((value) =>
+            isIngestURL(details.rawURL, value, xhrRuntime.location?.href),
+          )
         ) {
           return originalSend.call(this, body);
         }

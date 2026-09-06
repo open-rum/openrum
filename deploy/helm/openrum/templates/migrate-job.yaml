@@ -1,0 +1,46 @@
+{{- if .Values.migration.enabled }}
+{{- $migrationRepository := default .Values.image.repository .Values.migration.image.repository }}
+{{- $migrationTag := default .Values.image.tag .Values.migration.image.tag }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "openrum.fullname" . }}-migrate-{{ .Release.Revision }}
+  labels:
+    {{- include "openrum.labels" . | nindent 4 }}
+    app.kubernetes.io/component: migration
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "-5"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: {{ .Values.migration.backoffLimit }}
+  activeDeadlineSeconds: {{ .Values.migration.activeDeadlineSeconds }}
+  template:
+    metadata:
+      labels:
+        {{- include "openrum.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: migration
+    spec:
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: migrate
+          image: "{{ $migrationRepository }}:{{ $migrationTag }}"
+          imagePullPolicy: {{ .Values.migration.image.pullPolicy }}
+          command: {{ toJson .Values.migration.command }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          env:
+            - name: POSTGRES_DSN
+              valueFrom: { secretKeyRef: { name: {{ .Values.config.existingSecret }}, key: {{ .Values.config.secretKeys.postgresDSN }} } }
+            - name: CLICKHOUSE_DSN
+              valueFrom: { secretKeyRef: { name: {{ .Values.config.existingSecret }}, key: {{ .Values.config.secretKeys.clickhouseDSN }} } }
+          resources:
+            requests: { cpu: 50m, memory: 64Mi }
+            limits: { memory: 256Mi }
+{{- end }}

@@ -39,7 +39,7 @@ services:
         soft: 262144
         hard: 262144
     healthcheck:
-      test: ["CMD-SHELL", "wget --spider -q http://127.0.0.1:8123/ping || exit 1"]
+      test: ["CMD-SHELL", "clickhouse-client --host 127.0.0.1 --user $${CLICKHOUSE_USER} --password $${CLICKHOUSE_PASSWORD} --query 'SELECT 1' >/dev/null 2>&1"]
       interval: 5s
       timeout: 3s
       retries: 30
@@ -70,9 +70,9 @@ services:
     volumes:
       - kafka-data:/var/lib/kafka/data
     healthcheck:
-      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server 127.0.0.1:9092 --list >/dev/null 2>&1"]
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server 127.0.0.1:9092 >/dev/null 2>&1"]
       interval: 10s
-      timeout: 8s
+      timeout: 5s
       retries: 20
       start_period: 20s
 
@@ -104,25 +104,148 @@ services:
       timeout: 3s
       retries: 20
 
-  object-storage:
-    image: quay.io/minio/minio:RELEASE.2025-06-13T11-33-47Z
+  migrate:
+    image: openrum-local:dev
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    restart: "no"
+    command: ["/app/migrate", "up", "all"]
+    environment: &database-environment
+      POSTGRES_DSN: postgres://${POSTGRES_USER:-openrum}:${POSTGRES_PASSWORD:-openrum_local_only}@postgres:5432/${POSTGRES_DB:-openrum}?sslmode=disable
+      CLICKHOUSE_DSN: clickhouse://${CLICKHOUSE_USER:-openrum}:${CLICKHOUSE_PASSWORD:-openrum_local_only}@clickhouse:9000/${CLICKHOUSE_DB:-openrum}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+
+  demo-seed:
+    image: openrum-local:dev
+    restart: "no"
+    command: ["/app/demo"]
+    environment: *database-environment
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  api:
+    image: openrum-local:dev
     restart: unless-stopped
-    command: ["server", "/data", "--console-address", ":9001"]
-    environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-openrum}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-openrum_local_only}
-      MC_HOST_local: http://${MINIO_ROOT_USER:-openrum}:${MINIO_ROOT_PASSWORD:-openrum_local_only}@127.0.0.1:9000
-    ports:
-      - "${OBJECT_STORAGE_PORT:-9100}:9000"
-      - "${OBJECT_STORAGE_CONSOLE_PORT:-9101}:9001"
-    volumes:
-      - object-storage-data:/data
+    command: ["/app/api"]
+    environment: &application-environment
+      <<: *database-environment
+      APP_ENV: development
+      PUBLIC_BASE_URL: http://127.0.0.1:${CONSOLE_PORT:-4173}
+      KAFKA_BROKERS: kafka:19092
+      REDIS_ADDR: redis:6379
+      # Country resolution is only believable behind a proxy that overwrites the
+      # header. Here that proxy is the bundled nginx, so the whole compose
+      # network is trusted; a real deployment must narrow this to its edge.
+      # Reached service-to-service; the public origin would resolve to the
+      # container's own loopback here.
+      INGEST_BASE_URL: ${INGEST_BASE_URL:-http://ingest:8081/ingest}
+      GEO_COUNTRY_HEADER: ${GEO_COUNTRY_HEADER:-CF-IPCountry}
+      GEO_TRUSTED_PROXIES: ${GEO_TRUSTED_PROXIES:-10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,127.0.0.0/8,::1/128}
+      OBJECT_STORAGE_PROVIDER: ${OBJECT_STORAGE_PROVIDER:-}
+      OBJECT_STORAGE_ENDPOINT: ${OBJECT_STORAGE_ENDPOINT:-}
+      OBJECT_STORAGE_BUCKET: ${OBJECT_STORAGE_BUCKET:-}
+      OBJECT_STORAGE_REGION: ${OBJECT_STORAGE_REGION:-}
+      OBJECT_STORAGE_FORCE_PATH_STYLE: ${OBJECT_STORAGE_FORCE_PATH_STYLE:-}
+      OPENRUM_OBJECT_STORAGE_ENDPOINT_ALLOWLIST: ${OPENRUM_OBJECT_STORAGE_ENDPOINT_ALLOWLIST:-}
+      OPENRUM_ALLOW_MANAGED_SECRETS: ${OPENRUM_ALLOW_MANAGED_SECRETS:-false}
+      OPENRUM_MASTER_KEY: ${OPENRUM_MASTER_KEY:-}
+      OPENRUM_MASTER_KEY_ID: ${OPENRUM_MASTER_KEY_ID:-v1}
+      OSS_ACCESS_KEY_ID: ${OSS_ACCESS_KEY_ID:-}
+      OSS_ACCESS_KEY_SECRET: ${OSS_ACCESS_KEY_SECRET:-}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      AWS_SESSION_TOKEN: ${AWS_SESSION_TOKEN:-}
+    depends_on:
+      demo-seed:
+        condition: service_completed_successfully
+      kafka-init:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "mc ready local >/dev/null 2>&1"]
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:8080/health/ready"]
       interval: 5s
-      timeout: 5s
-      retries: 30
-      start_period: 10s
+      timeout: 3s
+      retries: 20
+
+  ingest:
+    image: openrum-local:dev
+    restart: unless-stopped
+    command: ["/app/ingest"]
+    environment: *application-environment
+    # Published so an API or SDK running on the host can reach ingest directly
+    # instead of having to traverse the bundled proxy.
+    ports:
+      - "${INGEST_PORT:-8081}:8081"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      kafka-init:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:8081/health/ready"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  consumer:
+    image: openrum-local:dev
+    restart: unless-stopped
+    command: ["/app/consumer"]
+    environment: *application-environment
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      kafka-init:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:8082/health/ready"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  worker:
+    image: openrum-local:dev
+    restart: unless-stopped
+    command: ["/app/worker"]
+    environment: *application-environment
+    depends_on:
+      demo-seed:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:8083/health/ready"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  web:
+    image: openrum-local:dev
+    restart: unless-stopped
+    command: ["/app/web"]
+    ports:
+      - "${CONSOLE_PORT:-4173}:8080"
+    volumes:
+      - ./nginx.conf:/app/nginx.conf:ro
+    depends_on:
+      api:
+        condition: service_healthy
+      ingest:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:8080/health/ready"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
 
 volumes:
   postgres-data:
@@ -130,4 +253,3 @@ volumes:
   clickhouse-logs:
   kafka-data:
   redis-data:
-  object-storage-data:

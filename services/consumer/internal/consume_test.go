@@ -15,6 +15,7 @@ import (
 
 	"openrum/internal/event"
 	"openrum/internal/ingest"
+	"openrum/internal/metadata"
 )
 
 type fakeSource struct {
@@ -53,6 +54,15 @@ type fakeDeadLetterSink struct {
 	err     error
 }
 
+type fixedRetentionPolicies struct {
+	policy metadata.ProjectRetentionPolicy
+	err    error
+}
+
+func (policies fixedRetentionPolicies) Get(context.Context, uuid.UUID) (metadata.ProjectRetentionPolicy, error) {
+	return policies.policy, policies.err
+}
+
 func (sink *fakeDeadLetterSink) WriteDeadLetters(_ context.Context, letters []DeadLetter) error {
 	if sink.err == nil {
 		sink.letters = append(sink.letters, letters...)
@@ -67,6 +77,12 @@ func TestConsumerWritesValidEventsBeforeCommitting(t *testing.T) {
 	}
 	if len(events.events) != 5 || len(deadLetters.letters) != 0 || source.commits != 1 {
 		t.Fatalf("events=%d deadLetters=%d commits=%d", len(events.events), len(deadLetters.letters), source.commits)
+	}
+	for _, current := range events.events {
+		if !current.RawExpiresAt.Equal(current.Timestamp.AddDate(0, 0, 14)) ||
+			!current.AggregateExpiresAt.Equal(current.Timestamp.AddDate(0, 0, 90)) {
+			t.Fatalf("event expiry raw=%s aggregate=%s timestamp=%s", current.RawExpiresAt, current.AggregateExpiresAt, current.Timestamp)
+		}
 	}
 	if err := consumer.Close(); err != nil || !source.closed {
 		t.Fatalf("close=%v closed=%v", err, source.closed)
@@ -133,12 +149,25 @@ func TestConsumerDoesNotCommitWhenDLQOrEventSinkFails(t *testing.T) {
 	}
 }
 
+func TestConsumerDoesNotCommitWhenRetentionCannotBeResolved(t *testing.T) {
+	source, events, deadLetters, consumer := testConsumer(t, validQueuePayload(t))
+	consumer.retention = fixedRetentionPolicies{err: errors.New("Postgres unavailable")}
+	if err := consumer.ConsumeOne(context.Background()); err == nil {
+		t.Fatal("expected retention resolver error")
+	}
+	if source.commits != 0 || len(events.events) != 0 || len(deadLetters.letters) != 0 {
+		t.Fatalf("commits=%d events=%d deadLetters=%d", source.commits, len(events.events), len(deadLetters.letters))
+	}
+}
+
 func testConsumer(t *testing.T, payload []byte) (*fakeSource, *fakeEventSink, *fakeDeadLetterSink, *Consumer) {
 	t.Helper()
 	source := &fakeSource{message: kafka.Message{Topic: "rum-events-v1", Partition: 2, Offset: 42, Value: payload}}
 	events := &fakeEventSink{}
 	deadLetters := &fakeDeadLetterSink{}
-	consumer := NewConsumer(source, events, deadLetters)
+	consumer := NewConsumer(source, events, deadLetters, WithRetentionPolicies(fixedRetentionPolicies{
+		policy: metadata.ProjectRetentionPolicy{RawDays: 14, AggregateDays: 90},
+	}))
 	consumer.now = func() time.Time { return time.Date(2026, 9, 2, 10, 0, 0, 0, time.UTC) }
 	return source, events, deadLetters, consumer
 }

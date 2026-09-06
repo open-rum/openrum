@@ -44,9 +44,13 @@ func MainWithRoutes(service config.Service, register RouteRegistrar) error {
 	if err != nil {
 		return err
 	}
-	healthManager := health.NewManager(checks, 2*time.Second)
-	router := httpx.NewRouter(logger)
 	metrics := observability.NewMetricsRegistry(string(configuration.Service), configuration.AppEnv)
+	httpMetrics, err := httpx.NewHTTPMetrics(metrics)
+	if err != nil {
+		return fmt.Errorf("register %s HTTP metrics: %w", configuration.Service, err)
+	}
+	healthManager := health.NewManager(checks, 2*time.Second)
+	router := httpx.NewRouter(logger, httpMetrics)
 	router.Handle("GET /health/live", healthManager.LiveHandler())
 	router.Handle("GET /health/ready", healthManager.ReadyHandler())
 	router.Handle("GET /metrics", metrics.Handler())

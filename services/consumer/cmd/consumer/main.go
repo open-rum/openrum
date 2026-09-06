@@ -7,10 +7,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/redis/go-redis/v9"
 	"github.com/rs/zerolog"
 
 	"openrum/internal/config"
 	"openrum/internal/httpx"
+	"openrum/internal/ingest"
+	"openrum/internal/metadata"
 	"openrum/internal/observability"
 	"openrum/internal/service"
 	consumerservice "openrum/services/consumer/internal"
@@ -31,10 +34,22 @@ func registerRoutes(ctx context.Context, _ *httpx.Router, configuration config.C
 	defer cancelConnect()
 	writerOptions := consumerservice.DefaultClickHouseWriterOptions()
 	writerOptions.Observer = metrics
-	writer, err := consumerservice.OpenBufferedClickHouseWriter(connectCtx, configuration.ClickHouseDSN, writerOptions)
+	redisClient := redis.NewClient(&redis.Options{Addr: configuration.RedisAddress, ContextTimeoutEnabled: true})
+	writerOptions.ConnectionStatus = ingest.NewRedisConnectionStatus(redisClient)
+	metadataDatabase, err := metadata.OpenPostgres(connectCtx, configuration.PostgresDSN)
 	if err != nil {
+		_ = redisClient.Close()
 		return nil, err
 	}
+	writer, err := consumerservice.OpenBufferedClickHouseWriter(connectCtx, configuration.ClickHouseDSN, writerOptions)
+	if err != nil {
+		_ = metadataDatabase.Close()
+		_ = redisClient.Close()
+		return nil, err
+	}
+	retentionPolicies := consumerservice.NewCachedRetentionPolicyProvider(
+		metadata.NewProjectConfigRepository(metadataDatabase), configuration.SystemSettings, 30*time.Second,
+	)
 	deadLetters := consumerservice.NewKafkaDeadLetterSink(configuration.KafkaBrokers, configuration.KafkaEventTopic+".dlq")
 	workerCtx, cancelWorkers := context.WithCancel(ctx)
 	const workerCount = 4
@@ -42,7 +57,8 @@ func registerRoutes(ctx context.Context, _ *httpx.Router, configuration config.C
 	var workers sync.WaitGroup
 	for range workerCount {
 		source := consumerservice.NewKafkaMessageSource(configuration.KafkaBrokers, configuration.KafkaEventTopic, "openrum-consumer-v1")
-		consumer := consumerservice.NewConsumer(source, writer, deadLetters, consumerservice.WithMetrics(metrics))
+		consumer := consumerservice.NewConsumer(source, writer, deadLetters,
+			consumerservice.WithMetrics(metrics), consumerservice.WithRetentionPolicies(retentionPolicies))
 		consumers = append(consumers, consumer)
 		workers.Add(1)
 		go func() {
@@ -59,7 +75,7 @@ func registerRoutes(ctx context.Context, _ *httpx.Router, configuration config.C
 			closeErrors = append(closeErrors, consumer.Close())
 		}
 		workers.Wait()
-		closeErrors = append(closeErrors, deadLetters.Close(), writer.Close())
+		closeErrors = append(closeErrors, deadLetters.Close(), writer.Close(), redisClient.Close(), metadataDatabase.Close())
 		return errors.Join(closeErrors...)
 	}, nil
 }

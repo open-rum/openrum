@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "@tanstack/react-router";
 import { Check, Copy, Key, Plus, Warning } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import {
@@ -9,9 +10,11 @@ import {
   listOrganizations,
   type Project,
 } from "@/lib/api/projects";
+import { recordProductEvent } from "@/lib/telemetry/productEvents";
 
 export function ProjectCreatePage() {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [organizationId, setOrganizationId] = useState("");
   const [showOrganizationForm, setShowOrganizationForm] = useState(false);
   const [createdProject, setCreatedProject] = useState<Project | null>(null);
@@ -44,9 +47,13 @@ export function ProjectCreatePage() {
     mutationFn: (input: Parameters<typeof createProject>[1]) =>
       createProject(activeOrganizationId, input),
     onSuccess: async (project) => {
+      recordProductEvent("project_created", project.id);
       setCopied(false);
       setCreatedProject(project);
+      if (project.writeKey)
+        sessionStorage.setItem(`openrum:write-key:${project.id}`, project.writeKey);
       await queryClient.invalidateQueries({ queryKey: ["projects", activeOrganizationId] });
+      await navigate({ to: "/projects/$projectId/onboarding", params: { projectId: project.id } });
     },
   });
 
@@ -112,7 +119,7 @@ export function ProjectCreatePage() {
                 name="allowedOrigins"
                 required
                 rows={4}
-                placeholder={"https://www.example.com\nhttp://localhost:5173"}
+                placeholder={"https://www.example.com\nhttp://localhost:4173"}
               />
             </FormField>
           </div>

@@ -175,6 +175,32 @@ func (handler *ProjectHandler) Update(writer http.ResponseWriter, request *http.
 	writeJSON(writer, http.StatusOK, projectDTO(project, access.Role))
 }
 
+func (handler *ProjectHandler) Delete(writer http.ResponseWriter, request *http.Request) {
+	principal, ok := httpx.PrincipalFromContext(request.Context())
+	if !ok {
+		httpx.WriteError(writer, request, http.StatusUnauthorized, "UNAUTHENTICATED", "Authentication is required.")
+		return
+	}
+	projectID, ok := parsePathUUID(writer, request, "projectId")
+	if !ok {
+		return
+	}
+	access, err := handler.projects.GetForUser(request.Context(), principal.UserID, projectID)
+	if err != nil {
+		writeControlPlaneError(writer, request, handler.logger, err)
+		return
+	}
+	if err := auth.Authorize(access.Role, auth.ActionDeleteProject); err != nil {
+		writeControlPlaneError(writer, request, handler.logger, errors.Join(metadata.ErrForbidden, err))
+		return
+	}
+	if err := handler.projects.RequestDeletion(request.Context(), principal.UserID, projectID); err != nil {
+		writeControlPlaneError(writer, request, handler.logger, err)
+		return
+	}
+	writeJSON(writer, http.StatusAccepted, map[string]any{"status": "deleting", "deadlineHours": 24})
+}
+
 func validateCreateProject(payload createProjectRequest, organizationID uuid.UUID) (metadata.CreateProjectInput, bool) {
 	payload.Name = strings.TrimSpace(payload.Name)
 	payload.Slug = strings.TrimSpace(payload.Slug)

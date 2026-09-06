@@ -45,9 +45,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     root.classList.toggle("dark", resolvedTheme === "dark");
     root.dataset.theme = resolvedTheme;
     root.style.colorScheme = resolvedTheme;
-    document
-      .querySelector('meta[name="theme-color"]')
-      ?.setAttribute("content", resolvedTheme === "dark" ? "#0c0e14" : "#ffffff");
+    const canvas = getComputedStyle(root).getPropertyValue("--ds-canvas").trim();
+    document.querySelector('meta[name="theme-color"]')?.setAttribute("content", canvas);
   }, [resolvedTheme]);
 
   const value = useMemo<ThemeContextValue>(

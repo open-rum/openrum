@@ -1,0 +1,61 @@
+groups:
+  - name: openrum.pipeline
+    rules:
+      - alert: OpenRUMIngestUnavailable
+        expr: sum(rate(openrum_ingest_envelopes_total{outcome="unavailable"}[5m])) > 0
+        for: 2m
+        labels: { severity: critical, team: openrum }
+        annotations:
+          summary: Ingest cannot durably acknowledge envelopes
+          runbook_url: docs/operations/kafka.md
+      - alert: OpenRUMIngestRejectRateHigh
+        expr: sum(rate(openrum_ingest_rejected_envelopes_total[5m])) / clamp_min(sum(rate(openrum_ingest_envelopes_total[5m])), 0.001) > 0.05
+        for: 10m
+        labels: { severity: warning, team: openrum }
+        annotations:
+          summary: More than 5% of ingest envelopes are rejected
+          runbook_url: docs/operations/kafka.md
+      - alert: OpenRUMKafkaLagHigh
+        expr: max(openrum_consumer_kafka_lag_seconds) > 30
+        for: 10m
+        labels: { severity: critical, team: openrum }
+        annotations:
+          summary: Consumer Kafka lag exceeds 30 seconds
+          runbook_url: docs/operations/kafka.md
+      - alert: OpenRUMClickHouseInsertErrors
+        expr: sum(rate(openrum_consumer_clickhouse_batches_total{outcome="error"}[5m])) > 0
+        for: 5m
+        labels: { severity: critical, team: openrum }
+        annotations:
+          summary: Consumer ClickHouse inserts are failing
+          runbook_url: docs/operations/clickhouse.md
+      - alert: OpenRUMDataFreshnessHigh
+        expr: max(openrum_consumer_data_freshness_seconds) > 120
+        for: 10m
+        labels: { severity: critical, team: openrum }
+        annotations:
+          summary: Query data is more than two minutes stale
+          runbook_url: docs/operations/clickhouse.md
+  - name: openrum.query
+    rules:
+      - alert: OpenRUMAPIErrorRateHigh
+        expr: sum(rate(openrum_http_requests_total{service=~".*-api",status_class="5xx"}[5m])) / clamp_min(sum(rate(openrum_http_requests_total{service=~".*-api"}[5m])), 0.001) > 0.02
+        for: 10m
+        labels: { severity: warning, team: openrum }
+        annotations:
+          summary: Query API 5xx rate exceeds 2%
+          runbook_url: docs/operations/postgres.md
+      - alert: OpenRUMAPIRequestP99High
+        expr: histogram_quantile(0.99, sum by (le) (rate(openrum_http_request_duration_seconds_bucket{service=~".*-api"}[5m]))) > 2
+        for: 10m
+        labels: { severity: warning, team: openrum }
+        annotations:
+          summary: Query API P99 latency exceeds two seconds
+          runbook_url: docs/operations/clickhouse.md
+      - alert: OpenRUMTargetDown
+        expr: min by (service) (up{service=~".*openrum.*"}) == 0
+        for: 5m
+        labels: { severity: critical, team: openrum }
+        annotations:
+          summary: An OpenRUM metrics target is down
+          runbook_url: docs/operations/upgrades.md

@@ -70,6 +70,12 @@ function capturePage(
 ): void {
   try {
     if (renewPage) client.startPage();
+    const route = client.getContext().page.route;
+    client.addBreadcrumb({
+      category: "navigation",
+      message: navigationType,
+      ...(route ? { data: { route } } : {}),
+    });
     client.capture({ type: "page_view", navigation_type: navigationType });
   } catch {
     // Public client methods are already guarded; this protects custom client-like wrappers.

@@ -1,0 +1,30 @@
+[
+  {
+    "name": "checkout dynamic order one",
+    "group": "checkout",
+    "errorType": "TypeError",
+    "message": "Cannot read order 84291 for user 018f4d9c-83a1-76c9-81c2-3020ab667001",
+    "stack": "TypeError: failed\n    at submitOrder (https://shop.example.com/assets/checkout.aabbccdd.js:41:9)\n    at dispatch (https://shop.example.com/node_modules/react/index.js:10:2)"
+  },
+  {
+    "name": "checkout dynamic order two",
+    "group": "checkout",
+    "errorType": "TypeError",
+    "message": "Cannot read order 99102 for user 018f4d9c-83a1-76c9-81c2-3020ab667099",
+    "stack": "TypeError: failed\n    at submitOrder (https://shop.example.com/assets/checkout.11223344.js:87:2)"
+  },
+  {
+    "name": "different message template",
+    "group": "inventory",
+    "errorType": "TypeError",
+    "message": "Inventory unavailable for sku 84291",
+    "stack": "TypeError: failed\n    at submitOrder (https://shop.example.com/assets/checkout.aabbccdd.js:41:9)"
+  },
+  {
+    "name": "different in-app frame",
+    "group": "payment",
+    "errorType": "TypeError",
+    "message": "Cannot read order 84291 for user 018f4d9c-83a1-76c9-81c2-3020ab667001",
+    "stack": "TypeError: failed\n    at chargeCard (https://shop.example.com/assets/payment.aabbccdd.js:41:9)"
+  }
+]

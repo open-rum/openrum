@@ -11,11 +11,14 @@ import (
 	"path/filepath"
 	"runtime"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 
+	"openrum/internal/geo"
 	"openrum/internal/httpx"
+	"openrum/internal/ingest"
 	"openrum/internal/metadata"
 )
 
@@ -43,6 +46,34 @@ func (limiter fakeLimiter) AllowProject(context.Context, uuid.UUID) bool {
 type fakeAcceptor struct {
 	accepted *AcceptedEnvelope
 	err      error
+}
+
+type fakeConnectionStatus struct {
+	sdkSeen    []time.Time
+	received   []time.Time
+	queryable  []time.Time
+	rejections []ingest.RejectReason
+	err        error
+}
+
+func (status *fakeConnectionStatus) MarkSDKSeen(_ context.Context, _ uuid.UUID, at time.Time) error {
+	status.sdkSeen = append(status.sdkSeen, at)
+	return status.err
+}
+
+func (status *fakeConnectionStatus) MarkEventReceived(_ context.Context, _ uuid.UUID, at time.Time) error {
+	status.received = append(status.received, at)
+	return status.err
+}
+
+func (status *fakeConnectionStatus) MarkEventQueryable(_ context.Context, _ uuid.UUID, at time.Time) error {
+	status.queryable = append(status.queryable, at)
+	return status.err
+}
+
+func (status *fakeConnectionStatus) MarkRejected(_ context.Context, _ uuid.UUID, _ time.Time, reason ingest.RejectReason) error {
+	status.rejections = append(status.rejections, reason)
+	return status.err
 }
 
 func (acceptor *fakeAcceptor) Accept(_ context.Context, envelope AcceptedEnvelope) (Acceptance, error) {
@@ -75,6 +106,57 @@ func TestHandlerAcceptsValidatedIdentityAndGzipEnvelopes(t *testing.T) {
 				t.Fatalf("CORS origin = %q", response.Header().Get("Access-Control-Allow-Origin"))
 			}
 		})
+	}
+}
+
+func TestHandlerOnlyTrustsTheCountryHeaderBehindADeclaredProxy(t *testing.T) {
+	resolver, err := geo.New("CF-IPCountry", []string{"10.0.0.0/8"})
+	if err != nil {
+		t.Fatalf("new resolver: %v", err)
+	}
+	for _, testCase := range []struct {
+		name       string
+		remoteAddr string
+		want       string
+	}{
+		// The peer address is the only thing a caller cannot forge, so it alone
+		// decides whether the forwarded country is believable.
+		{name: "behind the proxy", remoteAddr: "10.1.2.3:4321", want: "JP"},
+		{name: "direct caller", remoteAddr: "203.0.113.10:4321", want: geo.Unknown},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			authenticator := &fakeAuthenticator{access: metadata.ProjectKeyAccess{Project: metadata.Project{
+				ID: uuid.MustParse("00000000-0000-4000-8000-000000000001"), Environment: "production",
+				AllowedOrigins: []string{"https://shop.example.com"}, Status: metadata.ProjectStatusActive,
+			}}}
+			acceptor := &fakeAcceptor{}
+			handler := NewHandler(authenticator, fakeLimiter{allowIP: true, allowProject: true}, acceptor,
+				zerolog.Nop(), WithGeoResolver(resolver))
+			request := ingestRequest(validEnvelope(t))
+			request.RemoteAddr = testCase.remoteAddr
+			request.Header.Set("CF-IPCountry", "JP")
+
+			testRouter(handler).ServeHTTP(httptest.NewRecorder(), request)
+
+			if acceptor.accepted == nil {
+				t.Fatal("envelope was not accepted")
+			}
+			if acceptor.accepted.ClientCountry != testCase.want {
+				t.Fatalf("country = %q, want %q", acceptor.accepted.ClientCountry, testCase.want)
+			}
+		})
+	}
+}
+
+func TestHandlerStoresAnUnknownCountryWithoutAResolver(t *testing.T) {
+	_, acceptor, router := testHandler(t, nil)
+	request := ingestRequest(validEnvelope(t))
+	request.Header.Set("CF-IPCountry", "JP")
+
+	router.ServeHTTP(httptest.NewRecorder(), request)
+
+	if acceptor.accepted == nil || acceptor.accepted.ClientCountry != geo.Unknown {
+		t.Fatalf("accepted = %+v, want country %q", acceptor.accepted, geo.Unknown)
 	}
 }
 
@@ -178,6 +260,41 @@ func TestHandlerPreflightAndQueueFailure(t *testing.T) {
 	router.ServeHTTP(retryResponse, ingestRequest(validEnvelope(t)))
 	if retryResponse.Code != http.StatusAccepted {
 		t.Fatalf("retry status=%d body=%s", retryResponse.Code, retryResponse.Body.String())
+	}
+}
+
+func TestHandlerAdvancesConnectionStatusAtDurabilityBoundaries(t *testing.T) {
+	authenticator, acceptor, _ := testHandler(t, nil)
+	status := &fakeConnectionStatus{}
+	clock := time.Date(2026, 9, 2, 10, 0, 0, 0, time.UTC)
+	handler := NewHandler(authenticator, fakeLimiter{allowIP: true, allowProject: true}, acceptor, zerolog.Nop(), WithConnectionStatus(status))
+	handler.now = func() time.Time { return clock }
+	response := httptest.NewRecorder()
+	testRouter(handler).ServeHTTP(response, ingestRequest(validEnvelope(t)))
+	if response.Code != http.StatusAccepted || len(status.sdkSeen) != 1 || len(status.received) != 1 || len(status.rejections) != 0 {
+		t.Fatalf("status=%d SDK=%v received=%v rejections=%v", response.Code, status.sdkSeen, status.received, status.rejections)
+	}
+	if len(status.queryable) != 0 {
+		t.Fatal("Ingest must not report ClickHouse queryability")
+	}
+
+	status = &fakeConnectionStatus{}
+	handler = NewHandler(authenticator, fakeLimiter{allowIP: true, allowProject: true}, acceptor, zerolog.Nop(), WithConnectionStatus(status))
+	request := ingestRequest(validEnvelope(t))
+	request.Header.Set("Origin", "https://wrong.example")
+	response = httptest.NewRecorder()
+	testRouter(handler).ServeHTTP(response, request)
+	if response.Code != http.StatusForbidden || len(status.sdkSeen) != 1 || len(status.received) != 0 ||
+		len(status.rejections) != 1 || status.rejections[0] != ingest.RejectOriginRejected {
+		t.Fatalf("status=%d SDK=%v received=%v rejections=%v", response.Code, status.sdkSeen, status.received, status.rejections)
+	}
+
+	status = &fakeConnectionStatus{err: context.DeadlineExceeded}
+	handler = NewHandler(authenticator, fakeLimiter{allowIP: true, allowProject: true}, acceptor, zerolog.Nop(), WithConnectionStatus(status))
+	response = httptest.NewRecorder()
+	testRouter(handler).ServeHTTP(response, ingestRequest(validEnvelope(t)))
+	if response.Code != http.StatusAccepted {
+		t.Fatalf("best-effort status tracking changed ingest response: %d", response.Code)
 	}
 }
 

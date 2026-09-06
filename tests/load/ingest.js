@@ -52,13 +52,17 @@ export default function () {
     },
     events,
   });
-  const response = http.post(__ENV.OPENRUM_INGEST_URL || "http://127.0.0.1:8081/ingest/v1/envelope", body, {
-    headers: {
-      "Content-Type": "application/json",
-      "X-OpenRUM-Key": __ENV.OPENRUM_WRITE_KEY,
-      Origin: __ENV.OPENRUM_ORIGIN || "https://load.example.com",
+  const response = http.post(
+    __ENV.OPENRUM_INGEST_URL || "http://127.0.0.1:8081/ingest/v1/envelope",
+    body,
+    {
+      headers: {
+        "Content-Type": "application/json",
+        "X-OpenRUM-Key": __ENV.OPENRUM_WRITE_KEY,
+        Origin: __ENV.OPENRUM_ORIGIN || "https://load.example.com",
+      },
     },
-  });
+  );
   const accepted = check(response, {
     "durably accepted": (current) => current.status === 202 || current.status === 207,
   });

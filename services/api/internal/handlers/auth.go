@@ -31,6 +31,10 @@ type passwordRequest struct {
 	NewPassword     string `json:"newPassword"`
 }
 
+type reauthenticationRequest struct {
+	CurrentPassword string `json:"currentPassword"`
+}
+
 func NewAuthHandler(loginManager *auth.LoginManager, sessions *auth.SessionManager, logger zerolog.Logger, secureCookie bool) *AuthHandler {
 	return &AuthHandler{loginManager: loginManager, sessions: sessions, logger: logger, secureCookie: secureCookie}
 }
@@ -85,11 +89,12 @@ func (handler *AuthHandler) Me(writer http.ResponseWriter, request *http.Request
 		httpx.WriteError(writer, request, http.StatusUnauthorized, "UNAUTHENTICATED", "Authentication is required.")
 		return
 	}
-	writeJSON(writer, http.StatusOK, map[string]string{
-		"userId":      principal.UserID.String(),
-		"email":       principal.Email,
-		"displayName": principal.DisplayName,
-	})
+	writeJSON(writer, http.StatusOK, struct {
+		UserID       string `json:"userId"`
+		Email        string `json:"email"`
+		DisplayName  string `json:"displayName"`
+		InstanceRole string `json:"instanceRole,omitempty"`
+	}{principal.UserID.String(), principal.Email, principal.DisplayName, principal.InstanceRole})
 }
 
 func (handler *AuthHandler) Logout(writer http.ResponseWriter, request *http.Request) {
@@ -129,6 +134,27 @@ func (handler *AuthHandler) ChangePassword(writer http.ResponseWriter, request *
 		return
 	}
 	writer.WriteHeader(http.StatusNoContent)
+}
+
+func (handler *AuthHandler) Reauthenticate(writer http.ResponseWriter, request *http.Request) {
+	principal, ok := httpx.PrincipalFromContext(request.Context())
+	if !ok {
+		httpx.WriteError(writer, request, http.StatusUnauthorized, "UNAUTHENTICATED", "Authentication is required.")
+		return
+	}
+	var payload reauthenticationRequest
+	if !decodeJSONBody(writer, request, &payload) {
+		return
+	}
+	if err := handler.sessions.Elevate(request.Context(), principal, payload.CurrentPassword); err != nil {
+		if errors.Is(err, auth.ErrInvalidCredentials) {
+			httpx.WriteError(writer, request, http.StatusUnauthorized, "REAUTHENTICATION_FAILED", "Current password is incorrect or unavailable for this account.")
+			return
+		}
+		handler.internalError(writer, request, err)
+		return
+	}
+	writeJSON(writer, http.StatusOK, map[string]any{"elevated": true, "expiresInSeconds": 300})
 }
 
 func (handler *AuthHandler) setCookies(writer http.ResponseWriter, credentials auth.SessionCredentials) {

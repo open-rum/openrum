@@ -119,7 +119,7 @@ func TestConcurrentBootstrapCreatesExactlyOneOwner(t *testing.T) {
 	if successes.Load() != 1 || alreadyInitialized.Load() != requests-1 || unexpected.Load() != 0 {
 		t.Fatalf("success=%d already=%d unexpected=%d", successes.Load(), alreadyInitialized.Load(), unexpected.Load())
 	}
-	for table, want := range map[string]int{"users": 1, "organizations": 1, "organization_members": 1, "audit_logs": 1, "sessions": 1} {
+	for table, want := range map[string]int{"users": 1, "organizations": 1, "organization_members": 1, "instance_members": 1, "audit_logs": 1, "sessions": 1} {
 		var count int
 		if err := database.QueryRowContext(ctx, "SELECT count(*) FROM "+table).Scan(&count); err != nil {
 			t.Fatal(err)

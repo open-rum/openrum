@@ -10,6 +10,7 @@ import (
 type UserStatus string
 type AuthSource string
 type OrganizationRole string
+type InstanceRole string
 type ProjectStatus string
 
 const (
@@ -23,6 +24,9 @@ const (
 	RoleAdmin  OrganizationRole = "admin"
 	RoleMember OrganizationRole = "member"
 	RoleViewer OrganizationRole = "viewer"
+
+	InstanceRoleOwner InstanceRole = "instance_owner"
+	InstanceRoleAdmin InstanceRole = "instance_admin"
 
 	ProjectStatusActive   ProjectStatus = "active"
 	ProjectStatusDisabled ProjectStatus = "disabled"
@@ -56,6 +60,14 @@ type OrganizationMember struct {
 	Role           OrganizationRole
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
+}
+
+type InstanceMember struct {
+	UserID    uuid.UUID
+	Role      InstanceRole
+	CreatedBy *uuid.UUID
+	CreatedAt time.Time
+	UpdatedAt time.Time
 }
 
 type Project struct {

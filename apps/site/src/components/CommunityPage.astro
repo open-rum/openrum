@@ -1,0 +1,102 @@
+---
+import { GitBranch, Github, HeartHandshake, Map, ShieldAlert } from "lucide-astro";
+import PublicLayout from "../layouts/PublicLayout.astro";
+const { lang = "en" } = Astro.props;
+const zh = lang === "zh";
+const repository = import.meta.env.PUBLIC_REPOSITORY_URL || "https://github.com/openrum/openrum";
+const cards = zh
+  ? [
+      [
+        "参与开发",
+        "从本地开发、测试和领域文档开始；深层贡献指南会明确回退英文原文。",
+        GitBranch,
+        "/docs/contributing/local-development/",
+      ],
+      [
+        "报告问题",
+        "提供版本、复现步骤、预期/实际结果和不含 Secret 的诊断信息。",
+        Github,
+        `${repository}/issues`,
+      ],
+      [
+        "安全报告",
+        "不要公开凭证或未修复漏洞；使用仓库 Security policy 的私密渠道。",
+        ShieldAlert,
+        `${repository}/security`,
+      ],
+      [
+        "查看路线图",
+        "已实现、计划中和需要外部验证的任务都在仓库路线图中明确标记。",
+        Map,
+        `${repository}/blob/main/docs/product-roadmap.md`,
+      ],
+    ]
+  : [
+      [
+        "Contribute",
+        "Start with local development, tests and domain docs; send a small, verifiable pull request.",
+        GitBranch,
+        "/docs/contributing/local-development/",
+      ],
+      [
+        "Report an issue",
+        "Include version, reproduction, expected/actual behavior and diagnostics with secrets removed.",
+        Github,
+        `${repository}/issues`,
+      ],
+      [
+        "Report a vulnerability",
+        "Do not publish credentials or an unpatched vulnerability; use the repository security policy.",
+        ShieldAlert,
+        `${repository}/security`,
+      ],
+      [
+        "Read the roadmap",
+        "Implemented, planned and externally verified work is explicitly marked in the repository roadmap.",
+        Map,
+        `${repository}/blob/main/docs/product-roadmap.md`,
+      ],
+    ];
+---
+
+<PublicLayout
+  title={zh ? "开源社区 — OpenRUM" : "Open-source community — OpenRUM"}
+  description={zh ? "参与 OpenRUM 开源项目。" : "Participate in the OpenRUM open-source project."}
+  lang={lang}
+  ><section class="page-hero">
+    <div class="site-container">
+      <p class="eyebrow">Community</p><h1>
+        {zh ? "一起把前端调查体验做得更完整" : "Help make frontend investigation more complete"}
+      </h1><p>
+        {
+          zh
+            ? "OpenRUM 仍处于 Alpha。欢迎用真实但已脱敏的场景验证 SDK、查询、部署和调查路径。"
+            : "OpenRUM is still Alpha. Validate the SDK, queries, deployment and investigation path with realistic, privacy-safe scenarios."
+        }
+      </p>
+    </div>
+  </section><section class="section">
+    <div class="site-container">
+      <div class="card-grid">
+        {
+          cards.map(([title, body, Icon, href]) => (
+            <article class="ui-card feature-card">
+              <>
+                <span class="feature-icon">
+                  <Icon size={19} />
+                </span>
+                <h3>{title}</h3>
+                <p>{body}</p>
+                <a href={href as string}>{zh ? "打开" : "Open"} →</a>
+              </>
+            </article>
+          ))
+        }
+      </div><div class="cta-row">
+        <a class="ui-button ui-button-primary" href={repository}
+          ><HeartHandshake size={16} />{zh ? "前往 GitHub" : "Visit GitHub"}</a
+        >
+      </div>
+    </div>
+  </section></PublicLayout
+>

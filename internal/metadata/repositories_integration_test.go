@@ -3,13 +3,17 @@
 package metadata
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
+
+	secure "openrum/internal/crypto"
 )
 
 func TestRepositoryIsolationAndLastOwnerInvariant(t *testing.T) {
@@ -64,6 +68,56 @@ func TestRepositoryIsolationAndLastOwnerInvariant(t *testing.T) {
 	access, err := projects.GetForUser(ctx, ownerA, projectA.ID)
 	if err != nil || access.Role != RoleOwner || len(access.Project.AllowedOrigins) != 1 {
 		t.Fatalf("project access=%+v err=%v", access, err)
+	}
+	configs := NewProjectConfigRepository(database)
+	initialConfig, err := configs.Get(ctx, projectA.ID, time.Now())
+	if err != nil || initialConfig.Version != 1 {
+		t.Fatalf("initial SDK config=%+v err=%v", initialConfig, err)
+	}
+	updatedRate := 0.4
+	if _, err := projects.Update(ctx, ownerA, projectA.ID, UpdateProjectInput{EventSampleRate: &updatedRate}); err != nil {
+		t.Fatal(err)
+	}
+	updatedConfig, err := configs.Get(ctx, projectA.ID, time.Now())
+	if err != nil || updatedConfig.Version != 2 || updatedConfig.EventSampleRate != updatedRate {
+		t.Fatalf("updated SDK config=%+v err=%v", updatedConfig, err)
+	}
+	emergencyRate, emergencyExpiry := 0.05, time.Now().UTC().Add(time.Hour)
+	emergencyConfig, err := configs.SetEmergency(ctx, ownerA, projectA.ID, &emergencyRate, &emergencyExpiry)
+	if err != nil || emergencyConfig.Version != 3 || emergencyConfig.EmergencySampleRate == nil {
+		t.Fatalf("emergency SDK config=%+v err=%v", emergencyConfig, err)
+	}
+	var auditCount int
+	if err := database.QueryRowContext(ctx, `SELECT count(*) FROM audit_logs WHERE resource_id=$1
+		AND action IN ('project.updated','project.sdk_config.emergency_updated')`, projectA.ID).Scan(&auditCount); err != nil || auditCount != 2 {
+		t.Fatalf("SDK config audit count=%d err=%v", auditCount, err)
+	}
+	oldEncryptionKey := secure.Key{ID: "integration-old", Material: bytes.Repeat([]byte{7}, 32)}
+	oldKeyring, err := secure.NewKeyring(oldEncryptionKey.ID, oldEncryptionKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	alerts := NewAlertRepository(database, oldKeyring)
+	channel, err := alerts.CreateChannel(ctx, ownerA, organizationA, "Incident webhook", ChannelWebhook, json.RawMessage(`{"url":"https://hooks.example.test/incident"}`))
+	if err != nil || channel.EncryptionKeyID != oldEncryptionKey.ID || bytes.Contains(channel.EncryptedConfig, []byte("hooks.example")) {
+		t.Fatalf("channel=%+v err=%v", channel, err)
+	}
+	newEncryptionKey := secure.Key{ID: "integration-new", Material: bytes.Repeat([]byte{8}, 32)}
+	newKeyring, err := secure.NewKeyring(newEncryptionKey.ID, oldEncryptionKey, newEncryptionKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	alerts = NewAlertRepository(database, newKeyring)
+	if changed, err := alerts.RotateChannelConfig(ctx, channel.ID); err != nil || !changed {
+		t.Fatalf("rotate channel changed=%v err=%v", changed, err)
+	}
+	opened, err := alerts.OpenChannelConfig(ctx, ownerA, channel.ID)
+	if err != nil || string(opened) != `{"url":"https://hooks.example.test/incident"}` {
+		t.Fatalf("opened channel=%s err=%v", opened, err)
+	}
+	var storedKeyID string
+	if err := database.QueryRowContext(ctx, "SELECT encryption_key_id FROM notification_channels WHERE id=$1", channel.ID).Scan(&storedKeyID); err != nil || storedKeyID != newEncryptionKey.ID {
+		t.Fatalf("stored channel key=%q err=%v", storedKeyID, err)
 	}
 
 	organizations := NewOrganizationRepository(database)

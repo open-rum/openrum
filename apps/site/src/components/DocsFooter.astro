@@ -1,0 +1,19 @@
+---
+import DefaultFooter from "@astrojs/starlight/components/Footer.astro";
+
+const release = import.meta.env.PUBLIC_OPENRUM_RELEASE || "Alpha / main";
+const commit = import.meta.env.PUBLIC_COMMIT_SHA || "local";
+---
+
+<DefaultFooter />
+<p class="docs-build" data-openrum-build>
+  Release {release} · commit {commit.slice(0, 8)}
+</p>
+
+<style>
+  .docs-build {
+    margin: 1.5rem 0 0;
+    color: var(--ds-text-muted);
+    font-size: var(--text-caption);
+  }
+</style>

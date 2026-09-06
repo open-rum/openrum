@@ -1,0 +1,173 @@
+/* Development data generator. Imported by DevDataPage rather than the global
+   stylesheet so a production build, which never reaches that module, emits
+   none of these rules. */
+.devdata {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.devdata-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+.devdata-header h1 {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-title);
+}
+.devdata-header h1 > svg {
+  width: 20px;
+  color: var(--ds-brand);
+}
+.devdata-header p {
+  max-width: 72ch;
+  margin-top: var(--space-1);
+  color: var(--ds-text-muted);
+  font-size: var(--text-table);
+}
+.devdata-env {
+  padding: 2px var(--space-2);
+  border: 1px solid var(--ds-border);
+  border-radius: 999px;
+  color: var(--ds-text-muted);
+  font-size: var(--text-caption);
+}
+.devdata-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: var(--space-3);
+}
+.devdata-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--ds-border);
+  border-radius: var(--radius-md);
+  background: var(--ds-surface);
+}
+.devdata-field > legend,
+.devdata-field > span {
+  color: var(--ds-text);
+  font-size: var(--text-table);
+  font-weight: 500;
+}
+.devdata-field input,
+.devdata-advanced textarea {
+  width: 100%;
+  padding: 6px var(--space-2);
+  border: 1px solid var(--ds-border);
+  border-radius: var(--radius-sm);
+  background: var(--ds-surface);
+  color: var(--ds-text);
+  font-size: var(--text-table);
+}
+.devdata-field input:disabled {
+  background: var(--ds-surface-subtle);
+  color: var(--ds-text-muted);
+}
+.devdata-presets,
+.devdata-windows {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+.devdata-presets button,
+.devdata-windows button {
+  padding: 4px var(--space-2);
+  border: 1px solid var(--ds-border);
+  border-radius: var(--radius-sm);
+  background: var(--ds-surface);
+  color: var(--ds-text-muted);
+  font-size: var(--text-caption);
+  cursor: pointer;
+}
+.devdata-presets button[data-active="true"],
+.devdata-windows button[data-active="true"] {
+  border-color: var(--ds-brand);
+  background: var(--ds-surface-hover);
+  color: var(--ds-text);
+}
+.devdata-hint {
+  color: var(--ds-text-muted);
+  font-size: var(--text-caption);
+  line-height: 1.5;
+}
+.devdata-error {
+  color: var(--ds-danger);
+  font-size: var(--text-table);
+}
+.devdata-advanced {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.devdata-advanced > label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-table);
+}
+.devdata-advanced textarea {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: var(--text-caption);
+  line-height: 1.6;
+  resize: vertical;
+}
+.devdata-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+.devdata-result {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--ds-border);
+  border-radius: var(--radius-md);
+  background: var(--ds-surface);
+}
+.devdata-result-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: var(--space-3);
+}
+.devdata-result-cards > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.devdata-result-cards span {
+  color: var(--ds-text-muted);
+  font-size: var(--text-caption);
+}
+.devdata-result-cards strong {
+  font-size: var(--text-title);
+}
+.devdata-result-cards strong[data-warn="true"] {
+  color: var(--ds-danger);
+}
+.devdata-breakdown {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.devdata-breakdown li {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  padding: 3px var(--space-2);
+  border: 1px solid var(--ds-border);
+  border-radius: 999px;
+  font-size: var(--text-caption);
+}
+.devdata-breakdown span {
+  color: var(--ds-text-muted);
+}

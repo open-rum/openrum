@@ -1,0 +1,114 @@
+---
+import { Boxes, Cloud, Database, ShieldCheck } from "lucide-astro";
+import PublicLayout from "../layouts/PublicLayout.astro";
+const { lang = "en" } = Astro.props;
+const zh = lang === "zh";
+const tiers = zh
+  ? [
+      [
+        "本地验证",
+        "Docker Compose",
+        "一条命令启动完整数据链路与 30,000 个确定性 Session。适合评估，不是生产高可用。",
+        Boxes,
+      ],
+      [
+        "生产 Kubernetes",
+        "Helm + 外部依赖",
+        "API、Ingest、Consumer 与 Web 可独立扩缩；使用生产级 PostgreSQL、ClickHouse、Kafka 和 Redis。",
+        Cloud,
+      ],
+      [
+        "对象存储",
+        "可选 OSS / S3",
+        "Source Map 使用 Alibaba OSS 或 S3-compatible。没有 Bucket 时核心监控能力保持可用。",
+        Database,
+      ],
+    ]
+  : [
+      [
+        "Local evaluation",
+        "Docker Compose",
+        "One command starts the data path and 30,000 deterministic Sessions. Good for evaluation, not production HA.",
+        Boxes,
+      ],
+      [
+        "Production Kubernetes",
+        "Helm + external dependencies",
+        "Scale API, Ingest, Consumer and Web independently with production PostgreSQL, ClickHouse, Kafka and Redis.",
+        Cloud,
+      ],
+      [
+        "Object storage",
+        "Optional OSS / S3",
+        "Source Maps use Alibaba OSS or an S3-compatible provider. Core monitoring remains available without a Bucket.",
+        Database,
+      ],
+    ];
+---
+
+<PublicLayout
+  title={zh ? "自部署 — OpenRUM" : "Self-host OpenRUM"}
+  description={zh ? "在自己的基础设施运行 OpenRUM。" : "Run OpenRUM in your own infrastructure."}
+  lang={lang}
+  ><section class="page-hero">
+    <div class="site-container">
+      <p class="eyebrow">Self-host</p><h1>
+        {
+          zh
+            ? "数据、保留策略与依赖都由你控制"
+            : "Control your data, retention policy and dependencies"
+        }
+      </h1><p>
+        {
+          zh
+            ? "先用 Compose 验证调查路径，再按容量与可用性要求迁移到 Kubernetes。OpenRUM 不要求连接托管控制面。"
+            : "Validate the investigation path with Compose, then move to Kubernetes for capacity and availability. OpenRUM does not require a hosted control plane."
+        }
+      </p><div class="cta-row">
+        <a
+          class="ui-button ui-button-primary"
+          href={zh ? "/zh/docs/getting-started/quickstart/" : "/docs/getting-started/quickstart/"}
+          >{zh ? "本地快速开始" : "Local quickstart"}</a
+        ><a
+          class="ui-button ui-button-outline"
+          href={zh ? "/zh/docs/self-hosting/overview/" : "/docs/self-hosting/overview/"}
+          >{zh ? "生产部署文档" : "Production deployment docs"}</a
+        >
+      </div>
+    </div>
+  </section><section class="section">
+    <div class="site-container">
+      <div class="card-grid">
+        {
+          tiers.map(([title, status, body, Icon]) => (
+            <article class="ui-card feature-card">
+              <>
+                <span class="feature-icon">
+                  <Icon size={19} />
+                </span>
+                <h3>{title}</h3>
+                <p>{body}</p>
+                <div class="status-line">
+                  <>
+                    <span>{status}</span>
+                    <span>{zh ? "已发布" : "Published"}</span>
+                  </>
+                </div>
+              </>
+            </article>
+          ))
+        }
+      </div><div class="ui-card proof-card" style="margin-top:14px">
+        <span class="feature-icon"><ShieldCheck size={19} /></span><h3>
+          {zh ? "生产前检查" : "Production readiness"}
+        </h3><p>
+          {
+            zh
+              ? "启用 TLS、外部 Secret、备份恢复、依赖监控、容量验证和升级演练。千万级日 PV 是设计目标，不是未经验证的默认承诺。"
+              : "Enable TLS, external secrets, backup/restore, dependency monitoring, capacity verification and upgrade drills. Ten-million daily PV is a design target—not an unverified default claim."
+          }
+        </p>
+      </div>
+    </div>
+  </section></PublicLayout
+>
