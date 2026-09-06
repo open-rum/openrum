@@ -52,7 +52,7 @@ func (repository *ProjectRepository) ListForOrganization(ctx context.Context, us
 		        projects.status, projects.created_at, projects.updated_at
 		 FROM projects
 		 JOIN organization_members ON organization_members.organization_id=projects.organization_id
-		 WHERE projects.organization_id=$1 AND organization_members.user_id=$2
+		 WHERE projects.organization_id=$1 AND organization_members.user_id=$2 AND projects.status!='deleting'
 		 ORDER BY projects.name, projects.id`, organizationID, userID)
 	if err != nil {
 		return nil, err
@@ -78,7 +78,7 @@ func (repository *ProjectRepository) GetForUser(ctx context.Context, userID, pro
 		        projects.status, projects.created_at, projects.updated_at, organization_members.role
 		 FROM projects
 		 JOIN organization_members ON organization_members.organization_id=projects.organization_id
-		 WHERE projects.id=$1 AND organization_members.user_id=$2`,
+		 WHERE projects.id=$1 AND organization_members.user_id=$2 AND projects.status!='deleting'`,
 		projectID, userID,
 	).Scan(&access.Project.ID, &access.Project.OrganizationID, &access.Project.Name, &access.Project.Slug,
 		&allowedOriginsJSON, &access.Project.Environment, &access.Project.RetentionDays,
@@ -94,6 +94,45 @@ func (repository *ProjectRepository) GetForUser(ctx context.Context, userID, pro
 		return ProjectAccess{}, fmt.Errorf("decode allowed origins: %w", err)
 	}
 	return access, nil
+}
+
+// RequestDeletion immediately disables ingest and hides the project, then
+// queues asynchronous ClickHouse and OSS cleanup with a 24-hour deadline.
+func (repository *ProjectRepository) RequestDeletion(ctx context.Context, actorID, projectID uuid.UUID) error {
+	transaction, err := repository.database.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = transaction.Rollback() }()
+	var organizationID uuid.UUID
+	err = transaction.QueryRowContext(ctx, "SELECT organization_id FROM projects WHERE id=$1 FOR UPDATE", projectID).Scan(&organizationID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return ErrNotFound
+	}
+	if err != nil {
+		return err
+	}
+	role, err := lockMembership(ctx, transaction, organizationID, actorID)
+	if err != nil {
+		return err
+	}
+	if role != RoleOwner {
+		return ErrForbidden
+	}
+	if _, err := transaction.ExecContext(ctx, "UPDATE projects SET status='deleting',updated_at=now() WHERE id=$1", projectID); err != nil {
+		return err
+	}
+	if _, err := transaction.ExecContext(ctx, "UPDATE project_keys SET revoked_at=COALESCE(revoked_at,now()) WHERE project_id=$1", projectID); err != nil {
+		return err
+	}
+	if _, err := transaction.ExecContext(ctx, `INSERT INTO project_deletions (project_id,organization_id,requested_by)
+		VALUES ($1,$2,$3) ON CONFLICT (project_id) DO NOTHING`, projectID, organizationID, actorID); err != nil {
+		return err
+	}
+	if err := insertAudit(ctx, transaction, organizationID, actorID, "project.deletion_requested", "project", projectID); err != nil {
+		return err
+	}
+	return transaction.Commit()
 }
 
 func (repository *ProjectRepository) Create(ctx context.Context, actorID uuid.UUID, input CreateProjectInput) (Project, error) {
@@ -208,7 +247,10 @@ func (repository *ProjectRepository) Update(ctx context.Context, actorID, projec
 		   name=COALESCE($1, name), slug=COALESCE($2, slug), allowed_origins=COALESCE($3, allowed_origins),
 		   environment=COALESCE($4, environment), retention_days=COALESCE($5, retention_days),
 		   event_sample_rate=COALESCE($6, event_sample_rate), api_sample_rate=COALESCE($7, api_sample_rate),
-		   status=COALESCE($8, status), updated_at=now()
+		   status=COALESCE($8, status),
+		   sdk_config_version=CASE WHEN $6::double precision IS NOT NULL OR $7::double precision IS NOT NULL THEN sdk_config_version+1 ELSE sdk_config_version END,
+		   sdk_config_effective_at=CASE WHEN $6::double precision IS NOT NULL OR $7::double precision IS NOT NULL THEN now() ELSE sdk_config_effective_at END,
+		   updated_at=now()
 		 WHERE id=$9
 		 RETURNING id, organization_id, name, slug, to_json(allowed_origins), environment, retention_days,
 		           event_sample_rate, api_sample_rate, status, created_at, updated_at`,

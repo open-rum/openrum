@@ -34,6 +34,7 @@ func (acceptor *KafkaAcceptor) Accept(ctx context.Context, accepted AcceptedEnve
 		ReceivedAt:         accepted.ReceivedAt,
 		Origin:             accepted.Origin,
 		ClientIP:           accepted.ClientIP,
+		ClientCountry:      accepted.ClientCountry,
 		UserAgent:          accepted.UserAgent,
 		Envelope:           accepted.Envelope,
 	}

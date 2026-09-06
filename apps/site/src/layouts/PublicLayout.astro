@@ -1,0 +1,37 @@
+---
+import "../styles/global.css";
+import SiteHeader from "../components/SiteHeader.astro";
+import SiteFooter from "../components/SiteFooter.astro";
+const { title, description, lang = "en" } = Astro.props;
+const canonical = new URL(Astro.url.pathname, Astro.site);
+const image = new URL("/og.svg", Astro.site);
+---
+
+<!doctype html>
+<html lang={lang === "zh" ? "zh-CN" : "en"}>
+  <head
+    ><meta charset="UTF-8" /><meta name="viewport" content="width=device-width" /><title>
+      {title}
+    </title><meta name="description" content={description} /><link
+      rel="canonical"
+      href={canonical}
+    /><meta property="og:type" content="website" /><meta property="og:title" content={title} /><meta
+      property="og:description"
+      content={description}
+    /><meta property="og:url" content={canonical} /><meta
+      property="og:image"
+      content={image}
+    /><meta name="twitter:card" content="summary_large_image" /><script is:inline>
+      try {
+        const t = localStorage.getItem("openrum-theme");
+        if (t === "dark" || (!t && matchMedia("(prefers-color-scheme:dark)").matches))
+          document.documentElement.classList.add("dark");
+      } catch {}
+    </script></head
+  ><body
+    ><a class="sr-only" href="#main-content">Skip to content</a><SiteHeader
+      lang={lang}
+      path={Astro.url.pathname}
+    /><main id="main-content"><slot /></main><SiteFooter lang={lang} /></body
+  >
+</html>

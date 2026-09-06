@@ -1,0 +1,109 @@
+{{- range $name, $service := .Values.services }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "openrum.fullname" $ }}-{{ $name }}
+  labels:
+    {{- include "openrum.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: {{ $name }}
+spec:
+  replicas: {{ $service.replicas }}
+  revisionHistoryLimit: 3
+  minReadySeconds: 5
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      {{- include "openrum.selectorLabels" $ | nindent 6 }}
+      app.kubernetes.io/component: {{ $name }}
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") $ | sha256sum }}
+        {{- with $.Values.podAnnotations }}{{ toYaml . | nindent 8 }}{{- end }}
+      labels:
+        {{- include "openrum.selectorLabels" $ | nindent 8 }}
+        app.kubernetes.io/component: {{ $name }}
+    spec:
+      terminationGracePeriodSeconds: {{ $.Values.termination.gracePeriodSeconds }}
+      {{- with $.Values.imagePullSecrets }}
+      imagePullSecrets: {{ toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        runAsNonRoot: true
+        fsGroup: 65532
+        fsGroupChangePolicy: OnRootMismatch
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: {{ $name }}
+          image: "{{ $.Values.image.repository }}:{{ $.Values.image.tag }}"
+          imagePullPolicy: {{ $.Values.image.pullPolicy }}
+          command: {{ toJson $service.command }}
+          lifecycle:
+            preStop:
+              exec:
+                command: {{ toJson $.Values.termination.preStopCommand }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+          ports:
+            - name: http
+              containerPort: {{ $service.port }}
+          envFrom:
+            - configMapRef: { name: {{ include "openrum.fullname" $ }} }
+          env:
+            - name: {{ upper $name }}_HTTP_ADDR
+              value: ":{{ $service.port }}"
+            - name: POSTGRES_DSN
+              valueFrom: { secretKeyRef: { name: {{ $.Values.config.existingSecret }}, key: {{ $.Values.config.secretKeys.postgresDSN }} } }
+            - name: CLICKHOUSE_DSN
+              valueFrom: { secretKeyRef: { name: {{ $.Values.config.existingSecret }}, key: {{ $.Values.config.secretKeys.clickhouseDSN }} } }
+            - name: BOOTSTRAP_TOKEN
+              valueFrom: { secretKeyRef: { name: {{ $.Values.config.existingSecret }}, key: {{ $.Values.config.secretKeys.bootstrapToken }}, optional: true } }
+            - name: OSS_ACCESS_KEY_ID
+              valueFrom: { secretKeyRef: { name: {{ $.Values.config.existingSecret }}, key: {{ $.Values.config.secretKeys.ossAccessKeyID }}, optional: true } }
+            - name: OSS_ACCESS_KEY_SECRET
+              valueFrom: { secretKeyRef: { name: {{ $.Values.config.existingSecret }}, key: {{ $.Values.config.secretKeys.ossAccessKeySecret }}, optional: true } }
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom: { secretKeyRef: { name: {{ $.Values.config.existingSecret }}, key: {{ $.Values.config.secretKeys.awsAccessKeyID }}, optional: true } }
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom: { secretKeyRef: { name: {{ $.Values.config.existingSecret }}, key: {{ $.Values.config.secretKeys.awsSecretAccessKey }}, optional: true } }
+            - name: AWS_SESSION_TOKEN
+              valueFrom: { secretKeyRef: { name: {{ $.Values.config.existingSecret }}, key: {{ $.Values.config.secretKeys.awsSessionToken }}, optional: true } }
+            - name: OPENRUM_MASTER_KEY
+              valueFrom: { secretKeyRef: { name: {{ $.Values.config.existingSecret }}, key: {{ $.Values.config.secretKeys.managedSecretsMasterKey }}, optional: true } }
+          readinessProbe:
+            httpGet: { path: {{ $service.readyPath }}, port: http }
+            periodSeconds: 2
+            timeoutSeconds: 3
+          livenessProbe:
+            httpGet: { path: {{ $service.livePath }}, port: http }
+            periodSeconds: 20
+            timeoutSeconds: 3
+          startupProbe:
+            httpGet: { path: {{ $service.livePath }}, port: http }
+            failureThreshold: 30
+            periodSeconds: 2
+          resources: {{ toYaml $service.resources | nindent 12 }}
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 128Mi
+      {{- with $.Values.nodeSelector }}
+      nodeSelector: {{ toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $.Values.tolerations }}
+      tolerations: {{ toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $.Values.affinity }}
+      affinity: {{ toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

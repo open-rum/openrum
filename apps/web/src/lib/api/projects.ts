@@ -88,6 +88,21 @@ export function createProject(
   );
 }
 
+export function updateProject(
+  projectId: string,
+  input: { eventSampleRate?: number; apiSampleRate?: number },
+) {
+  return apiFetch<Project>(
+    `/api/v1/projects/${encodeURIComponent(projectId)}`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", ...csrfHeaders() },
+      body: JSON.stringify(input),
+    },
+    protectedRequest,
+  );
+}
+
 export function listMembers(organizationId: string) {
   return apiFetch<{ members: OrganizationMember[] }>(
     `/api/v1/organizations/${encodeURIComponent(organizationId)}/members`,

@@ -125,6 +125,7 @@ func ChecksForConfig(configuration config.Config) (map[string]Check, error) {
 		if err := addURLCheck("clickhouse", configuration.ClickHouseDSN, "9000"); err != nil {
 			return nil, err
 		}
+		checks["kafka"] = AnyTCPCheck(configuration.KafkaBrokers)
 		checks["redis"] = TCPCheck(configuration.RedisAddress)
 	case config.ServiceIngest:
 		if err := addURLCheck("postgres", configuration.PostgresDSN, "5432"); err != nil {
@@ -144,8 +145,10 @@ func ChecksForConfig(configuration config.Config) (map[string]Check, error) {
 		if err := addURLCheck("clickhouse", configuration.ClickHouseDSN, "9000"); err != nil {
 			return nil, err
 		}
-		if err := addURLCheck("object-storage", configuration.OSSEndpoint, defaultPortForEndpoint(configuration.OSSEndpoint)); err != nil {
-			return nil, err
+		if configuration.ObjectStorageProvider != config.ObjectStorageProviderNone && configuration.ObjectStorageEndpoint != "" {
+			if err := addURLCheck("object-storage", configuration.ObjectStorageEndpoint, defaultPortForEndpoint(configuration.ObjectStorageEndpoint)); err != nil {
+				return nil, err
+			}
 		}
 	default:
 		return nil, fmt.Errorf("unsupported service %q", configuration.Service)

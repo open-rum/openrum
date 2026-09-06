@@ -14,6 +14,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
+
 	"openrum/internal/migrate"
 	"openrum/migrations"
 )
@@ -126,11 +128,66 @@ func TestRUMEventsSchemaStoresEveryProtocolEvent(t *testing.T) {
 	for _, fragment := range []string{
 		"PARTITION BY (toYYYYMM(timestamp), project_id)",
 		"ORDER BY (project_id, event_type, timestamp, event_id)",
-		"TTL timestamp + toIntervalDay(14)",
+		"`raw_expires_at` DateTime64(3, 'UTC')",
+		"`aggregate_expires_at` DateTime64(3, 'UTC')",
+		"TTL raw_expires_at",
 	} {
 		if !strings.Contains(localDefinition, fragment) {
 			t.Errorf("local schema does not contain %q: %s", fragment, localDefinition)
 		}
+	}
+}
+
+func TestRetentionPolicyPhysicallyExpiresRawAndPreservesConfiguredAggregates(t *testing.T) {
+	database := openClickHouseIntegrationDatabase(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	if err := migrate.ClickHouseUp(ctx, database, migrations.Files); err != nil {
+		t.Fatal(err)
+	}
+
+	rawExpiredProject, aggregateExpiredProject := uuid.New(), uuid.New()
+	now := time.Now().UTC().Truncate(time.Second)
+	insertRetentionEvent(t, database, rawExpiredProject, now, now.Add(-time.Hour), now.Add(24*time.Hour))
+	insertRetentionEvent(t, database, aggregateExpiredProject, now.Add(time.Second), now.Add(24*time.Hour), now.Add(-time.Hour))
+
+	for _, table := range []string{"rum_events_local", "project_metrics_1m_local", "behavior_metrics_1m_local"} {
+		if _, err := database.ExecContext(ctx, "ALTER TABLE "+table+" MATERIALIZE TTL SETTINGS mutations_sync=2"); err != nil {
+			t.Fatalf("materialize %s TTL: %v", table, err)
+		}
+	}
+
+	assertProjectCount(t, database, "rum_events_local", rawExpiredProject, 0)
+	assertProjectCount(t, database, "rum_events_local", aggregateExpiredProject, 1)
+	assertProjectCount(t, database, "project_metrics_1m_local", rawExpiredProject, 1)
+	assertProjectCount(t, database, "project_metrics_1m_local", aggregateExpiredProject, 0)
+	assertProjectCount(t, database, "behavior_metrics_1m_local", rawExpiredProject, 5)
+	assertProjectCount(t, database, "behavior_metrics_1m_local", aggregateExpiredProject, 0)
+}
+
+func insertRetentionEvent(t *testing.T, database *sql.DB, projectID uuid.UUID, timestamp, rawExpiry, aggregateExpiry time.Time) {
+	t.Helper()
+	_, err := database.ExecContext(context.Background(), `INSERT INTO rum_events_local
+		(project_id,event_id,event_type,timestamp,received_at,raw_expires_at,aggregate_expires_at,
+		session_id,page_id,sample_rate,country,environment,anonymous_user_id)
+		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		projectID, uuid.New(), "page_view", timestamp, timestamp, rawExpiry, aggregateExpiry,
+		uuid.New(), uuid.New(), 1, "ZZ", "test", uuid.NewString())
+	if err != nil {
+		t.Fatalf("insert retention fixture: %v", err)
+	}
+}
+
+func assertProjectCount(t *testing.T, database *sql.DB, table string, projectID uuid.UUID, want uint64) {
+	t.Helper()
+	var count uint64
+	if err := database.QueryRowContext(context.Background(),
+		"SELECT count() FROM "+table+" WHERE project_id = ?", projectID,
+	).Scan(&count); err != nil {
+		t.Fatalf("count %s project %s: %v", table, projectID, err)
+	}
+	if count != want {
+		t.Fatalf("%s project %s count=%d want=%d", table, projectID, count, want)
 	}
 }
 

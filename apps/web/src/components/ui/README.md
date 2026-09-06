@@ -27,7 +27,7 @@ may use 10px axis ticks only when labels do not carry the primary meaning.
 - Navigation: `.nav-item`, `.tab`, `.project-switcher`
 - Containers: `.panel`, `.kpi-strip`, `.data-panel`
 - Tables: `.data-table`, `.compact-table`, `.rank-list`
-- Feedback: `.severity`, `.toast`, `.detail-drawer`
+- Feedback: `.severity`, `.toast`, shadcn `Drawer`
 
 All interactive elements must expose hover/focus states, use the shared control
 height tokens, and preserve a minimum 32px pointer target in dense desktop views.

@@ -1,0 +1,262 @@
+---
+import {
+  ArrowRight,
+  Check,
+  Code2,
+  Database,
+  Github,
+  Search,
+  Server,
+  ShieldCheck,
+  UsersRound,
+  Zap,
+} from "lucide-astro";
+import PublicLayout from "../../layouts/PublicLayout.astro";
+const { lang = "en" } = Astro.props;
+const zh = lang === "zh";
+const prefix = zh ? "/zh" : "";
+const repository = import.meta.env.PUBLIC_REPOSITORY_URL || "https://github.com/openrum/openrum";
+const copy = zh
+  ? {
+      sloganLead: "了解你的用户，",
+      sloganAccent: "快速定位线上问题",
+      description:
+        "OpenRUM 是一个开源、可自托管的前端监控平台，帮助你理解用户行为，快速定位并修复线上问题。",
+      quick: "快速开始",
+      pathTitle: "统一调查路径",
+      pathSteps: [
+        ["行为", "发现异常"],
+        ["会话", "还原旅程"],
+        ["问题", "聚合影响"],
+        ["修复", "定位根因"],
+      ],
+      flowTitle: "从现象到根因，不再跨系统拼接证据",
+      flow: [
+        ["01", "行为异常", "从 PV/UV、自定义事件、漏斗或国家/设备/浏览器分群发现变化。"],
+        ["02", "Session", "打开受影响用户会话，查看页面、点击、请求与错误时间线。"],
+        ["03", "Issue", "按稳定 Fingerprint 聚合错误，确认影响范围、Release 与新增趋势。"],
+        ["04", "定位与修复", "结合会话上下文与失败 API，快速确认根因并推进修复。"],
+      ],
+      capabilityTitle: "分析与错误是核心，性能与 API 是调查证据",
+      capabilities: [
+        ["用户行为分析", "PV/UV、来源、地域、设备、浏览器、自定义事件、漏斗、路径与留存。"],
+        ["错误监控", "自动捕获 JavaScript 错误，稳定分组、影响统计与会话上下文。"],
+        ["真实用户体验", "Core Web Vitals、Route 性能和浏览器 API 请求帮助解释用户体验异常。"],
+      ],
+      proofTitle: "为自部署而设计，不依赖 OpenRUM 云服务",
+      proof: [
+        ["可选对象存储", "没有 Bucket 时核心监控仍可运行；Source Map 可接 OSS 或 S3-compatible。"],
+        ["数据生命周期", "原始与聚合数据按项目策略物理过期，历史清理可预览、审计和限速。"],
+        ["透明证据", "公开 Demo seed、压测方法与失败结果，不把本地演练包装成生产容量声明。"],
+      ],
+    }
+  : {
+      sloganLead: "Understand your users.",
+      sloganAccent: "Resolve production issues fast.",
+      description:
+        "OpenRUM is an open-source, self-hosted frontend monitoring platform that helps you understand user behavior and quickly identify, diagnose, and resolve production issues.",
+      quick: "Quickstart",
+      pathTitle: "One investigation path",
+      pathSteps: [
+        ["Behavior", "Spot the change"],
+        ["Session", "Replay the journey"],
+        ["Issue", "Measure impact"],
+        ["Fix", "Find the cause"],
+      ],
+      flowTitle: "Move from symptom to root cause without rebuilding context",
+      flow: [
+        [
+          "01",
+          "Behavior change",
+          "Start with PV/UV, Custom Events, a funnel, or a country, device and browser segment.",
+        ],
+        [
+          "02",
+          "Session",
+          "Open the affected user Session and inspect page, interaction, request and error events in order.",
+        ],
+        [
+          "03",
+          "Issue",
+          "Use a stable Fingerprint to understand impact, Release context and whether the problem is new.",
+        ],
+        [
+          "04",
+          "Diagnose and fix",
+          "Use Session context and the failed API Request to confirm the root cause and ship a fix.",
+        ],
+      ],
+      capabilityTitle: "Analysis and errors are core; performance and APIs provide evidence",
+      capabilities: [
+        [
+          "Behavior analytics",
+          "PV/UV, acquisition, geography, device, browser, Custom Events, funnels, paths and retention.",
+        ],
+        [
+          "Error monitoring",
+          "Automatic JavaScript capture, stable grouping, impact statistics and Session context.",
+        ],
+        [
+          "Real-user experience",
+          "Core Web Vitals, Route performance and browser API requests explain experience regressions.",
+        ],
+      ],
+      proofTitle: "Designed for self-hosting, with no OpenRUM cloud dependency",
+      proof: [
+        [
+          "Optional object storage",
+          "Core monitoring runs without a Bucket; Source Maps can use OSS or an S3-compatible provider.",
+        ],
+        [
+          "Data lifecycle",
+          "Raw and aggregate data expire by Project policy; historical cleanup is previewed, audited and rate-limited.",
+        ],
+        [
+          "Transparent evidence",
+          "Demo seeds, benchmark methods and failed overload results are public—not promoted as production capacity.",
+        ],
+      ],
+    };
+const capabilityIcons = [UsersRound, Zap, Search];
+const proofIcons = [Server, Database, ShieldCheck];
+const pageTitle = zh
+  ? "OpenRUM — 了解你的用户，快速定位线上问题"
+  : "OpenRUM — Understand your users. Resolve production issues fast.";
+---
+
+<PublicLayout title={pageTitle} description={copy.description} lang={lang}>
+  <section class="hero">
+    <div class="site-container hero-grid">
+      <div>
+        <p class="eyebrow">OpenRUM Alpha · Self-host first</p>
+        <h1>
+          {copy.sloganLead}
+          <span>{copy.sloganAccent}</span>
+        </h1>
+        <p class="hero-copy">{copy.description}</p>
+        <div class="cta-row">
+          <a
+            class="ui-button ui-button-primary"
+            href={zh ? "/zh/docs/getting-started/quickstart/" : "/docs/getting-started/quickstart/"}
+            >{copy.quick}<ArrowRight size={16} /></a
+          >
+          <a class="ui-button ui-button-outline" href={repository}><Github size={16} />GitHub</a>
+        </div>
+        <div class="hero-proof">
+          <span><Check size={14} />{zh ? "开源自部署" : "Open source & self-hosted"}</span>
+          <span
+            ><Check size={14} />{zh ? "行为与错误同一路径" : "Behavior + errors in one path"}</span
+          >
+          <span><Check size={14} />{zh ? "不采集原始输入" : "No raw input collection"}</span>
+        </div>
+      </div>
+      <div
+        class="path-preview"
+        role="img"
+        aria-label={zh
+          ? "OpenRUM 统一调查路径示意：行为、会话、问题、修复"
+          : "Illustration of the OpenRUM investigation path: behavior, session, issue, and fix"}
+      >
+        <div class="path-preview-header">
+          <span class="path-preview-label">{copy.pathTitle}</span>
+          <span class="path-preview-badge">Alpha</span>
+        </div>
+        <ol class="path-preview-steps">
+          {
+            copy.pathSteps.map(([title, body], index) => (
+              <li class="path-preview-step">
+                <span class="path-preview-index">{String(index + 1).padStart(2, "0")}</span>
+                <div>
+                  <strong>{title}</strong>
+                  <small>{body}</small>
+                </div>
+              </li>
+            ))
+          }
+        </ol>
+      </div>
+    </div>
+  </section>
+  <section class="section">
+    <div class="site-container">
+      <div class="section-heading">
+        <p class="eyebrow">Investigation path</p>
+        <h2>{copy.flowTitle}</h2>
+      </div>
+      <div class="flow-grid">
+        {
+          copy.flow.map(([number, title, body]) => (
+            <article class="flow-step">
+              <span class="flow-number">{number}</span>
+              <h3>{title}</h3>
+              <p>{body}</p>
+            </article>
+          ))
+        }
+      </div>
+    </div>
+  </section>
+  <section class="section section-muted">
+    <div class="site-container">
+      <div class="section-heading">
+        <p class="eyebrow">Shipped capabilities</p>
+        <h2>{copy.capabilityTitle}</h2>
+      </div>
+      <div class="card-grid">
+        {
+          copy.capabilities.map(([title, body], index) => {
+            const Icon = capabilityIcons[index];
+            return (
+              <article class="ui-card feature-card">
+                <span class="feature-icon">
+                  <Icon size={19} />
+                </span>
+                <h3>{title}</h3>
+                <p>{body}</p>
+                <a href={`${prefix}/product`}>
+                  {zh ? "查看能力边界" : "See capability boundaries"} →
+                </a>
+                <div class="status-line">
+                  <span>Alpha</span>
+                  <span>{zh ? "已实现" : "Implemented"}</span>
+                </div>
+              </article>
+            );
+          })
+        }
+      </div>
+    </div>
+  </section>
+  <section class="section">
+    <div class="site-container">
+      <div class="section-heading">
+        <p class="eyebrow">Self-host proof</p>
+        <h2>{copy.proofTitle}</h2>
+      </div>
+      <div class="proof-grid">
+        {
+          copy.proof.map(([title, body], index) => {
+            const Icon = proofIcons[index];
+            return (
+              <article class="ui-card proof-card">
+                <span class="feature-icon">
+                  <Icon size={19} />
+                </span>
+                <h3>{title}</h3>
+                <p>{body}</p>
+              </article>
+            );
+          })
+        }
+      </div>
+      <div class="cta-row">
+        <a class="ui-button ui-button-primary" href={`${prefix}/self-host`}
+          >{zh ? "选择部署路径" : "Choose a deployment path"}<ArrowRight size={16} /></a
+        >
+        <a class="ui-button ui-button-outline" href={`${prefix}/benchmarks`}
+          ><Code2 size={16} />{zh ? "查看可复现证据" : "Review reproducible evidence"}</a
+        >
+      </div>
+    </div>
+  </section>
+</PublicLayout>

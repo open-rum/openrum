@@ -213,6 +213,16 @@ func TestControlPlaneCRUDAndRBAC(t *testing.T) {
 	if _, err := keys.Validate(ctx, createdKey.WriteKey); err != nil {
 		t.Fatalf("created key validation error=%v", err)
 	}
+	connectionPath := "/api/v1/projects/" + projectA.ID + "/connection-status"
+	response = performControlPlaneRequest(t, router, "viewer", http.MethodGet, connectionPath, "", false)
+	assertStatus(t, response, http.StatusOK)
+	var connection connectionStatusResponse
+	decodeResponse(t, response, &connection)
+	if !connection.KeyConfigured {
+		t.Fatal("active project key was not reflected in connection status")
+	}
+	response = performControlPlaneRequest(t, router, "owner-b", http.MethodGet, connectionPath, "", false)
+	assertStatus(t, response, http.StatusNotFound)
 
 	projectB, err := projects.Create(ctx, ownerB, metadata.CreateProjectInput{
 		OrganizationID: organizationB.Organization.ID, Name: "Private B", Slug: "private-b", Environment: "production",
@@ -261,6 +271,17 @@ func TestControlPlaneCRUDAndRBAC(t *testing.T) {
 	response = performControlPlaneRequest(t, router, "owner-a", http.MethodPatch, "/api/v1/projects/"+projectA.ID,
 		`{"retentionDays":7}`, false)
 	assertStatus(t, response, http.StatusForbidden)
+	response = performControlPlaneRequest(t, router, "admin", http.MethodDelete, "/api/v1/projects/"+projectA.ID, "", true)
+	assertStatus(t, response, http.StatusForbidden)
+	response = performControlPlaneRequest(t, router, "owner-a", http.MethodDelete, "/api/v1/projects/"+projectA.ID, "", false)
+	assertStatus(t, response, http.StatusForbidden)
+	response = performControlPlaneRequest(t, router, "owner-a", http.MethodDelete, "/api/v1/projects/"+projectA.ID, "", true)
+	assertStatus(t, response, http.StatusAccepted)
+	response = performControlPlaneRequest(t, router, "owner-a", http.MethodGet, "/api/v1/projects/"+projectA.ID, "", false)
+	assertStatus(t, response, http.StatusNotFound)
+	if _, err := keys.Validate(ctx, createdKey.WriteKey); !errors.Is(err, metadata.ErrInvalidProjectKey) {
+		t.Fatalf("deletion did not revoke project key: %v", err)
+	}
 
 	organizationAID := uuid.MustParse(organizationA.ID)
 	var audits int
@@ -293,6 +314,7 @@ func controlPlaneTestRouter(organizations *metadata.OrganizationRepository, proj
 	memberHandler := NewMemberHandler(organizations, logger)
 	projectHandler := NewProjectHandler(organizations, projects, logger)
 	projectKeyHandler := NewProjectKeyHandler(keys, logger)
+	connectionStatusHandler := NewConnectionStatusHandler(keys, fakeConnectionReader{}, logger)
 	requireSession := httpx.RequireSession(fixtureAuthenticator{principals: principals})
 	baseURL, _ := url.Parse("http://openrum.test")
 	requireCSRF := httpx.RequireCSRF(baseURL)
@@ -308,7 +330,9 @@ func controlPlaneTestRouter(organizations *metadata.OrganizationRepository, proj
 	router.Handle("POST /api/v1/organizations/{orgId}/projects", write(projectHandler.Create))
 	router.Handle("GET /api/v1/projects/{projectId}", read(projectHandler.Get))
 	router.Handle("PATCH /api/v1/projects/{projectId}", write(projectHandler.Update))
+	router.Handle("DELETE /api/v1/projects/{projectId}", write(projectHandler.Delete))
 	router.Handle("GET /api/v1/projects/{projectId}/keys", read(projectKeyHandler.List))
+	router.Handle("GET /api/v1/projects/{projectId}/connection-status", read(connectionStatusHandler.Get))
 	router.Handle("POST /api/v1/projects/{projectId}/keys", write(projectKeyHandler.Create))
 	router.Handle("POST /api/v1/projects/{projectId}/keys/{keyId}/rotate", write(projectKeyHandler.Rotate))
 	router.Handle("DELETE /api/v1/projects/{projectId}/keys/{keyId}", write(projectKeyHandler.Revoke))

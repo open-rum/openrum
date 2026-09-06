@@ -28,9 +28,13 @@ export interface ClientOptions {
   eventSampleRate?: number;
   apiSampleRate?: number;
   errorSampleRate?: number;
+  /** Automatically capture privacy-safe interactive element clicks. Defaults to true. */
+  captureClicks?: boolean;
   flushIntervalMs?: number;
   /** Optional pre-authenticated endpoint for sendBeacon; never receives the project key. */
   beaconEndpoint?: string;
+  /** Defaults to `/api/v1/sdk/config` on the ingest endpoint origin. Set false to disable. */
+  configEndpoint?: string | false;
   integrations?: Integration[];
 }
 
@@ -79,7 +83,7 @@ export class OpenRUMClient {
   readonly #nowISO: () => string;
   readonly #randomUUID: () => string;
   readonly #onClose?: () => void;
-  readonly #sampling: SamplingOptions;
+  #sampling: SamplingOptions;
   readonly #teardowns: Array<() => void> = [];
   readonly #breadcrumbs: Breadcrumb[] = [];
   #state: "running" | "closed" = "running";
@@ -189,6 +193,21 @@ export class OpenRUMClient {
 
   diagnostics(): Readonly<Diagnostics> {
     return { ...this.#diagnostics };
+  }
+
+  updateSampling(options: Partial<SamplingOptions>): void {
+    runSafely(this.#diagnostics, undefined, () => {
+      this.#sampling = normalizeSamplingOptions({ ...this.#sampling, ...options });
+    });
+  }
+
+  sampling(): Readonly<SamplingOptions> {
+    return { ...this.#sampling };
+  }
+
+  registerTeardown(teardown: () => void): void {
+    if (this.#state === "running") this.#teardowns.push(teardown);
+    else runSafely(this.#diagnostics, undefined, teardown);
   }
 
   async close(): Promise<void> {

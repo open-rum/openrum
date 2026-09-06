@@ -4,6 +4,7 @@ export type SessionUser = {
   userId: string;
   email: string;
   displayName: string;
+  instanceRole?: "instance_owner" | "instance_admin";
 };
 
 export type SetupStatus = { initialized: boolean };

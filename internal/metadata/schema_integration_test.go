@@ -27,17 +27,33 @@ func TestControlPlaneConstraints(t *testing.T) {
 		"invalid-local@example.com", "Invalid Local")
 
 	userID := uuid.New()
+	invalidRoleUserID := uuid.New()
 	organizationID := uuid.New()
 	projectID := uuid.New()
 	mustExec(t, ctx, transaction,
 		"INSERT INTO users (id, email, display_name, password_hash) VALUES ($1, $2, $3, $4)",
 		userID, "owner@example.com", "Owner", "argon2id-placeholder")
 	mustExec(t, ctx, transaction,
+		"INSERT INTO users (id, email, display_name, password_hash) VALUES ($1, $2, $3, $4)",
+		invalidRoleUserID, "invalid-role@example.com", "Invalid Role", "argon2id-placeholder")
+	mustExec(t, ctx, transaction,
 		"INSERT INTO organizations (id, name, slug, created_by) VALUES ($1, $2, $3, $4)",
 		organizationID, "Example", "example", userID)
 	mustExec(t, ctx, transaction,
 		"INSERT INTO organization_members (organization_id, user_id, role) VALUES ($1, $2, 'owner')",
 		organizationID, userID)
+	mustExec(t, ctx, transaction,
+		"INSERT INTO instance_members (user_id, role, created_by) VALUES ($1, 'instance_owner', $1)",
+		userID)
+	expectConstraint(t, ctx, transaction,
+		"INSERT INTO instance_members (user_id, role, created_by) VALUES ($1, 'owner', $1)",
+		invalidRoleUserID)
+	mustExec(t, ctx, transaction,
+		"INSERT INTO instance_settings (namespace,key,value_json,updated_by) VALUES ('retention','rawDays','14',$1)",
+		userID)
+	expectConstraint(t, ctx, transaction,
+		"INSERT INTO instance_settings (namespace,key,value_json,version,source,updated_by) VALUES ('invalid namespace','rawDays','14',0,'deployment',$1)",
+		userID)
 
 	expectConstraint(t, ctx, transaction,
 		"INSERT INTO projects (organization_id, name, slug, retention_days) VALUES ($1, $2, $3, 91)",

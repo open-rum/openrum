@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/mileusna/useragent"
 
+	"openrum/internal/geo"
 	"openrum/internal/privacy"
 )
 
@@ -21,57 +22,61 @@ const (
 )
 
 type CanonicalEvent struct {
-	ProjectID         uuid.UUID
-	EventID           uuid.UUID
-	EventType         EventType
-	Timestamp         time.Time
-	ReceivedAt        time.Time
-	Environment       string
-	Release           string
-	Dist              string
-	SessionID         uuid.UUID
-	AnonymousUserID   string
-	UserID            string
-	PageID            uuid.UUID
-	PageURL           string
-	PageURLNormalized string
-	Route             string
-	Referrer          string
-	Title             string
-	NavigationType    string
-	SDKName           string
-	SDKVersion        string
-	SchemaVersion     string
-	SampleRate        float32
-	Browser           string
-	BrowserVersion    string
-	OS                string
-	OSVersion         string
-	DeviceType        string
-	Country           string
-	TraceID           string
-	SpanID            string
-	ErrorType         string
-	ErrorMessage      string
-	ErrorStack        string
-	ErrorMechanism    string
-	Fingerprint       string
-	Handled           bool
-	APIMethod         string
-	APIURLNormalized  string
-	APIStatus         uint16
-	APIFailure        string
-	DurationMS        float64
-	TransferSize      uint64
-	MetricName        string
-	MetricValue       float64
-	MetricDelta       float64
-	MetricRating      string
-	CustomName        string
-	Attributes        map[string]string
-	Measurements      map[string]float64
-	Breadcrumbs       []string
-	IngestFlags       []string
+	ProjectID          uuid.UUID
+	EventID            uuid.UUID
+	EventType          EventType
+	Timestamp          time.Time
+	ReceivedAt         time.Time
+	RawExpiresAt       time.Time
+	AggregateExpiresAt time.Time
+	Environment        string
+	Release            string
+	Dist               string
+	SessionID          uuid.UUID
+	AnonymousUserID    string
+	UserID             string
+	PageID             uuid.UUID
+	PageURL            string
+	PageURLNormalized  string
+	Route              string
+	Referrer           string
+	Title              string
+	NavigationType     string
+	SDKName            string
+	SDKVersion         string
+	SchemaVersion      string
+	SampleRate         float32
+	Browser            string
+	BrowserVersion     string
+	OS                 string
+	OSVersion          string
+	DeviceType         string
+	Country            string
+	TraceID            string
+	SpanID             string
+	ErrorType          string
+	ErrorMessage       string
+	ErrorStack         string
+	ErrorMechanism     string
+	Fingerprint        string
+	FingerprintVersion uint16
+	CustomFingerprint  []string
+	Handled            bool
+	APIMethod          string
+	APIURLNormalized   string
+	APIStatus          uint16
+	APIFailure         string
+	DurationMS         float64
+	TransferSize       uint64
+	MetricName         string
+	MetricValue        float64
+	MetricDelta        float64
+	MetricRating       string
+	CustomName         string
+	Attributes         map[string]string
+	Measurements       map[string]float64
+	Breadcrumbs        []string
+	IngestFlags        []string
 }
 
 type EventFailure struct {
@@ -86,7 +91,9 @@ type queuedEnvelopeDocument struct {
 	ReceivedAt         time.Time `json:"received_at"`
 	Origin             string    `json:"origin"`
 	ClientIP           string    `json:"client_ip"`
+	ClientCountry      string    `json:"client_country,omitempty"`
 	UserAgent          string    `json:"user_agent"`
+	Synthetic          bool      `json:"synthetic,omitempty"`
 	Envelope           struct {
 		SchemaVersion string            `json:"schema_version"`
 		SentAt        string            `json:"sent_at"`
@@ -192,7 +199,11 @@ func normalizeEvent(input normalizeInput) (CanonicalEvent, error) {
 		SDKName: input.queued.Envelope.SDK.Name, SDKVersion: input.queued.Envelope.SDK.Version,
 		SchemaVersion: input.queued.Envelope.SchemaVersion, SampleRate: sampleRate,
 		Browser: input.userAgent.Name, BrowserVersion: input.userAgent.Version, OS: input.userAgent.OS, OSVersion: input.userAgent.OSVersion,
-		DeviceType: deviceType(input.userAgent), Country: "ZZ", Attributes: attributes, Measurements: map[string]float64{}, Breadcrumbs: []string{}, IngestFlags: []string{},
+		DeviceType: deviceType(input.userAgent), Country: geo.Normalize(input.queued.ClientCountry),
+		Attributes: attributes, Measurements: map[string]float64{}, Breadcrumbs: []string{}, IngestFlags: []string{},
+	}
+	if input.queued.Synthetic {
+		result.IngestFlags = append(result.IngestFlags, "synthetic")
 	}
 	if timestamp.Before(time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC)) || timestamp.After(input.queued.ReceivedAt.Add(24*time.Hour)) {
 		result.Timestamp = input.queued.ReceivedAt.UTC()
@@ -220,6 +231,7 @@ func normalizeEvent(input normalizeInput) (CanonicalEvent, error) {
 		result.ErrorMessage, titleChanged = privacy.ScrubString(input.event.Error.Message, 2048)
 		result.ErrorStack, userChanged = privacy.ScrubString(input.event.Error.Stack, 65536)
 		result.ErrorMechanism, anonymousChanged = privacy.ScrubString(input.event.Error.Mechanism, 64)
+		result.CustomFingerprint = append([]string(nil), input.event.Fingerprint...)
 		result.Handled = input.event.Error.Handled
 		result.Breadcrumbs, attributesChanged = scrubBreadcrumbs(input.event.Breadcrumbs)
 		if titleChanged || userChanged || anonymousChanged || attributesChanged {
@@ -263,6 +275,11 @@ func normalizeEvent(input normalizeInput) (CanonicalEvent, error) {
 		}
 		result.CustomName, titleChanged = privacy.ScrubString(input.event.Name, 80)
 		customAttributes, customChanged := privacy.ScrubAttributes(input.event.Attributes, 20)
+		customAttributes, behaviorChanged, behaviorErr := NormalizeBehaviorAttributes(result.CustomName, customAttributes)
+		if behaviorErr != nil {
+			return CanonicalEvent{}, behaviorErr
+		}
+		customChanged = customChanged || behaviorChanged
 		for key, value := range customAttributes {
 			result.Attributes[key] = value
 		}

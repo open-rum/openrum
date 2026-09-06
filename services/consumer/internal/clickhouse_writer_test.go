@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 
 	"openrum/internal/event"
+	"openrum/internal/ingest"
 )
 
 type fakeClickHouseConnection struct {
@@ -40,6 +41,34 @@ type fakeClickHouseBatch struct {
 	driver.Batch
 	connection *fakeClickHouseConnection
 	rows       [][]any
+}
+
+type fakeConnectionRecorder struct {
+	mutex     sync.Mutex
+	queryable map[uuid.UUID]time.Time
+	err       error
+}
+
+func (recorder *fakeConnectionRecorder) MarkSDKSeen(context.Context, uuid.UUID, time.Time) error {
+	return recorder.err
+}
+
+func (recorder *fakeConnectionRecorder) MarkEventReceived(context.Context, uuid.UUID, time.Time) error {
+	return recorder.err
+}
+
+func (recorder *fakeConnectionRecorder) MarkEventQueryable(_ context.Context, projectID uuid.UUID, at time.Time) error {
+	recorder.mutex.Lock()
+	defer recorder.mutex.Unlock()
+	if recorder.queryable == nil {
+		recorder.queryable = make(map[uuid.UUID]time.Time)
+	}
+	recorder.queryable[projectID] = at
+	return recorder.err
+}
+
+func (recorder *fakeConnectionRecorder) MarkRejected(context.Context, uuid.UUID, time.Time, ingest.RejectReason) error {
+	return recorder.err
 }
 
 func (batch *fakeClickHouseBatch) Append(values ...any) error {
@@ -101,6 +130,57 @@ func TestBufferedClickHouseWriterRetriesSameBatchAndReportsDurability(t *testing
 	}
 }
 
+func TestBufferedClickHouseWriterMarksQueryableOnlyAfterSuccessfulInsert(t *testing.T) {
+	recorder := &fakeConnectionRecorder{}
+	connection := &fakeClickHouseConnection{}
+	current := canonicalFixture()
+	writer := NewBufferedClickHouseWriter(context.Background(), connection, ClickHouseWriterOptions{
+		MaxRows: 1, MaxAttempts: 1, ConnectionStatus: recorder,
+	})
+	if err := writer.WriteEvents(context.Background(), []event.CanonicalEvent{current}); err != nil {
+		t.Fatal(err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatal(err)
+	}
+	recorder.mutex.Lock()
+	markedAt, ok := recorder.queryable[current.ProjectID]
+	recorder.mutex.Unlock()
+	if !ok || !markedAt.Equal(current.ReceivedAt) {
+		t.Fatalf("queryable=%v want project=%s at=%s", recorder.queryable, current.ProjectID, current.ReceivedAt)
+	}
+
+	recorder = &fakeConnectionRecorder{}
+	connection = &fakeClickHouseConnection{sendFailures: 1}
+	writer = NewBufferedClickHouseWriter(context.Background(), connection, ClickHouseWriterOptions{
+		MaxRows: 1, MaxAttempts: 1, ConnectionStatus: recorder,
+	})
+	if err := writer.WriteEvents(context.Background(), []event.CanonicalEvent{current}); err == nil {
+		t.Fatal("failed ClickHouse insert was reported as successful")
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatal(err)
+	}
+	recorder.mutex.Lock()
+	marked := len(recorder.queryable)
+	recorder.mutex.Unlock()
+	if marked != 0 {
+		t.Fatalf("failed insert marked %d projects queryable", marked)
+	}
+
+	recorder = &fakeConnectionRecorder{err: context.DeadlineExceeded}
+	connection = &fakeClickHouseConnection{}
+	writer = NewBufferedClickHouseWriter(context.Background(), connection, ClickHouseWriterOptions{
+		MaxRows: 1, MaxAttempts: 1, ConnectionStatus: recorder,
+	})
+	if err := writer.WriteEvents(context.Background(), []event.CanonicalEvent{current}); err != nil {
+		t.Fatalf("best-effort connection tracking changed durable write result: %v", err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestBufferedClickHouseWriterRejectsWritesAfterClose(t *testing.T) {
 	connection := &fakeClickHouseConnection{}
 	writer := NewBufferedClickHouseWriter(context.Background(), connection, DefaultClickHouseWriterOptions())
@@ -127,9 +207,11 @@ func TestEventBatchTokenIsDeterministicAndOrderSensitive(t *testing.T) {
 }
 
 func canonicalFixture() event.CanonicalEvent {
+	now := time.Now().UTC()
 	return event.CanonicalEvent{
 		ProjectID: uuid.New(), EventID: uuid.New(), EventType: event.EventTypePageView,
-		Timestamp: time.Now().UTC(), ReceivedAt: time.Now().UTC(), SessionID: uuid.New(), PageID: uuid.New(),
+		Timestamp: now, ReceivedAt: now, RawExpiresAt: now.AddDate(0, 0, 14), AggregateExpiresAt: now.AddDate(0, 0, 90),
+		SessionID: uuid.New(), PageID: uuid.New(),
 		Environment: "production", Country: "ZZ", Attributes: map[string]string{}, Measurements: map[string]float64{},
 		Breadcrumbs: []string{}, IngestFlags: []string{},
 	}

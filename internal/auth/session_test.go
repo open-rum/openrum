@@ -61,6 +61,12 @@ func TestSessionLifecycleRotationExpiryRevokeAndPasswordChange(t *testing.T) {
 		t.Fatal(err)
 	}
 	manager := NewSessionManager(database)
+	if err := manager.Reauthenticate(ctx, userID, "current-password"); err != nil {
+		t.Fatalf("reauthenticate valid password: %v", err)
+	}
+	if err := manager.Reauthenticate(ctx, userID, "wrong-password"); !errors.Is(err, ErrInvalidCredentials) {
+		t.Fatalf("reauthenticate wrong password error=%v", err)
+	}
 	first, err := manager.Create(ctx, userID, "127.0.0.1", "test-agent")
 	if err != nil {
 		t.Fatal(err)
@@ -89,6 +95,19 @@ func TestSessionLifecycleRotationExpiryRevokeAndPasswordChange(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	elevatedAt := time.Now().UTC().Truncate(time.Millisecond)
+	manager.now = func() time.Time { return elevatedAt }
+	if err := manager.Elevate(ctx, rotatedPrincipal, "current-password"); err != nil {
+		t.Fatalf("elevate session: %v", err)
+	}
+	if err := manager.RequireRecentElevation(ctx, rotatedPrincipal, 5*time.Minute); err != nil {
+		t.Fatalf("fresh elevation rejected: %v", err)
+	}
+	manager.now = func() time.Time { return elevatedAt.Add(5*time.Minute + time.Second) }
+	if err := manager.RequireRecentElevation(ctx, rotatedPrincipal, 5*time.Minute); !errors.Is(err, ErrReauthenticationRequired) {
+		t.Fatalf("expired elevation error=%v", err)
+	}
+	manager.now = time.Now
 
 	other, err := manager.Create(ctx, userID, "127.0.0.2", "other-agent")
 	if err != nil {

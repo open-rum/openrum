@@ -120,6 +120,8 @@ func writeControlPlaneError(writer http.ResponseWriter, request *http.Request, l
 		httpx.WriteError(writer, request, http.StatusConflict, "CONFLICT", "A resource with these values already exists.")
 	case errors.Is(err, metadata.ErrLastOwner):
 		httpx.WriteError(writer, request, http.StatusConflict, "LAST_OWNER_REQUIRED", "The organization must retain at least one owner.")
+	case errors.Is(err, metadata.ErrLastInstanceOwner):
+		httpx.WriteError(writer, request, http.StatusConflict, "LAST_INSTANCE_OWNER_REQUIRED", "The instance must retain at least one owner.")
 	default:
 		logger.Error().Err(err).Str("request_id", httpx.RequestIDFromContext(request.Context())).Msg("control-plane request failed")
 		httpx.WriteError(writer, request, http.StatusInternalServerError, "INTERNAL_ERROR", "An internal error occurred.")

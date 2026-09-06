@@ -1,0 +1,31 @@
+{
+  "name": "@openrum/site",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev",
+    "sync:docs": "node ../../scripts/docs/sync-content.mjs",
+    "build": "pnpm sync:docs && astro check && astro build",
+    "preview": "astro preview",
+    "typecheck": "astro check",
+    "test": "node --test tests/*.test.mjs"
+  },
+  "dependencies": {
+    "@astrojs/react": "^6.0.5",
+    "@astrojs/starlight": "^0.42.0",
+    "@fontsource-variable/geist": "^5.2.8",
+    "@openrum/design-tokens": "workspace:*",
+    "@openrum/ui": "workspace:*",
+    "@tailwindcss/vite": "^4.3.3",
+    "astro": "^7.3.1",
+    "lucide-astro": "^0.556.0",
+    "react": "19.2.0",
+    "react-dom": "19.2.0",
+    "tailwindcss": "^4.3.3"
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.9.6",
+    "typescript": "^6.0.3"
+  }
+}

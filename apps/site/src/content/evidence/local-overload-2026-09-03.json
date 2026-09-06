@@ -1,0 +1,13 @@
+{
+  "id": "local-3x-20260903",
+  "date": "2026-09-03",
+  "scope": "single-replica Docker Compose development machine",
+  "status": "failed",
+  "productionClaim": false,
+  "ingestP95Seconds": 26.59,
+  "ingestFailurePercent": 39.14,
+  "queryP95Seconds": 21.21,
+  "queryFailurePercent": 40.56,
+  "lagRecoveryUpperBoundMinutes": 7,
+  "source": "docs/benchmarks/initial-capacity.md"
+}

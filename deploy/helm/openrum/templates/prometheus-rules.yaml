@@ -1,0 +1,11 @@
+{{- if .Values.prometheusRules.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ include "openrum.fullname" . }}
+  labels:
+    {{- include "openrum.labels" . | nindent 4 }}
+    {{- with .Values.prometheusRules.labels }}{{ toYaml . | nindent 4 }}{{- end }}
+spec:
+{{ .Files.Get "files/openrum-rules.yaml" | nindent 2 }}
+{{- end }}

@@ -11,6 +11,7 @@ import (
 	"github.com/segmentio/kafka-go"
 
 	"openrum/internal/event"
+	"openrum/internal/fingerprint"
 )
 
 const DeadLetterSchemaVersion = "1.0"
@@ -47,6 +48,8 @@ type Consumer struct {
 	deadLetters DeadLetterSink
 	now         func() time.Time
 	metrics     *Metrics
+	fingerprint errorFingerprinter
+	retention   RetentionPolicyProvider
 }
 
 type ConsumerOption func(*Consumer)
@@ -55,8 +58,12 @@ func WithMetrics(metrics *Metrics) ConsumerOption {
 	return func(consumer *Consumer) { consumer.metrics = metrics }
 }
 
+func WithRetentionPolicies(provider RetentionPolicyProvider) ConsumerOption {
+	return func(consumer *Consumer) { consumer.retention = provider }
+}
+
 func NewConsumer(source MessageSource, events EventSink, deadLetters DeadLetterSink, options ...ConsumerOption) *Consumer {
-	consumer := &Consumer{source: source, events: events, deadLetters: deadLetters, now: time.Now}
+	consumer := &Consumer{source: source, events: events, deadLetters: deadLetters, now: time.Now, fingerprint: fingerprint.Compute}
 	for _, option := range options {
 		option(consumer)
 	}
@@ -133,6 +140,17 @@ func (consumer *Consumer) processMessage(ctx context.Context, message kafka.Mess
 		}
 	}
 	if len(normalized) > 0 {
+		if consumer.retention == nil {
+			return fmt.Errorf("resolve event retention: no retention policy provider configured")
+		}
+		policy, err := consumer.retention.Get(ctx, normalized[0].ProjectID)
+		if err != nil {
+			return fmt.Errorf("resolve event retention: %w", err)
+		}
+		if err := applyRetentionPolicy(normalized, policy); err != nil {
+			return fmt.Errorf("apply event retention: %w", err)
+		}
+		enrichErrorEvents(normalized, consumer.fingerprint)
 		if err := consumer.events.WriteEvents(ctx, normalized); err != nil {
 			return fmt.Errorf("write canonical events: %w", err)
 		}

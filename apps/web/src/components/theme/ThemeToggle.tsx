@@ -1,58 +1,30 @@
-import { Monitor, Moon, Sun } from "lucide-react";
+import { Moon, Sun } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuLabel,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { useTheme, type Theme } from "./ThemeProvider";
+import { useTheme } from "./ThemeProvider";
 
-const themeLabels: Record<Theme, string> = {
-  light: "亮色",
-  dark: "暗色",
-  system: "跟随系统",
-};
-
-export function ThemeToggle() {
-  const { theme, resolvedTheme, setTheme } = useTheme();
-  const TriggerIcon = theme === "system" ? Monitor : resolvedTheme === "dark" ? Moon : Sun;
+export function ThemeToggle({
+  showLabel = false,
+  compact = false,
+}: {
+  showLabel?: boolean;
+  compact?: boolean;
+}) {
+  const { resolvedTheme, setTheme } = useTheme();
+  const targetTheme = resolvedTheme === "dark" ? "light" : "dark";
+  const TargetIcon = targetTheme === "dark" ? Moon : Sun;
+  const targetLabel = targetTheme === "dark" ? "暗色模式" : "亮色模式";
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button
-          variant="outline"
-          size="icon-lg"
-          type="button"
-          aria-label={`外观：${themeLabels[theme]}`}
-          title={`外观：${themeLabels[theme]}`}
-        >
-          <TriggerIcon />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        <DropdownMenuLabel>界面外观</DropdownMenuLabel>
-        <DropdownMenuGroup>
-          <DropdownMenuRadioGroup value={theme} onValueChange={(value) => setTheme(value as Theme)}>
-            <DropdownMenuRadioItem value="light">
-              <Sun />
-              亮色
-            </DropdownMenuRadioItem>
-            <DropdownMenuRadioItem value="dark">
-              <Moon />
-              暗色
-            </DropdownMenuRadioItem>
-            <DropdownMenuRadioItem value="system">
-              <Monitor />
-              跟随系统
-            </DropdownMenuRadioItem>
-          </DropdownMenuRadioGroup>
-        </DropdownMenuGroup>
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <Button
+      variant={showLabel || compact ? "ghost" : "outline"}
+      size={showLabel ? "default" : compact ? "icon" : "icon-lg"}
+      type="button"
+      aria-label={`切换至${targetLabel}`}
+      title={showLabel ? undefined : `切换至${targetLabel}`}
+      onClick={() => setTheme(targetTheme)}
+    >
+      <TargetIcon data-icon="inline-start" />
+      {showLabel ? <span>切换至{targetLabel}</span> : null}
+    </Button>
   );
 }

@@ -10,9 +10,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 
 	"openrum/internal/event"
+	"openrum/internal/geo"
 	"openrum/internal/httpx"
 	"openrum/internal/ingest"
 	"openrum/internal/metadata"
@@ -25,14 +27,15 @@ type EnvelopeAcceptor interface {
 }
 
 type AcceptedEnvelope struct {
-	Access     metadata.ProjectKeyAccess
-	Envelope   event.EnvelopeV1
-	Raw        []byte
-	Origin     string
-	ClientIP   string
-	UserAgent  string
-	ReceivedAt time.Time
-	Rejected   []Rejection
+	Access        metadata.ProjectKeyAccess
+	Envelope      event.EnvelopeV1
+	Raw           []byte
+	Origin        string
+	ClientIP      string
+	ClientCountry string
+	UserAgent     string
+	ReceivedAt    time.Time
+	Rejected      []Rejection
 }
 
 type Acceptance struct {
@@ -49,6 +52,8 @@ type Handler struct {
 	authenticator ingest.Authenticator
 	limiter       ingest.RateLimiter
 	acceptor      EnvelopeAcceptor
+	connection    ingest.ConnectionStatusRecorder
+	geo           *geo.Resolver
 	logger        zerolog.Logger
 	now           func() time.Time
 	metrics       *Metrics
@@ -58,6 +63,17 @@ type HandlerOption func(*Handler)
 
 func WithMetrics(metrics *Metrics) HandlerOption {
 	return func(handler *Handler) { handler.metrics = metrics }
+}
+
+// WithGeoResolver enables country resolution. Without it every event stores an
+// unknown country, which is the safe default for a deployment that has not
+// declared which proxy it trusts.
+func WithGeoResolver(resolver *geo.Resolver) HandlerOption {
+	return func(handler *Handler) { handler.geo = resolver }
+}
+
+func WithConnectionStatus(connection ingest.ConnectionStatusRecorder) HandlerOption {
+	return func(handler *Handler) { handler.connection = connection }
 }
 
 func NewHandler(authenticator ingest.Authenticator, limiter ingest.RateLimiter, acceptor EnvelopeAcceptor, logger zerolog.Logger, options ...HandlerOption) *Handler {
@@ -97,31 +113,38 @@ func (handler *Handler) ServeHTTP(response http.ResponseWriter, request *http.Re
 		handler.writeError(response, request, http.StatusUnauthorized, "INVALID_KEY", "The project key is invalid or revoked.")
 		return
 	}
+	handler.markSDKSeen(request.Context(), access.Project.ID, handler.now().UTC())
 	origin, ok := allowedOrigin(request.Header.Get("Origin"), access.Project.AllowedOrigins)
 	if !ok {
+		handler.markRejected(request.Context(), access.Project.ID, ingest.RejectOriginRejected)
 		handler.writeError(response, request, http.StatusForbidden, "ORIGIN_REJECTED", "The request origin is not allowed for this project.")
 		return
 	}
 	setCORSHeaders(response.Header(), origin)
 	if !handler.limiter.AllowProject(request.Context(), access.Project.ID) {
+		handler.markRejected(request.Context(), access.Project.ID, ingest.RejectRateLimited)
 		handler.writeRateLimit(response, request)
 		return
 	}
 	body, err := ingest.ReadEnvelopeBody(request)
 	if err != nil {
+		handler.markRejected(request.Context(), access.Project.ID, bodyRejectReason(err))
 		handler.writeBodyError(response, request, err)
 		return
 	}
 	envelope, rejections, err := validateEnvelope(body)
 	if err != nil {
+		handler.markRejected(request.Context(), access.Project.ID, ingest.RejectInvalidEnvelope)
 		handler.writeError(response, request, http.StatusBadRequest, "INVALID_ENVELOPE", "The event envelope does not match a supported schema.")
 		return
 	}
 	if envelope.Context.Environment != access.Project.Environment {
+		handler.markRejected(request.Context(), access.Project.ID, ingest.RejectEnvironmentMismatch)
 		handler.writeError(response, request, http.StatusBadRequest, "ENVIRONMENT_MISMATCH", "The envelope environment does not match the project.")
 		return
 	}
 	if len(envelope.Events) == 0 {
+		handler.markRejected(request.Context(), access.Project.ID, ingest.RejectInvalidEvent)
 		result := Acceptance{Accepted: 0, Rejected: rejections}
 		if handler.metrics != nil {
 			handler.metrics.observeRejectedOnly(rejections)
@@ -130,10 +153,14 @@ func (handler *Handler) ServeHTTP(response http.ResponseWriter, request *http.Re
 		return
 	}
 	acceptStarted := time.Now()
+	receivedAt := handler.now().UTC()
 	result, err := handler.acceptor.Accept(request.Context(), AcceptedEnvelope{
-		Access: access, Envelope: envelope, Raw: body, Origin: origin, ClientIP: clientIP, UserAgent: boundedHeader(request.UserAgent(), 512), ReceivedAt: handler.now().UTC(), Rejected: rejections,
+		Access: access, Envelope: envelope, Raw: body, Origin: origin, ClientIP: clientIP,
+		ClientCountry: handler.geo.Country(request.RemoteAddr, request.Header),
+		UserAgent:     boundedHeader(request.UserAgent(), 512), ReceivedAt: receivedAt, Rejected: rejections,
 	})
 	if err != nil {
+		handler.markRejected(request.Context(), access.Project.ID, ingest.RejectIngestUnavailable)
 		if handler.metrics != nil {
 			handler.metrics.observeUnavailable(time.Since(acceptStarted))
 		}
@@ -143,6 +170,10 @@ func (handler *Handler) ServeHTTP(response http.ResponseWriter, request *http.Re
 		}
 		httpx.WriteError(response, request, http.StatusServiceUnavailable, "INGEST_UNAVAILABLE", "Events could not be durably accepted. Retry later.")
 		return
+	}
+	handler.markEventReceived(request.Context(), access.Project.ID, receivedAt)
+	if len(result.Rejected) > 0 {
+		handler.markRejected(request.Context(), access.Project.ID, ingest.RejectInvalidEvent)
 	}
 	if handler.metrics != nil {
 		handler.metrics.observeAccepted(AcceptedEnvelope{Envelope: envelope, Raw: body, Rejected: result.Rejected}, time.Since(acceptStarted))
@@ -185,6 +216,21 @@ func (handler *Handler) writeBodyError(response http.ResponseWriter, request *ht
 		handler.writeError(response, request, http.StatusBadRequest, "INVALID_COMPRESSION", "The gzip request body is invalid.")
 	default:
 		handler.writeError(response, request, http.StatusBadRequest, "INVALID_BODY", "The request body could not be read.")
+	}
+}
+
+func bodyRejectReason(err error) ingest.RejectReason {
+	switch {
+	case errors.Is(err, ingest.ErrPayloadTooLarge):
+		return ingest.RejectPayloadTooLarge
+	case errors.Is(err, ingest.ErrUnsupportedEncoding):
+		return ingest.RejectUnsupportedEncoding
+	case errors.Is(err, ingest.ErrUnsupportedMedia):
+		return ingest.RejectUnsupportedMedia
+	case errors.Is(err, ingest.ErrInvalidCompression):
+		return ingest.RejectInvalidCompression
+	default:
+		return ingest.RejectInvalidBody
 	}
 }
 
@@ -266,6 +312,24 @@ func (handler *Handler) writeError(response http.ResponseWriter, request *http.R
 		handler.metrics.observeEnvelopeRejected(code)
 	}
 	httpx.WriteError(response, request, status, code, message)
+}
+
+func (handler *Handler) markSDKSeen(ctx context.Context, projectID uuid.UUID, at time.Time) {
+	if handler.connection != nil {
+		_ = handler.connection.MarkSDKSeen(context.WithoutCancel(ctx), projectID, at)
+	}
+}
+
+func (handler *Handler) markEventReceived(ctx context.Context, projectID uuid.UUID, at time.Time) {
+	if handler.connection != nil {
+		_ = handler.connection.MarkEventReceived(context.WithoutCancel(ctx), projectID, at)
+	}
+}
+
+func (handler *Handler) markRejected(ctx context.Context, projectID uuid.UUID, reason ingest.RejectReason) {
+	if handler.connection != nil {
+		_ = handler.connection.MarkRejected(context.WithoutCancel(ctx), projectID, handler.now().UTC(), reason)
+	}
 }
 
 type UnavailableAcceptor struct{}

@@ -13,10 +13,14 @@ type Router struct {
 	handler http.Handler
 }
 
-func NewRouter(logger zerolog.Logger) *Router {
+func NewRouter(logger zerolog.Logger, metrics ...*HTTPMetrics) *Router {
 	mux := http.NewServeMux()
 	router := &Router{mux: mux}
-	router.handler = RequestID(requestLogger(logger)(recoverer(logger)(mux)))
+	var observer *HTTPMetrics
+	if len(metrics) > 0 {
+		observer = metrics[0]
+	}
+	router.handler = RequestID(requestLogger(logger, observer)(recoverer(logger)(mux)))
 	return router
 }
 
@@ -53,12 +57,15 @@ func recoverPanic(logger zerolog.Logger, response http.ResponseWriter, request *
 	}
 }
 
-func requestLogger(logger zerolog.Logger) func(http.Handler) http.Handler {
+func requestLogger(logger zerolog.Logger, metrics *HTTPMetrics) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
 			startedAt := time.Now()
 			recorder := &statusRecorder{ResponseWriter: response, status: http.StatusOK}
 			next.ServeHTTP(recorder, request)
+			if metrics != nil {
+				metrics.Observe(request, recorder.status, time.Since(startedAt))
+			}
 			logger.Info().
 				Str("request_id", RequestIDFromContext(request.Context())).
 				Str("method", request.Method).

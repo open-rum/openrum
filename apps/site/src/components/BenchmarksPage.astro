@@ -1,0 +1,124 @@
+---
+import { AlertTriangle, CheckCircle2, Terminal } from "lucide-astro";
+import evidence from "../content/evidence/local-overload-2026-09-03.json";
+import PublicLayout from "../layouts/PublicLayout.astro";
+
+const { lang = "en" } = Astro.props;
+const zh = lang === "zh";
+---
+
+<PublicLayout
+  title={zh ? "基准与证据 — OpenRUM" : "Benchmarks and evidence — OpenRUM"}
+  description={zh
+    ? "可复现的 OpenRUM Demo 与容量验证方法。"
+    : "Reproducible OpenRUM Demo and capacity validation methods."}
+  lang={lang}
+>
+  <section class="page-hero">
+    <div class="site-container">
+      <p class="eyebrow">Evidence · {evidence.date}</p>
+      <h1>
+        {
+          zh
+            ? "公开方法、失败结果与已知限制"
+            : "Publish the method, failed results and known limits"
+        }
+      </h1>
+      <p>
+        {
+          zh
+            ? "千万级日 PV 是产品容量目标。当前公开结果来自单机 Compose 过载演练，不能用于生产容量承诺。"
+            : "Ten-million daily PV is a product capacity target. The current public result is a single-machine Compose overload rehearsal and is not a production capacity claim."
+        }
+      </p>
+    </div>
+  </section>
+  <section class="section">
+    <div class="site-container content-grid">
+      <nav class="local-nav" aria-label="Benchmark sections">
+        <a href="#dataset">{zh ? "数据集" : "Dataset"}</a>
+        <a href="#method">{zh ? "方法" : "Method"}</a>
+        <a href="#result">{zh ? "结果" : "Result"}</a>
+        <a href="#limits">{zh ? "限制" : "Limits"}</a>
+      </nav>
+      <div>
+        <section class="prose-section" id="dataset">
+          <p class="eyebrow">01 · Dataset</p>
+          <h2>
+            {
+              zh
+                ? "固定合成数据，不使用生产用户数据"
+                : "Fixed synthetic data, never production user data"
+            }
+          </h2>
+          <p>
+            {
+              zh
+                ? "本地 Demo 生成 30,000 个 Session，覆盖地域、设备、浏览器、行为、Web Vitals、API 请求和错误。每次重置使用固定 seed，并带 openrum_demo 标记。"
+                : "The local Demo generates 30,000 Sessions across geography, devices, browsers, behavior, Web Vitals, API Requests and errors. Every reset uses a fixed seed and openrum_demo marker."
+            }
+          </p>
+        </section>
+        <section class="prose-section" id="method">
+          <p class="eyebrow">02 · Method</p>
+          <h2>{zh ? "摄取与查询隔离施压" : "Separate ingest and query pressure"}</h2>
+          <pre
+            class="code-block"><code>{`EVENT_RATE=<required_eps> DURATION=15m RUN_ID=<unique-run> \\
+OPENRUM_INGEST_URL=<url> OPENRUM_WRITE_KEY=<key> \\
+k6 run tests/load/ingest-production.js`}</code></pre>
+          <p>
+            {
+              zh
+                ? "required_eps = 实测峰值 PV/s × events/PV × sample_rate × 3；同时运行 query-production.js 并记录最大 lag 与恢复时间。"
+                : "required_eps = measured peak PV/s × events/PV × sample_rate × 3. Run query-production.js concurrently and record maximum lag and recovery time."
+            }
+          </p>
+        </section>
+        <section class="prose-section" id="result">
+          <p class="eyebrow">03 · Result</p>
+          <h2>{zh ? "本地 3× 假设负载：未通过" : "Local assumed 3× load: failed"}</h2>
+          <div class="proof-grid">
+            <article class="ui-card proof-card">
+              <AlertTriangle size={22} /><strong>{evidence.ingestP95Seconds}s</strong>
+              <p>Ingest P95 · {evidence.ingestFailurePercent}% failed/timed out</p>
+            </article>
+            <article class="ui-card proof-card">
+              <AlertTriangle size={22} /><strong>{evidence.queryP95Seconds}s</strong>
+              <p>Query P95 · {evidence.queryFailurePercent}% failed</p>
+            </article>
+            <article class="ui-card proof-card">
+              <CheckCircle2 size={22} /><strong
+                >&lt; {evidence.lagRecoveryUpperBoundMinutes}m</strong
+              >
+              <p>Kafka lag recovered to zero after load</p>
+            </article>
+          </div>
+          <p>
+            {
+              zh
+                ? "该结果证明单副本本地拓扑不满足假设负载，并发现客户端超时但服务端已写入的模糊结果；不是容量宣传数字。"
+                : "This proves the single-replica local topology does not meet the assumed load and exposes ambiguous client-timeout/server-write outcomes. It is not a marketing capacity number."
+            }
+          </p>
+        </section>
+        <section class="prose-section" id="limits">
+          <p class="eyebrow">04 · Next evidence</p>
+          <h2>{zh ? "生产发布门槛仍被阻塞" : "Production evidence remains a release gate"}</h2>
+          <p>
+            {
+              zh
+                ? "下一次测试必须在隔离 Kubernetes 环境中运行 15 分钟，使用真实峰值、生产资源限制、Kafka 副本与 ClickHouse 拓扑，并核对 acknowledged、ambiguous、stored 和 unique 事件数。"
+                : "The next run must use an isolated Kubernetes environment for 15 minutes with measured peak inputs, production resource limits, Kafka replication and ClickHouse topology, reconciling acknowledged, ambiguous, stored and unique event totals."
+            }
+          </p>
+          <a
+            class="ui-button ui-button-outline"
+            href="https://github.com/openrum/openrum/blob/main/docs/benchmarks/initial-capacity.md"
+          >
+            <Terminal size={16} />{zh ? "完整基准记录" : "Full benchmark record"}
+          </a>
+        </section>
+      </div>
+    </div>
+  </section>
+</PublicLayout>

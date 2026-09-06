@@ -1,0 +1,18 @@
+{{- if .Values.pdb.enabled }}
+{{- range $name, $service := .Values.services }}
+{{- if gt (int $service.replicas) 1 }}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "openrum.fullname" $ }}-{{ $name }}
+  labels: {{- include "openrum.labels" $ | nindent 4 }}
+spec:
+  minAvailable: {{ $.Values.pdb.minAvailable }}
+  selector:
+    matchLabels:
+      {{- include "openrum.selectorLabels" $ | nindent 6 }}
+      app.kubernetes.io/component: {{ $name }}
+{{- end }}
+{{- end }}
+{{- end }}

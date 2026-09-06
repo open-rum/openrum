@@ -20,3 +20,5 @@ This k6 scenario targets 10,000 accepted Events/s by default, using 100 Events p
    ```
 
 `count()` and `uniqExact(event_id)` must equal the k6 accepted total. Any mismatch is silent loss or duplication and fails the run. For the required burst test, set `EVENT_RATE=30000 DURATION=5m`; the Kafka lag must recover below 60 seconds within 15 minutes. Keep `BATCH_SIZE=100` at these rates so the request-rate guard does not become the tested bottleneck. Run capacity tests against an isolated environment, never a shared production Project.
+
+For production-like evidence, point `OPENRUM_INGEST_URL` and `OPENRUM_API_URL` at their intended ingress paths. Sending both scenarios through the local Compose Web proxy also measures that single proxy and is only an overload rehearsal. A request that times out at k6 can still be Kafka-acknowledged after the client gives up; record these ambiguous outcomes separately, reconcile the tagged stored total, and rely on unique event IDs for safe retry deduplication.

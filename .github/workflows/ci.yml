@@ -36,6 +36,9 @@ jobs:
       - name: Check formatting
         run: pnpm run format:check
 
+      - name: Enforce shared semantic design tokens
+        run: pnpm run design:check
+
       - name: Lint TypeScript and vet Go
         run: pnpm run lint
 
@@ -50,6 +53,11 @@ jobs:
       - name: Run unit and protocol fixture tests
         run: pnpm run test
 
+      - name: Scan production dependencies
+        run: |
+          pnpm audit --prod --audit-level high
+          go run golang.org/x/vuln/cmd/govulncheck@v1.7.0 ./...
+
       - name: Verify generated protocol contract
         run: |
           pnpm run protocol:check
@@ -58,5 +66,56 @@ jobs:
       - name: Build all packages and services
         run: pnpm run build
 
+      - name: Verify generated documentation and public-site content
+        run: |
+          pnpm run docs:check
+          pnpm run site:spell
+          pnpm run site:verify-demo
+          node scripts/site/check-built-links.mjs
+          node scripts/site/check-performance-budget.mjs
+
+      - name: Install browser for public-site accessibility checks
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Enforce public-site Lighthouse targets
+        run: node scripts/site/check-lighthouse.mjs
+
+      - name: Test public-site accessibility and navigation
+        run: pnpm run site:test:e2e
+
+      - name: Build production image
+        run: docker build --tag openrum:ci --build-arg VERSION=${{ github.sha }} --build-arg COMMIT=${{ github.sha }} .
+
+      - name: Scan production image
+        uses: aquasecurity/trivy-action@0.36.0
+        with:
+          image-ref: openrum:ci
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: 1
+
       - name: Enforce browser SDK size budget
         run: pnpm run sdk:size
+
+      - name: Enforce Console initial-load budget
+        run: pnpm run console:size
+
+  integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+
+      - name: Run isolated PostgreSQL, ClickHouse, Kafka and Redis integration suite
+        run: bash scripts/test-integration.sh
+
+      - name: Preserve dependency logs on failure
+        if: failure()
+        run: docker compose --env-file deploy/compose/.env.example -f deploy/compose/docker-compose.yml logs --no-color

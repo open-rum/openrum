@@ -1,39 +1,27 @@
-# OpenRUM local dependencies
+# Local OpenRUM Alpha
 
-This Compose stack is for development only. Production uses managed or existing PostgreSQL, ClickHouse, Kafka, Redis, and Alibaba Cloud OSS; MinIO is not part of the production topology.
-
-## Start
+This Compose file starts the full core product: console, API, ingest, consumer, worker, PostgreSQL, ClickHouse, Kafka and Redis. Object storage is intentionally optional and is not bundled. The stack also runs migrations and an idempotent demo seeder.
 
 ```sh
-cp deploy/compose/.env.example deploy/compose/.env
-docker compose --env-file deploy/compose/.env -f deploy/compose/docker-compose.yml up -d --wait
-docker compose --env-file deploy/compose/.env -f deploy/compose/docker-compose.yml ps
+docker compose --env-file deploy/compose/.env.example -f deploy/compose/docker-compose.yml up -d --build
+docker compose --env-file deploy/compose/.env.example -f deploy/compose/docker-compose.yml ps
 ```
 
-The stack exposes PostgreSQL on `5433`, ClickHouse HTTP/native on `8123`/`9000`, Kafka on `9092`, Redis on `6379`, and development object storage/API console on `9100`/`9101` by default. PostgreSQL intentionally avoids the common local `5432` port. Override host ports in `.env` when they conflict with existing services. ClickHouse runs a single-node embedded Keeper and `openrum_cluster` topology so replicated-table migrations exercise their production engine locally; this is not a production quorum.
+Console: `http://127.0.0.1:4173`
+Login: `demo@openrum.local` / `OpenRUM-demo-2026!`
 
-Application connection values:
+The seeder initializes the demo owner and project, then loads a deterministic 14-day ecommerce dataset with approximately 30,000 sessions and 301,000 events. If an owner other than the demo owner already exists, it exits without changing that instance. Re-running the stack preserves and does not duplicate demo events. See the [demo data guide](../../docs/demo-data.md) for explicit rerun and reset commands.
 
-```dotenv
-POSTGRES_DSN=postgres://openrum:openrum_local_only@127.0.0.1:5433/openrum?sslmode=disable
-CLICKHOUSE_DSN=clickhouse://openrum:openrum_local_only@127.0.0.1:9000/openrum
-KAFKA_BROKERS=127.0.0.1:9092
-KAFKA_EVENT_TOPIC=rum-events-v1
-REDIS_ADDR=127.0.0.1:6379
-OSS_ENDPOINT=http://127.0.0.1:9100
-OSS_BUCKET=openrum
-OSS_ACCESS_KEY_ID=openrum
-OSS_ACCESS_KEY_SECRET=openrum_local_only
-```
+Default host ports are console `4173`, PostgreSQL `5433`, ClickHouse HTTP/native `8123`/`9000`, Kafka `9092`, and Redis `6379`. Override them by copying `.env.example` to an untracked `.env`.
 
-Create the development bucket after the first start:
+Without object storage, behavior analytics, errors, performance, API monitoring and alerts remain available. To enable Source Map artifacts, configure either Alibaba OSS (`OBJECT_STORAGE_PROVIDER=oss`) or Amazon S3/S3-compatible storage (`OBJECT_STORAGE_PROVIDER=s3`) in the environment file.
+
+Stop containers without deleting data:
 
 ```sh
-docker compose --env-file deploy/compose/.env -f deploy/compose/docker-compose.yml exec object-storage mc mb --ignore-existing local/openrum
+docker compose --env-file deploy/compose/.env.example -f deploy/compose/docker-compose.yml down
 ```
 
-## Stop
+Add `--volumes` only when you intentionally want a complete local reset. Example credentials and single-node dependencies must never be used for production.
 
-`docker compose --env-file deploy/compose/.env -f deploy/compose/docker-compose.yml down` stops containers without deleting data. Add `--volumes` only when you intentionally want to reset all local dependency data.
-
-Never reuse the example credentials outside local development and never commit `deploy/compose/.env`.
+For Vite hot reload and running the Go API from source against these dependencies, see [local development](../../docs/local-development.md).

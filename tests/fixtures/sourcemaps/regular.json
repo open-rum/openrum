@@ -1,0 +1,1 @@
+{"version":3,"file":"app.js","sourceRoot":"webpack:///","sources":["src/checkout.ts"],"sourcesContent":["export function checkout() { return true }"],"names":["checkout"],"mappings":"AAAAA"}

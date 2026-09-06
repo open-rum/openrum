@@ -16,14 +16,19 @@ const QueueSchemaVersion = event.QueueSchemaVersion
 const PreviousQueueSchemaVersion = event.PreviousQueueSchemaVersion
 
 type QueuedEnvelope struct {
-	QueueSchemaVersion string           `json:"queue_schema_version"`
-	ProjectID          uuid.UUID        `json:"project_id"`
-	OrganizationID     uuid.UUID        `json:"organization_id"`
-	ReceivedAt         time.Time        `json:"received_at"`
-	Origin             string           `json:"origin"`
-	ClientIP           string           `json:"client_ip"`
-	UserAgent          string           `json:"user_agent"`
-	Envelope           event.EnvelopeV1 `json:"envelope"`
+	QueueSchemaVersion string    `json:"queue_schema_version"`
+	ProjectID          uuid.UUID `json:"project_id"`
+	OrganizationID     uuid.UUID `json:"organization_id"`
+	ReceivedAt         time.Time `json:"received_at"`
+	Origin             string    `json:"origin"`
+	ClientIP           string    `json:"client_ip"`
+	// ClientCountry is resolved at the edge, where the trust decision about the
+	// proxy can still be made. Messages written before this field existed omit
+	// it, which reads as an unknown country rather than a wrong one.
+	ClientCountry string           `json:"client_country,omitempty"`
+	UserAgent     string           `json:"user_agent"`
+	Synthetic     bool             `json:"synthetic,omitempty"`
+	Envelope      event.EnvelopeV1 `json:"envelope"`
 }
 
 type MessageWriter interface {
