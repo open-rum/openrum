@@ -122,6 +122,11 @@ func writeControlPlaneError(writer http.ResponseWriter, request *http.Request, l
 		httpx.WriteError(writer, request, http.StatusConflict, "LAST_OWNER_REQUIRED", "The organization must retain at least one owner.")
 	case errors.Is(err, metadata.ErrLastInstanceOwner):
 		httpx.WriteError(writer, request, http.StatusConflict, "LAST_INSTANCE_OWNER_REQUIRED", "The instance must retain at least one owner.")
+	case errors.Is(err, metadata.ErrInvalidAlertConfig):
+		httpx.WriteError(writer, request, http.StatusBadRequest, "VALIDATION_ERROR", "Alert settings are invalid.")
+	case errors.Is(err, metadata.ErrSecretsUnavailable):
+		httpx.WriteError(writer, request, http.StatusServiceUnavailable, "MANAGED_SECRETS_REQUIRED",
+			"Notification channels need an Instance master key. Set OPENRUM_ALLOW_MANAGED_SECRETS and OPENRUM_MASTER_KEY.")
 	default:
 		logger.Error().Err(err).Str("request_id", httpx.RequestIDFromContext(request.Context())).Msg("control-plane request failed")
 		httpx.WriteError(writer, request, http.StatusInternalServerError, "INTERNAL_ERROR", "An internal error occurred.")

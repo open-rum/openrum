@@ -3,6 +3,11 @@ export interface Diagnostics {
   droppedEvents: number;
   droppedAttributes: number;
   droppedBreadcrumbs: number;
+  /**
+   * Counted apart from droppedEvents because these were not lost: the project
+   * asked for them to go, and the consumer would have removed them anyway.
+   */
+  filteredEvents: number;
 }
 
 export function runSafely<T>(diagnostics: Diagnostics, fallback: T, operation: () => T): T {

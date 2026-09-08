@@ -11,12 +11,17 @@ export function calculateSamplingImpact(
   usage: UsageResponse,
   eventSampleRate: number,
   apiSampleRate: number,
+  errorSampleRate: number,
 ): SamplingImpact {
   const days = Math.max(1 / 24, (Date.parse(usage.to) - Date.parse(usage.from)) / 86_400_000);
   const acceptedRows = usage.breakdown.filter((row) => row.outcome === "accepted");
   const projected = acceptedRows.reduce((sum, row) => {
     const rate =
-      row.eventType === "error" ? 1 : row.eventType === "api" ? apiSampleRate : eventSampleRate;
+      row.eventType === "error"
+        ? errorSampleRate
+        : row.eventType === "api"
+          ? apiSampleRate
+          : eventSampleRate;
     return sum + row.estimated * rate;
   }, 0);
   const currentDaily = usage.totals.accepted / days;

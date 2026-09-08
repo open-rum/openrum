@@ -31,7 +31,27 @@ const (
 	ProjectStatusActive   ProjectStatus = "active"
 	ProjectStatusDisabled ProjectStatus = "disabled"
 	ProjectStatusDeleting ProjectStatus = "deleting"
+
+	// OverLimitReject refuses a request that is over the project's ingest
+	// limit. The cap is exact, and whichever callers arrive first in a second
+	// are the ones that get through.
+	OverLimitReject OverLimitBehavior = "reject"
+	// OverLimitSample sheds over-limit traffic by caller instead, so a session
+	// is either reported whole or not at all. The cap becomes approximate in
+	// exchange, bounded by a hard ceiling in internal/ingest.
+	OverLimitSample OverLimitBehavior = "sample"
 )
+
+// OverLimitBehavior says what ingest does with a project's traffic once the
+// project is over its own rate limit.
+//
+// The choice exists because the two answers fail differently and neither is
+// right for everyone. Refusing tears a burst in half, so a session that started
+// before the burst ends mid-recording and its metrics are computed from an
+// incomplete page. Shedding by caller keeps every session it admits complete,
+// which is what makes rates and Web Vitals comparable, but it stops being an
+// exact cap.
+type OverLimitBehavior string
 
 type User struct {
 	ID           uuid.UUID
@@ -80,9 +100,15 @@ type Project struct {
 	RetentionDays   int16
 	EventSampleRate float64
 	APISampleRate   float64
-	Status          ProjectStatus
-	CreatedAt       time.Time
-	UpdatedAt       time.Time
+	ErrorSampleRate float64
+	// IngestRateLimit is the project's own ceiling in requests per second. Nil
+	// means the instance default applies, which is how every project behaved
+	// while the limit was a constant shared by all of them.
+	IngestRateLimit   *int32
+	OverLimitBehavior OverLimitBehavior
+	Status            ProjectStatus
+	CreatedAt         time.Time
+	UpdatedAt         time.Time
 }
 
 type ProjectKey struct {

@@ -1,0 +1,108 @@
+/* Representative accents for the preset picker; not component colors. */
+:root {
+  --ds-preset-acid: #c8ff3d;
+  --ds-preset-citrus: #b8e954;
+  --ds-preset-graphite: #b3cdaa;
+}
+
+/* Presets override semantic roles; components consume the same variable names. */
+:root[data-palette="acid"],
+:root[data-palette="acid"] [data-theme-scope="light"] {
+  --ds-canvas: #f5f5f0;
+  --ds-surface: #ffffff;
+  --ds-surface-subtle: #ecede7;
+  --ds-text: #17191e;
+  --ds-text-secondary: #3f454f;
+  --ds-text-muted: #626873;
+  --ds-border: #d8dad1;
+  --ds-border-soft: #e5e7df;
+  --ds-primary: #c8ff3d;
+  --ds-brand: #456400;
+  --ds-brand-soft: #e6edcf;
+  --ds-secondary: #53646f;
+  --ds-success: #347449;
+  --ds-danger: #b82d38;
+  --ds-danger-soft: #f9e7e7;
+  --ds-warning: #875000;
+  --ds-warning-soft: #f4e9d5;
+  --ds-info: #28618c;
+  --ds-hero-surface: #111216;
+  --ds-hero-foreground: #f5f5f0;
+  --ds-light-ray-color: var(--ds-primary);
+}
+:root[data-palette="acid"]:is(.dark, [data-theme="dark"]) {
+  --ds-canvas: #181a1f;
+  --ds-surface: #202228;
+  --ds-surface-subtle: #292c33;
+  --ds-text: #f5f5f0;
+  --ds-text-secondary: #d0d2d5;
+  --ds-text-muted: #9a9da5;
+  --ds-border: #373b44;
+  --ds-border-soft: #2b2e36;
+  --ds-brand: #c8ff3d;
+  --ds-brand-soft: #2c371b;
+  --ds-secondary: #9eaab6;
+  --ds-success: #8cdca1;
+  --ds-danger: #ff5c5c;
+  --ds-danger-soft: #43242a;
+  --ds-warning: #ffb547;
+  --ds-warning-soft: #3e3020;
+  --ds-info: #5ca8ff;
+}
+:root[data-palette="graphite"],
+:root[data-palette="graphite"] [data-theme-scope="light"] {
+  --ds-canvas: #f4f5f3;
+  --ds-surface: #ffffff;
+  --ds-surface-subtle: #e9ede8;
+  --ds-text: #202723;
+  --ds-text-secondary: #404e45;
+  --ds-text-muted: #5d6b62;
+  --ds-border: #d3dbd3;
+  --ds-border-soft: #e3e8e2;
+  --ds-primary: #b3cdaa;
+  --ds-brand: #365c42;
+  --ds-brand-soft: #dce8d8;
+  --ds-secondary: #687989;
+  --ds-success: #3d7046;
+  --ds-danger: #ae3e44;
+  --ds-danger-soft: #f5e6e5;
+  --ds-warning: #85571d;
+  --ds-warning-soft: #f2e9d8;
+  --ds-info: #3e6578;
+  --ds-hero-surface: #161c19;
+  --ds-hero-foreground: #edf2eb;
+  --ds-light-ray-color: var(--ds-primary);
+}
+:root[data-palette="graphite"]:is(.dark, [data-theme="dark"]) {
+  --ds-canvas: #171d1a;
+  --ds-surface: #202824;
+  --ds-surface-subtle: #2a342e;
+  --ds-text: #edf2eb;
+  --ds-text-secondary: #c6d0c6;
+  --ds-text-muted: #a0ada3;
+  --ds-border: #39473e;
+  --ds-border-soft: #2e3932;
+  --ds-brand: #b3cdaa;
+  --ds-brand-soft: #2d3e2f;
+  --ds-secondary: #a4b5c5;
+  --ds-success: #93c498;
+  --ds-danger: #ee8b8d;
+  --ds-danger-soft: #40292c;
+  --ds-warning: #dfb880;
+  --ds-warning-soft: #3a3225;
+  --ds-info: #91bdcf;
+}
+/* Preset-sensitive derived roles, also used by shadcn Chart. */
+:root[data-palette],
+:root[data-palette] [data-theme-scope="light"] {
+  --ds-surface-hover: color-mix(in srgb, var(--ds-surface-subtle), var(--ds-brand) 5%);
+  --ds-surface-overlay: color-mix(in srgb, var(--ds-surface), transparent 4%);
+  --ds-sidebar: var(--ds-surface-overlay);
+  --ds-success-soft: color-mix(in srgb, var(--ds-surface), var(--ds-success) 12%);
+  --ds-chart-1: var(--ds-brand);
+  --ds-chart-2: var(--ds-secondary);
+  --ds-chart-3: var(--ds-text-muted);
+  --ds-chart-4: var(--ds-warning);
+  --ds-chart-5: var(--ds-danger);
+  --ds-chart-area: var(--ds-primary);
+}

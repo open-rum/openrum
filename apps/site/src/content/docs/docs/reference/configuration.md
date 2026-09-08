@@ -1,11 +1,12 @@
 ---
 title: Configuration reference
 description: Generated environment-variable reference for OpenRUM services.
+appliesTo: Alpha / main
 ---
 
 <!-- GENERATED: scripts/docs/generate-reference.mjs -->
 
-**Applies to:** Alpha / main. Generated from `internal/config/config.go`; do not edit by hand.
+Generated from `internal/config/config.go`; do not edit by hand.
 
 | Variable | Purpose |
 | --- | --- |
@@ -17,6 +18,7 @@ description: Generated environment-variable reference for OpenRUM services.
 | `GEO_COUNTRY_HEADER` | Header carrying the visitor country, injected by the edge proxy (for example CF-IPCountry). Unset disables country resolution and stores ZZ. |
 | `GEO_TRUSTED_PROXIES` | Comma-separated CIDRs or addresses whose forwarded country header is believed. Required when GEO_COUNTRY_HEADER is set; never widen this to the public internet. |
 | `INGEST_BASE_URL` | Optional service or feature configuration; see source validation for constraints. |
+| `INGEST_TRUSTED_PROXIES` | Comma-separated CIDRs or addresses of the proxies that terminate ingest traffic. Unset keeps the rate-limit identity on the socket peer, so every caller behind a shared proxy counts as one. Setting it reads X-Forwarded-For from those peers only; never widen this to the public internet, because whoever matches can choose the identity they are limited on. |
 | `KAFKA_BROKERS` | Comma-separated Kafka brokers. |
 | `KAFKA_EVENT_TOPIC` | Optional service or feature configuration; see source validation for constraints. |
 | `KUBERNETES_SERVICE_HOST` | Optional service or feature configuration; see source validation for constraints. |

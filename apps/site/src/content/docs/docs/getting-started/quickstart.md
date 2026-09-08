@@ -1,9 +1,10 @@
 ---
 title: Five-minute Quickstart
 description: Start a local OpenRUM Instance and follow the seeded investigation path.
+appliesTo: Alpha / main
 ---
 
-**Applies to:** Alpha / main. **Prerequisite:** Docker with Compose v2.
+**Prerequisite:** Docker with Compose v2.
 
 ## 1. Start the Instance
 
@@ -20,6 +21,8 @@ Wait until the Web, API, Ingest, Consumer, Worker, PostgreSQL, ClickHouse, Kafka
 docker compose -f deploy/compose/docker-compose.yml ps
 curl --fail http://127.0.0.1:4173/health/ready
 ```
+
+If you are working from source rather than evaluating, `pnpm openrum up` runs the same containers but waits for readiness instead of for launch and reports both halves of the stack in one table. It needs the Go and Node toolchains, which is why this page uses Compose directly. See [Local development](/docs/contributing/local-development/).
 
 Open `http://127.0.0.1:4173` and sign in:
 

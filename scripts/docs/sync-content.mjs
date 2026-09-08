@@ -9,49 +9,49 @@ const repositoryOutput = join(docsRoot, "repository");
 /** @type {Array<[string, string, string, string]>} */
 const publicGuides = [
   [
-    "operations/kafka",
+    "self-hosting/kafka",
     "Kafka",
     "Operate the ingestion buffer when brokers, lag or acknowledgement fail.",
     "docs/operations/kafka.md",
   ],
   [
-    "operations/postgres",
+    "self-hosting/postgres",
     "PostgreSQL",
     "Operate the control-plane database for users, projects and workflow state.",
     "docs/operations/postgres.md",
   ],
   [
-    "operations/redis",
+    "self-hosting/redis",
     "Redis",
     "Operate quotas, short-lived state and rate-limit dependencies.",
     "docs/operations/redis.md",
   ],
   [
-    "operations/clickhouse",
+    "self-hosting/clickhouse",
     "ClickHouse",
     "Operate event storage, aggregates and query freshness.",
     "docs/operations/clickhouse.md",
   ],
   [
-    "operations/object-storage",
+    "self-hosting/object-storage",
     "Object storage",
     "Operate optional OSS or S3-compatible storage for Source Map Artifacts.",
     "docs/operations/oss.md",
   ],
   [
-    "operations/upgrades",
+    "self-hosting/upgrades",
     "Upgrades",
     "Upgrade OpenRUM services, schema and dependencies safely.",
     "docs/operations/upgrades.md",
   ],
   [
-    "operations/backup-restore",
+    "self-hosting/backup-restore",
     "Backup and restore",
     "Protect control-plane state, events and optional Source Map Artifacts.",
     "docs/operations/backup-restore.md",
   ],
   [
-    "security/threat-model",
+    "self-hosting/security/threat-model",
     "Threat model",
     "Trust boundaries, threats, controls and residual risks for a public Instance.",
     "docs/security/threat-model.md",
@@ -61,12 +61,6 @@ const publicGuides = [
     "Local development",
     "Work on OpenRUM services, SDK, console and public site.",
     "docs/local-development.md",
-  ],
-  [
-    "contributing/system-administration",
-    "System administration",
-    "Instance-level configuration, data lifecycle, secrets and operator boundaries.",
-    "docs/system-administration.md",
   ],
   [
     "getting-started/demo-data",

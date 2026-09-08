@@ -1,11 +1,12 @@
 ---
 title: Helm values reference
 description: Generated source-of-truth values for the OpenRUM Helm chart.
+appliesTo: Alpha / main
 ---
 
 <!-- GENERATED: scripts/docs/generate-reference.mjs -->
 
-**Applies to:** Alpha / main. Generated verbatim from `deploy/helm/openrum/values.yaml`; do not edit by hand.
+Generated verbatim from `deploy/helm/openrum/values.yaml`; do not edit by hand.
 
 Use a separate values file for your environment and keep credentials in the configured existing Kubernetes Secret.
 
@@ -32,6 +33,16 @@ config:
   kafkaBrokers: kafka.example.svc:9092
   kafkaEventTopic: rum-events-v1
   redisAddress: redis.example.svc:6379
+  # Comma-separated CIDRs or addresses of the proxies that terminate inbound
+  # traffic. Leaving this empty keeps the ingest rate limit keyed on the socket
+  # peer, which behind an ingress means every caller shares one limit. Declaring
+  # the edge lets the limit apply per caller instead. Never widen it beyond the
+  # proxies you run: whoever matches can choose the identity they are limited on.
+  ingestTrustedProxies: ""
+  # Country attribution. The header is only believed on requests arriving from
+  # geoTrustedProxies, and setting the header without that list fails startup.
+  geoCountryHeader: ""
+  geoTrustedProxies: ""
   objectStorage:
     # Optional: "oss" for Alibaba OSS native API or "s3" for Amazon S3 and compatible providers.
     provider: ""

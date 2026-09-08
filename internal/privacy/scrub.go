@@ -102,13 +102,33 @@ func truncateUTF8(value string, maximum int) string {
 }
 
 func sensitiveKey(key string) bool {
-	normalized := strings.ToLower(strings.NewReplacer("-", "", "_", "", ".", "").Replace(key))
 	for _, fragment := range []string{"authorization", "cookie", "password", "passwd", "secret", "token", "apikey", "accesskey", "creditcard", "cardnumber"} {
-		if strings.Contains(normalized, fragment) {
+		if KeyMatchesFragment(key, fragment) {
 			return true
 		}
 	}
 	return false
+}
+
+// KeyMatchesFragment reports whether an attribute key contains a fragment,
+// ignoring case and the punctuation that separates words in a key. It is
+// exported so that a project adding its own sensitive names gets the same
+// matching the built-in list uses: a name that behaved differently depending on
+// who wrote it would be a trap, because the two lists are read as one.
+func KeyMatchesFragment(key, fragment string) bool {
+	normalized := normalizeKey(fragment)
+	// A fragment made only of separators normalizes to nothing, and an empty
+	// needle is contained in every key. Refused here rather than at validation
+	// so that no caller can reach the state where one entry drops every
+	// attribute the project sends.
+	if normalized == "" {
+		return false
+	}
+	return strings.Contains(normalizeKey(key), normalized)
+}
+
+func normalizeKey(value string) string {
+	return strings.ToLower(strings.NewReplacer("-", "", "_", "", ".", "", " ", "").Replace(value))
 }
 
 func luhnValid(candidate string) bool {

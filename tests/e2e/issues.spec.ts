@@ -28,7 +28,10 @@ test("issues filters, rows and themes remain usable", async ({ page }) => {
   await expect(themeToggle).toHaveAttribute("data-variant", "ghost");
   await themeToggle.click();
   await expect(page.locator("html")).toHaveClass(/dark/);
-  await expect(page.getByLabel("处理状态")).toHaveCSS("color", "oklch(0.922 0 0)");
+  const darkForeground = await page
+    .locator("body")
+    .evaluate((element) => getComputedStyle(element).color);
+  await expect(page.getByLabel("处理状态")).toHaveCSS("color", darkForeground);
   if (process.env.OPENRUM_ISSUES_DARK)
     await page.screenshot({ path: process.env.OPENRUM_ISSUES_DARK, fullPage: true });
   await page.setViewportSize({ width: 390, height: 844 });

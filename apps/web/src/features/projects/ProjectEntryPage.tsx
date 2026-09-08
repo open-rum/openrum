@@ -27,7 +27,7 @@ export function ProjectEntryPage() {
     }
     rememberProject(project);
     void navigate({
-      to: "/projects/$projectId/analytics",
+      to: "/projects/$projectId/overview",
       params: { projectId: project.id },
       replace: true,
     });

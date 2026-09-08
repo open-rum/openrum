@@ -23,6 +23,6 @@ Compose 是单副本评估拓扑。生产应使用 Kubernetes/Helm，并配置�
 - 配置备份并在隔离环境演练恢复
 - 建立保留策略、容量与升级 runbook
 - 用真实流量输入完成接近生产的压测
-- 阅读[威胁模型](/zh/docs/security/threat-model/)
+- 阅读[威胁模型](/zh/docs/self-hosting/security/threat-model/)
 
 对象存储可选：没有 Bucket 时，行为、错误、性能、API 和告警继续工作；Source Map 可接 Alibaba OSS 或 S3-compatible 服务。

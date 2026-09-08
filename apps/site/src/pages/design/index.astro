@@ -1,0 +1,309 @@
+---
+import DesignLayout from "../../layouts/DesignLayout.astro";
+import DesignSection from "../../components/design/DesignSection.astro";
+import BrandMark from "../../components/BrandMark.astro";
+import BrandWordmark from "../../components/BrandWordmark.astro";
+import ChartExamples from "../../components/design/ChartExamples";
+import { ArrowUpRight, Download, Copy, Check, ArrowRight } from "lucide-astro";
+import { palettes, colorGroups, typeSamples } from "@openrum/design-tokens/catalog";
+const spaces = [
+  ["--space-1", "04"],
+  ["--space-2", "08"],
+  ["--space-3", "12"],
+  ["--space-4", "16"],
+  ["--space-6", "24"],
+  ["--space-8", "32"],
+  ["--space-12", "48"],
+  ["--space-16", "64"],
+];
+---
+
+<DesignLayout>
+  <div class="ds-intro">
+    <div>
+      <p class="ds-overline">OPENRUM / VISUAL FOUNDATIONS</p><h1>
+        设计规范<span>Design system.</span>
+      </h1><p class="ds-intro-copy">
+        从品牌标识到每一条数据曲线。<br />在这里调整配色，查看规则，比较下一版首页。
+      </p>
+    </div><div class="ds-intro-mark"><BrandMark size={112} /></div>
+  </div>
+  <div class="ds-summary">
+    <span><strong>03</strong> 配色预设</span><span><strong>02</strong> 明暗模式</span><span
+      ><strong>03</strong> 图表类型</span
+    ><span class="ds-summary-live"><i class="ds-status-dot"></i> 与共享 token 同步</span>
+  </div>
+
+  <DesignSection
+    id="brand"
+    index="01"
+    title="品牌标识"
+    description="文档中的双段圆角环形，重绘为可缩放的 SVG。保持完整轮廓，避免拉伸、描边和装饰性渐变。"
+  >
+    <div class="ds-brand-board">
+      <div class="ds-brand-lockup">
+        <span class="brand-mark" data-brand-download><BrandMark size={88} /></span><BrandWordmark />
+      </div><span class="ds-board-caption">PRIMARY LOCKUP / SVG</span><button
+        class="ds-text-button"
+        data-download-logo><Download size={15} />下载当前配色 SVG</button
+      >
+    </div>
+    <div class="ds-logo-variants">
+      <div>
+        <div class="ds-logo-sample brand-mark"><BrandMark size={46} /></div><span
+          >图标 · 16px 起</span
+        >
+      </div>
+      <div>
+        <div class="ds-logo-sample ds-mono"><BrandMark size={46} /></div><span>单色 · 当前表面</span
+        >
+      </div>
+      <div>
+        <div class="ds-logo-sample ds-mono ds-inverse"><BrandMark size={46} /></div><span
+          >单色 · 反色表面</span
+        >
+      </div>
+      <div>
+        <div class="ds-logo-sample ds-clearspace">
+          <span><BrandMark size={42} /></span><small>¼ x</small>
+        </div><span>安全留白 · 至少 ¼ 标记宽度</span>
+      </div>
+    </div>
+  </DesignSection>
+
+  <DesignSection
+    id="palettes"
+    index="02"
+    title="配色预设"
+    description="选择一套预设，整页、图表与参考方案同时切换。选择会保存在当前浏览器，并跟随预览链接。"
+  >
+    <fieldset class="ds-presets">
+      <legend class="sr-only">选择配色方案</legend>
+      {
+        palettes.map((palette, index) => (
+          <label class="ds-preset">
+            <>
+              <input type="radio" name="palette" value={palette.id} data-palette-choice />
+              <div>
+                <>
+                  <span class="ds-preset-top">
+                    <>
+                      <small>
+                        0{index + 1} / {palette.label}
+                      </small>
+                      <Check size={15} />
+                    </>
+                  </span>
+                  <strong>{palette.name}</strong>
+                  <p>{palette.description}</p>
+                  <span
+                    class="ds-preset-line"
+                    style={`background:var(--ds-preset-${palette.id})`}
+                  />
+                </>
+              </div>
+            </>
+          </label>
+        ))
+      }
+    </fieldset>
+    <div class="ds-guidance">
+      <span>亮色原则</span><p>
+        标题、正文、操作和图表轮廓优先用深色。明亮的 Accent
+        用于面积、选中状态与少量重点，避免整页浅绿文字。
+      </p>
+    </div>
+  </DesignSection>
+
+  <DesignSection
+    id="colors"
+    index="03"
+    title="语义颜色"
+    description="颜色以用途命名。点击色卡复制 CSS 变量；数值读取当前主题，随预设实时更新。"
+  >
+    {
+      colorGroups.map((group) => (
+        <div class="ds-color-group">
+          <>
+            <div class="ds-subhead">
+              <>
+                <h3>{group.title}</h3>
+                <p>{group.description}</p>
+              </>
+            </div>
+            <div class="ds-swatch-grid">
+              {group.tokens.map(([token, title, usage]) => (
+                <button class="ds-swatch" data-copy-token={token} aria-label={`复制 ${token}`}>
+                  <span class="ds-swatch-paint" style={`background:var(${token})`} />
+                  <span class="ds-swatch-title">
+                    {title}
+                    <Copy size={13} />
+                  </span>
+                  <span
+                    class="ds-swatch-value"
+                    data-token-value={token}
+                    data-token-format="color"
+                  />
+                  <code>{token}</code>
+                  <small>{usage}</small>
+                </button>
+              ))}
+            </div>
+          </>
+        </div>
+      ))
+    }
+  </DesignSection>
+
+  <DesignSection
+    id="typography"
+    index="04"
+    title="字体与排版"
+    description="Geist 负责产品与官网正文；品牌字标使用轮廓 SVG。官网强调阅读节奏，控制台保留紧凑的数据密度。"
+  >
+    <div class="ds-type-family">
+      <strong>Aa <span>字</span></strong><div>
+        <b>Geist Variable</b><p>Sans serif / 系统中文字体回退</p>
+      </div><code>--font-product-sans</code>
+    </div>
+    <div class="ds-type-specimens">
+      {
+        typeSamples.map((sample) => (
+          <div class="ds-type-row">
+            <>
+              <div>
+                <>
+                  <b>{sample.name}</b>
+                  <span>{sample.detail}</span>
+                </>
+              </div>
+              <p style={`font-size:var(${sample.size});font-weight:${sample.weight}`}>
+                {sample.text}
+              </p>
+            </>
+          </div>
+        ))
+      }
+    </div>
+    <div class="ds-code-sample">
+      <span>CODE / MONOSPACE</span><code
+        >captureException(error, &#123; release: '1.0.0' &#125;)</code
+      ><small>堆栈、事件标识与数值对齐使用等宽字体。</small>
+    </div>
+  </DesignSection>
+
+  <DesignSection
+    id="foundations"
+    index="05"
+    title="空间与质感"
+    description="统一的间距步长与边界，构成界面的秩序。官网和控制台共享基础，但不强制使用相同的留白。"
+  >
+    <div class="ds-foundation-grid">
+      <div class="ds-material">
+        <h3>Spacing scale</h3><div class="ds-spacing-list">
+          {
+            spaces.map(([token, size]) => (
+              <div>
+                <>
+                  <code>{size}</code>
+                  <i style={`width:var(${token})`} />
+                  <span>{token}</span>
+                </>
+              </div>
+            ))
+          }
+        </div>
+      </div>
+      <div class="ds-material">
+        <h3>Radius & elevation</h3><div class="ds-radius-list">
+          {
+            ["sm", "md", "lg"].map((size) => (
+              <div>
+                <>
+                  <i style={`border-radius:var(--radius-${size})`} />
+                  <code data-token-value={`--radius-${size}`} />
+                  <span>{size}</span>
+                </>
+              </div>
+            ))
+          }
+        </div><div class="ds-elevations">
+          <span>Surface</span><span>Elevated</span><span>Frosted</span>
+        </div><p>阴影只用于需要抬升的菜单与控件。导航保留磨砂，内容面板使用实色表面。</p>
+      </div>
+    </div>
+    <div class="ds-interactions">
+      <div><h3>Interaction</h3><p>轻微位移，清晰焦点。状态变化不改变布局。</p></div><button
+        class="ui-button ui-button-contrast ds-hover-demo"
+        >Hover / Focus<ArrowRight size={16} /></button
+      ><button class="ui-button ui-button-neutral" disabled>Disabled</button>
+    </div>
+  </DesignSection>
+
+  <DesignSection
+    id="charts"
+    index="06"
+    title="数据可视化"
+    description="使用项目现有 shadcn Chart / Recharts 基础。三种常用图表共享同一套语义配色，支持悬停与键盘查看数据。"
+  >
+    <div class="ds-chart-palette">
+      {
+        [1, 2, 3, 4, 5].map((index) => (
+          <button data-copy-token={`--ds-chart-${index}`} aria-label={`复制图表颜色 ${index}`}>
+            <>
+              <i style={`background:var(--ds-chart-${index})`} />
+              <span>Series 0{index}</span>
+              <code data-token-value={`--ds-chart-${index}`} data-token-format="color" />
+            </>
+          </button>
+        ))
+      }
+    </div>
+    <ChartExamples client:visible />
+    <div class="ds-guidance">
+      <span>图表规则</span><p>
+        一个面板只展示一种单位。对比系列用中性色或虚线；错误与告警保持语义颜色。所有图表均为固定示例数据。
+      </p>
+    </div>
+  </DesignSection>
+
+  <DesignSection
+    id="previews"
+    index="07"
+    title="落地页方案"
+    description="保留不同版本，使用相同配色对比布局。方案 1 对应文档，后续方案会继续加入这里。"
+  >
+    <div class="ds-preview-cards">
+      <a class="ds-preview-card" href="/" data-preview-link="/"
+        ><div class="ds-mini ds-mini-centered">
+          <i></i><span></span><b></b><em></em><div>
+            <small></small><small></small><small></small>
+          </div>
+        </div><div>
+          <span>当前首页</span><h3>Centered / Light Rays <ArrowUpRight size={18} /></h3><p>
+            居中标题、动态光束与技术栈。
+          </p>
+        </div></a
+      >
+      <a class="ds-preview-card" href="/design/landing/01/" data-preview-link="/design/landing/01/"
+        ><div class="ds-mini ds-mini-split">
+          <section><span></span><b></b><em></em></section><section class="ds-mini-dashboard">
+            <i></i><i></i><i></i><svg viewBox="0 0 200 55"
+              ><path d="M0 48L18 32L35 39L60 20L86 30L110 13L136 24L164 8L185 13L200 3"></path></svg
+            >
+          </section>
+        </div><div>
+          <span>方案 01 · 文档原案</span><h3>Product first <ArrowUpRight size={18} /></h3><p>
+            双栏 Hero、产品界面示意与自部署叙事。
+          </p>
+        </div></a
+      >
+    </div>
+    <a class="ds-compare-link" href="/design/landing/" data-preview-link="/design/landing/"
+      >打开方案对比工作台 <ArrowRight size={17} /></a
+    >
+  </DesignSection>
+  <footer class="ds-page-footer">
+    <span>OpenRUM Design / Foundations v1</span><a href="/docs/contributing/">参与贡献 ↗</a>
+  </footer>
+</DesignLayout>

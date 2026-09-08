@@ -21,8 +21,11 @@ export async function mockOpenRUM(
   let queryable = options.projectExists ?? false;
   let releaseCreated = true;
   let artifactReady = false;
-  let eventSampleRate = 1;
-  let apiSampleRate = 0.2;
+  const projectSettings: MutableProject = { ...defaultProjectSettings };
+  let inboundFilters: InboundFilters = {
+    builtin: { ...defaultInboundFilters.builtin },
+    rules: [],
+  };
   const alertRules: Array<Record<string, unknown>> = [];
   const channels: Array<Record<string, unknown>> = [];
   const role = options.role ?? "owner";
@@ -143,16 +146,16 @@ export async function mockOpenRUM(
     if (path === `/api/v1/organizations/${organizationId}/projects`) {
       if (request.method() === "POST") {
         projectCreated = true;
-        return json(route, project(true, role, eventSampleRate, apiSampleRate), 201);
+        return json(route, project(true, role, projectSettings), 201);
       }
       return json(route, {
         projects: projectCreated
           ? [
-              project(false, role, eventSampleRate, apiSampleRate),
+              project(false, role, projectSettings),
               ...(options.projectCount === 2
                 ? [
                     {
-                      ...project(false, role, eventSampleRate, apiSampleRate),
+                      ...project(false, role, projectSettings),
                       id: secondProjectId,
                       name: "Admin Console",
                       slug: "admin-console",
@@ -168,14 +171,20 @@ export async function mockOpenRUM(
       if (request.method() === "PATCH") {
         if (options.failProjectPatch)
           return json(route, { error: { code: "QUERY_UNAVAILABLE", requestId: "e2e" } }, 503);
-        const payload = request.postDataJSON() as {
-          eventSampleRate?: number;
-          apiSampleRate?: number;
-        };
-        eventSampleRate = payload.eventSampleRate ?? eventSampleRate;
-        apiSampleRate = payload.apiSampleRate ?? apiSampleRate;
+        Object.assign(projectSettings, request.postDataJSON() as Partial<MutableProject>);
       }
-      return json(route, project(false, role, eventSampleRate, apiSampleRate));
+      return json(route, project(false, role, projectSettings));
+    }
+    if (path === `/api/v1/projects/${projectId}/filters`) {
+      if (request.method() === "PUT") {
+        const payload = request.postDataJSON() as typeof inboundFilters;
+        // Replaced wholesale, the way the server replaces the document.
+        inboundFilters = {
+          builtin: { ...defaultInboundFilters.builtin, ...payload.builtin },
+          rules: payload.rules ?? [],
+        };
+      }
+      return json(route, inboundFilters);
     }
     if (path === `/api/v1/projects/${projectId}/connection-status`)
       return json(route, {
@@ -909,23 +918,52 @@ function issues() {
   };
 }
 
+// Everything PATCH /api/v1/projects/{id} can change. Held as one object so the
+// mock can merge a partial payload the same way the server's COALESCE does.
+type MutableProject = {
+  name: string;
+  slug: string;
+  allowedOrigins: string[];
+  environment: string;
+  retentionDays: number;
+  eventSampleRate: number;
+  apiSampleRate: number;
+  errorSampleRate: number;
+  status: "active" | "disabled";
+};
+
+type InboundFilters = {
+  builtin: Record<string, "off" | "dry_run" | "enforced">;
+  rules: Array<{ id: string; kind: string; pattern: string; mode: string; note?: string }>;
+};
+
+// Every category is reported, including the off ones, the way the API does.
+const defaultInboundFilters: InboundFilters = {
+  builtin: { bot: "off", extension: "off", localhost: "off" },
+  rules: [],
+};
+
+const defaultProjectSettings: MutableProject = {
+  name: "Magic Moment H5",
+  slug: "magic-moment-h5",
+  allowedOrigins: ["http://127.0.0.1:4174"],
+  environment: "production",
+  retentionDays: 14,
+  eventSampleRate: 1,
+  apiSampleRate: 0.2,
+  errorSampleRate: 1,
+  status: "active",
+};
+
 function project(
   includeKey: boolean,
   role: "owner" | "admin" | "member" | "viewer" = "owner",
-  eventSampleRate = 1,
-  apiSampleRate = 0.2,
+  settings: MutableProject = defaultProjectSettings,
 ) {
   return {
     id: projectId,
     organizationId,
-    name: "Magic Moment H5",
-    slug: "magic-moment-h5",
-    allowedOrigins: ["http://127.0.0.1:4174"],
-    environment: "production",
-    retentionDays: 14,
-    eventSampleRate,
-    apiSampleRate,
-    status: "active",
+    ...settings,
     role,
     createdAt: now,
     updatedAt: now,
@@ -963,26 +1001,72 @@ function usage() {
   };
 }
 
+// A short but non-degenerate series, so the dashboard's trend panels have
+// something to draw. An empty series only ever exercised their empty states.
+function overviewSeries() {
+  return Array.from({ length: 6 }, (_, index) => {
+    const pageViews = 1200 + index * 180;
+    return {
+      bucket: new Date(Date.UTC(2026, 8, 2, index)).toISOString(),
+      pageViews: { value: pageViews, samples: pageViews },
+      uniqueUsers: { value: 400 + index * 40, samples: 400, approximate: true },
+      errorRate: {
+        value: 0.012 + index * 0.002,
+        numerator: 14 + index,
+        denominator: pageViews,
+        numeratorSamples: 14 + index,
+        denominatorSamples: pageViews,
+      },
+      apiFailureRate: {
+        value: 0.03 + index * 0.004,
+        numerator: 9 + index,
+        denominator: 300,
+        numeratorSamples: 9 + index,
+        denominatorSamples: 300,
+      },
+      lcp: { p75: 2200 + index * 90, samples: 300, sufficient: true },
+      inp: { p75: 160 + index * 6, samples: 300, sufficient: true },
+      cls: { p75: 0.06 + index * 0.004, samples: 300, sufficient: true },
+    };
+  });
+}
+
+// Derived from the series rather than written independently, so the KPI cards
+// and the trend panels cannot disagree about the same range.
+function overviewKpis(series: ReturnType<typeof overviewSeries>) {
+  const total = (pick: (point: (typeof series)[number]) => number) =>
+    series.reduce((sum, point) => sum + pick(point), 0);
+  const pageViews = total((point) => point.pageViews.value);
+  const errors = total((point) => point.errorRate.numerator);
+  const apiFailures = total((point) => point.apiFailureRate.numerator);
+  const apiRequests = total((point) => point.apiFailureRate.denominator);
+  const last = series[series.length - 1];
+  return {
+    pageViews: { value: pageViews, samples: pageViews },
+    uniqueUsers: { value: 1180, samples: 1180, approximate: true },
+    errorRate: {
+      value: errors / pageViews,
+      numerator: errors,
+      denominator: pageViews,
+      numeratorSamples: errors,
+      denominatorSamples: pageViews,
+    },
+    apiFailureRate: {
+      value: apiFailures / apiRequests,
+      numerator: apiFailures,
+      denominator: apiRequests,
+      numeratorSamples: apiFailures,
+      denominatorSamples: apiRequests,
+    },
+    lcp: { p75: last.lcp.p75, samples: 1800, sufficient: true },
+    inp: { p75: last.inp.p75, samples: 1800, sufficient: true },
+    cls: { p75: last.cls.p75, samples: 1800, sufficient: true },
+  };
+}
+
 function overview() {
-  const count = { value: 1, samples: 1 };
-  const users = { value: 1, samples: 1, approximate: true };
-  const rate = {
-    value: 0,
-    numerator: 0,
-    denominator: 1,
-    numeratorSamples: 0,
-    denominatorSamples: 1,
-  };
-  const vital = { p75: null, samples: 0, sufficient: false };
-  const kpis = {
-    pageViews: count,
-    uniqueUsers: users,
-    errorRate: rate,
-    apiFailureRate: rate,
-    lcp: vital,
-    inp: vital,
-    cls: vital,
-  };
+  const series = overviewSeries();
+  const kpis = overviewKpis(series);
   return {
     from: "2026-09-02T00:00:00.000Z",
     to: now,
@@ -1002,7 +1086,7 @@ function overview() {
         clsPercent: null,
       },
     },
-    series: [],
+    series,
     topIssues: [
       {
         fingerprint: "v1:e2e-0",

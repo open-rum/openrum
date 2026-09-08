@@ -3,21 +3,46 @@
 @import "@openrum/design-tokens/tokens.css";
 @import "@openrum/ui/styles.css";
 
+@source "../../../../packages/ui/src";
+
 :root {
+  --site-nav-height: 56px;
   font-family: var(--font-product-sans);
   color: var(--ds-text);
   background: var(--ds-canvas);
   --sl-color-accent-low: var(--ds-brand-soft);
   --sl-color-accent: var(--ds-brand);
-  --sl-color-accent-high: var(--ds-text);
+  /* Starlight reads accent-high as link text on dark surfaces and accent as link text on
+     light ones. Pointing accent-high at the plain text token made dark-mode links exactly
+     the colour of body text. `--ds-brand` already flips to the bright lemon green in dark
+     mode, so both ends of the ramp can come from it. */
+  --sl-color-accent-high: var(--ds-brand);
   --sl-color-white: var(--ds-text);
+  /* Starlight's ramp keeps gray-1 through gray-3 as text colours and only turns into
+     hairlines at gray-4. Mapping gray-3 onto a border token painted hairline-coloured
+     text on the canvas at 1.2:1 everywhere Starlight draws secondary text: the edit
+     link, tab labels, LinkCard descriptions, FileTree icons. Shifting the ramp by one
+     keeps text readable and gives inline code a chip it can be seen against. */
   --sl-color-gray-1: var(--ds-text-secondary);
   --sl-color-gray-2: var(--ds-text-muted);
-  --sl-color-gray-3: var(--ds-border);
-  --sl-color-gray-4: var(--ds-border-soft);
-  --sl-color-gray-5: var(--ds-surface-subtle);
-  --sl-color-gray-6: var(--ds-surface);
+  --sl-color-gray-3: var(--ds-text-muted);
+  --sl-color-gray-4: var(--ds-border);
+  --sl-color-gray-5: var(--ds-border-soft);
+  --sl-color-gray-6: var(--ds-surface-subtle);
+  --sl-color-gray-7: var(--ds-surface);
   --sl-color-black: var(--ds-canvas);
+  /* Starlight derives the nav and sidebar backgrounds from gray-6, which lands them
+     one step lighter than the article. That reads as three stacked panels rather
+     than one page. Both are pinned to the canvas so the documentation shell is a
+     single surface, the way the marketing pages are, and the separation is carried
+     by hairlines instead of by fills. */
+  --sl-color-bg-nav: var(--ds-canvas);
+  --sl-color-bg-sidebar: var(--ds-canvas);
+  /* With the fills gone these are the only thing left dividing the shell, so they
+     are pinned to the border token rather than left on Starlight's shade ramp. */
+  --sl-color-hairline: var(--ds-border);
+  --sl-color-hairline-shade: var(--ds-border);
+  --sl-color-hairline-light: var(--ds-border-soft);
   --sl-font: var(--font-product-sans);
   --sl-font-mono: var(--font-mono);
 }
@@ -35,27 +60,37 @@ body {
   background: var(--ds-canvas);
   -webkit-font-smoothing: antialiased;
 }
-a {
+/* Marketing components colour their own links, so the default blue is reset here. This
+   rule is unlayered and therefore also outranks Starlight's `@layer starlight.core`
+   link colour; docs.css restores it for documentation prose.
+
+   Buttons are excluded rather than overridden: `.ui-button-primary` lives in
+   `@layer components`, so an unlayered `a` rule beat it on every anchor-shaped button
+   and made the label inherit body text. In dark mode that painted near-white text on
+   the lemon-green fill at 1.12:1. Not matching the button leaves the layered rule to
+   supply `--ds-primary-foreground`. */
+a:not(.ui-button) {
   color: inherit;
 }
 :focus-visible {
   outline: 3px solid color-mix(in oklch, var(--ds-primary), transparent 35%);
   outline-offset: 3px;
 }
+/* Keep marketing navigation, centered hero, cards and footer on the same measure. */
 .site-container {
-  width: min(1180px, calc(100% - 40px));
+  width: min(1184px, calc(100% - 48px));
   margin-inline: auto;
 }
 .site-header {
   position: sticky;
   top: 0;
   z-index: 20;
-  border-bottom: 1px solid color-mix(in oklch, var(--ds-border), transparent 18%);
-  background: color-mix(in oklch, var(--ds-canvas), transparent 8%);
-  backdrop-filter: blur(16px);
+  background: color-mix(in oklch, var(--ds-canvas), transparent 28%);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
+  backdrop-filter: blur(20px) saturate(140%);
 }
 .site-nav {
-  min-height: 64px;
+  min-height: var(--site-nav-height);
   display: flex;
   align-items: center;
   gap: 28px;
@@ -67,16 +102,39 @@ a {
   font-weight: 750;
   letter-spacing: -0.035em;
   text-decoration: none;
-  font-size: 1.12rem;
+  font-size: 1.32rem;
 }
 .brand-mark {
   display: grid;
-  width: 28px;
-  height: 28px;
   place-items: center;
-  border-radius: var(--radius-md);
-  color: var(--ds-primary-foreground);
-  background: var(--ds-primary);
+  /* The mark carries the brand colour itself rather than sitting on a filled
+     tile. `--ds-brand` is the theme-aware pair — the flat `--ds-primary` fill is
+     the same pale lime in both themes and disappears on a light page. */
+  color: var(--ds-brand);
+}
+.brand-word {
+  letter-spacing: -0.035em;
+}
+/* Half the wordmark is the product category and half is the promise. Colouring
+   `RUM` splits the two without a second typeface, and it is what makes the name
+   readable as Open + RUM rather than as one invented word. */
+.brand-word-accent {
+  color: var(--ds-brand);
+}
+.brand-wordmark {
+  display: block;
+  width: 6.3em;
+  height: auto;
+  overflow: visible;
+}
+.brand-wordmark .word-open {
+  fill: var(--ds-text);
+}
+.brand-wordmark .word-rum {
+  fill: var(--ds-text);
+}
+.site-star {
+  white-space: nowrap;
 }
 .site-links {
   display: flex;
@@ -87,7 +145,7 @@ a {
 .site-links a {
   color: var(--ds-text-muted);
   text-decoration: none;
-  font-size: 0.875rem;
+  font-size: 0.92rem;
   font-weight: 550;
 }
 .site-links a:hover,
@@ -98,6 +156,17 @@ a {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+.site-nav .icon-action {
+  border-color: transparent;
+  background: transparent;
+  transition:
+    background var(--motion-fast),
+    transform var(--motion-fast);
+}
+.site-nav .icon-action:hover {
+  background: var(--ds-surface-subtle);
+  transform: translateY(-1px);
 }
 .icon-action {
   display: grid;
@@ -121,7 +190,7 @@ a {
 }
 .mobile-nav-panel {
   position: absolute;
-  top: 58px;
+  top: calc(100% + 8px);
   right: 20px;
   display: grid;
   min-width: 190px;
@@ -142,24 +211,6 @@ a {
   color: var(--ds-text);
   background: var(--ds-surface-subtle);
 }
-.hero {
-  padding: 96px 0 72px;
-  overflow: hidden;
-  border-bottom: 1px solid var(--ds-border);
-  background:
-    radial-gradient(
-      circle at 72% 8%,
-      color-mix(in oklch, var(--ds-primary), transparent 78%),
-      transparent 42%
-    ),
-    color-mix(in oklch, var(--ds-hero-surface), transparent 96%);
-}
-.hero-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 0.95fr) minmax(420px, 1.05fr);
-  align-items: center;
-  gap: 72px;
-}
 .eyebrow {
   display: inline-flex;
   align-items: center;
@@ -177,170 +228,15 @@ a {
   content: "";
   background: var(--ds-primary);
 }
-.hero h1 {
-  max-width: 720px;
-  margin: 0;
-  font-size: clamp(2.75rem, 6vw, 5.15rem);
-  line-height: 0.98;
-  letter-spacing: -0.065em;
-  font-weight: 730;
-  text-wrap: balance;
-}
-.hero h1 span {
-  color: var(--ds-brand);
-}
-.hero-copy {
-  max-width: 650px;
-  margin: 28px 0 0;
-  color: var(--ds-text-muted);
-  font-size: 1.1rem;
-  line-height: 1.75;
-}
 .cta-row {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
   margin-top: 32px;
 }
-.hero-proof {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 18px;
-  margin-top: 26px;
-  color: var(--ds-text-muted);
-  font-size: 0.78rem;
-}
-.hero-proof span {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-.path-preview {
-  overflow: hidden;
-  min-height: 430px;
-  padding: 28px;
-  border: 1px solid var(--ds-border);
-  border-radius: 16px;
-  background: var(--ds-surface);
-  box-shadow: var(--shadow-hero);
-}
-.path-preview-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 28px;
-}
-.path-preview-label {
-  color: var(--ds-text-muted);
-  font-size: 0.78rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-.path-preview-badge {
-  display: inline-flex;
-  align-items: center;
-  padding: 4px 10px;
-  border-radius: 999px;
-  background: var(--ds-brand-soft);
-  color: var(--ds-brand);
-  font-size: 0.72rem;
-  font-weight: 700;
-}
-.path-preview-steps {
-  display: grid;
-  gap: 14px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.path-preview-step {
-  display: grid;
-  grid-template-columns: 52px 1fr;
-  align-items: center;
-  gap: 16px;
-  padding: 18px 18px 18px 16px;
-  border: 1px solid var(--ds-border);
-  border-radius: 12px;
-  background: var(--ds-surface-subtle);
-}
-.path-preview-step:nth-child(1) {
-  border-color: color-mix(in oklch, var(--ds-primary), transparent 55%);
-  background: color-mix(in oklch, var(--ds-primary), transparent 90%);
-}
-.path-preview-index {
-  display: grid;
-  place-items: center;
-  width: 52px;
-  height: 52px;
-  border-radius: 12px;
-  background: var(--ds-surface);
-  color: var(--ds-brand);
-  font-size: 0.95rem;
-  font-weight: 750;
-  letter-spacing: -0.04em;
-}
-.path-preview-step strong {
-  display: block;
-  margin-bottom: 4px;
-  font-size: 1.05rem;
-  letter-spacing: -0.03em;
-}
-.path-preview-step small {
-  color: var(--ds-text-muted);
-  font-size: 0.88rem;
-}
 .section {
   padding: 84px 0;
   border-bottom: 1px solid var(--ds-border);
-}
-.section-muted {
-  background: var(--ds-surface-subtle);
-}
-.section-heading {
-  max-width: 720px;
-  margin-bottom: 38px;
-}
-.section-heading h2 {
-  margin: 8px 0 0;
-  font-size: clamp(2rem, 4vw, 3.3rem);
-  line-height: 1.08;
-  letter-spacing: -0.045em;
-  text-wrap: balance;
-}
-.section-heading p {
-  margin: 18px 0 0;
-  color: var(--ds-text-muted);
-  line-height: 1.7;
-}
-.flow-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 1px;
-  overflow: hidden;
-  border: 1px solid var(--ds-border);
-  border-radius: var(--radius-lg);
-  background: var(--ds-border);
-}
-.flow-step {
-  min-height: 230px;
-  padding: 26px;
-  background: var(--ds-surface);
-}
-.flow-number {
-  color: var(--ds-brand);
-  font: 700 0.75rem/1 var(--font-mono);
-}
-.flow-step h3 {
-  margin: 58px 0 8px;
-  font-size: 1.05rem;
-}
-.flow-step p {
-  margin: 0;
-  color: var(--ds-text-muted);
-  font-size: 0.875rem;
-  line-height: 1.6;
 }
 .card-grid {
   display: grid;
@@ -486,16 +382,12 @@ a {
   text-align: center;
 }
 @media (max-width: 900px) {
-  .hero-grid {
-    grid-template-columns: 1fr;
-  }
-  .path-preview {
-    min-height: auto;
-  }
-  .flow-grid,
   .card-grid,
   .proof-grid {
     grid-template-columns: 1fr 1fr;
+  }
+  .site-actions {
+    margin-left: auto;
   }
   .site-links {
     display: none;
@@ -514,16 +406,22 @@ a {
   }
 }
 @media (max-width: 600px) {
+  .site-nav {
+    gap: 12px;
+  }
+  .site-nav .site-brand {
+    font-size: 1.18rem;
+  }
+  .site-nav .icon-action {
+    width: 32px;
+    height: 32px;
+  }
+  .site-nav .site-actions {
+    gap: 2px;
+  }
   .site-container {
-    width: min(100% - 28px, 1180px);
+    width: min(100% - 28px, 1320px);
   }
-  .hero {
-    padding-top: 64px;
-  }
-  .hero h1 {
-    font-size: 2.75rem;
-  }
-  .flow-grid,
   .card-grid,
   .proof-grid {
     grid-template-columns: 1fr;
@@ -543,4 +441,9 @@ a {
     transition-duration: 0.01ms !important;
     animation-duration: 0.01ms !important;
   }
+}
+
+[data-design-embed] #theme-toggle,
+[data-design-embed] astro-dev-toolbar {
+  display: none;
 }

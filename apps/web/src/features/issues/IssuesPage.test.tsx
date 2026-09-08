@@ -114,6 +114,7 @@ function useControlPlaneHandlers() {
             retentionDays: 14,
             eventSampleRate: 1,
             apiSampleRate: 0.2,
+            errorSampleRate: 1,
             status: "active",
             role: "owner",
             createdAt: "2026-09-03T00:00:00Z",

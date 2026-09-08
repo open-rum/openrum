@@ -70,7 +70,7 @@ func TestProjectDeletionLeavesNoQueryableData(t *testing.T) {
 	projects := metadata.NewProjectRepository(postgres)
 	project, _, err := projects.CreateWithKey(ctx, ownerID, metadata.CreateProjectInput{
 		OrganizationID: organizationID, Name: "Delete Me", Slug: "delete-me", AllowedOrigins: []string{"https://delete.example"},
-		Environment: "production", RetentionDays: 14, EventSampleRate: 1, APISampleRate: 0.2,
+		Environment: "production", RetentionDays: 14, EventSampleRate: 1, APISampleRate: 0.2, ErrorSampleRate: 1,
 	}, "Default")
 	if err != nil {
 		t.Fatal(err)

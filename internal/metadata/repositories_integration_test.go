@@ -60,7 +60,7 @@ func TestRepositoryIsolationAndLastOwnerInvariant(t *testing.T) {
 	}
 	projectA, err := projects.Create(ctx, ownerA, CreateProjectInput{
 		OrganizationID: organizationA, Name: "Web", Slug: "web", AllowedOrigins: []string{"https://example.com"},
-		Environment: "production", RetentionDays: 14, EventSampleRate: 1, APISampleRate: 0.2,
+		Environment: "production", RetentionDays: 14, EventSampleRate: 1, APISampleRate: 0.2, ErrorSampleRate: 1,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -82,14 +82,25 @@ func TestRepositoryIsolationAndLastOwnerInvariant(t *testing.T) {
 	if err != nil || updatedConfig.Version != 2 || updatedConfig.EventSampleRate != updatedRate {
 		t.Fatalf("updated SDK config=%+v err=%v", updatedConfig, err)
 	}
+	// The error sample rate used to be a SQL literal, so the SDK could never be
+	// told to collect fewer errors. Assert it round-trips and bumps the version
+	// SDKs poll against.
+	errorRate := 0.25
+	if _, err := projects.Update(ctx, ownerA, projectA.ID, UpdateProjectInput{ErrorSampleRate: &errorRate}); err != nil {
+		t.Fatal(err)
+	}
+	errorConfig, err := configs.Get(ctx, projectA.ID, time.Now())
+	if err != nil || errorConfig.Version != 3 || errorConfig.ErrorSampleRate != errorRate {
+		t.Fatalf("error sample rate SDK config=%+v err=%v", errorConfig, err)
+	}
 	emergencyRate, emergencyExpiry := 0.05, time.Now().UTC().Add(time.Hour)
 	emergencyConfig, err := configs.SetEmergency(ctx, ownerA, projectA.ID, &emergencyRate, &emergencyExpiry)
-	if err != nil || emergencyConfig.Version != 3 || emergencyConfig.EmergencySampleRate == nil {
+	if err != nil || emergencyConfig.Version != 4 || emergencyConfig.EmergencySampleRate == nil {
 		t.Fatalf("emergency SDK config=%+v err=%v", emergencyConfig, err)
 	}
 	var auditCount int
 	if err := database.QueryRowContext(ctx, `SELECT count(*) FROM audit_logs WHERE resource_id=$1
-		AND action IN ('project.updated','project.sdk_config.emergency_updated')`, projectA.ID).Scan(&auditCount); err != nil || auditCount != 2 {
+		AND action IN ('project.updated','project.sdk_config.emergency_updated')`, projectA.ID).Scan(&auditCount); err != nil || auditCount != 3 {
 		t.Fatalf("SDK config audit count=%d err=%v", auditCount, err)
 	}
 	oldEncryptionKey := secure.Key{ID: "integration-old", Material: bytes.Repeat([]byte{7}, 32)}

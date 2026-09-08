@@ -20,7 +20,7 @@ test("public pages keep Quickstart/GitHub adoption and avoid SaaS funnel claims"
     new URL("../src/components/landing/LandingPage.astro", import.meta.url),
     "utf8",
   );
-  assert.match(landing, /Quickstart/);
+  assert.match(landing, /getting-started\/quickstart\//);
   assert.match(landing, /GitHub/);
 });
 

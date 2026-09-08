@@ -1,0 +1,64 @@
+---
+title: Architecture
+description: How an Event travels from the browser to the Console, and which component owns each step.
+appliesTo: Alpha / main
+---
+
+import { Aside } from "@astrojs/starlight/components";
+import eventPath from "@/assets/diagrams/event-path.svg?raw";
+
+An OpenRUM Instance is four Go services, five dependencies and one browser SDK. Knowing
+which component owns which step is what makes a capacity estimate or an incident
+diagnosable rather than guesswork.
+
+## The path an Event takes
+
+<figure class="docs-diagram">
+  <Fragment set:html={eventPath} />
+  <figcaption>
+    Solid edges carry Events; the dashed edge is a quota check. Generated from
+    `docs/diagrams/event-path.mmd`.
+  </figcaption>
+</figure>
+
+Ingest acknowledges an Envelope once it is durably in Kafka, not once it is queryable.
+That is the single most useful thing to know when reading the diagram: a `202` means
+accepted, and everything downstream of Kafka is asynchronous. An Instance can therefore
+absorb a traffic spike or a ClickHouse restart without dropping Events, and Events can be
+briefly accepted but not yet visible in the Console.
+
+## Components
+
+| Component            | Owns                                                                                                                    |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| Browser SDK          | Capturing Page Views, interactions, errors, Web Vitals and API Requests, and scrubbing them before they leave the page  |
+| Vite plugin          | Uploading Source Map Artifacts for a Release at build time                                                              |
+| Ingest               | Authenticating the write key, validating against the Envelope schema, scrubbing, fingerprinting, and producing to Kafka |
+| Consumer             | Reading Kafka and writing Events and aggregates to ClickHouse                                                           |
+| Worker               | Background jobs: mapping stack frames, data lifecycle, notifications, Project deletion                                  |
+| API                  | Authenticated Console and control-plane operations                                                                      |
+| Console (`apps/web`) | The operator interface                                                                                                  |
+
+<Aside title="Mapped stack frames arrive late">
+  Symbolication is a Worker batch job that runs after an Error is already stored, so an Error is
+  visible with raw frames first and gains mapped frames a moment later. An Error whose Release was
+  never uploaded simply keeps its raw frames.
+</Aside>
+
+## Dependencies and what each one is for
+
+| Dependency     | Holds                                            | Losing it means                                                             |
+| -------------- | ------------------------------------------------ | --------------------------------------------------------------------------- |
+| PostgreSQL     | Control plane: Projects, users, Alerts, Releases | The Console cannot authenticate or configure; stored Events are unaffected  |
+| ClickHouse     | Events and aggregates                            | Analysis and Investigation stop; ingestion continues into Kafka             |
+| Kafka          | The durable ingestion buffer                     | Ingest starts rejecting; this is the one dependency whose loss drops Events |
+| Redis          | Quotas, status and short-lived caches            | Quota enforcement degrades                                                  |
+| Object storage | Source Map Artifacts, optional                   | New Releases cannot be uploaded; existing mappings are unaffected           |
+
+Kafka is the only dependency in that table whose failure is lossy, which is why
+[capacity planning](/docs/self-hosting/capacity/) starts with Kafka retention headroom
+rather than with ClickHouse disk.
+
+See [External dependencies](/docs/self-hosting/dependencies/) for versions and
+configuration, and the repository's `CONTEXT.md` for the domain language these names come
+from.

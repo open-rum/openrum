@@ -1,9 +1,9 @@
-import { ChartNoAxesCombined } from "lucide-react";
+import { brandMarkPath, brandMarkViewBox } from "@openrum/design-tokens/brand";
 import { cn } from "@/lib/utils";
 
 const sizes = {
-  sm: "size-5 rounded-md [&_svg]:size-3.5",
-  md: "size-9 rounded-lg [&_svg]:size-5",
+  sm: "size-5 [&_svg]:size-5",
+  md: "size-9 [&_svg]:size-9",
 } as const;
 
 export function BrandMark({
@@ -17,13 +17,12 @@ export function BrandMark({
     <span
       aria-hidden="true"
       data-slot="brand-mark"
-      className={cn(
-        "grid shrink-0 place-items-center bg-primary text-primary-foreground",
-        sizes[size],
-        className,
-      )}
+      className={cn("grid shrink-0 place-items-center text-(--ds-brand)", sizes[size], className)}
     >
-      <ChartNoAxesCombined strokeWidth={2.5} />
+      <svg viewBox={brandMarkViewBox} fill="currentColor" focusable="false">
+        <path d={brandMarkPath} />
+        <path d={brandMarkPath} transform="rotate(180 20 20)" />
+      </svg>
     </span>
   );
 }

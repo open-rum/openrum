@@ -1,0 +1,58 @@
+---
+import DesignLayout from "../../../layouts/DesignLayout.astro";
+import { landingConcepts } from "../../../lib/landing-concepts";
+---
+
+<DesignLayout title="落地页方案对比" gallery>
+  <div class="ds-comparison-intro">
+    <div>
+      <a href="/design/">← 返回设计规范</a><h1>落地页方案</h1><p>
+        相同配色，不同表达。两个预览可以分别滚动，打开新页面查看完整效果。
+      </p>
+    </div><label
+      >预览视口 <select class="ds-viewport-select" data-preview-width aria-label="预览视口宽度"
+        ><option value="1280">Desktop · 1280</option><option value="768">Tablet · 768</option
+        ><option value="390">Mobile · 390</option></select
+      ></label
+    >
+  </div>
+  <div class="ds-comparison-grid">
+    {
+      landingConcepts.map((concept) => (
+        <section class="ds-comparison-panel">
+          <>
+            <div class="ds-comparison-title">
+              <>
+                <div>
+                  <>
+                    <span>{concept.title}</span>
+                    <h2>{concept.subtitle}</h2>
+                  </>
+                </div>
+                <a
+                  href={concept.href}
+                  data-preview-link={concept.href}
+                  target="_blank"
+                  rel="noopener"
+                >
+                  完整预览 ↗
+                </a>
+              </>
+            </div>
+            <div class="ds-frame-host" data-frame-host>
+              <iframe
+                data-preview-frame={concept.href}
+                title={`${concept.title}：${concept.subtitle}`}
+                loading="lazy"
+              />
+            </div>
+            <p>{concept.description}</p>
+          </>
+        </section>
+      ))
+    }
+  </div>
+  <p class="ds-comparison-note">
+    方案 01 是静态视觉参考，界面中的数据为示例。后续方案继续保留独立页面，方便回看。
+  </p>
+</DesignLayout>

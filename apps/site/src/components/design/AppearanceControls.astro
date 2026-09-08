@@ -1,0 +1,19 @@
+---
+import { palettes } from "@openrum/design-tokens/catalog";
+---
+
+<div class="ds-appearance">
+  <label
+    ><span>配色</span><select data-design-palette aria-label="配色预设">
+      {palettes.map((palette) => <option value={palette.id}>{palette.name}</option>)}
+    </select></label
+  >
+  <label
+    ><span>模式</span><select data-design-mode aria-label="明暗主题">
+      <option value="dark">深色</option><option value="light">亮色</option>
+    </select></label
+  >
+</div>
+<script>
+  import "../../lib/design-workbench";
+</script>

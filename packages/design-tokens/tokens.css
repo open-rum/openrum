@@ -1,4 +1,20 @@
-:root {
+@import "./presets.css";
+
+:root,
+[data-theme-scope="light"] {
+  --type-display: 56px;
+  --type-heading: 40px;
+  --type-body-marketing: 18px;
+  --space-8: 32px;
+  --space-12: 48px;
+  --space-16: 64px;
+  --space-24: 96px;
+  --ds-chart-1: var(--ds-brand);
+  --ds-chart-2: var(--ds-secondary);
+  --ds-chart-3: var(--ds-text-muted);
+  --ds-chart-4: var(--ds-warning);
+  --ds-chart-5: var(--ds-danger);
+  --ds-chart-area: var(--ds-primary);
   --font-product-sans:
     "Geist Variable", Inter, "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
   --font-mono: "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
@@ -23,7 +39,12 @@
   --ds-border: oklch(0.922 0 0);
   --ds-border-soft: oklch(0.95 0 0);
   --ds-primary: oklch(0.8719 0.1829 125.59);
+  --ds-light-ray-color: var(--ds-primary);
   --ds-primary-foreground: oklch(0 0 0);
+  --ds-action-contrast: oklch(0 0 0);
+  --ds-action-contrast-foreground: oklch(1 0 0);
+  --ds-action-neutral: oklch(1 0 0);
+  --ds-action-neutral-foreground: oklch(0 0 0);
   --ds-brand: oklch(0.46 0.112 125.59);
   --ds-brand-foreground: oklch(1 0 0);
   --ds-brand-soft: oklch(0.955 0.055 125.59);
@@ -69,7 +90,16 @@
   --blue: var(--ds-info);
 }
 
-.dark {
+/* The console and the marketing pages mark dark mode with a `.dark` class; Starlight
+   marks it with `data-theme` on the documentation shell. Both selectors resolve to the
+   same tokens so the documentation theme toggle actually changes something. */
+.dark,
+[data-theme="dark"] {
+  --ds-light-ray-color: #84cc16;
+  --ds-action-contrast: oklch(1 0 0);
+  --ds-action-contrast-foreground: oklch(0 0 0);
+  --ds-action-neutral: oklch(0 0 0);
+  --ds-action-neutral-foreground: oklch(1 0 0);
   --ds-canvas: oklch(0.145 0 0);
   --ds-surface: oklch(0.205 0 0);
   --ds-surface-subtle: oklch(0.269 0 0);

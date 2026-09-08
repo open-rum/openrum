@@ -1,0 +1,10 @@
+---
+const { id, index, title, description } = Astro.props;
+---
+
+<section class="ds-section" id={id}>
+  <div class="ds-section-head">
+    <span class="ds-index">{index}</span><div><h2>{title}</h2><p>{description}</p></div>
+  </div>
+  <slot />
+</section>

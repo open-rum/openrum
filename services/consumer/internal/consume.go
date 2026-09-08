@@ -50,6 +50,8 @@ type Consumer struct {
 	metrics     *Metrics
 	fingerprint errorFingerprinter
 	retention   RetentionPolicyProvider
+	filters     FilterSettingsProvider
+	processing  ProcessingSettingsProvider
 }
 
 type ConsumerOption func(*Consumer)
@@ -60,6 +62,20 @@ func WithMetrics(metrics *Metrics) ConsumerOption {
 
 func WithRetentionPolicies(provider RetentionPolicyProvider) ConsumerOption {
 	return func(consumer *Consumer) { consumer.retention = provider }
+}
+
+// WithInboundFilters enables project-defined filtering. Without it no event is
+// ever discarded, which is the behaviour of a deployment that has not been
+// migrated yet.
+func WithInboundFilters(provider FilterSettingsProvider) ConsumerOption {
+	return func(consumer *Consumer) { consumer.filters = provider }
+}
+
+// WithProcessingRules enables the project-defined URL and redaction rules.
+// Without it an event is stored exactly as normalization produced it, which is
+// the behaviour of a deployment that has not been migrated yet.
+func WithProcessingRules(provider ProcessingSettingsProvider) ConsumerOption {
+	return func(consumer *Consumer) { consumer.processing = provider }
 }
 
 func NewConsumer(source MessageSource, events EventSink, deadLetters DeadLetterSink, options ...ConsumerOption) *Consumer {
@@ -138,6 +154,25 @@ func (consumer *Consumer) processMessage(ctx context.Context, message kafka.Mess
 		for _, failure := range failures {
 			deadLetters = append(deadLetters, consumer.deadLetter(message, failure.Code, failure.EventID))
 		}
+	}
+	// Filtering runs before retention and fingerprinting so that discarded
+	// events do not pay for work whose only consumer is storage.
+	if len(normalized) > 0 && consumer.filters != nil {
+		compiled, err := consumer.filters.Get(ctx, normalized[0].ProjectID)
+		if err != nil {
+			return fmt.Errorf("resolve inbound filters: %w", err)
+		}
+		normalized = applyInboundFilters(normalized, compiled, consumer.metrics)
+	}
+	// Rewriting runs after filtering, so a discarded event pays for none of it,
+	// and before fingerprinting, so an issue is grouped on the text that will
+	// actually be stored rather than on the copy the project asked to redact.
+	if len(normalized) > 0 && consumer.processing != nil {
+		compiled, err := consumer.processing.Get(ctx, normalized[0].ProjectID)
+		if err != nil {
+			return fmt.Errorf("resolve processing rules: %w", err)
+		}
+		applyProcessingRules(normalized, compiled, consumer.metrics)
 	}
 	if len(normalized) > 0 {
 		if consumer.retention == nil {

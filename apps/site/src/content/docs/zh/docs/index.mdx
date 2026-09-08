@@ -1,27 +1,81 @@
 ---
 title: OpenRUM 文档
-description: 快速体验、接入和运维 OpenRUM Alpha。
+description: 部署一套 OpenRUM 实例，或者从应用里发出第一个 Event。
 template: splash
-hero:
-  title: 了解你的用户，快速定位线上问题
-  tagline: 开源、可自托管的前端监控平台，帮助你理解用户行为并快速定位线上问题。
-  actions:
-    - text: 五分钟快速开始
-      link: /zh/docs/getting-started/quickstart/
-      icon: right-arrow
-    - text: Browser SDK
-      link: /zh/docs/sdk/browser/
-      variant: minimal
+appliesTo: Alpha / main
 ---
 
-OpenRUM 是一个开源、可自托管的前端监控平台，帮助你理解用户行为，快速定位并修复线上问题。除非页面另有说明，文档适用于 **Alpha / main**。
+import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
-使用页头语言切换可在中英文之间整站切换。未翻译的进阶运维与 Reference 页面目前仅提供英文。
+OpenRUM 是开源、可自托管的前端监控平台。实例由你自己运行，所以这里其实是两件不同的事，
+而大多数读者手上只有其中一件。
 
-## 从这里开始
+## 从哪里开始
 
-- [五分钟快速开始](/zh/docs/getting-started/quickstart/)
-- [创建第一个项目](/zh/docs/getting-started/create-first-project/)
-- [Browser SDK](/zh/docs/sdk/browser/)
-- [自托管概览](/zh/docs/self-hosting/overview/)
-- [隐私边界](/zh/docs/security/privacy/)
+<div class="docs-entry-grid">
+  <CardGrid>
+    <LinkCard
+      title="部署一套实例"
+      description="用 Compose 或 Helm 把整套服务拉起来并保持健康。还没有任何环境时从这里开始。"
+      href="/zh/docs/getting-started/quickstart/"
+    />
+    <LinkCard
+      title="给应用接入监控"
+      description="装上 Browser SDK，把 Event 发到别人已经运行的实例，并拿到可读的堆栈。"
+      href="/zh/docs/sdk/browser/"
+    />
+  </CardGrid>
+</div>
+
+## 按任务查
+
+<CardGrid>
+  <LinkCard
+    title="部署到生产"
+    description="拓扑、外部依赖，以及那些事后很难改回来的决定。"
+    href="/zh/docs/self-hosting/overview/"
+  />
+  <LinkCard
+    title="接入服务端渲染应用"
+    description="Next.js 与 Astro：初始化位置放错会静默丢弃事件，不会报错。"
+    href="/zh/docs/sdk/nextjs/"
+  />
+  <LinkCard
+    title="排查一次线上问题"
+    description="从一个 Session 里的错误追到它的 Issue、受影响用户和那次失败的请求。"
+    href="/zh/docs/product/investigation/"
+  />
+  <LinkCard
+    title="看懂性能数据"
+    description="每个 Core Web Vital 的判定阈值，以及分位数样本少到什么程度就不该采信。"
+    href="/zh/docs/product/performance/"
+  />
+  <LinkCard
+    title="拿到可读堆栈"
+    description="按 Release 上传 Source Map，以及为什么映射后的帧是可选能力。"
+    href="/zh/docs/sdk/source-maps/"
+  />
+  <LinkCard
+    title="查一个配置项"
+    description="全部环境变量、Event schema 和 HTTP API。"
+    href="/zh/docs/reference/configuration/"
+  />
+  <LinkCard
+    title="备份与恢复"
+    description="把控制面、事件存储和可选的 Artifact 当成同一套恢复集合。"
+    href="/zh/docs/self-hosting/backup-restore/"
+  />
+  <LinkCard
+    title="确认采集了什么"
+    description="采集边界、保留期，以及 OpenRUM 明确拒收的字段。"
+    href="/zh/docs/self-hosting/security/privacy/"
+  />
+</CardGrid>
+
+## 对外暴露实例之前
+
+OpenRUM 处于 Alpha。先读[威胁模型](/zh/docs/self-hosting/security/threat-model/)和
+[实测容量上限](/zh/docs/self-hosting/capacity/)：已发布的基准是一次本地单机压测，
+OpenRUM 在目标速率上并没有通过，我们不会据此给出任何生产容量结论。
+
+页头的语言切换是整站生效的。未翻译的进阶运维与 Reference 页面目前仅提供英文。

@@ -96,6 +96,7 @@ export function ProjectCreatePage() {
               retentionDays: Number(form.get("retentionDays") ?? 14),
               eventSampleRate: Number(form.get("eventSampleRate") ?? 1),
               apiSampleRate: Number(form.get("apiSampleRate") ?? 0.2),
+              errorSampleRate: Number(form.get("errorSampleRate") ?? 1),
             });
           }}
         >
@@ -162,6 +163,17 @@ export function ProjectCreatePage() {
                 step={0.01}
                 required
                 defaultValue={0.2}
+              />
+            </FormField>
+            <FormField label="错误采样率" hint="0–1，建议保持 1">
+              <input
+                name="errorSampleRate"
+                type="number"
+                min={0}
+                max={1}
+                step={0.01}
+                required
+                defaultValue={1}
               />
             </FormField>
           </div>

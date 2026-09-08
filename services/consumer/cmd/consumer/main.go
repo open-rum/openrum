@@ -50,6 +50,14 @@ func registerRoutes(ctx context.Context, _ *httpx.Router, configuration config.C
 	retentionPolicies := consumerservice.NewCachedRetentionPolicyProvider(
 		metadata.NewProjectConfigRepository(metadataDatabase), configuration.SystemSettings, 30*time.Second,
 	)
+	// Shared across workers so one project's settings are compiled once, not
+	// once per worker goroutine.
+	inboundFilters := consumerservice.NewCachedFilterSettingsProvider(
+		metadata.NewProjectFilterRepository(metadataDatabase), 30*time.Second,
+	)
+	processingRules := consumerservice.NewCachedProcessingSettingsProvider(
+		metadata.NewProjectProcessingRepository(metadataDatabase), 30*time.Second,
+	)
 	deadLetters := consumerservice.NewKafkaDeadLetterSink(configuration.KafkaBrokers, configuration.KafkaEventTopic+".dlq")
 	workerCtx, cancelWorkers := context.WithCancel(ctx)
 	const workerCount = 4
@@ -58,7 +66,9 @@ func registerRoutes(ctx context.Context, _ *httpx.Router, configuration config.C
 	for range workerCount {
 		source := consumerservice.NewKafkaMessageSource(configuration.KafkaBrokers, configuration.KafkaEventTopic, "openrum-consumer-v1")
 		consumer := consumerservice.NewConsumer(source, writer, deadLetters,
-			consumerservice.WithMetrics(metrics), consumerservice.WithRetentionPolicies(retentionPolicies))
+			consumerservice.WithMetrics(metrics), consumerservice.WithRetentionPolicies(retentionPolicies),
+			consumerservice.WithInboundFilters(inboundFilters),
+			consumerservice.WithProcessingRules(processingRules))
 		consumers = append(consumers, consumer)
 		workers.Add(1)
 		go func() {

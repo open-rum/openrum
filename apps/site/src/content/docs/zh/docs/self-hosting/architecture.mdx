@@ -1,0 +1,57 @@
+---
+title: 架构
+description: 一个 Event 如何从浏览器走到 Console，以及每一步由谁负责。
+appliesTo: Alpha / main
+---
+
+import { Aside } from "@astrojs/starlight/components";
+import eventPath from "@/assets/diagrams/event-path.svg?raw";
+
+一个 OpenRUM Instance 由四个 Go 服务、五个依赖和一个浏览器 SDK 组成。搞清楚哪一步归谁负责，是
+让容量估算和故障排查有据可依、而不是靠猜的前提。
+
+## 一个 Event 走过的路径
+
+<figure class="docs-diagram">
+  <Fragment set:html={eventPath} />
+  <figcaption>
+    实线边传递 Event，虚线边是配额检查。由 `docs/diagrams/event-path.mmd` 生成。
+  </figcaption>
+</figure>
+
+Ingest 是在 Envelope 可靠写入 Kafka 之后确认的，而不是在它可被查询之后。这是读这张图时最有用的
+一件事：`202` 只代表已接收，Kafka 下游的一切都是异步的。因此一个 Instance 可以在流量突增或
+ClickHouse 重启期间不丢 Event，同时也意味着 Event 可能已被接收、但还没出现在 Console 里。
+
+## 各组件的职责
+
+| 组件                  | 负责                                                                          |
+| --------------------- | ----------------------------------------------------------------------------- |
+| Browser SDK           | 采集 Page View、交互、错误、Web Vitals 和 API Request，并在离开页面前完成清洗 |
+| Vite 插件             | 构建时按 Release 上传 Source Map Artifact                                     |
+| Ingest                | 校验 write key、按 Envelope schema 校验、清洗、指纹计算，并写入 Kafka         |
+| Consumer              | 读取 Kafka，把 Event 与聚合结果写入 ClickHouse                                |
+| Worker                | 后台任务：映射堆栈帧、数据生命周期、通知、Project 删除                        |
+| API                   | 需要认证的 Console 与控制面操作                                               |
+| Console（`apps/web`） | 运维人员使用的界面                                                            |
+
+<Aside title="映射后的堆栈帧会晚一点到">
+  符号化是 Worker 的批处理任务，在 Error 已经入库之后才运行，所以一个 Error 会先带着原始帧出现，
+  过一会儿才拿到映射后的帧。如果它的 Release 从未上传过，那它就只会保留原始帧。
+</Aside>
+
+## 各依赖的用途
+
+| 依赖       | 存放                                  | 失去它意味着                                           |
+| ---------- | ------------------------------------- | ------------------------------------------------------ |
+| PostgreSQL | 控制面：Project、用户、Alert、Release | Console 无法认证或配置；已存储的 Event 不受影响        |
+| ClickHouse | Event 与聚合结果                      | Analysis 和排查中断；数据仍会继续进入 Kafka            |
+| Kafka      | 可靠的接入缓冲                        | Ingest 开始拒绝请求；这是唯一一个失效会丢 Event 的依赖 |
+| Redis      | 配额、状态和短期缓存                  | 配额约束能力下降                                       |
+| 对象存储   | Source Map Artifact，可选             | 无法上传新 Release；已有映射不受影响                   |
+
+表里只有 Kafka 的失效是有损的，这也是[容量规划](/docs/self-hosting/capacity/)为什么先从 Kafka
+的保留余量算起、而不是先看 ClickHouse 磁盘。
+
+版本与配置见[外部依赖](/docs/self-hosting/dependencies/)，这些名字所属的领域语言见仓库根目录的
+`CONTEXT.md`。

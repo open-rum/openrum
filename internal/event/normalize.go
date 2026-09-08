@@ -205,6 +205,12 @@ func normalizeEvent(input normalizeInput) (CanonicalEvent, error) {
 	if input.queued.Synthetic {
 		result.IngestFlags = append(result.IngestFlags, "synthetic")
 	}
+	// Recorded here because this is the last point that holds the raw user
+	// agent: the canonical event keeps only the parsed browser and OS, so a
+	// later stage could not recover the distinction.
+	if input.userAgent.Bot {
+		result.IngestFlags = append(result.IngestFlags, "bot")
+	}
 	if timestamp.Before(time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC)) || timestamp.After(input.queued.ReceivedAt.Add(24*time.Hour)) {
 		result.Timestamp = input.queued.ReceivedAt.UTC()
 		result.IngestFlags = append(result.IngestFlags, "clock_adjusted")

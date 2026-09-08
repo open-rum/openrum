@@ -524,7 +524,7 @@
 
 **Reference sections — read these before starting this phase:**
 
-- Public website: `docs/public-site.md`
+- Public website: `docs/adr/0002-documentation-is-organised-by-reader-task.md`
 - PRD: US-014–US-015；FR-028–FR-030；§ 8 Public Website/Documentation；§ 12 Public site dependencies
 - Vision: § 3 Product Strategy > Messaging Framework、Competitive Differentiation Narrative；§ 5 Visual Design
 - Design: `docs/design.md`
@@ -532,10 +532,10 @@
 
 **Phase prompt — give this to your coding agent:**
 
-> "Read docs/public-site.md and Phase 9. Build one static public app for the product pages and `/docs`, keep it decoupled from the authenticated console, use only verifiable product claims, and make Quickstart and GitHub the two clear adoption paths."
+> "Read docs/adr/0002-documentation-is-organised-by-reader-task.md and Phase 9. Build one static public app for the product pages and `/docs`, keep it decoupled from the authenticated console, use only verifiable product claims, and make Quickstart and GitHub the two clear adoption paths."
 
 - [x] **TASK-095** — Lock public-site decisions, message hierarchy and content inventory
-      Files: `docs/public-site.md`, `docs/product-vision.md`, `README.md`
+      Files: `docs/adr/0002-documentation-is-organised-by-reader-task.md`, `docs/product-vision.md`, `README.md`
       Notes: resolve production domain/repository URLs, benchmark claims and version policy; map every public claim to implemented/released/planned/evidence. Verify: no contradictory CTA, terminology or unsupported capability across README, vision and site plan.
 
 - [x] **TASK-096** — Scaffold the static public site and documentation runtime
@@ -579,8 +579,39 @@
       Notes: canonical/meta/OG/sitemap/robots/404, semantic headings, alt text, code overflow, reduced motion, broken-link/orphan/spelling/version checks; review custom UI against the shared shadcn contract. Verify: key pages pass axe with no critical findings, Lighthouse targets and public-site performance budget, with no one-off replacements for available shadcn primitives.
 
 - [ ] **TASK-106** — Ship preview/production deployment and complete external adoption verification
-      Files: `.github/workflows/`, `deploy/site/`, `apps/site/README.md`, `tests/e2e/public-site.spec.ts`, `docs/public-site.md`
+      Files: `.github/workflows/`, `deploy/site/`, `apps/site/README.md`, `tests/e2e/public-site.spec.ts`
       Notes: PR preview, immutable assets/short HTML cache, production domain, Release/commit footer and optional privacy-safe OpenRUM dogfooding. Verify: an external tester goes Landing → Quickstart → local Demo → behavior Session → Issue, then finds install/upgrade/backup docs without author help.
+
+## Phase 10: Browser SDK Coverage Gaps
+
+> **Goal:** 收敛文档里已经如实标注为"不支持/计划中"的 SDK 缺口，让公开文档的支持矩阵可以逐行改成"可用"。
+
+**Reference sections — read these before starting this phase:**
+
+- Documentation decisions: `docs/adr/0002-documentation-is-organised-by-reader-task.md`
+- Published support matrix: `apps/site/src/content/docs/docs/sdk/browser.mdx`
+- SDK source: `packages/browser-sdk/src/`
+- Domain language: `CONTEXT.md`
+
+**Phase prompt — give this to your coding agent:**
+
+> "Read Phase 10 and the support matrix in apps/site/src/content/docs/docs/sdk/browser.mdx. Every row marked not supported or planned is a claim the documentation is currently making about the SDK; close the gap, then change the row and the generated options reference in the same commit."
+
+- [ ] **TASK-107** — Record parameterized Routes instead of resolved pathnames
+      Files: `packages/browser-sdk/src/integrations/page.ts`, `packages/browser-sdk/src/context.ts`, `packages/browser-sdk/src/client.ts`, `apps/site/src/content/docs/docs/sdk/browser.mdx`
+      Notes: 自动 Page View 目前先带着解析后的 pathname 发出，之后的 `startPage({ route })` 又会开启新的 Page，因此 Page View 与其后续 Event 落在不同 `page_id` 上。需要让路由模式在首个 Page View 之前就能提供，而不是事后覆盖。Verify: 一个动态路由在 Analysis 中聚合为一行，且该次导航的 Page View、错误和 API Request 共享同一个 `page_id`。
+
+- [ ] **TASK-108** — Make server-side initialization observable instead of silent
+      Files: `packages/browser-sdk/src/index.ts`, `packages/browser-sdk/src/transport/sender.ts`, `apps/site/src/content/docs/docs/sdk/nextjs.mdx`, `apps/site/src/content/docs/docs/sdk/astro.mdx`
+      Notes: `window` 不存在时 `init()` 会返回一个无传输层的 client 并静默计为丢弃，一个放错位置的初始化与"接入正常但没有流量"无法区分；同时模块级单例会让这个失效 client 被服务端后续所有请求复用。Verify: 在 Node 下初始化会给出一次明确的诊断信号，且不会跨请求复用 client。
+
+- [ ] **TASK-109** — Capture hash-based routing
+      Files: `packages/browser-sdk/src/integrations/page.ts`, `apps/site/src/content/docs/docs/sdk/browser.mdx`
+      Notes: 目前只监听 history 事件，hash 模式的应用只会记录首个 Page View。Verify: hash 路由的每次跳转产生一个 Page View，且不会为 history 模式重复计数。
+
+- [ ] **TASK-110** — Publish a bundler-free build and serve it from the Instance
+      Files: `packages/browser-sdk/tsup.config.ts`, `packages/browser-sdk/package.json`, `services/api/internal/handlers/`, `apps/site/src/content/docs/docs/sdk/browser.mdx`
+      Notes: 当前只有 ESM 产物，因此文档把 CDN `<script>` 标注为计划中；需要 IIFE/UMD 产物、体积预算和版本化的分发路径。Verify: 一个没有打包器的静态页面用 `<script>` 即可完成接入，且产物体积有门禁。
 
 ## Agent Session Guide
 

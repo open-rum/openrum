@@ -13,6 +13,7 @@ import (
 
 	"openrum/internal/auth"
 	"openrum/internal/httpx"
+	"openrum/internal/ingest"
 	"openrum/internal/metadata"
 )
 
@@ -32,34 +33,49 @@ type createProjectRequest struct {
 	RetentionDays   *int16   `json:"retentionDays"`
 	EventSampleRate *float64 `json:"eventSampleRate"`
 	APISampleRate   *float64 `json:"apiSampleRate"`
+	ErrorSampleRate *float64 `json:"errorSampleRate"`
 }
 
 type updateProjectRequest struct {
-	Name            *string                 `json:"name"`
-	Slug            *string                 `json:"slug"`
-	AllowedOrigins  *[]string               `json:"allowedOrigins"`
-	Environment     *string                 `json:"environment"`
-	RetentionDays   *int16                  `json:"retentionDays"`
-	EventSampleRate *float64                `json:"eventSampleRate"`
-	APISampleRate   *float64                `json:"apiSampleRate"`
-	Status          *metadata.ProjectStatus `json:"status"`
+	Name            *string   `json:"name"`
+	Slug            *string   `json:"slug"`
+	AllowedOrigins  *[]string `json:"allowedOrigins"`
+	Environment     *string   `json:"environment"`
+	RetentionDays   *int16    `json:"retentionDays"`
+	EventSampleRate *float64  `json:"eventSampleRate"`
+	APISampleRate   *float64  `json:"apiSampleRate"`
+	ErrorSampleRate *float64  `json:"errorSampleRate"`
+	// IngestRateLimit is decoded as a pointer to a pointer so that omitting the
+	// field and sending an explicit null stay distinguishable: omitted leaves
+	// the override as it is, null clears it back to the instance default.
+	IngestRateLimit   **int32                     `json:"ingestRateLimit"`
+	OverLimitBehavior *metadata.OverLimitBehavior `json:"overLimitBehavior"`
+	Status            *metadata.ProjectStatus     `json:"status"`
 }
 
 type projectResponse struct {
-	ID              string                    `json:"id"`
-	OrganizationID  string                    `json:"organizationId"`
-	Name            string                    `json:"name"`
-	Slug            string                    `json:"slug"`
-	AllowedOrigins  []string                  `json:"allowedOrigins"`
-	Environment     string                    `json:"environment"`
-	RetentionDays   int16                     `json:"retentionDays"`
-	EventSampleRate float64                   `json:"eventSampleRate"`
-	APISampleRate   float64                   `json:"apiSampleRate"`
-	Status          metadata.ProjectStatus    `json:"status"`
-	Role            metadata.OrganizationRole `json:"role,omitempty"`
-	CreatedAt       string                    `json:"createdAt"`
-	UpdatedAt       string                    `json:"updatedAt"`
-	WriteKey        string                    `json:"writeKey,omitempty"`
+	ID              string   `json:"id"`
+	OrganizationID  string   `json:"organizationId"`
+	Name            string   `json:"name"`
+	Slug            string   `json:"slug"`
+	AllowedOrigins  []string `json:"allowedOrigins"`
+	Environment     string   `json:"environment"`
+	RetentionDays   int16    `json:"retentionDays"`
+	EventSampleRate float64  `json:"eventSampleRate"`
+	APISampleRate   float64  `json:"apiSampleRate"`
+	ErrorSampleRate float64  `json:"errorSampleRate"`
+	// Null means the project has no override and the instance default applies.
+	IngestRateLimit   *int32                     `json:"ingestRateLimit"`
+	OverLimitBehavior metadata.OverLimitBehavior `json:"overLimitBehavior"`
+	// DefaultIngestRateLimit is the ceiling that applies when there is no
+	// override. Reported alongside so the Console can show what "default"
+	// currently means without hard-coding a number that lives in the ingest.
+	DefaultIngestRateLimit int                       `json:"defaultIngestRateLimit"`
+	Status                 metadata.ProjectStatus    `json:"status"`
+	Role                   metadata.OrganizationRole `json:"role,omitempty"`
+	CreatedAt              string                    `json:"createdAt"`
+	UpdatedAt              string                    `json:"updatedAt"`
+	WriteKey               string                    `json:"writeKey,omitempty"`
 }
 
 func NewProjectHandler(organizations *metadata.OrganizationRepository, projects *metadata.ProjectRepository, logger zerolog.Logger) *ProjectHandler {
@@ -212,7 +228,7 @@ func validateCreateProject(payload createProjectRequest, organizationID uuid.UUI
 	if !validName(payload.Name) || !validSlug(payload.Slug) || !environmentPattern.MatchString(payload.Environment) || !ok {
 		return metadata.CreateProjectInput{}, false
 	}
-	retentionDays, eventSampleRate, apiSampleRate := int16(14), 1.0, 0.2
+	retentionDays, eventSampleRate, apiSampleRate, errorSampleRate := int16(14), 1.0, 0.2, 1.0
 	if payload.RetentionDays != nil {
 		retentionDays = *payload.RetentionDays
 	}
@@ -222,19 +238,24 @@ func validateCreateProject(payload createProjectRequest, organizationID uuid.UUI
 	if payload.APISampleRate != nil {
 		apiSampleRate = *payload.APISampleRate
 	}
-	if !validRetention(retentionDays) || !validSampleRate(eventSampleRate) || !validSampleRate(apiSampleRate) {
+	if payload.ErrorSampleRate != nil {
+		errorSampleRate = *payload.ErrorSampleRate
+	}
+	if !validRetention(retentionDays) || !validSampleRate(eventSampleRate) || !validSampleRate(apiSampleRate) ||
+		!validSampleRate(errorSampleRate) {
 		return metadata.CreateProjectInput{}, false
 	}
 	return metadata.CreateProjectInput{
 		OrganizationID: organizationID, Name: payload.Name, Slug: payload.Slug, AllowedOrigins: origins,
 		Environment: payload.Environment, RetentionDays: retentionDays, EventSampleRate: eventSampleRate,
-		APISampleRate: apiSampleRate,
+		APISampleRate: apiSampleRate, ErrorSampleRate: errorSampleRate,
 	}, true
 }
 
 func validateUpdateProject(payload updateProjectRequest) (metadata.UpdateProjectInput, bool) {
 	if payload.Name == nil && payload.Slug == nil && payload.AllowedOrigins == nil && payload.Environment == nil &&
-		payload.RetentionDays == nil && payload.EventSampleRate == nil && payload.APISampleRate == nil && payload.Status == nil {
+		payload.RetentionDays == nil && payload.EventSampleRate == nil && payload.APISampleRate == nil &&
+		payload.ErrorSampleRate == nil && payload.Status == nil {
 		return metadata.UpdateProjectInput{}, false
 	}
 	if payload.Name != nil {
@@ -274,6 +295,17 @@ func validateUpdateProject(payload updateProjectRequest) (metadata.UpdateProject
 	if payload.APISampleRate != nil && !validSampleRate(*payload.APISampleRate) {
 		return metadata.UpdateProjectInput{}, false
 	}
+	if payload.ErrorSampleRate != nil && !validSampleRate(*payload.ErrorSampleRate) {
+		return metadata.UpdateProjectInput{}, false
+	}
+	if payload.IngestRateLimit != nil && *payload.IngestRateLimit != nil &&
+		!validIngestRateLimit(**payload.IngestRateLimit) {
+		return metadata.UpdateProjectInput{}, false
+	}
+	if payload.OverLimitBehavior != nil && *payload.OverLimitBehavior != metadata.OverLimitReject &&
+		*payload.OverLimitBehavior != metadata.OverLimitSample {
+		return metadata.UpdateProjectInput{}, false
+	}
 	if payload.Status != nil && *payload.Status != metadata.ProjectStatusActive && *payload.Status != metadata.ProjectStatusDisabled {
 		return metadata.UpdateProjectInput{}, false
 	}
@@ -310,6 +342,13 @@ func validRetention(value int16) bool {
 	return value >= 1 && value <= 90
 }
 
+// validIngestRateLimit bounds the override to what the column accepts. The
+// floor is 1 rather than 0 because a project that wants no traffic disables
+// itself; a limit of zero would look like a quota and behave like an outage.
+func validIngestRateLimit(value int32) bool {
+	return value >= 1 && value <= 1_000_000
+}
+
 func validSampleRate(value float64) bool {
 	return value >= 0 && value <= 1 && !math.IsNaN(value) && !math.IsInf(value, 0)
 }
@@ -318,7 +357,10 @@ func projectDTO(project metadata.Project, role metadata.OrganizationRole) projec
 	return projectResponse{
 		ID: project.ID.String(), OrganizationID: project.OrganizationID.String(), Name: project.Name, Slug: project.Slug,
 		AllowedOrigins: project.AllowedOrigins, Environment: project.Environment, RetentionDays: project.RetentionDays,
-		EventSampleRate: project.EventSampleRate, APISampleRate: project.APISampleRate, Status: project.Status,
-		Role: role, CreatedAt: project.CreatedAt.UTC().Format(timeFormat), UpdatedAt: project.UpdatedAt.UTC().Format(timeFormat),
+		EventSampleRate: project.EventSampleRate, APISampleRate: project.APISampleRate,
+		ErrorSampleRate: project.ErrorSampleRate, IngestRateLimit: project.IngestRateLimit,
+		OverLimitBehavior: project.OverLimitBehavior, DefaultIngestRateLimit: ingest.DefaultProjectRequestsPerSecond,
+		Status: project.Status,
+		Role:   role, CreatedAt: project.CreatedAt.UTC().Format(timeFormat), UpdatedAt: project.UpdatedAt.UTC().Format(timeFormat),
 	}
 }

@@ -259,11 +259,14 @@ export function MembersPage() {
             </dl>
           </div>
           <div className="border border-border bg-card p-5">
-            <h2 className="text-base font-semibold">项目 Keys</h2>
+            <h2 className="text-base font-semibold">项目设置</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Origin、环境、保留与 Write Key 都按项目配置。
+            </p>
             <div className="mt-3 space-y-2">
               {projectsQuery.data?.projects.map((project) => (
                 <Button key={project.id} asChild variant="outline" className="w-full justify-start">
-                  <Link to="/projects/$projectId/settings/keys" params={{ projectId: project.id }}>
+                  <Link to="/projects/$projectId/settings" params={{ projectId: project.id }}>
                     <Key /> {project.name}
                   </Link>
                 </Button>

@@ -21,4 +21,4 @@ Analysis answers what users did across a Project and Environment.
 - Use a funnel or Route filter to select candidate Sessions instead of scanning raw Events.
 - Treat Custom Events as product milestones, not free-form logs.
 
-Related: [Investigation](/docs/product/investigation/), [Domain model](/docs/concepts/domain-model/), [Browser SDK](/docs/sdk/browser/).
+Related: [Investigation](/docs/product/investigation/), [Domain model](/docs/getting-started/domain-model/), [Browser SDK](/docs/sdk/browser/).

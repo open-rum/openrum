@@ -1,107 +1,141 @@
 ---
 import {
   ArrowRight,
+  BarChart3,
+  Bug,
   Check,
-  Code2,
   Database,
+  Gauge,
   Github,
-  Search,
+  PlayCircle,
   Server,
   ShieldCheck,
-  UsersRound,
-  Zap,
+  TriangleAlert,
 } from "lucide-astro";
+import LightRays from "./LightRays.astro";
+import BrandMark from "../BrandMark.astro";
+import TechStack from "./TechStack.astro";
 import PublicLayout from "../../layouts/PublicLayout.astro";
+import "../../styles/landing.css";
 const { lang = "en" } = Astro.props;
 const zh = lang === "zh";
 const prefix = zh ? "/zh" : "";
 const repository = import.meta.env.PUBLIC_REPOSITORY_URL || "https://github.com/openrum/openrum";
+const docs = zh ? "/zh/docs" : "/docs";
 const copy = zh
   ? {
       sloganLead: "了解你的用户，",
-      sloganAccent: "快速定位线上问题",
-      description:
-        "OpenRUM 是一个开源、可自托管的前端监控平台，帮助你理解用户行为，快速定位并修复线上问题。",
-      quick: "快速开始",
-      pathTitle: "统一调查路径",
-      pathSteps: [
-        ["行为", "发现异常"],
-        ["会话", "还原旅程"],
-        ["问题", "聚合影响"],
-        ["修复", "定位根因"],
+      sloganAccent: "快速修复问题。",
+      description: "追踪应用错误、分析用户行为、监控应用性能，数据完全掌握在自己手里。",
+      quick: "立即开始",
+      exampleTag: "示例",
+      appRange: "最近 7 天",
+      topPagesTitle: "热门页面",
+      topPagesRows: [
+        ["/product", "32.4%"],
+        ["/checkout", "18.7%"],
+        ["/dashboard", "12.3%"],
+        ["/profile", "8.9%"],
+        ["/", "6.1%"],
       ],
-      flowTitle: "从现象到根因，不再跨系统拼接证据",
-      flow: [
-        ["01", "行为异常", "从 PV/UV、自定义事件、漏斗或国家/设备/浏览器分群发现变化。"],
-        ["02", "Session", "打开受影响用户会话，查看页面、点击、请求与错误时间线。"],
-        ["03", "Issue", "按稳定 Fingerprint 聚合错误，确认影响范围、Release 与新增趋势。"],
-        ["04", "定位与修复", "结合会话上下文与失败 API，快速确认根因并推进修复。"],
+      errorTitle: "快速定位并修复问题",
+      errorLead:
+        "获取完整的错误上下文，包括堆栈信息、面包屑、用户信息和更多内容，减少调试时间，提升稳定性。",
+      errorCalloutLead: "从错误到修复",
+      errorCallout: "只需几分钟，而不是几小时。",
+      errorStatus: "Open",
+      errorType: "TypeError",
+      errorMessage: "Cannot read properties of undefined (reading 'map')",
+      errorTabs: ["详情", "追踪信息", "标签", "用户", "设备", "原始数据"],
+      errorMeta: [
+        ["事件 ID", "7f3a2e6c-8b4d-4a4f-9e2c-1d65e8a77f2b"],
+        ["发生时间", "2025-08-03 14:32:18（2 小时前）"],
+        ["URL", "https://app.example.com/product"],
+        ["用户", "user_123456"],
+        ["浏览器", "Chrome 126.0.0.0"],
+        ["设备", "Mac OS 14.5 - MacBook Pro"],
       ],
-      capabilityTitle: "分析与错误是核心，性能与 API 是调查证据",
-      capabilities: [
-        ["用户行为分析", "PV/UV、来源、地域、设备、浏览器、自定义事件、漏斗、路径与留存。"],
-        ["错误监控", "自动捕获 JavaScript 错误，稳定分组、影响统计与会话上下文。"],
-        ["真实用户体验", "Core Web Vitals、Route 性能和浏览器 API 请求帮助解释用户体验异常。"],
+      stackLabel: "堆栈信息",
+      analyticsEyebrow: "行为分析",
+      analyticsTitle: "了解用户在做什么",
+      analyticsLead:
+        "PV/UV、会话、来源和自定义事件与错误落在同一份数据里，所以「这个错误值不值得今天修」是能回答的。",
+      analyticsQuote: "错误告诉你哪里坏了，行为分析告诉你它为什么重要。",
+      analyticsLink: "查看行为分析能力",
+      analyticsStats: [
+        ["页面浏览", "128.4K"],
+        ["独立用户", "32.8K"],
+        ["会话", "46.2K"],
+        ["跳出率", "38%"],
       ],
-      proofTitle: "为自部署而设计，不依赖 OpenRUM 云服务",
+      proofEyebrow: "自部署",
+      proofTitle: "你的数据，你的服务器",
+      proofLead: "部署在你自己的基础设施上，监控数据从头到尾不经过第三方。",
       proof: [
         ["可选对象存储", "没有 Bucket 时核心监控仍可运行；Source Map 可接 OSS 或 S3-compatible。"],
         ["数据生命周期", "原始与聚合数据按项目策略物理过期，历史清理可预览、审计和限速。"],
         ["透明证据", "公开 Demo seed、压测方法与失败结果，不把本地演练包装成生产容量声明。"],
       ],
+      deployList: ["Docker Compose", "Kubernetes", "无厂商锁定", "数据完全自持"],
+      terminalTitle: "本地启动一套完整实例",
+      terminalComment: "# 拉起全部服务",
+      terminalNote: "容器就绪后访问 http://127.0.0.1:4173 完成初始化，无需注册任何账号。",
+      closerEyebrow: "开源",
+      closerTitle: "为开发者而生，由开发者共建",
+      closerBody: "现在就把监控放进你自己的基础设施，或先看压测方法与失败结果再决定。",
+      deploy: "选择部署路径",
+      evidence: "查看可复现证据",
     }
   : {
       sloganLead: "Understand your users.",
-      sloganAccent: "Resolve production issues fast.",
+      sloganAccent: "Fix issues faster.",
       description:
-        "OpenRUM is an open-source, self-hosted frontend monitoring platform that helps you understand user behavior and quickly identify, diagnose, and resolve production issues.",
-      quick: "Quickstart",
-      pathTitle: "One investigation path",
-      pathSteps: [
-        ["Behavior", "Spot the change"],
-        ["Session", "Replay the journey"],
-        ["Issue", "Measure impact"],
-        ["Fix", "Find the cause"],
+        "Track errors, analyze user behavior, and monitor application performance — all on your own infrastructure.",
+      quick: "Get started",
+      exampleTag: "Example",
+      appRange: "Last 7 days",
+      topPagesTitle: "Top Pages",
+      topPagesRows: [
+        ["/product", "32.4%"],
+        ["/checkout", "18.7%"],
+        ["/dashboard", "12.3%"],
+        ["/profile", "8.9%"],
+        ["/", "6.1%"],
       ],
-      flowTitle: "Move from symptom to root cause without rebuilding context",
-      flow: [
-        [
-          "01",
-          "Behavior change",
-          "Start with PV/UV, Custom Events, a funnel, or a country, device and browser segment.",
-        ],
-        [
-          "02",
-          "Session",
-          "Open the affected user Session and inspect page, interaction, request and error events in order.",
-        ],
-        [
-          "03",
-          "Issue",
-          "Use a stable Fingerprint to understand impact, Release context and whether the problem is new.",
-        ],
-        [
-          "04",
-          "Diagnose and fix",
-          "Use Session context and the failed API Request to confirm the root cause and ship a fix.",
-        ],
+      errorTitle: "Find and fix issues, faster",
+      errorLead:
+        "Get full error context with stack traces, breadcrumbs, user information and more. Reduce debugging time and improve stability.",
+      errorCalloutLead: "From error to fix",
+      errorCallout: "in minutes, not hours.",
+      errorStatus: "Open",
+      errorType: "TypeError",
+      errorMessage: "Cannot read properties of undefined (reading 'map')",
+      errorTabs: ["Details", "Breadcrumbs", "Tags", "User", "Device", "Raw"],
+      errorMeta: [
+        ["Event ID", "7f3a2e6c-8b4d-4a4f-9e2c-1d65e8a77f2b"],
+        ["Occurred", "2025-08-03 14:32:18 (2 hours ago)"],
+        ["URL", "https://app.example.com/product"],
+        ["User", "user_123456"],
+        ["Browser", "Chrome 126.0.0.0"],
+        ["Device", "Mac OS 14.5 - MacBook Pro"],
       ],
-      capabilityTitle: "Analysis and errors are core; performance and APIs provide evidence",
-      capabilities: [
-        [
-          "Behavior analytics",
-          "PV/UV, acquisition, geography, device, browser, Custom Events, funnels, paths and retention.",
-        ],
-        [
-          "Error monitoring",
-          "Automatic JavaScript capture, stable grouping, impact statistics and Session context.",
-        ],
-        [
-          "Real-user experience",
-          "Core Web Vitals, Route performance and browser API requests explain experience regressions.",
-        ],
+      stackLabel: "Stack Trace",
+      analyticsEyebrow: "Behavior analytics",
+      analyticsTitle: "Understand what your users do",
+      analyticsLead:
+        "Page views, sessions, acquisition and Custom Events sit in the same dataset as your errors, so “is this error worth fixing today” is a question you can answer.",
+      analyticsQuote: "Errors tell you what broke. Analytics tells you why it matters.",
+      analyticsLink: "See behavior analytics",
+      analyticsStats: [
+        ["Page views", "128.4K"],
+        ["Unique users", "32.8K"],
+        ["Sessions", "46.2K"],
+        ["Bounce rate", "38%"],
       ],
-      proofTitle: "Designed for self-hosting, with no OpenRUM cloud dependency",
+      proofEyebrow: "Self-hosted",
+      proofTitle: "Your data. Your server.",
+      proofLead:
+        "Deploy on your own infrastructure. Monitoring data never passes through anyone else.",
       proof: [
         [
           "Optional object storage",
@@ -116,147 +150,318 @@ const copy = zh
           "Demo seeds, benchmark methods and failed overload results are public—not promoted as production capacity.",
         ],
       ],
+      deployList: ["Docker Compose", "Kubernetes", "No vendor lock-in", "Full data ownership"],
+      terminalTitle: "Bring up a full instance locally",
+      terminalComment: "# start every service",
+      terminalNote:
+        "Once the containers report ready, open http://127.0.0.1:4173 to finish setup. No account signup required.",
+      closerEyebrow: "Open source",
+      closerTitle: "Built by developers, for developers",
+      closerBody:
+        "Put monitoring inside your own infrastructure, or read the benchmark method and the failed overload results first.",
+      deploy: "Choose a deployment path",
+      evidence: "Review reproducible evidence",
     };
-const capabilityIcons = [UsersRound, Zap, Search];
 const proofIcons = [Server, Database, ShieldCheck];
+const featureIcons = [Bug, BarChart3, Gauge];
+const featureCards = zh
+  ? [
+      [
+        "错误追踪",
+        "找到根源，修复问题。",
+        "堆栈、面包屑与 Source Map，让定位问题需要的上下文触手可及。",
+      ],
+      [
+        "行为分析",
+        "看见旅程，理解影响。",
+        "关联页面浏览、会话与自定义事件，了解用户如何使用你的产品。",
+      ],
+      [
+        "真实用户性能",
+        "衡量体验，找到瓶颈。",
+        "在真实用户的浏览器里，监控 Web Vitals、资源耗时与 API 请求。",
+      ],
+    ]
+  : [
+      [
+        "Error tracking",
+        "Find the source. Fix the issue.",
+        "Stack traces, breadcrumbs and Source Maps. The context you need, right where you need it.",
+      ],
+      [
+        "Behavior analytics",
+        "See the journey. Understand the impact.",
+        "Connect page views, sessions and Custom Events to understand what your users do.",
+      ],
+      [
+        "Real-user performance",
+        "Measure the experience. Find the friction.",
+        "Web Vitals, resource timing and API requests, measured where they matter: in the browser.",
+      ],
+    ];
+const trendAxis = ["Jul 26", "Jul 27", "Jul 28", "Jul 29", "Jul 30", "Jul 31", "Aug 1"];
+const stackFrames = [
+  ["TypeError: Cannot read properties of undefined (reading 'map')", ""],
+  ["  at ProductList", "(.../src/pages/product/index.tsx:45:22)"],
+  ["  at renderWithHooks", "(react-dom.development.js:16067:18)"],
+  ["  at mountIndeterminateComponent", "(react-dom.development.js:20074:17)"],
+];
 const pageTitle = zh
-  ? "OpenRUM — 了解你的用户，快速定位线上问题"
-  : "OpenRUM — Understand your users. Resolve production issues fast.";
+  ? "OpenRUM — 了解你的用户，快速修复问题"
+  : "OpenRUM — Understand your users. Fix issues faster.";
 ---
 
 <PublicLayout title={pageTitle} description={copy.description} lang={lang}>
-  <section class="hero">
-    <div class="site-container hero-grid">
-      <div>
-        <p class="eyebrow">OpenRUM Alpha · Self-host first</p>
-        <h1>
-          {copy.sloganLead}
-          <span>{copy.sloganAccent}</span>
+  <div class="lp-page">
+    <section class="lp-hero" aria-labelledby="lp-hero-title">
+      <LightRays />
+      <div class="site-container lp-hero-content">
+        <h1 id="lp-hero-title">
+          <span class="lp-title-line"><span class="lp-title-ink">{copy.sloganLead}</span></span>
+          <span class="lp-title-line lp-accent"
+            ><span class="lp-title-ink">{copy.sloganAccent}</span></span
+          >
         </h1>
-        <p class="hero-copy">{copy.description}</p>
-        <div class="cta-row">
+        <p class="lp-hero-copy">{copy.description}</p>
+        <div class="lp-cta">
           <a
-            class="ui-button ui-button-primary"
-            href={zh ? "/zh/docs/getting-started/quickstart/" : "/docs/getting-started/quickstart/"}
-            >{copy.quick}<ArrowRight size={16} /></a
+            class="ui-button ui-button-contrast lp-cta-button"
+            href={`${docs}/getting-started/quickstart/`}
           >
-          <a class="ui-button ui-button-outline" href={repository}><Github size={16} />GitHub</a>
+            {copy.quick}<ArrowRight data-icon="inline-end" size={17} />
+          </a>
+          <a class="ui-button ui-button-neutral lp-cta-button" href={repository}>
+            <Github data-icon="inline-start" size={17} />GitHub
+          </a>
         </div>
-        <div class="hero-proof">
-          <span><Check size={14} />{zh ? "开源自部署" : "Open source & self-hosted"}</span>
-          <span
-            ><Check size={14} />{zh ? "行为与错误同一路径" : "Behavior + errors in one path"}</span
+        <TechStack lang={lang} />
+      </div>
+    </section>
+
+    <section class="lp-features site-container" aria-labelledby="lp-features-title">
+      <div class="lp-feature-heading lp-reveal">
+        <h2 id="lp-features-title">
+          {zh ? "看清全貌，" : "The whole picture."}<br /><span
+            >{zh ? "在一处理解用户体验。" : "One place to understand it."}</span
           >
-          <span><Check size={14} />{zh ? "不采集原始输入" : "No raw input collection"}</span>
-        </div>
+        </h2>
+        <p>
+          {zh ? "从用户的第一次点击，到问题的根源。" : "From the first click to the root cause."}<br
+          />{zh ? "让用户行为与产品稳定性关联起来。" : "Connect behavior with reliability."}
+        </p>
       </div>
-      <div
-        class="path-preview"
-        role="img"
-        aria-label={zh
-          ? "OpenRUM 统一调查路径示意：行为、会话、问题、修复"
-          : "Illustration of the OpenRUM investigation path: behavior, session, issue, and fix"}
-      >
-        <div class="path-preview-header">
-          <span class="path-preview-label">{copy.pathTitle}</span>
-          <span class="path-preview-badge">Alpha</span>
-        </div>
-        <ol class="path-preview-steps">
-          {
-            copy.pathSteps.map(([title, body], index) => (
-              <li class="path-preview-step">
-                <span class="path-preview-index">{String(index + 1).padStart(2, "0")}</span>
-                <div>
-                  <strong>{title}</strong>
-                  <small>{body}</small>
-                </div>
-              </li>
-            ))
-          }
-        </ol>
-      </div>
-    </div>
-  </section>
-  <section class="section">
-    <div class="site-container">
-      <div class="section-heading">
-        <p class="eyebrow">Investigation path</p>
-        <h2>{copy.flowTitle}</h2>
-      </div>
-      <div class="flow-grid">
+      <div class="lp-feature-grid">
         {
-          copy.flow.map(([number, title, body]) => (
-            <article class="flow-step">
-              <span class="flow-number">{number}</span>
-              <h3>{title}</h3>
-              <p>{body}</p>
-            </article>
-          ))
-        }
-      </div>
-    </div>
-  </section>
-  <section class="section section-muted">
-    <div class="site-container">
-      <div class="section-heading">
-        <p class="eyebrow">Shipped capabilities</p>
-        <h2>{copy.capabilityTitle}</h2>
-      </div>
-      <div class="card-grid">
-        {
-          copy.capabilities.map(([title, body], index) => {
-            const Icon = capabilityIcons[index];
+          featureCards.map(([label, title, body], index) => {
+            const Icon = featureIcons[index];
             return (
-              <article class="ui-card feature-card">
-                <span class="feature-icon">
-                  <Icon size={19} />
-                </span>
-                <h3>{title}</h3>
-                <p>{body}</p>
-                <a href={`${prefix}/product`}>
-                  {zh ? "查看能力边界" : "See capability boundaries"} →
-                </a>
-                <div class="status-line">
-                  <span>Alpha</span>
-                  <span>{zh ? "已实现" : "Implemented"}</span>
+              <article class="ui-card lp-feature-card lp-reveal">
+                <div class="lp-feature-card-header">
+                  <Icon class="lp-feature-icon" size={26} />
+                  <p class="lp-feature-label">{label}</p>
+                  <h3>
+                    {title.split(zh ? "，" : ". ").map((line, part, lines) => (
+                      <span>
+                        {line}
+                        {part < lines.length - 1 ? (zh ? "，" : ".") : ""}
+                      </span>
+                    ))}
+                  </h3>
+                </div>
+                <div class="lp-feature-card-content">
+                  <p>{body}</p>
                 </div>
               </article>
             );
           })
         }
       </div>
-    </div>
-  </section>
-  <section class="section">
-    <div class="site-container">
-      <div class="section-heading">
-        <p class="eyebrow">Self-host proof</p>
-        <h2>{copy.proofTitle}</h2>
+    </section>
+
+    <section class="lp-section lp-rule">
+      <div class="site-container lp-split lp-reveal">
+        <div class="lp-app">
+          <div class="lp-app-bar lp-app-bar-issue">
+            <span class="lp-issue-mark"><TriangleAlert size={13} /></span>
+            <strong class="lp-issue-title"
+              ><span class="lp-issue-type">{copy.errorType}:</span>
+              {copy.errorMessage}</strong
+            >
+            <span class="lp-issue-status">{copy.errorStatus}</span>
+          </div>
+          <div class="lp-app-body">
+            <ul class="lp-tabs">
+              {
+                copy.errorTabs.map((tab, index) => (
+                  <li class={index === 0 ? "is-active" : ""}>{tab}</li>
+                ))
+              }
+            </ul>
+            <dl class="lp-meta">
+              {
+                copy.errorMeta.map(([label, value]) => (
+                  <div>
+                    <dt>{label}</dt>
+                    <dd>{value}</dd>
+                  </div>
+                ))
+              }
+            </dl>
+            <p class="lp-app-label" id="lp-stack-label">{copy.stackLabel}</p>
+            <pre
+              class="lp-stack"
+              tabindex="0"
+              role="group"
+              aria-labelledby="lp-stack-label"><code>{stackFrames.map(([symbol, location]) => (
+              <span class="lp-stack-frame"><span class="lp-stack-symbol">{symbol}</span>{location ? " " : ""}<span class="lp-stack-location">{location}</span></span>
+            ))}</code></pre>
+          </div>
+        </div>
+        <div class="lp-split-copy">
+          <h2 class="lp-split-title">{copy.errorTitle}</h2>
+          <p>{copy.errorLead}</p>
+          <div class="lp-callout">
+            <span class="lp-callout-icon"><PlayCircle size={19} /></span>
+            <p>
+              <strong>{copy.errorCalloutLead}</strong>
+              <span>{copy.errorCallout}</span>
+            </p>
+          </div>
+        </div>
       </div>
-      <div class="proof-grid">
-        {
-          copy.proof.map(([title, body], index) => {
-            const Icon = proofIcons[index];
-            return (
-              <article class="ui-card proof-card">
-                <span class="feature-icon">
-                  <Icon size={19} />
-                </span>
-                <h3>{title}</h3>
-                <p>{body}</p>
-              </article>
-            );
-          })
-        }
+    </section>
+
+    <section class="lp-section lp-rule">
+      <div class="site-container lp-split lp-split-reverse lp-reveal">
+        <div class="lp-split-copy">
+          <p class="lp-eyebrow">{copy.analyticsEyebrow}</p>
+          <h2>{copy.analyticsTitle}</h2>
+          <p>{copy.analyticsLead}</p>
+          <blockquote class="lp-quote">{copy.analyticsQuote}</blockquote>
+          <a class="lp-tile-link" href={`${prefix}/product`}>{copy.analyticsLink} →</a>
+        </div>
+        <div class="lp-app">
+          <div class="lp-app-bar">
+            <span class="lp-app-brand"
+              ><span class="lp-app-mark"><BrandMark size={16} /></span><span class="lp-app-word"
+                >Analytics</span
+              ></span
+            >
+            <span class="lp-app-tag">{copy.exampleTag}</span>
+            <span class="lp-app-chip">{copy.appRange}</span>
+          </div>
+          <div class="lp-app-body">
+            <dl class="lp-stats">
+              {
+                copy.analyticsStats.map(([label, value]) => (
+                  <div>
+                    <dt>{label}</dt>
+                    <dd>{value}</dd>
+                  </div>
+                ))
+              }
+            </dl>
+            <figure class="lp-chart">
+              <figcaption>{copy.analyticsStats[0][0]}</figcaption>
+              <div class="lp-bars">
+                {[46, 62, 51, 78, 66, 91, 84].map((height) => <span style={`height:${height}%`} />)}
+              </div>
+              <ol class="lp-chart-axis" aria-hidden="true">
+                {trendAxis.map((tick) => <li>{tick}</li>)}
+              </ol>
+            </figure>
+            <p class="lp-app-label">{copy.topPagesTitle}</p>
+            <ul class="lp-top-pages">
+              {
+                copy.topPagesRows.map(([path, share]) => (
+                  <li>
+                    <span class="lp-top-path">{path}</span>
+                    <span class="lp-top-bar" style={`--lp-share:${share}`} />
+                    <span class="lp-top-share">{share}</span>
+                  </li>
+                ))
+              }
+            </ul>
+          </div>
+        </div>
       </div>
-      <div class="cta-row">
-        <a class="ui-button ui-button-primary" href={`${prefix}/self-host`}
-          >{zh ? "选择部署路径" : "Choose a deployment path"}<ArrowRight size={16} /></a
-        >
-        <a class="ui-button ui-button-outline" href={`${prefix}/benchmarks`}
-          ><Code2 size={16} />{zh ? "查看可复现证据" : "Review reproducible evidence"}</a
-        >
+    </section>
+
+    <section class="lp-section lp-rule">
+      <div class="site-container">
+        <div class="lp-head lp-reveal">
+          <p class="lp-eyebrow">{copy.proofEyebrow}</p>
+          <h2>{copy.proofTitle}</h2>
+          <p>{copy.proofLead}</p>
+        </div>
+        <div class="lp-proof-grid">
+          <div class="lp-reveal">
+            <ul class="lp-proof-list">
+              {
+                copy.proof.map(([title, body], index) => {
+                  const Icon = proofIcons[index];
+                  return (
+                    <li class="lp-proof-item">
+                      <span class="lp-tile-icon" style="margin-bottom:0">
+                        <Icon size={19} />
+                      </span>
+                      <div>
+                        <strong>{title}</strong>
+                        <p>{body}</p>
+                      </div>
+                    </li>
+                  );
+                })
+              }
+            </ul>
+            <ul class="lp-deploy-list">
+              {
+                copy.deployList.map((item) => (
+                  <li>
+                    <Check size={14} />
+                    {item}
+                  </li>
+                ))
+              }
+            </ul>
+          </div>
+          <div class="lp-reveal">
+            <div class="lp-terminal">
+              <div class="lp-terminal-bar">
+                <span></span><span></span><span></span><strong>{copy.terminalTitle}</strong>
+              </div>
+              <pre><code><span class="lp-terminal-comment">{copy.terminalComment}</span>
+docker compose <span class="lp-terminal-flag">--env-file</span> deploy/compose/.env.example \
+  <span class="lp-terminal-flag">-f</span> deploy/compose/docker-compose.yml up <span class="lp-terminal-flag">-d --build</span>
+
+curl --fail http://127.0.0.1:4173/health/ready</code></pre>
+            </div>
+            <p class="lp-terminal-note">{copy.terminalNote}</p>
+          </div>
+        </div>
       </div>
-    </div>
-  </section>
+    </section>
+
+    <section class="lp-section lp-section-tight lp-rule">
+      <div class="site-container">
+        <div class="lp-closer lp-reveal">
+          <div class="lp-aurora"></div>
+          <p class="lp-eyebrow">{copy.closerEyebrow}</p>
+          <h2>{copy.closerTitle}</h2>
+          <p>{copy.closerBody}</p>
+          <div class="lp-cta">
+            <a class="ui-button ui-button-contrast lp-cta-button" href={`${prefix}/self-host`}
+              >{copy.deploy}<ArrowRight size={16} /></a
+            >
+            <a class="ui-button ui-button-neutral lp-cta-button" href={repository}
+              ><Github size={16} />GitHub</a
+            >
+            <a class="ui-button ui-button-neutral lp-cta-button" href={`${prefix}/benchmarks`}
+              >{copy.evidence}</a
+            >
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
 </PublicLayout>

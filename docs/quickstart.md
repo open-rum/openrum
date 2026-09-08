@@ -14,6 +14,8 @@ From the repository root, run:
 docker compose --env-file deploy/compose/.env.example -f deploy/compose/docker-compose.yml up -d --build
 ```
 
+If you are developing from source rather than evaluating, use `pnpm openrum up` instead; it drives the same containers but waits for readiness and reports the whole stack in one table. It needs the Go and Node toolchains, so this page stays on Compose. See [local development](local-development.md).
+
 Wait until `docker compose --env-file deploy/compose/.env.example -f deploy/compose/docker-compose.yml ps` shows the long-running services as healthy. Open `http://127.0.0.1:4173` and use:
 
 ```text

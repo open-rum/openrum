@@ -1,11 +1,12 @@
 ---
-import { ChartNoAxesCombined, Github, Languages, Menu, Moon } from "lucide-astro";
+import { Languages, Menu, Moon } from "lucide-astro";
+import BrandMark from "./BrandMark.astro";
+import BrandWordmark from "./BrandWordmark.astro";
 import { docsBase, equivalentPath } from "../lib/site";
 const { lang = "en", path = "/" } = Astro.props;
 const zh = lang === "zh";
 const prefix = zh ? "/zh" : "";
 const equivalent = equivalentPath(path, zh ? "zh" : "en");
-const repository = import.meta.env.PUBLIC_REPOSITORY_URL || "https://github.com/openrum/openrum";
 const links = zh
   ? [
       ["产品", "/zh/product"],
@@ -25,11 +26,9 @@ const links = zh
 
 <header class="site-header">
   <nav class="site-container site-nav" aria-label={zh ? "公共导航" : "Public navigation"}>
-    <a class="site-brand" href={`${prefix}/`}
-      ><span class="brand-mark" aria-hidden="true"
-        ><ChartNoAxesCombined size={17} strokeWidth={2.5} /></span
-      >OpenRUM</a
-    ><div class="site-links">
+    <a class="site-brand" href={`${prefix}/`} aria-label="OpenRUM"
+      ><span class="brand-mark" aria-hidden="true"><BrandMark size={28} /></span><BrandWordmark />
+    </a><div class="site-links">
       {
         links.map(([label, href]) => (
           <a href={href} aria-current={path === href ? "page" : undefined}>
@@ -47,7 +46,6 @@ const links = zh
         id="theme-toggle"
         type="button"
         aria-label={zh ? "切换明暗主题" : "Toggle color theme"}><Moon size={17} /></button
-      ><a class="ui-button ui-button-outline" href={repository}><Github size={15} /> GitHub</a
       ><details class="mobile-nav">
         <summary class="icon-action" aria-label={zh ? "打开导航" : "Open navigation"}
           ><Menu size={18} /></summary
@@ -67,6 +65,15 @@ const links = zh
 <script is:inline>
   document.querySelector("#theme-toggle")?.addEventListener("click", () => {
     const dark = document.documentElement.classList.toggle("dark");
-    localStorage.setItem("openrum-theme", dark ? "dark" : "light");
+    document.documentElement.dataset.theme = dark ? "dark" : "light";
+    document.documentElement.style.colorScheme = dark ? "dark" : "light";
+    const url = new URL(location.href);
+    if (url.searchParams.has("theme")) {
+      url.searchParams.set("theme", dark ? "dark" : "light");
+      history.replaceState(null, "", url);
+    }
+    try {
+      localStorage.setItem("openrum-theme", dark ? "dark" : "light");
+    } catch {}
   });
 </script>

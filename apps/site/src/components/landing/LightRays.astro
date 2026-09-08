@@ -1,0 +1,30 @@
+<div class="lp-rays" aria-hidden="true">
+  <div class="lp-rays-fallback"></div>
+  <canvas></canvas>
+</div>
+<script>
+  const canvas = document.querySelector<HTMLCanvasElement>(".lp-rays canvas");
+  const start = async () => {
+    if (!canvas || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    try {
+      const { mountLightRays } = await import("../../lib/light-rays");
+      const cleanup = mountLightRays(canvas);
+      document.addEventListener("astro:before-swap", cleanup, { once: true });
+      window.addEventListener(
+        "pagehide",
+        (event) => {
+          if (!event.persisted) cleanup();
+        },
+        { once: true },
+      );
+    } catch {
+      // Decorative enhancement: the static light field and all page content remain usable.
+    }
+  };
+  requestAnimationFrame(() =>
+    requestAnimationFrame(() => {
+      if ("requestIdleCallback" in window) window.requestIdleCallback(start, { timeout: 1200 });
+      else setTimeout(start, 0);
+    }),
+  );
+</script>

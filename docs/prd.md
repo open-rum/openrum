@@ -183,7 +183,7 @@ PostgreSQL 控制面实体：
 | users                 | id UUID PK；email CITEXT unique；display_name varchar(120)；password_hash nullable for OIDC；status active/disabled；auth_source local/oidc；oidc_subject；timestamps |
 | organizations         | id；name；slug unique；created_by；timestamps                                                                                                                         |
 | organization_members  | organization_id + user_id composite PK；role owner/admin/member/viewer                                                                                                |
-| projects              | id；organization_id；name；slug；allowed_origins text[]；environment；retention_days 1–90 default 14；event_sample_rate default 1；api_sample_rate default .2；status |
+| projects              | id；organization_id；name；slug；allowed_origins text[]；environment；retention_days 1–90 default 14；event_sample_rate default 1；api_sample_rate default .2；error_sample_rate default 1；status |
 | project_keys          | id；project_id；key_prefix；key_hash unique；name；last_used_at；revoked_at                                                                                           |
 | sessions              | id；user_id；token_hash unique；ip_hash；user_agent；expires_at；idle_expires_at；revoked_at                                                                          |
 | releases              | id；project_id；version；dist；commit_sha；deployed_at；unique(project_id,version,dist)                                                                               |
@@ -789,7 +789,7 @@ Acceptance Criteria:
 
 > Visual tokens are not yet defined. Run the Design System skill with image references to generate docs/design.md before implementation begins.
 
-全局使用组织/项目选择器、左侧导航、顶部时间/环境/release 筛选。一级产品导航固定为：分析、错误、性能、事件、API、告警、会话、设置。探索作为会话页内的高级筛选能力；洞察保留给未来系统自动发现。接入、发布与用量放入视觉上次一级的项目管理区。
+全局使用组织/项目选择器、左侧导航、顶部时间/环境/release 筛选。一级产品导航固定为：数据大盘、分析、错误、性能、事件、API、告警、会话、设置。数据大盘是登录后的落地页，根路径、项目切换器与接入向导的「进入数据大盘」都指向它。探索作为会话页内的高级筛选能力；洞察保留给未来系统自动发现。接入、发布、用量与项目设置放入视觉上次一级的项目管理区。
 
 ### Screen: Instance Setup
 
@@ -1111,4 +1111,4 @@ Web：ESLint、Prettier、Vitest、Testing Library、MSW、Playwright、axe-core
 
 系统管理的完整权限、页面、Secret 和数据生命周期设计见 `docs/system-administration.md`。
 
-公共产品站、文档信息架构、内容策略和发布质量门槛见 `docs/public-site.md`。
+公共产品站、文档信息架构、内容策略和发布质量门槛见 `docs/adr/0002-documentation-is-organised-by-reader-task.md` 与 `docs/design.md`。

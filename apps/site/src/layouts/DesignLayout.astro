@@ -1,0 +1,76 @@
+---
+import "../styles/global.css";
+import "../styles/design/workbench.css";
+import BrandMark from "../components/BrandMark.astro";
+import BrandWordmark from "../components/BrandWordmark.astro";
+import PaletteBootstrap from "../components/PaletteBootstrap.astro";
+import AppearanceControls from "../components/design/AppearanceControls.astro";
+const { title = "Design system", gallery = false } = Astro.props;
+const sections = [
+  ["brand", "品牌标识"],
+  ["palettes", "配色预设"],
+  ["colors", "语义颜色"],
+  ["typography", "字体与排版"],
+  ["foundations", "空间与质感"],
+  ["charts", "数据可视化"],
+  ["previews", "落地页方案"],
+];
+---
+
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=device-width" />
+    <title>{title} — OpenRUM</title>
+    <meta
+      name="description"
+      content="OpenRUM 可视化设计规范、品牌资产、配色预设、图表和落地页方案。"
+    />
+    <meta name="robots" content="noindex,follow" />
+    <link rel="icon" href="/favicon.svg" /><PaletteBootstrap manageTheme />
+  </head>
+  <body class:list={["ds-body", { "ds-gallery-body": gallery }]}>
+    <a class="ds-skip-link" href="#design-main">跳到设计规范</a>
+    <header class="ds-topbar">
+      <a href="/" class="site-brand" aria-label="OpenRUM 首页"
+        ><span class="brand-mark"><BrandMark /></span><BrandWordmark /></a
+      >
+      <span class="ds-topbar-divider"></span><a href="/design/" class="ds-workspace-name"
+        >Design system</a
+      >
+      <AppearanceControls />
+    </header>
+    {
+      !gallery && (
+        <aside class="ds-sidebar">
+          <>
+            <p>
+              FOUNDATIONS <span>01—07</span>
+            </p>
+            <nav aria-label="设计规范目录">
+              {sections.map(([id, label], index) => (
+                <a href={`#${id}`}>
+                  <span>{String(index + 1).padStart(2, "0")}</span>
+                  {label}
+                </a>
+              ))}
+            </nav>
+            <div class="ds-sidebar-note">
+              <span class="ds-status-dot" /> Live tokens
+              <p>
+                官网 · 文档 · 控制台
+                <br />
+                共享一套设计语言。
+              </p>
+            </div>
+          </>
+          <a class="ds-sidebar-back" href="/" data-preview-link="/">
+            查看当前首页 ↗
+          </a>
+        </aside>
+      )
+    }
+    <main id="design-main" class:list={["ds-main", { "ds-main-wide": gallery }]}><slot /></main>
+    <div class="ds-live-status" role="status" aria-live="polite" data-design-status></div>
+  </body>
+</html>

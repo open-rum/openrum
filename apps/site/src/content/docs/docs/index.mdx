@@ -1,29 +1,80 @@
 ---
 title: OpenRUM documentation
-description: Start, integrate and operate the OpenRUM Alpha.
+description: Run an OpenRUM Instance, or send your first Event from an application.
 template: splash
-hero:
-  title: Understand your users. Resolve production issues fast.
-  tagline: Open-source, self-hosted frontend monitoring for user behavior and production issues.
-  actions:
-    - text: Start the Quickstart
-      link: /docs/getting-started/quickstart/
-      icon: right-arrow
-    - text: Browser SDK
-      link: /docs/sdk/browser/
-      variant: minimal
+appliesTo: Alpha / main
 ---
 
-OpenRUM is an open-source, self-hosted frontend monitoring platform. It helps you understand user behavior and quickly identify, diagnose, and resolve production issues. Documentation applies to **Alpha / main** unless a page says otherwise.
+import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
-For local evaluation, use the deterministic Demo. For production, read Self-hosting, Operations, Security and the benchmark limitations before exposing an Instance.
+OpenRUM is open-source, self-hosted frontend monitoring. Because you run the Instance
+yourself, there are two separate jobs here, and most readers only have one of them.
 
-## Start here
+## Where to start
 
-- [Five-minute Quickstart](/docs/getting-started/quickstart/)
-- [Create your first project](/docs/getting-started/create-first-project/)
-- [Demo data](/docs/getting-started/demo-data/)
-- [Browser SDK](/docs/sdk/browser/)
-- [Self-hosting overview](/docs/self-hosting/overview/)
-- [Threat model](/docs/security/threat-model/)
-- [Contributing](/docs/contributing/)
+<div class="docs-entry-grid">
+  <CardGrid>
+    <LinkCard
+      title="Run an Instance"
+      description="Bring up the stack with Compose or Helm, then keep it healthy. Start here if nothing is deployed yet."
+      href="/docs/getting-started/quickstart/"
+    />
+    <LinkCard
+      title="Instrument an application"
+      description="Install the browser SDK, send Events to an Instance somebody already runs, and get readable stack traces."
+      href="/docs/sdk/browser/"
+    />
+  </CardGrid>
+</div>
+
+## By task
+
+<CardGrid>
+  <LinkCard
+    title="Deploy to production"
+    description="Topology, dependencies and the decisions that are hard to reverse later."
+    href="/docs/self-hosting/overview/"
+  />
+  <LinkCard
+    title="Instrument a server-rendered app"
+    description="Next.js and Astro, where initializing in the wrong place drops Events with no error."
+    href="/docs/sdk/nextjs/"
+  />
+  <LinkCard
+    title="Investigate a production issue"
+    description="Follow one error from a Session to its Issue, affected users and the failed Request."
+    href="/docs/product/investigation/"
+  />
+  <LinkCard
+    title="Read the performance data"
+    description="What each Core Web Vital is measured against, and when a percentile has too few samples to trust."
+    href="/docs/product/performance/"
+  />
+  <LinkCard
+    title="Get readable stack traces"
+    description="Upload Source Maps per Release, and understand why mapped frames are optional."
+    href="/docs/sdk/source-maps/"
+  />
+  <LinkCard
+    title="Look up a setting"
+    description="Every environment variable, the Event schema and the HTTP API."
+    href="/docs/reference/configuration/"
+  />
+  <LinkCard
+    title="Back up and restore"
+    description="Treat the control plane, the Event store and optional Artifacts as one recovery set."
+    href="/docs/self-hosting/backup-restore/"
+  />
+  <LinkCard
+    title="Check what is collected"
+    description="Collection boundaries, retention and the fields OpenRUM refuses to accept."
+    href="/docs/self-hosting/security/privacy/"
+  />
+</CardGrid>
+
+## Before you expose an Instance
+
+OpenRUM is Alpha. Read the [threat model](/docs/self-hosting/security/threat-model/) and the
+[measured capacity limits](/docs/self-hosting/capacity/) first: the published benchmark is a
+local single-host rehearsal that OpenRUM did not pass at its target rate, and no production
+capacity claim is made from it.

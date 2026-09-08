@@ -11,6 +11,8 @@ import {
   Pulse,
   ShieldCheck,
   SidebarSimple,
+  Sliders,
+  SquaresFour,
   WarningCircle,
   UsersThree,
 } from "@phosphor-icons/react";
@@ -37,6 +39,7 @@ import { AppStatusBar } from "./AppStatusBar";
 const SIDEBAR_STORAGE_KEY = "openrum-sidebar-collapsed";
 
 const primaryNavigation = [
+  { label: "数据大盘", icon: SquaresFour, to: "/projects/$projectId/overview" },
   { label: "分析", icon: ChartPieSlice, to: "/projects/$projectId/analytics" },
   { label: "错误", icon: WarningCircle, to: "/projects/$projectId/issues" },
   { label: "性能", icon: Gauge, to: "/projects/$projectId/performance" },
@@ -50,6 +53,7 @@ const utilityNavigation = [
   { label: "接入", icon: Plug, to: "/projects/$projectId/onboarding" },
   { label: "发布", icon: Package, to: "/projects/$projectId/releases" },
   { label: "用量", icon: ChartBar, to: "/projects/$projectId/usage" },
+  { label: "项目设置", icon: Sliders, to: "/projects/$projectId/settings" },
   // Only reachable in a development build, matching the route registration.
   ...(import.meta.env.DEV
     ? ([{ label: "造数据", icon: Flask, to: "/projects/$projectId/dev-data" }] as const)
@@ -147,7 +151,7 @@ export function App() {
               </Button>
             </div>
 
-            <nav className="sidebar__nav">
+            <nav className="sidebar__nav" aria-label="主导航">
               {primaryNavigation.map(({ label, icon: Icon, to }) => (
                 <SidebarTooltip key={to} label={label} enabled={sidebarCollapsed}>
                   {project ? (
