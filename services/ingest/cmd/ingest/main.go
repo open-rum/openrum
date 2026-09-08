@@ -10,6 +10,7 @@ import (
 	"github.com/redis/go-redis/v9"
 	"github.com/rs/zerolog"
 
+	"openrum/internal/clientip"
 	"openrum/internal/config"
 	"openrum/internal/geo"
 	"openrum/internal/httpx"
@@ -58,9 +59,20 @@ func registerRoutes(ctx context.Context, router *httpx.Router, configuration con
 			return nil, err
 		}
 	}
+	// Declaring the edge is opt-in and has no development relaxation: unlike a
+	// country, the rate-limit identity is what keeps one caller from occupying
+	// the whole limit, so an undeclared edge keeps the identity on the socket
+	// peer rather than believing a header.
+	callers, err := clientip.New(configuration.IngestTrustedProxies)
+	if err != nil {
+		_ = producer.Close()
+		_ = redisClient.Close()
+		_ = database.Close()
+		return nil, err
+	}
 	handler := ingestservice.NewHandler(authenticator, limiter, ingestservice.NewKafkaAcceptor(producer), logger,
 		ingestservice.WithMetrics(metrics), ingestservice.WithConnectionStatus(connectionStatus),
-		ingestservice.WithGeoResolver(countries))
+		ingestservice.WithGeoResolver(countries), ingestservice.WithClientIPResolver(callers))
 	router.Handle("POST /ingest/v1/envelope", http.HandlerFunc(handler.ServeHTTP))
 	router.Handle("OPTIONS /ingest/v1/envelope", http.HandlerFunc(handler.ServeHTTP))
 	return func() error {

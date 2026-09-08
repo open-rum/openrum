@@ -13,6 +13,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 
+	"openrum/internal/clientip"
 	"openrum/internal/event"
 	"openrum/internal/geo"
 	"openrum/internal/httpx"
@@ -54,6 +55,7 @@ type Handler struct {
 	acceptor      EnvelopeAcceptor
 	connection    ingest.ConnectionStatusRecorder
 	geo           *geo.Resolver
+	clientIP      *clientip.Resolver
 	logger        zerolog.Logger
 	now           func() time.Time
 	metrics       *Metrics
@@ -70,6 +72,14 @@ func WithMetrics(metrics *Metrics) HandlerOption {
 // declared which proxy it trusts.
 func WithGeoResolver(resolver *geo.Resolver) HandlerOption {
 	return func(handler *Handler) { handler.geo = resolver }
+}
+
+// WithClientIPResolver lets requests that arrived through a declared proxy be
+// rate limited on the caller the proxy observed rather than on the proxy
+// itself. Without it the identity stays bound to the socket peer, so a shared
+// proxy collapses every caller behind it onto one limit.
+func WithClientIPResolver(resolver *clientip.Resolver) HandlerOption {
+	return func(handler *Handler) { handler.clientIP = resolver }
 }
 
 func WithConnectionStatus(connection ingest.ConnectionStatusRecorder) HandlerOption {
@@ -95,7 +105,7 @@ func (handler *Handler) ServeHTTP(response http.ResponseWriter, request *http.Re
 		handler.preflight(response, request)
 		return
 	}
-	clientIP := remoteIP(request.RemoteAddr)
+	clientIP := handler.resolveClientIP(request)
 	if !handler.limiter.AllowIP(request.Context(), clientIP) {
 		handler.writeRateLimit(response, request)
 		return
@@ -121,7 +131,11 @@ func (handler *Handler) ServeHTTP(response http.ResponseWriter, request *http.Re
 		return
 	}
 	setCORSHeaders(response.Header(), origin)
-	if !handler.limiter.AllowProject(request.Context(), access.Project.ID) {
+	quota := ingest.ProjectQuota{Behavior: access.Project.OverLimitBehavior}
+	if access.Project.IngestRateLimit != nil {
+		quota.RequestsPerSecond = *access.Project.IngestRateLimit
+	}
+	if !handler.limiter.AllowProject(request.Context(), access.Project.ID, quota, clientIP) {
 		handler.markRejected(request.Context(), access.Project.ID, ingest.RejectRateLimited)
 		handler.writeRateLimit(response, request)
 		return
@@ -276,6 +290,15 @@ func singleHeader(header http.Header, name string) string {
 		return ""
 	}
 	return values[0]
+}
+
+// resolveClientIP returns the address the rate limiter keys on. It falls back
+// to the socket peer whenever no proxy has been declared, which is the default.
+func (handler *Handler) resolveClientIP(request *http.Request) string {
+	if handler.clientIP.Enabled() {
+		return handler.clientIP.Resolve(request.RemoteAddr, request.Header)
+	}
+	return remoteIP(request.RemoteAddr)
 }
 
 func remoteIP(remoteAddress string) string {

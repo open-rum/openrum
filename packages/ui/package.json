@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "peerDependencies": {
-    "react": ">=19"
+    "react": ">=19",
+    "recharts": "^3.8.0"
   },
   "dependencies": {
     "class-variance-authority": "^0.7.1",
@@ -13,6 +14,11 @@
   },
   "exports": {
     ".": "./src/index.ts",
-    "./styles.css": "./styles.css"
+    "./styles.css": "./styles.css",
+    "./chart": "./src/chart.tsx"
+  },
+  "devDependencies": {
+    "recharts": "^3.8.0",
+    "@types/react": "^19.2.18"
   }
 }

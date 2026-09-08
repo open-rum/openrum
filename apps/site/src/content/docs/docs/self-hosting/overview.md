@@ -23,6 +23,6 @@ Compose is a single-replica evaluation topology. Production should use Kubernete
 - Configure backups and test a restore
 - Establish retention, capacity and upgrade runbooks
 - Run a production-like ingest/query benchmark with measured traffic inputs
-- Read the [Threat model](/docs/security/threat-model/)
+- Read the [Threat model](/docs/self-hosting/security/threat-model/)
 
 No MinIO deployment is required. Configure Alibaba OSS or an S3-compatible provider only when Source Map Artifacts are needed.

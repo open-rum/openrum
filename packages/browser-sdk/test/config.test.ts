@@ -50,7 +50,7 @@ void test("applies remote sampling, caps refresh at five minutes, and expires em
     clearTimeout: (() => undefined) as typeof clearTimeout,
   };
   const stop = startRemoteConfig(
-    { updateSampling: (sampling) => updates.push(sampling) },
+    { updateSampling: (sampling) => updates.push(sampling), updateFilters: () => undefined },
     { endpoint: "https://rum.example.test/ingest/v1/envelope", writeKey: "orr_pk_test" },
     runtime,
   );
@@ -77,7 +77,7 @@ void test("applies remote sampling, caps refresh at five minutes, and expires em
 void test("keeps local sampling when remote payload is invalid", async () => {
   const updates: Partial<SamplingOptions>[] = [];
   startRemoteConfig(
-    { updateSampling: (sampling) => updates.push(sampling) },
+    { updateSampling: (sampling) => updates.push(sampling), updateFilters: () => undefined },
     { endpoint: "https://rum.example.test/ingest/v1/envelope", writeKey: "orr_pk_test" },
     {
       fetch: async () =>

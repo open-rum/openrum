@@ -23,11 +23,11 @@ test("a user can list, switch and restore projects", async ({ page }) => {
   const projectSwitcher = page.getByRole("navigation", { name: "切换项目" });
   await expect(projectSwitcher).toBeVisible();
   await projectSwitcher.getByRole("button", { name: /Admin Console/ }).click();
-  await expect(page).toHaveURL(new RegExp(`/projects/${secondProjectId}/analytics(?:\\?.*)?$`));
+  await expect(page).toHaveURL(new RegExp(`/projects/${secondProjectId}/overview(?:\\?.*)?$`));
   await expect(page.getByText("Admin Console", { exact: true }).first()).toBeVisible();
 
   await page.goto("/");
-  await expect(page).toHaveURL(new RegExp(`/projects/${secondProjectId}/analytics(?:\\?.*)?$`));
+  await expect(page).toHaveURL(new RegExp(`/projects/${secondProjectId}/overview(?:\\?.*)?$`));
 });
 
 test("collapsed sidebar stacks its expand control below the brand", async ({ page }) => {

@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -97,7 +98,53 @@ func TestNormalizeQueuedEnvelopeRejectsUnsupportedOrIncompleteMetadata(t *testin
 	}
 }
 
+func TestNormalizeFlagsCrawlerAndHeadlessTraffic(t *testing.T) {
+	for _, testCase := range []struct {
+		name      string
+		userAgent string
+		wantBot   bool
+	}{
+		{
+			name:      "ordinary browser",
+			userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/128.0.0.0 Safari/537.36",
+			wantBot:   false,
+		},
+		{
+			name:      "search crawler",
+			userAgent: "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)",
+			wantBot:   true,
+		},
+		{
+			// Automation reaches the SDK the way a real browser does, which is
+			// why it is worth flagging: a crawler that never runs JavaScript
+			// would not have produced an event at all.
+			name:      "headless browser",
+			userAgent: "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 HeadlessChrome/128.0.0.0 Safari/537.36",
+			wantBot:   true,
+		},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			payload := queuedPayloadWithUserAgent(t, fixtureEnvelope(t), "1.0", testCase.userAgent)
+			normalized, failures, err := event.NormalizeQueuedEnvelope(payload)
+			if err != nil || len(failures) != 0 || len(normalized) == 0 {
+				t.Fatalf("normalize: err=%v failures=%v events=%d", err, failures, len(normalized))
+			}
+			for _, candidate := range normalized {
+				if slices.Contains(candidate.IngestFlags, "bot") != testCase.wantBot {
+					t.Fatalf("flags = %v, want bot=%v", candidate.IngestFlags, testCase.wantBot)
+				}
+			}
+		})
+	}
+}
+
 func queuedPayload(t *testing.T, envelope event.EnvelopeV1, queueVersion string) []byte {
+	t.Helper()
+	return queuedPayloadWithUserAgent(t, envelope, queueVersion,
+		"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/128.0.0.0 Safari/537.36")
+}
+
+func queuedPayloadWithUserAgent(t *testing.T, envelope event.EnvelopeV1, queueVersion, userAgent string) []byte {
 	t.Helper()
 	queued := ingest.QueuedEnvelope{
 		QueueSchemaVersion: queueVersion,
@@ -106,7 +153,7 @@ func queuedPayload(t *testing.T, envelope event.EnvelopeV1, queueVersion string)
 		ReceivedAt:         time.Date(2026, 9, 2, 10, 0, 2, 0, time.UTC),
 		Origin:             "https://shop.example.com",
 		ClientIP:           "203.0.113.10",
-		UserAgent:          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/128.0.0.0 Safari/537.36",
+		UserAgent:          userAgent,
 		Envelope:           envelope,
 	}
 	payload, err := json.Marshal(queued)

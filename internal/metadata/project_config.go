@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 
 	"openrum/internal/config"
+	"openrum/internal/filter"
 )
 
 var ErrInvalidProjectConfig = errors.New("invalid project SDK configuration")
@@ -24,6 +25,10 @@ type ProjectSDKConfig struct {
 	ErrorSampleRate     float64    `json:"errorSampleRate"`
 	EmergencySampleRate *float64   `json:"emergencySampleRate,omitempty"`
 	EmergencyExpiresAt  *time.Time `json:"emergencyExpiresAt,omitempty"`
+	// Filters carries only the rules a browser should act on. The consumer
+	// applies the full set, so this is a bandwidth optimisation rather than
+	// the authoritative copy.
+	Filters filter.Settings `json:"filters"`
 }
 
 type ProjectRetentionPolicy struct {
@@ -39,17 +44,23 @@ func NewProjectConfigRepository(database *sql.DB) *ProjectConfigRepository {
 
 func (repository *ProjectConfigRepository) Get(ctx context.Context, projectID uuid.UUID, now time.Time) (ProjectSDKConfig, error) {
 	var config ProjectSDKConfig
+	var filters []byte
 	err := repository.database.QueryRowContext(ctx, `SELECT id,sdk_config_version,sdk_config_effective_at,
-		event_sample_rate,api_sample_rate,1.0,emergency_sample_rate,emergency_expires_at
+		event_sample_rate,api_sample_rate,error_sample_rate,emergency_sample_rate,emergency_expires_at,inbound_filters
 		FROM projects WHERE id=$1 AND status='active'`, projectID).Scan(&config.ProjectID, &config.Version,
 		&config.EffectiveAt, &config.EventSampleRate, &config.APISampleRate, &config.ErrorSampleRate,
-		&config.EmergencySampleRate, &config.EmergencyExpiresAt)
+		&config.EmergencySampleRate, &config.EmergencyExpiresAt, &filters)
 	if errors.Is(err, sql.ErrNoRows) {
 		return ProjectSDKConfig{}, ErrNotFound
 	}
 	if err != nil {
 		return ProjectSDKConfig{}, err
 	}
+	stored, err := decodeFilterSettings(filters)
+	if err != nil {
+		return ProjectSDKConfig{}, err
+	}
+	config.Filters = stored.ClientEnforced()
 	config.EffectiveAt = config.EffectiveAt.UTC()
 	if config.EmergencyExpiresAt != nil {
 		expires := config.EmergencyExpiresAt.UTC()

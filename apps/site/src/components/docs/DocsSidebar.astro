@@ -1,0 +1,78 @@
+---
+import MobileMenuFooter from "@astrojs/starlight/components/MobileMenuFooter.astro";
+import SidebarPersister from "@astrojs/starlight/components/SidebarPersister.astro";
+import SidebarSublist from "@astrojs/starlight/components/SidebarSublist.astro";
+import { activeTopic, topics } from "../../lib/docsTopics";
+
+const route = Astro.locals.starlightRoute;
+const sidebar = route.sidebar;
+const zh = Astro.url.pathname.startsWith("/zh/");
+const tabs = topics(sidebar);
+const active = activeTopic(sidebar);
+
+// Scoped to the current tab. Showing all nine groups at once was the reason the
+// sidebar read as one undifferentiated wall of links.
+const entries = active ? active.entries : sidebar;
+---
+
+<nav class="docs-mobile-tabs" aria-label={zh ? "文档分类" : "Documentation sections"}>
+  {
+    tabs.map((tab) => (
+      <a href={tab.href} aria-current={tab.isCurrent ? "true" : undefined}>
+        {tab.label}
+      </a>
+    ))
+  }
+</nav>
+
+{
+  /* The sidebar no longer shows the whole tree, so it says which tab it is scoped to
+     rather than presenting a handful of links with no anchor. */
+  active && <p class="docs-sidebar-topic">{active.label}</p>
+}
+
+<SidebarPersister>
+  <SidebarSublist sublist={entries} />
+</SidebarPersister>
+
+<div class="md:sl-hidden">
+  <MobileMenuFooter />
+</div>
+
+<style>
+  .docs-sidebar-topic {
+    margin: 0 0 0.75rem;
+    padding-inline: 0.5rem;
+    color: var(--ds-text-muted);
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  /* The header hides its tab row at this width, so the drawer has to carry it. */
+  .docs-mobile-tabs {
+    display: grid;
+    gap: 0.1rem;
+    margin-bottom: 1rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--ds-border);
+  }
+  .docs-mobile-tabs a {
+    padding: 0.4rem 0.5rem;
+    border-radius: var(--radius-md);
+    color: var(--ds-text-muted);
+    text-decoration: none;
+    font-size: 0.9375rem;
+    font-weight: 550;
+  }
+  .docs-mobile-tabs a[aria-current] {
+    color: var(--ds-primary-foreground);
+    background: var(--ds-primary);
+  }
+  @media (min-width: 72rem) {
+    .docs-mobile-tabs {
+      display: none;
+    }
+  }
+</style>

@@ -41,7 +41,9 @@ For a runnable example, copy `examples/react-vite/.env.example` to `.env.local`,
 pnpm --filter @openrum/example-react-vite dev
 ```
 
-See [Framework examples](/docs/sdk/frameworks/) and the full [Browser SDK](/docs/sdk/browser/) guide.
+See the [Browser SDK](/docs/sdk/browser/) guide for framework setup, and
+[Next.js](/docs/sdk/nextjs/) or [Astro](/docs/sdk/astro/) if the application renders on the
+server.
 
 ## 3. Verify the first Event
 
@@ -56,4 +58,4 @@ See [Framework examples](/docs/sdk/frameworks/) and the full [Browser SDK](/docs
 - CORS or network failure: the browser endpoint must match the public ingest URL and allowed Origins.
 - Source Map frames unavailable: expected until optional object storage is configured. Core monitoring still works.
 
-Next: [Domain model](/docs/concepts/domain-model/), [Self-hosting overview](/docs/self-hosting/overview/), or [Investigation](/docs/product/investigation/).
+Next: [Domain model](/docs/getting-started/domain-model/), [Self-hosting overview](/docs/self-hosting/overview/), or [Investigation](/docs/product/investigation/).

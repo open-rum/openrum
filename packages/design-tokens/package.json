@@ -4,6 +4,8 @@
   "private": true,
   "type": "module",
   "exports": {
-    "./tokens.css": "./tokens.css"
+    "./tokens.css": "./tokens.css",
+    "./catalog": "./catalog.ts",
+    "./brand": "./brand.ts"
   }
 }

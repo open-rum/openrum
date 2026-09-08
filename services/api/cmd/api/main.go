@@ -114,6 +114,10 @@ func registerRoutes(ctx context.Context, router *httpx.Router, configuration con
 	)
 	projectHandler := handlers.NewProjectHandler(organizationRepository, projectRepository, logger)
 	projectKeyHandler := handlers.NewProjectKeyHandler(projectKeyRepository, logger)
+	projectFilterHandler := handlers.NewProjectFilterHandler(projectRepository,
+		metadata.NewProjectFilterRepository(database), logger)
+	projectProcessingHandler := handlers.NewProjectProcessingHandler(projectRepository,
+		metadata.NewProjectProcessingRepository(database), logger)
 	sdkConfigHandler := handlers.NewSDKConfigHandler(projectKeyRepository, projectConfigRepository, logger)
 	connectionStatusHandler := handlers.NewConnectionStatusHandler(projectKeyRepository, connectionStatus, logger)
 	testEventHandler := handlers.NewTestEventHandler(projectRepository, eventProducer, connectionStatus, logger)
@@ -141,11 +145,15 @@ func registerRoutes(ctx context.Context, router *httpx.Router, configuration con
 	}
 	var instanceSecretRepository *metadata.InstanceSecretRepository
 	var storageSwitcher *sourcemap.SwitchableStorage
+	// Nil until managed secrets are configured. Alert rules work regardless;
+	// only notification channels need to seal a webhook secret at rest.
+	var channelCodec metadata.EnvelopeCodec
 	if configuration.AllowManagedSecrets {
 		keyring, keyErr := openrumcrypto.NewKeyring(configuration.ManagedSecretsKeyID, openrumcrypto.Key{ID: configuration.ManagedSecretsKeyID, Material: configuration.ManagedSecretsMasterKey})
 		if keyErr != nil {
 			return nil, keyErr
 		}
+		channelCodec = keyring
 		instanceSecretRepository = metadata.NewInstanceSecretRepository(database, keyring)
 		managed, _, managedErr := instanceSecretRepository.GetObjectStorage(connectCtx)
 		if managedErr == nil {
@@ -176,6 +184,9 @@ func registerRoutes(ctx context.Context, router *httpx.Router, configuration con
 		sourceMapMapper = sourcemap.NewMapper(sourcemap.NewArtifactCatalog(database), sourceMapStorage, sourcemap.NewCache(128<<20))
 	}
 	sourceMapMatchHandler := handlers.NewSourceMapMatchHandler(projectRepository, sourceMapMapper, logger)
+	alertRepository := metadata.NewAlertRepository(database, channelCodec)
+	alertHandler := handlers.NewAlertHandler(alertRepository, logger)
+	channelHandler := handlers.NewChannelHandler(alertRepository, organizationRepository, logger)
 	router.HandleFunc("GET /api/v1/setup/status", setupHandler.Status)
 	router.HandleFunc("POST /api/v1/setup/bootstrap", setupHandler.Bootstrap)
 	router.HandleFunc("POST /api/v1/auth/login", authHandler.Login)
@@ -212,6 +223,12 @@ func registerRoutes(ctx context.Context, router *httpx.Router, configuration con
 	router.Handle("GET /api/v1/projects/{projectId}", requireSession(http.HandlerFunc(projectHandler.Get)))
 	router.Handle("PATCH /api/v1/projects/{projectId}", requireSession(requireCSRF(http.HandlerFunc(projectHandler.Update))))
 	router.Handle("DELETE /api/v1/projects/{projectId}", requireSession(requireCSRF(http.HandlerFunc(projectHandler.Delete))))
+	router.Handle("GET /api/v1/projects/{projectId}/filters", requireSession(http.HandlerFunc(projectFilterHandler.Get)))
+	router.Handle("PUT /api/v1/projects/{projectId}/filters", requireSession(requireCSRF(http.HandlerFunc(projectFilterHandler.Put))))
+	router.Handle("GET /api/v1/projects/{projectId}/url-rules", requireSession(http.HandlerFunc(projectProcessingHandler.GetURLRules)))
+	router.Handle("PUT /api/v1/projects/{projectId}/url-rules", requireSession(requireCSRF(http.HandlerFunc(projectProcessingHandler.PutURLRules))))
+	router.Handle("GET /api/v1/projects/{projectId}/scrub-rules", requireSession(http.HandlerFunc(projectProcessingHandler.GetScrubRules)))
+	router.Handle("PUT /api/v1/projects/{projectId}/scrub-rules", requireSession(requireCSRF(http.HandlerFunc(projectProcessingHandler.PutScrubRules))))
 	router.Handle("GET /api/v1/projects/{projectId}/keys", requireSession(http.HandlerFunc(projectKeyHandler.List)))
 	router.Handle("GET /api/v1/projects/{projectId}/connection-status", requireSession(http.HandlerFunc(connectionStatusHandler.Get)))
 	router.Handle("GET /api/v1/projects/{projectId}/overview", requireSession(http.HandlerFunc(overviewHandler.Get)))
@@ -242,6 +259,10 @@ func registerRoutes(ctx context.Context, router *httpx.Router, configuration con
 	router.Handle("POST /api/v1/projects/{projectId}/keys", requireSession(requireCSRF(http.HandlerFunc(projectKeyHandler.Create))))
 	router.Handle("POST /api/v1/projects/{projectId}/keys/{keyId}/rotate", requireSession(requireCSRF(http.HandlerFunc(projectKeyHandler.Rotate))))
 	router.Handle("DELETE /api/v1/projects/{projectId}/keys/{keyId}", requireSession(requireCSRF(http.HandlerFunc(projectKeyHandler.Revoke))))
+	router.Handle("GET /api/v1/projects/{projectId}/alerts", requireSession(http.HandlerFunc(alertHandler.List)))
+	router.Handle("POST /api/v1/projects/{projectId}/alerts", requireSession(requireCSRF(http.HandlerFunc(alertHandler.Create))))
+	router.Handle("GET /api/v1/organizations/{orgId}/channels", requireSession(http.HandlerFunc(channelHandler.List)))
+	router.Handle("POST /api/v1/organizations/{orgId}/channels", requireSession(requireCSRF(http.HandlerFunc(channelHandler.Create))))
 	// Registered only outside production, so the generator is absent rather
 	// than merely refusing requests wherever it must not run.
 	if devDataHandler != nil {

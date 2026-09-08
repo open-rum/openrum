@@ -1,8 +1,17 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
-import { mockOpenRUM } from "./mockOpenRUM";
+import { mockOpenRUM, projectId } from "./mockOpenRUM";
 
-const corePages = ["/", "/issues", "/performance", "/apis", "/usage", "/alerts", "/settings"];
+const corePages = [
+  "/",
+  "/issues",
+  "/performance",
+  "/apis",
+  "/usage",
+  "/alerts",
+  "/settings",
+  `/projects/${projectId}/settings`,
+];
 
 for (const path of corePages) {
   test(`core page ${path} has no critical WCAG findings`, async ({ page }) => {
@@ -20,8 +29,8 @@ for (const path of corePages) {
 test("keyboard user can skip navigation and activate a primary route", async ({ page }) => {
   await mockOpenRUM(page, { projectExists: true });
   await page.goto("/");
-  await expect(page).toHaveURL(/\/projects\/[^/]+\/analytics(?:\?.*)?$/);
-  await expect(page.getByRole("heading", { name: "用户行为分析" })).toBeVisible();
+  await expect(page).toHaveURL(/\/projects\/[^/]+\/overview(?:\?.*)?$/);
+  await expect(page.getByRole("heading", { name: /环境概览$/ })).toBeVisible();
   await page.keyboard.press("Tab");
   const skip = page.getByRole("link", { name: "跳到主要内容" });
   await expect(skip).toBeFocused();

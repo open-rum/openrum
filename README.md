@@ -28,6 +28,8 @@ OpenRUM-demo-2026!
 
 The first start migrates both databases and loads a deterministic ecommerce demo with 30,000 sessions across behavior, performance, API and error monitoring. Object storage is optional. See the [quickstart](docs/quickstart.md) for verification and troubleshooting.
 
+Developing from source instead? `pnpm openrum dev` runs the API and console from source against containerised infrastructure, and `pnpm openrum up` runs everything in containers. Both wait for readiness and report the whole stack in one table; see [Local development](docs/local-development.md).
+
 ## Architecture
 
 - React, TypeScript, Vite and shadcn/ui for the console

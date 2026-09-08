@@ -30,6 +30,7 @@ void test("session and anonymous identifiers persist safely and renew after inac
     droppedEvents: 0,
     droppedAttributes: 0,
     droppedBreadcrumbs: 0,
+    filteredEvents: 0,
   };
   const randomUUID = deterministicUUIDs();
   let now = 1_000;

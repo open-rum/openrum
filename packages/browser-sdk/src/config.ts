@@ -1,4 +1,5 @@
 import type { ClientOptions } from "./client.ts";
+import { parseFilterSettings, type FilterSettings } from "./filters.ts";
 import type { SamplingOptions } from "./sampling.ts";
 
 const maximumRefreshMs = 5 * 60 * 1000;
@@ -6,6 +7,7 @@ const minimumRefreshMs = 10 * 1000;
 
 export interface SamplingTarget {
   updateSampling(options: Partial<SamplingOptions>): void;
+  updateFilters(settings: FilterSettings | undefined): void;
 }
 
 export interface ConfigRuntime {
@@ -23,6 +25,11 @@ export interface RemoteSDKConfig extends SamplingOptions {
   expiresAt: string;
   refreshAfterSeconds: number;
   emergency: boolean;
+  /**
+   * Carries only the rules the server decided a browser can evaluate against
+   * the same input it uses. Absent means filter nothing here.
+   */
+  filters?: FilterSettings;
   emergencySampleRate?: number;
   emergencyExpiresAt?: string;
 }
@@ -75,6 +82,7 @@ export function startRemoteConfig(
       errorSampleRate:
         cap === undefined ? config.errorSampleRate : Math.min(config.errorSampleRate, cap),
     });
+    target.updateFilters(config.filters);
   };
 
   const queue = (config: RemoteSDKConfig | undefined) => {
@@ -137,12 +145,17 @@ export function parseRemoteConfig(value: unknown): RemoteSDKConfig | undefined {
   )
     return undefined;
   if (typeof candidate.emergency !== "boolean") return undefined;
+  // A filter document that cannot be read invalidates the whole response. The
+  // alternative — applying the sampling half and silently ignoring the rules —
+  // would leave the SDK in a state the operator never configured.
+  const filters = parseFilterSettings(candidate.filters);
+  if (filters === undefined) return undefined;
   if (
     candidate.emergency &&
     (!validRate(candidate.emergencySampleRate) || !validTimestamp(candidate.emergencyExpiresAt))
   )
     return undefined;
-  return candidate as unknown as RemoteSDKConfig;
+  return { ...(candidate as unknown as RemoteSDKConfig), filters };
 }
 
 function readCache(

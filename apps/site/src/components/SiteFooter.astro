@@ -1,4 +1,6 @@
 ---
+import BrandMark from "./BrandMark.astro";
+import BrandWordmark from "./BrandWordmark.astro";
 const { lang = "en" } = Astro.props;
 const zh = lang === "zh";
 const release = import.meta.env.PUBLIC_OPENRUM_RELEASE || "Alpha / main";
@@ -9,7 +11,9 @@ const repository = import.meta.env.PUBLIC_REPOSITORY_URL || "https://github.com/
 <footer class="site-footer">
   <div class="site-container footer-grid">
     <div>
-      <a class="site-brand" href={zh ? "/zh/" : "/"}>OpenRUM</a><p class="footer-meta">
+      <a class="site-brand" aria-label="OpenRUM" href={zh ? "/zh/" : "/"}
+        ><span class="brand-mark"><BrandMark size={28} /></span><BrandWordmark /></a
+      ><p class="footer-meta">
         {
           zh
             ? "开源、可自托管的前端监控平台，帮助你理解用户行为，快速定位并修复线上问题。"
@@ -19,6 +23,7 @@ const repository = import.meta.env.PUBLIC_REPOSITORY_URL || "https://github.com/
         Release {release} · commit {commit.slice(0, 8)}
       </p>
     </div><div class="footer-links">
+      <a href="/design/">Design</a>
       <a href={zh ? "/zh/docs/getting-started/quickstart/" : "/docs/getting-started/quickstart/"}
         >{zh ? "快速开始" : "Quickstart"}</a
       ><a href={`${repository}/issues`}>Issues</a><a href={`${repository}/security`}>Security</a><a

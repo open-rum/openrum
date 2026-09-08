@@ -1,0 +1,141 @@
+/* Documentation-only overrides. Loaded through Starlight's `customCss`, so none of
+   this reaches the marketing pages.
+
+   Everything here is deliberately unlayered: Starlight ships its own rules inside
+   `@layer starlight.*`, and unlayered declarations win over layered ones regardless
+   of specificity. */
+
+:root {
+  /* The inherited scale ran h1 42px, h2 35px, body 16px: h1 and h2 were only 1.2x
+     apart while the step down to body was more than double, so a page read as one
+     giant heading followed by small print. */
+  --sl-text-h1: 2rem;
+  --sl-text-h2: 1.5rem;
+  --sl-text-h3: 1.25rem;
+  --sl-text-h4: 1.125rem;
+  --sl-text-h5: 1rem;
+
+  /* Starlight sizes the sidebar at 18.75rem, which suits its own deep multi-group
+     tree. Scoping the sidebar to one section left four short leaf links in a 300px
+     column, so most of it was empty and the prose column paid for it. */
+  --sl-sidebar-width: 15rem;
+}
+
+/* Starlight fills the current sidebar item with `--sl-color-text-accent` and labels
+   it with `--sl-color-text-invert`. Mapping those onto the shared tokens landed a
+   near-black label on dark olive at roughly 2:1, well under the 4.5:1 floor.
+
+   `--ds-primary` at full strength fixed the contrast but made one nav row the
+   loudest thing on the page, competing with the content it points at. The
+   soft-surface-plus-brand-ink pairing is the quieter form of the same token, and
+   it is what the path badges on the marketing pages already use. Both halves flip
+   with the theme, so one rule covers light and dark. */
+#starlight__sidebar a[aria-current="page"],
+#starlight__sidebar a[aria-current="page"]:hover,
+#starlight__sidebar a[aria-current="page"]:focus {
+  color: var(--ds-brand);
+  background-color: var(--ds-brand-soft);
+}
+
+/* Group labels were 16px/400 against 14px/400 links, a 2px difference at the same
+   weight, so the two tiers collapsed into one flat list. */
+#starlight__sidebar .group-label > .large {
+  color: var(--ds-text-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* Every entry was 550 weight because Starlight marks top-level items `.large`, and
+   after scoping the sidebar the top level is leaf pages rather than groups. Uniform
+   bold made four links look like four headings. */
+/* Rows were 0.3em tall in a 0.25rem radius, so the current-page fill hugged its
+   label and read as a highlighter stroke rather than a selected row. Only the
+   block axis and the radius are touched: the row is already full width, so inline
+   padding would inset the text without growing the fill, and it would also step
+   the links out of line with the `.docs-sidebar-topic` heading above them. */
+#starlight__sidebar a {
+  font-size: 0.875rem;
+  font-weight: 400;
+  padding-block: 0.5rem;
+  border-radius: 0.5rem;
+}
+#starlight__sidebar a[aria-current="page"] {
+  font-weight: 600;
+}
+
+/* Diagrams are inlined rather than linked so their strokes and labels can read design
+   tokens and follow the reader's theme. Mermaid sizes its own SVG, which is left to it. */
+.docs-diagram {
+  margin: 1.5rem 0;
+}
+.docs-diagram svg {
+  max-width: 100%;
+  height: auto;
+}
+.docs-diagram figcaption {
+  margin-top: 0.5rem;
+  color: var(--sl-color-gray-2);
+  font-size: var(--sl-text-sm);
+}
+
+/* Starlight does not wrap Markdown tables in a scroll container, so a table wider than the
+   prose column was clipped at the column edge with no way to reach the hidden cells — the
+   generated SDK options table lost the right-hand end of its longest notes. Making the
+   table its own scroll container keeps every cell reachable; `min-width: 100%` stops narrow
+   tables from shrinking to their content. */
+.sl-markdown-content table:not(:where(.not-content *)) {
+  display: block;
+  width: fit-content;
+  min-width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+/* Two problems, one rule.
+   `a { color: inherit }` in global.css is unlayered, and unlayered declarations beat
+   layered ones at any specificity, so it was silently overriding Starlight's
+   `@layer starlight.core` link colour: every prose link rendered in body-text black.
+   Restoring the colour here — also unlayered, loaded after — is what makes links visible
+   at all.
+   Colour on its own is still one signal, and WCAG 1.4.1 asks for a second, so links are
+   also underlined. The anchor icons beside headings are excluded; they are affordances,
+   not prose. */
+.sl-markdown-content a:not(:where(.not-content *, .sl-anchor-link)) {
+  color: var(--sl-color-text-accent);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.2em;
+  text-decoration-color: color-mix(in oklch, currentColor, transparent 55%);
+}
+.sl-markdown-content a:hover:not(:where(.not-content *, .sl-anchor-link)) {
+  color: var(--sl-color-text-accent);
+  text-decoration-color: currentColor;
+}
+
+/* Deploying an Instance and instrumenting an application are the two jobs a reader
+   arrives with, and picking between them is the whole purpose of the index. CardGrid's
+   auto-fill sized the pair narrower than the eight task cards underneath, which read as
+   the opposite priority. */
+.docs-entry-grid .card-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+@media (max-width: 50rem) {
+  .docs-entry-grid .card-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Expressive Code prints a macOS-style titlebar above shell blocks, and for those the
+   title is always empty: it rendered as a 34px washed-out strip per block that read as
+   a broken element. Hidden visually, kept for screen readers, which still announce
+   "Terminal window". Blocks that declare a file name keep their tab. */
+.expressive-code .frame.is-terminal > .header {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

@@ -1,0 +1,16 @@
+---
+import { brandMarkPath, brandMarkViewBox } from "@openrum/design-tokens/brand";
+const { size = 28 } = Astro.props;
+---
+
+<svg
+  width={size}
+  height={size}
+  viewBox={brandMarkViewBox}
+  fill="currentColor"
+  aria-hidden="true"
+  focusable="false"
+>
+  <path d={brandMarkPath}></path>
+  <path d={brandMarkPath} transform="rotate(180 20 20)"></path>
+</svg>

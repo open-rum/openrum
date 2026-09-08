@@ -20,36 +20,44 @@ export function MetricCards(props: MetricCardsProps) {
     );
   }
   const { kpis, comparison } = props.data;
+  const previous = comparison.previous;
   const metrics = [
     {
       label: "PV",
       value: compact(kpis.pageViews.value),
       detail: `${kpis.pageViews.samples.toLocaleString()} 个采集样本`,
       delta: percent(comparison.changes.pageViewsPercent),
+      was: compact(previous.pageViews.value),
     },
     {
       label: "UV",
       value: compact(kpis.uniqueUsers.value),
-      detail: `${kpis.uniqueUsers.samples.toLocaleString()} 个会话样本 · 近似`,
+      detail: `${kpis.uniqueUsers.samples.toLocaleString()} 个会话样本${
+        kpis.uniqueUsers.approximate ? " · 近似" : ""
+      }`,
       delta: percent(comparison.changes.uniqueUsersPercent),
+      was: compact(previous.uniqueUsers.value),
     },
     {
       label: "错误率",
       value: rate(kpis.errorRate.value),
       detail: `${compact(kpis.errorRate.numerator)} 错误 / ${compact(kpis.errorRate.denominator)} PV`,
       delta: points(comparison.changes.errorRatePoints),
+      was: rate(previous.errorRate.value),
     },
     {
       label: "API 失败率",
       value: rate(kpis.apiFailureRate.value),
       detail: `${kpis.apiFailureRate.numeratorSamples.toLocaleString()} 失败 / ${kpis.apiFailureRate.denominatorSamples.toLocaleString()} 请求`,
       delta: points(comparison.changes.apiFailureRatePoints),
+      was: rate(previous.apiFailureRate.value),
     },
     {
       label: "LCP P75",
       value: duration(kpis.lcp.p75),
       detail: `${kpis.lcp.samples.toLocaleString()} 个样本`,
       delta: percent(comparison.changes.lcpPercent),
+      was: duration(previous.lcp.p75),
       low: !kpis.lcp.sufficient,
     },
     {
@@ -57,6 +65,7 @@ export function MetricCards(props: MetricCardsProps) {
       value: duration(kpis.inp.p75),
       detail: `${kpis.inp.samples.toLocaleString()} 个样本`,
       delta: percent(comparison.changes.inpPercent),
+      was: duration(previous.inp.p75),
       low: !kpis.inp.sufficient,
     },
     {
@@ -64,6 +73,7 @@ export function MetricCards(props: MetricCardsProps) {
       value: decimal(kpis.cls.p75),
       detail: `${kpis.cls.samples.toLocaleString()} 个样本`,
       delta: percent(comparison.changes.clsPercent),
+      was: decimal(previous.cls.p75),
       low: !kpis.cls.sufficient,
     },
   ];
@@ -79,11 +89,13 @@ export function MetricCards(props: MetricCardsProps) {
             <strong className="text-2xl font-semibold tracking-tight tabular-nums">
               {metric.value}
             </strong>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
               <Badge variant={metric.low ? "outline" : "secondary"}>
                 {metric.low ? "样本不足" : metric.delta}
               </Badge>
-              <span className="text-xs text-muted-foreground">较上一周期</span>
+              {/* The delta alone cannot be sanity-checked: a +300% jump reads
+                  very differently from 1 to 4 than from 1k to 4k. */}
+              <span className="text-xs text-muted-foreground">上一周期 {metric.was}</span>
             </div>
           </CardContent>
         </Card>

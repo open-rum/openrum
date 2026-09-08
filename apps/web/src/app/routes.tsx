@@ -95,6 +95,31 @@ const ProjectKeysRoute = lazy(() =>
     default: module.ProjectKeysRoute,
   })),
 );
+const ProjectSettingsRoute = lazy(() =>
+  import("@/features/settings/ProjectSettingsPage").then((module) => ({
+    default: module.ProjectSettingsRoute,
+  })),
+);
+const ProjectFiltersRoute = lazy(() =>
+  import("@/features/settings/ProjectFiltersPage").then((module) => ({
+    default: module.ProjectFiltersRoute,
+  })),
+);
+const ProjectURLRulesRoute = lazy(() =>
+  import("@/features/settings/ProjectURLRulesPage").then((module) => ({
+    default: module.ProjectURLRulesRoute,
+  })),
+);
+const ProjectScrubbingRoute = lazy(() =>
+  import("@/features/settings/ProjectScrubbingPage").then((module) => ({
+    default: module.ProjectScrubbingRoute,
+  })),
+);
+const ProjectQuotaRoute = lazy(() =>
+  import("@/features/settings/ProjectQuotaPage").then((module) => ({
+    default: module.ProjectQuotaRoute,
+  })),
+);
 const AdminOverviewPage = lazy(() =>
   import("@/features/admin/AdminOverviewPage").then((module) => ({
     default: module.AdminOverviewPage,
@@ -437,10 +462,40 @@ const adminAuditRoute = createRoute({
   component: AuditPage,
 });
 
+const projectSettingsRoute = createRoute({
+  getParentRoute: () => protectedRoute,
+  path: "/projects/$projectId/settings",
+  component: ProjectSettingsRoute,
+});
+
 const projectKeysRoute = createRoute({
   getParentRoute: () => protectedRoute,
   path: "/projects/$projectId/settings/keys",
   component: ProjectKeysRoute,
+});
+
+const projectFiltersRoute = createRoute({
+  getParentRoute: () => protectedRoute,
+  path: "/projects/$projectId/settings/filters",
+  component: ProjectFiltersRoute,
+});
+
+const projectURLRulesRoute = createRoute({
+  getParentRoute: () => protectedRoute,
+  path: "/projects/$projectId/settings/url-rules",
+  component: ProjectURLRulesRoute,
+});
+
+const projectScrubbingRoute = createRoute({
+  getParentRoute: () => protectedRoute,
+  path: "/projects/$projectId/settings/scrubbing",
+  component: ProjectScrubbingRoute,
+});
+
+const projectQuotaRoute = createRoute({
+  getParentRoute: () => protectedRoute,
+  path: "/projects/$projectId/settings/quota",
+  component: ProjectQuotaRoute,
 });
 
 const plannedRoutes = [
@@ -527,7 +582,12 @@ const routeTree = rootRoute.addChildren([
     adminObjectStorageRoute,
     adminDataRetentionRoute,
     adminAuditRoute,
+    projectSettingsRoute,
     projectKeysRoute,
+    projectFiltersRoute,
+    projectURLRulesRoute,
+    projectScrubbingRoute,
+    projectQuotaRoute,
     ...devDataRoutes,
     ...protectedChildren,
   ]),

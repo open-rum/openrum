@@ -41,7 +41,7 @@ export function ProjectSwitcher({
               onClick={() => {
                 rememberProject(item);
                 void navigate({
-                  to: "/projects/$projectId/analytics",
+                  to: "/projects/$projectId/overview",
                   params: { projectId: item.id },
                 });
               }}

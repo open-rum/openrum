@@ -1,0 +1,206 @@
+---
+import { Check, Copy } from "lucide-astro";
+import { docsBase } from "../../lib/site";
+import { activeTopic, trail } from "../../lib/docsTopics";
+
+const route = Astro.locals.starlightRoute;
+const sidebar = route.sidebar;
+const zh = Astro.url.pathname.startsWith("/zh/");
+const lang = zh ? "zh" : "en";
+
+// The documentation index sits outside the taxonomy: it has no tab to belong to, and a
+// breadcrumb trail reading "Docs / OpenRUM documentation" would say nothing.
+const topic = activeTopic(sidebar);
+const crumbs = topic
+  ? [
+      { label: zh ? "文档" : "Docs", href: `${docsBase(lang)}/` },
+      { label: topic.label, href: topic.href },
+      ...trail(topic.entries).slice(0, -1),
+    ]
+  : [];
+
+// Declared in frontmatter rather than written into the body, so a gate can assert
+// that every page states which Release it describes.
+const appliesTo = route.entry.data.appliesTo;
+
+// Inlined instead of fetched: the site is statically built with no external scripts,
+// and a page's markdown is a couple of kilobytes against a 120 KB HTML budget.
+const markdown = topic && typeof route.entry.body === "string" ? route.entry.body : "";
+---
+
+{
+  crumbs.length > 0 && (
+    <div class="docs-page-meta">
+      <nav class="docs-crumbs" aria-label={zh ? "面包屑" : "Breadcrumb"}>
+        <ol>
+          {crumbs.map((crumb) => (
+            <li>
+              {crumb.href ? <a href={crumb.href}>{crumb.label}</a> : <span>{crumb.label}</span>}
+            </li>
+          ))}
+          <li aria-current="page">
+            <span>{route.entry.data.title}</span>
+          </li>
+        </ol>
+      </nav>
+
+      {markdown && (
+        <button class="docs-copy-page" type="button" data-copy-page>
+          <span class="docs-copy-idle">
+            <Copy size={14} />
+            {zh ? "复制本页" : "Copy page"}
+          </span>
+          <span class="docs-copy-done">
+            <Check size={14} />
+            {zh ? "已复制" : "Copied"}
+          </span>
+        </button>
+      )}
+    </div>
+  )
+}
+
+<h1 id="_top">{route.entry.data.title}</h1>
+
+{
+  appliesTo && (
+    <p class="docs-applies-to">
+      <span>{zh ? "适用于" : "Applies to"}</span>
+      {appliesTo}
+    </p>
+  )
+}
+
+{
+  markdown && (
+    <script
+      type="application/json"
+      data-page-markdown
+      is:inline
+      set:html={JSON.stringify(markdown).replaceAll("<", "\\u003c")}
+    />
+  )
+}
+
+<script is:inline>
+  (() => {
+    const button = document.querySelector("[data-copy-page]");
+    const source = document.querySelector("[data-page-markdown]");
+    if (!button || !source) return;
+    button.addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(JSON.parse(source.textContent || '""'));
+        button.dataset.copied = "true";
+        setTimeout(() => delete button.dataset.copied, 2000);
+      } catch {
+        button.dataset.copied = "failed";
+      }
+    });
+  })();
+</script>
+
+<style>
+  .docs-page-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-top: 0.25rem;
+  }
+
+  .docs-crumbs ol {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.4rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    font-size: 0.8125rem;
+  }
+  .docs-crumbs li {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    color: var(--ds-text-muted);
+  }
+  .docs-crumbs li + li::before {
+    content: "/";
+    color: var(--ds-border);
+  }
+  .docs-crumbs a {
+    color: var(--ds-text-muted);
+    text-decoration: none;
+  }
+  .docs-crumbs a:hover {
+    color: var(--ds-text);
+  }
+  .docs-crumbs [aria-current="page"] span {
+    color: var(--ds-text);
+  }
+
+  .docs-copy-page {
+    display: inline-grid;
+    flex-shrink: 0;
+    padding: 0.35rem 0.6rem;
+    border: 1px solid var(--ds-border);
+    border-radius: var(--radius-md);
+    color: var(--ds-text-secondary);
+    background: var(--ds-surface);
+    font: inherit;
+    font-size: 0.8125rem;
+    cursor: pointer;
+  }
+  .docs-copy-page:hover {
+    color: var(--ds-text);
+    border-color: var(--ds-text-muted);
+  }
+  .docs-copy-page span {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    grid-area: 1 / 1;
+  }
+  .docs-copy-page .docs-copy-done,
+  .docs-copy-page[data-copied] .docs-copy-idle {
+    visibility: hidden;
+  }
+  .docs-copy-page[data-copied] .docs-copy-done {
+    visibility: visible;
+  }
+
+  h1 {
+    margin-top: 0.75rem;
+    color: var(--sl-color-white);
+    font-size: var(--sl-text-h1);
+    font-weight: 600;
+    line-height: var(--sl-line-height-headings);
+    letter-spacing: -0.02em;
+  }
+
+  .docs-applies-to {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    margin-top: 0.6rem;
+    margin-bottom: 0;
+    color: var(--ds-text-muted);
+    font-size: 0.8125rem;
+  }
+  .docs-applies-to span {
+    padding: 0.1rem 0.4rem;
+    border: 1px solid var(--ds-border);
+    border-radius: var(--radius-sm);
+    color: var(--ds-text-secondary);
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  @media (max-width: 50rem) {
+    .docs-copy-page {
+      display: none;
+    }
+  }
+</style>

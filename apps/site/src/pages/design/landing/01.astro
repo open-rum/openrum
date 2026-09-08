@@ -1,0 +1,291 @@
+---
+import LandingPreviewLayout from "../../../layouts/LandingPreviewLayout.astro";
+import BrandMark from "../../../components/BrandMark.astro";
+import BrandWordmark from "../../../components/BrandWordmark.astro";
+import ProductMockup from "../../../components/design/ProductMockup.astro";
+import {
+  ArrowRight,
+  Bug,
+  ChartNoAxesCombined,
+  Gauge,
+  ScanEye,
+  Github,
+  Server,
+  ShieldCheck,
+  Code2,
+  Monitor,
+  Smartphone,
+  Layers,
+  Check,
+  Database,
+  Menu,
+} from "lucide-astro";
+const repository = import.meta.env.PUBLIC_REPOSITORY_URL || "https://github.com/openrum/openrum";
+const features = [
+  {
+    icon: Bug,
+    title: "Error Tracking",
+    copy: "Capture errors, stack traces, breadcrumbs, and context.",
+    href: "/docs/product/investigation/",
+    tone: "error",
+  },
+  {
+    icon: ChartNoAxesCombined,
+    title: "Analytics",
+    copy: "Understand users, sessions, page views, and events.",
+    href: "/docs/product/analytics/",
+    tone: "brand",
+  },
+  {
+    icon: Gauge,
+    title: "Performance",
+    copy: "Monitor real-world application performance.",
+    href: "/docs/product/performance/",
+    tone: "brand",
+  },
+  {
+    icon: ScanEye,
+    title: "Rich Context",
+    copy: "Know who was affected, what happened, and where.",
+    href: "/docs/product/investigation/",
+    tone: "brand",
+  },
+];
+---
+
+<LandingPreviewLayout>
+  <header class="p1-header p1-container">
+    <a href="/" class="site-brand" aria-label="OpenRUM 首页"
+      ><span class="brand-mark"><BrandMark /></span><BrandWordmark /></a
+    ><nav aria-label="方案 1 导航">
+      <a href="#features">Features</a><a href="#self-host">Self-Host</a><a href="/docs/">Docs</a><a
+        href={repository}>Community</a
+      >
+    </nav><div class="p1-nav-actions">
+      <a href={repository} aria-label="GitHub"><Github size={17} /></a><a
+        href="/docs/getting-started/quickstart/"
+        class="ui-button p1-primary">Get Started</a
+      ><details class="p1-mobile-menu">
+        <summary aria-label="Open navigation"><Menu size={20} /></summary><div>
+          <a href="#features">Features</a><a href="#self-host">Self-Host</a><a href="/docs/">Docs</a
+          >
+        </div>
+      </details>
+    </div>
+  </header>
+  <main>
+    <section class="p1-container p1-hero">
+      <div>
+        <p class="p1-eyebrow">Open Source <span>·</span> Self-Hosted <span>·</span> Your Data</p><h1
+        >
+          Understand your users.<br /><span>Fix issues faster.</span>
+        </h1><p class="p1-hero-copy">
+          Track errors, analyze user behavior, and monitor application performance — all on your own
+          infrastructure.
+        </p><div class="p1-actions">
+          <a href="/docs/getting-started/quickstart/" class="ui-button p1-primary"
+            >Get Started<ArrowRight size={15} /></a
+          ><a href="#product-preview" class="ui-button ui-button-neutral">View Demo</a>
+        </div><div class="p1-hero-points">
+          <span><Bug size={17} />Error tracking</span><span
+            ><ChartNoAxesCombined size={17} />Behavior analytics</span
+          ><span><Gauge size={17} />Performance</span>
+        </div>
+      </div>
+      <div id="product-preview" class="p1-hero-visual"><ProductMockup /></div>
+    </section>
+    <div class="p1-trust">
+      <div class="p1-container">
+        <span><Code2 size={16} />OPEN SOURCE</span><span><Server size={16} />SELF-HOSTED</span><span
+          ><ShieldCheck size={16} />YOUR DATA</span
+        ><span><Code2 size={16} />DEVELOPER-FIRST</span>
+      </div>
+    </div>
+    <section class="p1-section p1-container p1-features" id="features">
+      <div>
+        <p class="p1-kicker">FEATURES</p><h2>Powerful features for<br />modern applications.</h2><p
+          class="p1-copy"
+        >
+          OpenRUM gives you the complete picture of what’s happening across your applications — so
+          you can ship better experiences, with confidence.
+        </p><a href="/product" class="p1-text-link">View all features<ArrowRight size={15} /></a>
+      </div><div class="p1-feature-grid">
+        {
+          features.map(({ icon: Icon, title, copy, href, tone }) => (
+            <a href={href} class="p1-feature">
+              <>
+                <span class:list={["p1-feature-icon", { "p1-danger": tone === "error" }]}>
+                  <Icon size={22} />
+                </span>
+                <div>
+                  <>
+                    <h3>{title}</h3>
+                    <p>{copy}</p>
+                  </>
+                </div>
+              </>
+            </a>
+          ))
+        }
+      </div>
+    </section>
+    <section class="p1-section p1-rule">
+      <div class="p1-container p1-product-row">
+        <ProductMockup kind="errors" /><div>
+          <p class="p1-kicker">ERROR TRACKING</p><h2>
+            Find the problem.<br />Understand the cause.
+          </h2><p class="p1-copy">
+            Get the full story behind every error. Stack traces, breadcrumbs, device details, and
+            user context — in one place.
+          </p><p class="p1-promise">From error to fix in minutes, not hours.</p><a
+            href="/docs/product/investigation/"
+            class="p1-text-link">Learn more<ArrowRight size={15} /></a
+          >
+        </div>
+      </div>
+    </section>
+    <section class="p1-section p1-light-band" data-theme-scope="light">
+      <div class="p1-container p1-product-row p1-product-reverse">
+        <div>
+          <p class="p1-kicker">ANALYTICS</p><h2>Understand what<br />your users do.</h2><p
+            class="p1-copy"
+          >
+            Get insights into user behavior, sessions, page views, and custom events to build
+            products people love.
+          </p><p class="p1-promise">
+            Errors tell you what broke.<br />Analytics tells you why it matters.
+          </p><a href="/docs/product/analytics/" class="p1-text-link"
+            >Learn more<ArrowRight size={15} /></a
+          >
+        </div><ProductMockup kind="analytics" compact />
+      </div>
+    </section>
+    <section class="p1-section p1-container">
+      <div class="p1-performance">
+        <div>
+          <p class="p1-kicker">PERFORMANCE</p><h2>Know how your app<br />really performs.</h2><p
+            class="p1-copy"
+          >
+            Measure the experience where it matters: in your users’ browsers.
+          </p><a href="/docs/product/performance/" class="p1-text-link"
+            >Learn more<ArrowRight size={15} /></a
+          >
+        </div><div class="p1-vitals">
+          <span>WEB VITALS <small>Example</small></span><div>
+            {
+              [
+                ["LCP", "1.2", "s"],
+                ["CLS", "0.04", ""],
+                ["INP", "98", "ms"],
+              ].map(([label, number, unit]) => (
+                <div>
+                  <>
+                    <span>{label}</span>
+                    <strong>
+                      {number}
+                      <small>{unit}</small>
+                    </strong>
+                    <em>
+                      <i />
+                      Good
+                    </em>
+                  </>
+                </div>
+              ))
+            }
+          </div><svg viewBox="0 0 430 65" role="img" aria-label="示例性能趋势"
+            ><path
+              class="p1-line"
+              d="M0 42L28 28L59 40L81 20L107 33L143 16L179 37L218 31L244 47L275 29L302 37L340 17L374 29L402 15L430 23"
+            ></path></svg
+          ><p>Fixed sample data · values shown for visual reference</p>
+        </div>
+      </div>
+    </section>
+    <section class="p1-section p1-rule">
+      <div class="p1-container">
+        <div class="p1-centered-head">
+          <p class="p1-kicker">PLATFORMS</p><h2>
+            Start with the web.<br />Build toward what’s next.
+          </h2><p class="p1-copy">
+            Web is available today. Native and mini program SDKs are planned.
+          </p>
+        </div><div class="p1-platforms">
+          {
+            [
+              { icon: Monitor, name: "Web", state: "Available", live: true },
+              { icon: Smartphone, name: "iOS", state: "Roadmap", live: false },
+              { icon: Smartphone, name: "Android", state: "Roadmap", live: false },
+              { icon: Layers, name: "Mini Program", state: "Roadmap", live: false },
+            ].map(({ icon: Icon, name, state, live }) => (
+              <div>
+                <>
+                  <Icon size={29} />
+                  <h3>{name}</h3>
+                  <span class:list={[{ "p1-available": live }]}>{state}</span>
+                </>
+              </div>
+            ))
+          }
+        </div><a class="p1-text-link p1-centered-link" href="/docs/sdk/browser/"
+          >Explore the Web SDK<ArrowRight size={15} /></a
+        >
+      </div>
+    </section>
+    <section class="p1-section p1-light-band" id="self-host" data-theme-scope="light">
+      <div class="p1-container p1-selfhost">
+        <div>
+          <p class="p1-kicker">SELF-HOSTED</p><h2>Your Data.<br />Your Server.</h2><p
+            class="p1-copy"
+          >
+            Deploy on your own infrastructure.<br />Keep full ownership of your data.
+          </p><a href="/docs/self-hosting/overview/" class="p1-text-link"
+            >View Self-Host Guide<ArrowRight size={15} /></a
+          >
+        </div><div>
+          <div class="p1-architecture">
+            <div><Monitor size={25} /><span>Your App</span></div><ArrowRight size={18} /><div>
+              <Code2 size={25} /><span>OpenRUM SDK</span>
+            </div><ArrowRight size={18} /><div>
+              <Database size={25} /><span>Your Infrastructure</span>
+            </div>
+          </div><ul class="p1-selfhost-list">
+            {
+              [
+                "Docker Compose & Kubernetes",
+                "Full data ownership",
+                "No vendor lock-in",
+                "Deploy on your infrastructure",
+              ].map((item) => (
+                <li>
+                  <Check size={15} />
+                  {item}
+                </li>
+              ))
+            }
+          </ul>
+        </div>
+      </div>
+    </section>
+    <section class="p1-section p1-container p1-opensource">
+      <div>
+        <p class="p1-kicker">OPEN SOURCE</p><h2>Built by developers,<br />for developers.</h2><p
+          class="p1-copy"
+        >
+          Open source. Community driven.<br />Help shape the future of application monitoring.
+        </p><a href={repository} class="ui-button p1-primary"><Github size={16} />Star on GitHub</a>
+      </div><a href={repository} class="p1-github-card"
+        ><Github size={30} /><h3>OpenRUM</h3><p>
+          Open-source, self-hosted<br />real user monitoring.
+        </p><span>Explore the repository<ArrowRight size={16} /></span></a
+      >
+    </section>
+  </main>
+  <footer class="p1-footer p1-container">
+    <a href="/" class="site-brand" aria-label="OpenRUM 首页"
+      ><span class="brand-mark"><BrandMark size={25} /></span><BrandWordmark /></a
+    ><span>Open Source Real User Monitoring</span><nav aria-label="Footer">
+      <a href="/docs/">Docs</a><a href={repository}>GitHub</a><a href="/design/">Design</a>
+    </nav><p>方案 01 · Static reference · Landing Page Spec v1</p>
+  </footer>
+</LandingPreviewLayout>

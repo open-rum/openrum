@@ -16,6 +16,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 
+	"openrum/internal/clientip"
 	"openrum/internal/geo"
 	"openrum/internal/httpx"
 	"openrum/internal/ingest"
@@ -39,7 +40,7 @@ type fakeLimiter struct {
 }
 
 func (limiter fakeLimiter) AllowIP(context.Context, string) bool { return limiter.allowIP }
-func (limiter fakeLimiter) AllowProject(context.Context, uuid.UUID) bool {
+func (limiter fakeLimiter) AllowProject(context.Context, uuid.UUID, ingest.ProjectQuota, string) bool {
 	return limiter.allowProject
 }
 
@@ -104,6 +105,93 @@ func TestHandlerAcceptsValidatedIdentityAndGzipEnvelopes(t *testing.T) {
 			}
 			if response.Header().Get("Access-Control-Allow-Origin") != "https://shop.example.com" {
 				t.Fatalf("CORS origin = %q", response.Header().Get("Access-Control-Allow-Origin"))
+			}
+		})
+	}
+}
+
+// recordingLimiter captures the identity the handler keyed the limit on.
+type recordingLimiter struct {
+	seen []string
+}
+
+func (limiter *recordingLimiter) AllowIP(_ context.Context, address string) bool {
+	limiter.seen = append(limiter.seen, address)
+	return true
+}
+
+func (limiter *recordingLimiter) AllowProject(
+	context.Context, uuid.UUID, ingest.ProjectQuota, string,
+) bool {
+	return true
+}
+
+func TestHandlerRateLimitIdentityFollowsTheDeclaredEdge(t *testing.T) {
+	declared, err := clientip.New([]string{"10.0.0.0/8"})
+	if err != nil {
+		t.Fatalf("new resolver: %v", err)
+	}
+	for _, testCase := range []struct {
+		name       string
+		resolver   *clientip.Resolver
+		remoteAddr string
+		forwarded  string
+		want       string
+	}{
+		// Without a declared edge the header is ignored outright, so every
+		// caller behind a shared proxy still keys on the proxy.
+		{
+			name:       "no edge declared",
+			resolver:   nil,
+			remoteAddr: "10.1.2.3:4321",
+			forwarded:  "203.0.113.7",
+			want:       "10.1.2.3",
+		},
+		{
+			name:       "edge declared and peer is the edge",
+			resolver:   declared,
+			remoteAddr: "10.1.2.3:4321",
+			forwarded:  "1.1.1.1, 203.0.113.7",
+			want:       "203.0.113.7",
+		},
+		// A caller that reaches the handler directly cannot pick its identity
+		// by sending the header itself.
+		{
+			name:       "edge declared but caller is direct",
+			resolver:   declared,
+			remoteAddr: "198.51.100.4:4321",
+			forwarded:  "203.0.113.7",
+			want:       "198.51.100.4",
+		},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			authenticator := &fakeAuthenticator{access: metadata.ProjectKeyAccess{Project: metadata.Project{
+				ID: uuid.MustParse("00000000-0000-4000-8000-000000000001"), Environment: "production",
+				AllowedOrigins: []string{"https://shop.example.com"}, Status: metadata.ProjectStatusActive,
+			}}}
+			acceptor := &fakeAcceptor{}
+			limiter := &recordingLimiter{}
+			options := []HandlerOption{}
+			if testCase.resolver != nil {
+				options = append(options, WithClientIPResolver(testCase.resolver))
+			}
+			handler := NewHandler(authenticator, limiter, acceptor, zerolog.Nop(), options...)
+			request := ingestRequest(validEnvelope(t))
+			request.RemoteAddr = testCase.remoteAddr
+			request.Header.Set("X-Forwarded-For", testCase.forwarded)
+
+			testRouter(handler).ServeHTTP(httptest.NewRecorder(), request)
+
+			if len(limiter.seen) != 1 || limiter.seen[0] != testCase.want {
+				t.Fatalf("rate limit identity = %v, want [%s]", limiter.seen, testCase.want)
+			}
+			if acceptor.accepted == nil {
+				t.Fatal("envelope was not accepted")
+			}
+			// The stored address has to agree with the one that was limited, or
+			// an investigation would chase a caller that was never throttled.
+			if acceptor.accepted.ClientIP != testCase.want {
+				t.Fatalf("stored client IP = %q, want %q", acceptor.accepted.ClientIP, testCase.want)
 			}
 		})
 	}

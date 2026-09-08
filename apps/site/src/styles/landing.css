@@ -1,0 +1,1476 @@
+/* Landing-page visual system. Every class is `lp-` prefixed because this file is loaded
+   as global CSS by the landing component alone and must never reach the other marketing
+   pages, which still rely on the shared `.section` / `.card-grid` rules in global.css.
+
+   Three hard constraints shape everything below:
+   - `design:check` rejects raw colour literals in apps/site/src, so every tint is a
+     `color-mix(in oklch, …)` over a `--ds-*` token.
+   - The user-approved Light Rays background is progressively loaded after first paint;
+     native rendering is capped and suspended offscreen. Performance gates still apply.
+   - Decorative gradients are deliberately absent. The one exception is the ambient
+     aurora behind the hero and the closer, which is a light source rather than a
+     surface treatment: nothing that reads as a shape is filled with a gradient. */
+
+.lp-page {
+  margin-top: calc(0px - var(--site-nav-height));
+  --lp-glow-brand: color-mix(in oklch, var(--ds-primary), transparent 72%);
+  --lp-glow-secondary: color-mix(in oklch, var(--ds-secondary), transparent 82%);
+  --lp-hairline: color-mix(in oklch, var(--ds-border), transparent 25%);
+  --lp-glass: color-mix(in oklch, var(--ds-surface), transparent 22%);
+  --lp-dot: color-mix(in oklch, var(--ds-text), transparent 92%);
+  --lp-chip: color-mix(in oklch, var(--ds-text), transparent 94%);
+}
+.dark .lp-page {
+  --lp-glow-brand: color-mix(in oklch, var(--ds-primary), transparent 84%);
+  --lp-glow-secondary: color-mix(in oklch, var(--ds-secondary), transparent 86%);
+  --lp-glass: color-mix(in oklch, var(--ds-surface), transparent 12%);
+  --lp-dot: color-mix(in oklch, var(--ds-text), transparent 88%);
+  --lp-chip: color-mix(in oklch, var(--ds-text), transparent 90%);
+}
+
+/* ---------- Shared section scaffolding ---------- */
+
+.lp-section {
+  position: relative;
+  padding: 104px 0;
+}
+.lp-section-tight {
+  padding: 72px 0;
+}
+.lp-rule {
+  border-top: 1px solid var(--lp-hairline);
+}
+.lp-head {
+  max-width: 760px;
+  margin-bottom: 48px;
+}
+.lp-head h2 {
+  margin: 10px 0 0;
+  font-size: clamp(2rem, 3.6vw, 3rem);
+  line-height: 1.06;
+  letter-spacing: -0.045em;
+  text-wrap: balance;
+}
+.lp-head p {
+  margin: 18px 0 0;
+  max-width: 620px;
+  color: var(--ds-text-muted);
+  font-size: 1.02rem;
+  line-height: 1.7;
+}
+.lp-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  margin: 0;
+  color: var(--ds-brand);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.lp-eyebrow::before {
+  width: 20px;
+  height: 2px;
+  border-radius: 2px;
+  content: "";
+  background: var(--ds-primary);
+}
+
+/* ---------- Ambient background layers ---------- */
+
+/* Aurora and grid are separate absolutely-positioned layers rather than stacked
+   backgrounds on one element so each can be masked and animated independently. */
+.lp-aurora,
+.lp-grid {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border: 0;
+}
+.lp-aurora {
+  background:
+    radial-gradient(42rem 28rem at 78% -8%, var(--lp-glow-brand), transparent 68%),
+    radial-gradient(34rem 24rem at 8% 12%, var(--lp-glow-secondary), transparent 64%),
+    radial-gradient(30rem 22rem at 52% 104%, var(--lp-glow-brand), transparent 70%);
+  animation: lp-drift 24s ease-in-out infinite alternate;
+}
+.lp-grid {
+  /* Masked to fade out before the copy so the pattern never competes with text. */
+  background-image:
+    linear-gradient(to right, var(--lp-dot) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--lp-dot) 1px, transparent 1px);
+  background-size: 64px 64px;
+  mask-image: radial-gradient(58rem 34rem at 62% 0%, var(--ds-text), transparent 72%);
+}
+@keyframes lp-drift {
+  from {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  to {
+    transform: translate3d(-2.5%, 1.5%, 0) scale(1.08);
+  }
+}
+
+/* ---------- Centered hero and progressive Light Rays background ---------- */
+.lp-hero {
+  position: relative;
+  isolation: isolate;
+  overflow: clip;
+  display: flex;
+  align-items: center;
+  min-height: calc(720px + var(--site-nav-height));
+  padding: calc(132px + var(--site-nav-height)) 0 120px;
+}
+.lp-hero-content {
+  position: relative;
+  z-index: 1;
+  text-align: center;
+}
+.lp-hero h1 {
+  margin: 0;
+  font: 560 clamp(3.25rem, 5.9vw, 5.25rem)/1.12 var(--font-product-sans);
+  letter-spacing: -0.06em;
+}
+.lp-title-line {
+  display: block;
+  overflow: hidden;
+  padding: 0 0.06em 0.08em;
+  margin-bottom: -0.08em;
+}
+.lp-title-ink {
+  display: block;
+}
+.lp-accent {
+  color: var(--ds-brand);
+  margin-top: 2px;
+}
+.lp-hero-copy {
+  max-width: 690px;
+  margin: 26px auto 0;
+  color: var(--ds-text-secondary);
+  font-size: 1.0625rem;
+  line-height: 1.8;
+  letter-spacing: -0.015em;
+  text-wrap: balance;
+}
+.lp-cta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-top: 30px;
+}
+.lp-hero .lp-cta {
+  justify-content: center;
+}
+.lp-cta .ui-button {
+  min-height: 48px;
+  min-width: 174px;
+  padding: 14px 24px;
+  font-size: 0.875rem;
+  gap: 14px;
+}
+.lp-cta-button {
+  transition:
+    transform var(--motion-normal) var(--ease-standard),
+    background var(--motion-normal) var(--ease-standard);
+}
+.lp-cta-button:hover {
+  transform: translateY(-2px);
+}
+.lp-cta-button:active {
+  transform: translateY(0);
+}
+.lp-cta-button svg {
+  transition: transform var(--motion-normal) var(--ease-standard);
+}
+.lp-cta-button:hover svg[data-icon="inline-end"] {
+  transform: translateX(3px);
+}
+.lp-rays {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  overflow: hidden;
+  mix-blend-mode: multiply;
+  mask-image: linear-gradient(to bottom, black 85%, transparent 100%);
+}
+.lp-rays canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  transition: opacity 1.2s ease;
+}
+.lp-rays.is-ready canvas {
+  opacity: 0.85;
+}
+.dark .lp-rays {
+  mix-blend-mode: normal;
+}
+.dark .lp-rays.is-ready canvas {
+  opacity: 1;
+}
+.lp-rays-fallback {
+  --lp-ray-faint: 92%;
+  --lp-ray-strong: 87%;
+  position: absolute;
+  inset: 0;
+  background: conic-gradient(
+    from 165deg at 50% -20%,
+    transparent 0deg,
+    color-mix(in oklch, var(--ds-light-ray-color), transparent var(--lp-ray-faint)) 7deg,
+    transparent 12deg,
+    color-mix(in oklch, var(--ds-light-ray-color), transparent var(--lp-ray-strong)) 19deg,
+    transparent 27deg
+  );
+  transition: opacity 1.2s;
+}
+.dark .lp-rays-fallback {
+  --lp-ray-faint: 88%;
+  --lp-ray-strong: 80%;
+}
+.lp-rays.is-ready .lp-rays-fallback {
+  opacity: 0;
+}
+.lp-hero::after {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  width: min(100%, 1184px);
+  height: 1px;
+  transform: translateX(-50%);
+  content: "";
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--ds-border) 18%,
+    var(--ds-border) 82%,
+    transparent
+  );
+}
+.lp-tech-dock {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  list-style: none;
+  margin: 26px 0 0;
+  padding: 0;
+}
+.lp-tech-dock li {
+  display: flex;
+  position: relative;
+}
+.lp-tech-dock .lp-tech-link {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 39px;
+  height: 40px;
+  color: var(--ds-text-muted);
+  transition:
+    color 0.2s,
+    transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.lp-tech-link svg {
+  display: block;
+  width: 27px;
+  height: 27px;
+}
+.lp-tech-dock li:first-child svg {
+  width: 36px;
+  height: 36px;
+}
+.lp-tech-link:hover,
+.lp-tech-link:focus-visible {
+  color: var(--ds-brand);
+  transform: translateY(-5px) scale(1.1);
+}
+.lp-tech-label {
+  position: absolute;
+  top: calc(100% + 9px);
+  left: 50%;
+  padding: 4px 9px;
+  border: 1px solid var(--ds-border);
+  border-radius: var(--radius-sm);
+  background: var(--ds-surface);
+  color: var(--ds-text-secondary);
+  font-size: 11px;
+  white-space: nowrap;
+  opacity: 0;
+  visibility: hidden;
+  transform: translate(-50%, -3px);
+  transition:
+    opacity 0.15s,
+    transform 0.15s,
+    visibility 0.15s;
+  pointer-events: none;
+}
+.lp-tech-link:hover .lp-tech-label,
+.lp-tech-link:focus-visible .lp-tech-label {
+  visibility: visible;
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+@keyframes lp-title-enter {
+  from {
+    transform: translateY(110%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+@keyframes lp-content-enter {
+  from {
+    transform: translateY(16px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+@keyframes lp-icon-enter {
+  from {
+    transform: translateY(13px) scale(0.85);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .lp-title-line:first-child .lp-title-ink {
+    animation: lp-title-enter 0.9s cubic-bezier(0.16, 1, 0.3, 1) 0.08s both;
+  }
+  .lp-title-line.lp-accent .lp-title-ink {
+    animation: lp-title-enter 0.9s cubic-bezier(0.16, 1, 0.3, 1) 0.2s both;
+  }
+  .lp-hero-copy {
+    animation: lp-content-enter 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.36s both;
+  }
+  .lp-hero .lp-cta {
+    animation: lp-content-enter 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.48s both;
+  }
+  .lp-tech-dock li {
+    animation: lp-icon-enter 0.65s cubic-bezier(0.16, 1, 0.3, 1)
+      calc(0.62s + var(--lp-order) * 0.065s) both;
+  }
+}
+@media (max-width: 800px) {
+  .lp-hero {
+    min-height: calc(665px + var(--site-nav-height));
+    padding: calc(110px + var(--site-nav-height)) 0 110px;
+  }
+  .lp-hero h1 {
+    font-size: clamp(2.625rem, 7.1vw, 3.75rem);
+  }
+}
+@media (max-width: 480px) {
+  .lp-hero {
+    min-height: calc(640px + var(--site-nav-height));
+    padding: calc(110px + var(--site-nav-height)) 0 110px;
+  }
+  .lp-rays {
+    left: -25%;
+    right: -25%;
+  }
+  .lp-hero h1 {
+    font-size: clamp(2rem, 8.6vw, 2.625rem);
+    line-height: 1.16;
+    letter-spacing: -0.052em;
+  }
+  .lp-title-ink {
+    max-width: 9.5em;
+    margin-inline: auto;
+  }
+  .lp-accent {
+    margin-top: 7px;
+  }
+  .lp-hero-copy {
+    font-size: 15px;
+    max-width: 330px;
+    margin-top: 24px;
+  }
+  .lp-hero .lp-cta {
+    gap: 10px;
+    margin-top: 27px;
+  }
+  .lp-hero .ui-button {
+    min-width: 0;
+    flex: 0 1 155px;
+    padding-inline: 17px;
+    min-height: 47px;
+  }
+  .lp-tech-dock {
+    gap: 10px;
+    margin-top: 25px;
+  }
+  .lp-tech-dock .lp-tech-link {
+    width: 34px;
+    height: 36px;
+  }
+  .lp-tech-link svg {
+    width: 25px;
+    height: 25px;
+  }
+  .lp-tech-dock li:first-child svg {
+    width: 32px;
+    height: 32px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lp-rays canvas {
+    transition: none;
+  }
+  .lp-tech-link:hover,
+  .lp-tech-link:focus-visible,
+  .lp-cta-button:hover,
+  .lp-cta-button:hover svg[data-icon] {
+    transform: none;
+  }
+}
+
+/* ---------- Product surface ----------
+
+   One chrome shared by the three interface panels (hero overview, Issue detail,
+   Analytics). Built from markup rather than screenshots so it answers the theme
+   toggle, stays sharp at any density, and cannot go stale the way an exported PNG
+   of the console does. */
+
+.lp-app {
+  overflow: hidden;
+  border: 1px solid color-mix(in oklch, var(--ds-border), transparent 10%);
+  border-radius: 16px;
+  background: var(--ds-surface);
+  box-shadow: var(--shadow-elevated);
+}
+.lp-app-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 13px;
+  border-bottom: 1px solid var(--lp-hairline);
+  background: var(--ds-surface-subtle);
+}
+/* The window chrome carries the product's own mark instead of three fake traffic
+   lights. It says whose interface this is at the size where a caption would not
+   be read. */
+.lp-app-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--ds-text);
+  font: 700 0.78rem/1 var(--font-product-sans);
+  letter-spacing: -0.02em;
+}
+.lp-app-mark {
+  display: grid;
+  place-items: center;
+  color: var(--ds-brand);
+}
+/* The wordmark is one flex item, not two. Left as bare text beside the accent
+   span, `Open` and `RUM` became separate flex children and the bar's 8px gap
+   opened up in the middle of the name. */
+.lp-app-word {
+  white-space: nowrap;
+}
+.lp-app-mark-accent {
+  color: var(--ds-brand);
+}
+.lp-app-chip {
+  padding: 3px 9px;
+  border: 1px solid var(--lp-hairline);
+  border-radius: 999px;
+  color: var(--ds-text-secondary);
+  font: 600 0.66rem/1.4 var(--font-product-sans);
+}
+/* Says out loud that the figures are illustrative. The self-host section two screens
+   down promises not to dress numbers up as something they are not, and an unlabelled
+   dashboard in the hero would be the page contradicting itself. */
+.lp-app-tag {
+  margin-left: auto;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--lp-chip);
+  /* Secondary rather than muted: muted on this chip measured 4.31:1 in dark mode,
+     just under the 4.5:1 axe threshold for text this size. */
+  color: var(--ds-text-secondary);
+  font: 600 0.66rem/1.4 var(--font-mono);
+}
+.lp-app-body {
+  padding: 18px;
+}
+/* Sidebar plus content, because a monitoring product is a place you navigate
+   rather than a single chart. The nav is aria-hidden: it is a picture of an
+   interface, and announcing six links that go nowhere would be worse than
+   silence. */
+.lp-app-shell {
+  display: grid;
+  grid-template-columns: 8.5rem minmax(0, 1fr);
+}
+.lp-app-side {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 9px;
+  border-right: 1px solid var(--lp-hairline);
+  background: color-mix(in oklch, var(--ds-surface-subtle), transparent 40%);
+}
+.lp-app-side span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 9px;
+  border-radius: 7px;
+  color: var(--ds-text-muted);
+  font-size: 0.72rem;
+  white-space: nowrap;
+}
+.lp-app-side .is-active {
+  background: var(--ds-brand-soft);
+  color: var(--ds-brand);
+  font-weight: 650;
+}
+.lp-app-main {
+  min-width: 0;
+  padding: 13px;
+}
+.lp-app-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+  gap: 10px;
+  margin-top: 14px;
+}
+.lp-app-card {
+  min-width: 0;
+  padding: 11px 12px;
+  border: 1px solid var(--lp-hairline);
+  border-radius: 11px;
+  background: color-mix(in oklch, var(--ds-surface), transparent 34%);
+}
+.lp-app-card h3 {
+  margin: 0 0 9px;
+  color: var(--ds-text-muted);
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.lp-app-label {
+  margin: 20px 0 10px;
+  color: var(--ds-text-muted);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+/* ---------- Hero panel: KPIs, trend, recent errors ---------- */
+
+.lp-kpis {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 9px;
+  margin: 0;
+}
+.lp-kpi {
+  min-width: 0;
+  padding: 11px 12px;
+  border: 1px solid var(--lp-hairline);
+  border-radius: 11px;
+  background: color-mix(in oklch, var(--ds-surface), transparent 34%);
+}
+.lp-kpi dt {
+  overflow: hidden;
+  color: var(--ds-text-muted);
+  font-size: 0.66rem;
+  letter-spacing: 0.02em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lp-kpi dd {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 7px 0 0;
+  font: 700 1.3rem/1 var(--font-product-sans);
+  letter-spacing: -0.035em;
+}
+.lp-kpi-icon {
+  display: grid;
+  flex: none;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+  border-radius: 999px;
+}
+/* Tinted circles rather than flat glyphs, so the three cards are told apart by
+   shape and colour before any of their labels are read. */
+.lp-tone-danger {
+  background: var(--ds-danger-soft);
+  color: color-mix(in oklch, var(--ds-danger), var(--ds-text) 12%);
+}
+.lp-tone-success {
+  background: var(--ds-success-soft);
+  color: color-mix(in oklch, var(--ds-success), var(--ds-text) 12%);
+}
+.lp-tone-info {
+  background: color-mix(in oklch, var(--ds-info), transparent 86%);
+  color: color-mix(in oklch, var(--ds-info), var(--ds-text) 12%);
+}
+/* Inside the <dd> rather than beside it: a <dl> may only hold dt/dd pairs, and a
+   sibling <p> made the whole list fail structural validation. */
+.lp-kpi dd {
+  flex-wrap: wrap;
+}
+.lp-kpi-delta {
+  flex-basis: 100%;
+  margin-top: 6px;
+  color: var(--ds-brand);
+  font: 650 0.66rem/1 var(--font-product-sans);
+}
+.lp-chart {
+  margin: 14px 0 0;
+  padding: 11px 12px;
+  border: 1px solid var(--lp-hairline);
+  border-radius: 11px;
+  background: color-mix(in oklch, var(--ds-surface), transparent 34%);
+}
+.lp-chart figcaption {
+  margin-bottom: 9px;
+  color: var(--ds-text-muted);
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.lp-chart svg {
+  display: block;
+  width: 100%;
+  height: 62px;
+}
+/* Real tick labels, because a chart without an axis is a decoration and the point
+   of putting the product in the hero is that it is not one. */
+.lp-chart-axis {
+  display: flex;
+  justify-content: space-between;
+  gap: 4px;
+  margin: 7px 0 0;
+  padding: 0;
+  list-style: none;
+  color: var(--ds-text-muted);
+  font: 0.6rem/1 var(--font-mono);
+}
+.lp-chart-line {
+  fill: none;
+  stroke: var(--ds-brand);
+  stroke-width: 1.75;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+/* Flat translucent fill rather than a fade-to-transparent gradient. */
+.lp-chart-area {
+  fill: color-mix(in oklch, var(--ds-primary), transparent 88%);
+  stroke: none;
+}
+.lp-error-list {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.lp-error-list li {
+  display: grid;
+  grid-template-columns: 7px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 0;
+  font-size: 0.72rem;
+}
+.lp-error-list li + li {
+  border-top: 1px solid var(--lp-hairline);
+}
+.lp-error-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--ds-danger);
+}
+.lp-error-body {
+  min-width: 0;
+}
+.lp-error-message {
+  display: block;
+  overflow: hidden;
+  color: var(--ds-text-secondary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Path and timestamp share the second line so the message gets the full width of
+   the card. Given its own column the timestamp left the message with room for
+   about two words. */
+.lp-error-path {
+  display: block;
+  margin-top: 2px;
+  color: var(--ds-text-muted);
+  font: 0.66rem/1.3 var(--font-mono);
+}
+.lp-error-when {
+  color: var(--ds-text-muted);
+  font-size: 0.64rem;
+  white-space: nowrap;
+}
+.lp-error-when::before {
+  margin: 0 5px;
+  content: "·";
+}
+.lp-error-count {
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: var(--ds-danger-soft);
+  color: color-mix(in oklch, var(--ds-danger), var(--ds-text) 30%);
+  font: 650 0.66rem/1.5 var(--font-mono);
+}
+
+/* ---------- Feature cards ---------- */
+.lp-features {
+  padding-block: 74px 60px;
+}
+.lp-feature-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 40px;
+  margin-bottom: 38px;
+}
+.lp-feature-heading h2 {
+  margin: 0;
+  font-size: 36px;
+  font-weight: 520;
+  line-height: 1.18;
+  letter-spacing: -0.045em;
+}
+.lp-feature-heading h2 span {
+  color: var(--ds-text-muted);
+}
+.lp-feature-heading > p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.8;
+  color: var(--ds-text-muted);
+}
+.lp-feature-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+.lp-feature-card {
+  padding: 32px;
+  transition:
+    border-color 0.2s,
+    transform 0.2s;
+  box-shadow: none;
+  background: var(--ds-canvas);
+}
+.lp-feature-card:hover {
+  border-color: color-mix(in oklch, var(--ds-brand), transparent 60%);
+  transform: translateY(-3px);
+}
+.lp-feature-icon {
+  color: var(--ds-brand);
+  margin-bottom: 25px;
+}
+.lp-feature-label {
+  margin: 0 0 13px;
+  font-size: 12px;
+  color: var(--ds-text-muted);
+}
+.lp-feature-card h3 {
+  margin: 0;
+  font-size: 23px;
+  font-weight: 520;
+  line-height: 1.25;
+  letter-spacing: -0.035em;
+}
+.lp-feature-card h3 span {
+  display: block;
+}
+.lp-feature-card-content p {
+  margin: 17px 0 0;
+  color: var(--ds-text-muted);
+  font-size: 13px;
+  line-height: 1.8;
+  max-width: 32ch;
+}
+@media (max-width: 800px) {
+  .lp-feature-heading {
+    display: block;
+  }
+  .lp-feature-heading > p {
+    margin-top: 20px;
+  }
+  .lp-feature-heading h2 {
+    font-size: 32px;
+  }
+  .lp-feature-grid {
+    grid-template-columns: 1fr;
+  }
+  .lp-feature-card-content p {
+    max-width: 48ch;
+  }
+}
+@media (max-width: 480px) {
+  .lp-features {
+    padding-top: 48px;
+  }
+  .lp-feature-heading h2 {
+    font-size: 29px;
+  }
+  .lp-feature-card {
+    padding: 25px;
+  }
+}
+
+/* ---------- Four capability pillars ---------- */
+
+.lp-pillars {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+.lp-tile {
+  display: flex;
+  flex-direction: column;
+  padding: 24px;
+  border: 1px solid var(--lp-hairline);
+  border-radius: 16px;
+  background: var(--ds-surface);
+  transition:
+    transform var(--motion-normal) var(--ease-standard),
+    border-color var(--motion-normal) var(--ease-standard);
+}
+.lp-tile:hover {
+  transform: translateY(-3px);
+  border-color: color-mix(in oklch, var(--ds-primary), transparent 58%);
+}
+.lp-tile-icon {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  margin-bottom: 28px;
+  border-radius: 11px;
+  color: var(--ds-brand);
+  background: var(--ds-brand-soft);
+}
+.lp-tile h3 {
+  margin: 0 0 9px;
+  font-size: 1.06rem;
+  letter-spacing: -0.025em;
+}
+.lp-tile p {
+  margin: 0;
+  color: var(--ds-text-muted);
+  font-size: 0.88rem;
+  line-height: 1.66;
+}
+.lp-tile-link {
+  display: inline-block;
+  margin-top: 18px;
+  color: var(--ds-brand);
+  font-size: 0.85rem;
+  font-weight: 650;
+  text-decoration: none;
+}
+.lp-tile-link:hover {
+  text-decoration: underline;
+}
+
+/* The four pillars restated as a sum, because the argument of the section is that the
+   combination is the product, not any one of the four. */
+.lp-equation {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 10px 14px;
+  margin: 40px 0 0;
+  padding: 22px;
+  border: 1px dashed color-mix(in oklch, var(--ds-primary), transparent 62%);
+  border-radius: 16px;
+  text-align: center;
+}
+.lp-equation-term {
+  color: var(--ds-text-secondary);
+  font-size: 0.94rem;
+  font-weight: 650;
+}
+.lp-equation-plus,
+.lp-equation-equals {
+  color: var(--ds-text-muted);
+  font: 0.94rem/1 var(--font-mono);
+}
+.lp-equation-result {
+  color: var(--ds-brand);
+  font-size: 1.02rem;
+  font-weight: 720;
+  letter-spacing: -0.02em;
+}
+
+/* ---------- Copy beside an interface ---------- */
+
+.lp-split {
+  display: grid;
+  grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr);
+  align-items: center;
+  gap: 56px;
+}
+/* Direction order swaps rather than the DOM order: the copy stays first in the reading
+   order for a screen reader while the interface leads visually on alternating sections. */
+.lp-split-reverse {
+  direction: rtl;
+}
+.lp-split-reverse > * {
+  direction: ltr;
+}
+.lp-split-copy h2 {
+  margin: 10px 0 0;
+  font-size: clamp(1.85rem, 3.1vw, 2.6rem);
+  line-height: 1.08;
+  letter-spacing: -0.045em;
+  text-wrap: balance;
+}
+.lp-split-copy > p {
+  margin: 18px 0 0;
+  color: var(--ds-text-muted);
+  font-size: 1.05rem;
+  line-height: 1.7;
+}
+.lp-points {
+  display: grid;
+  gap: 10px;
+  margin: 24px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.9rem;
+}
+.lp-points li {
+  display: grid;
+  grid-template-columns: 15px minmax(0, 1fr);
+  align-items: start;
+  gap: 10px;
+  color: var(--ds-text-secondary);
+  line-height: 1.6;
+}
+.lp-points svg {
+  margin-top: 3px;
+  color: var(--ds-brand);
+}
+/* The one line the section is arguing for, given its own surface so it survives
+   being skimmed past the paragraph above it. */
+.lp-callout {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr);
+  align-items: center;
+  gap: 14px;
+  margin: 26px 0 0;
+  padding: 16px 18px;
+  border: 1px solid color-mix(in oklch, var(--ds-primary), transparent 62%);
+  border-radius: 14px;
+  background: color-mix(in oklch, var(--ds-primary), transparent 92%);
+}
+.lp-callout-icon {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--ds-primary);
+  color: var(--ds-primary-foreground);
+}
+.lp-callout p {
+  margin: 0;
+  line-height: 1.5;
+}
+.lp-callout strong {
+  display: block;
+  font-size: 0.98rem;
+  letter-spacing: -0.02em;
+}
+.lp-callout span {
+  color: var(--ds-text-muted);
+  font-size: 0.9rem;
+}
+.lp-split-title {
+  margin: 0;
+  font-size: clamp(1.85rem, 3.1vw, 2.6rem);
+  line-height: 1.08;
+  letter-spacing: -0.045em;
+  text-wrap: balance;
+}
+.lp-quote {
+  margin: 26px 0 0;
+  padding: 0 0 0 18px;
+  border-left: 2px solid var(--ds-primary);
+  font-size: 1.06rem;
+  font-weight: 600;
+  line-height: 1.6;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+
+/* ---------- Issue detail panel ---------- */
+
+/* The issue header lives in the window chrome rather than in the body, matching
+   how the console shows it: the title is the identity of the view, not its first
+   row of content. */
+.lp-app-bar-issue {
+  gap: 10px;
+}
+.lp-issue-mark {
+  display: grid;
+  flex: none;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--ds-danger-soft);
+  color: color-mix(in oklch, var(--ds-danger), var(--ds-text) 12%);
+}
+.lp-issue-title {
+  overflow: hidden;
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 600;
+  line-height: 1.5;
+  letter-spacing: -0.015em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lp-issue-status {
+  flex: none;
+  margin-left: auto;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--ds-brand-soft);
+  color: var(--ds-brand);
+  font: 650 0.66rem/1.4 var(--font-product-sans);
+}
+.lp-issue-type {
+  margin-right: 4px;
+  padding: 0;
+  border-radius: 6px;
+  background: transparent;
+  /* The raw danger token on its own soft tint measured 4.38:1 in dark and 4.43:1 in
+     light — under threshold in both. Mixing toward `--ds-text` fixes both at once and
+     in opposite directions, because that token is near-black in light and near-white
+     in dark, so the same expression darkens the red on the pale chip and lightens it
+     on the dark one. */
+  color: color-mix(in oklch, var(--ds-danger), var(--ds-text) 30%);
+  font: 700 0.82rem/1.5 var(--font-product-sans);
+}
+.lp-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 16px 0 0;
+  padding: 0 0 10px;
+  border-bottom: 1px solid var(--lp-hairline);
+  list-style: none;
+}
+.lp-tabs {
+  gap: 2px;
+}
+.lp-tabs li {
+  padding: 6px 11px;
+  border-radius: 7px 7px 0 0;
+  color: var(--ds-text-muted);
+  font-size: 0.76rem;
+}
+/* Underlined rather than filled: a filled pill inside a panel that already has a
+   filled sidebar item made two different things look equally selected. */
+.lp-tabs .is-active {
+  box-shadow: inset 0 -2px 0 var(--ds-primary);
+  color: var(--ds-text);
+  font-weight: 650;
+}
+.lp-meta {
+  display: grid;
+  gap: 9px;
+  margin: 16px 0 0;
+}
+/* Label and value on one line, label column fixed, so the values form a single
+   readable column the way they do in the console's detail view. */
+.lp-meta > div {
+  display: grid;
+  grid-template-columns: 7.5rem minmax(0, 1fr);
+  gap: 14px;
+  align-items: baseline;
+}
+.lp-meta dt {
+  color: var(--ds-text-muted);
+  font-size: 0.76rem;
+}
+.lp-meta dd {
+  margin: 0;
+  color: var(--ds-text-secondary);
+  font: 0.76rem/1.5 var(--font-mono);
+  overflow-wrap: anywhere;
+}
+.lp-stack {
+  margin: 0;
+  /* Focusable because it scrolls horizontally: a scroll container that only a
+     mouse can reach strands the frames past the right edge. */
+  overflow-x: auto;
+  padding: 13px 14px;
+  border: 1px solid var(--lp-hairline);
+  border-radius: 10px;
+  background: var(--ds-surface-subtle);
+}
+.lp-stack code {
+  display: grid;
+  gap: 5px;
+  font: 0.74rem/1.5 var(--font-mono);
+}
+.lp-stack-frame {
+  white-space: nowrap;
+}
+.lp-stack-symbol {
+  color: var(--ds-text-secondary);
+}
+/* The frame that resolves into the reader's own source is the one the eye should land
+   on, so it carries the brand colour and the vendor frames stay muted. */
+.lp-stack-frame:nth-child(2) .lp-stack-location {
+  color: var(--ds-brand);
+}
+.lp-stack-frame:first-child .lp-stack-symbol {
+  color: color-mix(in oklch, var(--ds-danger), var(--ds-text) 30%);
+}
+.lp-stack-location {
+  color: var(--ds-text-muted);
+}
+
+/* ---------- Analytics panel ---------- */
+
+.lp-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0;
+}
+.lp-stats dt {
+  color: var(--ds-text-muted);
+  font-size: 0.68rem;
+}
+.lp-stats dd {
+  margin: 5px 0 0;
+  font: 700 1.15rem/1 var(--font-product-sans);
+  letter-spacing: -0.03em;
+}
+.lp-bars {
+  display: grid;
+  grid-auto-flow: column;
+  align-items: end;
+  gap: 8px;
+  height: 62px;
+}
+.lp-bars span {
+  border-radius: 4px 4px 0 0;
+  background: color-mix(in oklch, var(--ds-primary), transparent 30%);
+}
+.lp-bars span:last-child {
+  background: var(--ds-primary);
+}
+.lp-top-pages {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.lp-top-pages li {
+  display: grid;
+  grid-template-columns: 6.5rem minmax(0, 1fr) 3rem;
+  align-items: center;
+  gap: 12px;
+  font-size: 0.78rem;
+}
+/* Inside the hero window the same list has about a third of the width, so the
+   fixed columns have to shrink or the percentage is clipped off the right edge. */
+.lp-app-card .lp-top-pages li {
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  padding: 4px 0;
+  font-size: 0.72rem;
+}
+.lp-app-card .lp-top-bar {
+  display: none;
+}
+.lp-app-card .lp-top-path {
+  font-size: 0.7rem;
+}
+.lp-top-path {
+  overflow: hidden;
+  color: var(--ds-text-secondary);
+  font: 0.76rem/1.4 var(--font-mono);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* The share is both the label and the bar width, so the two can never disagree. */
+.lp-top-bar {
+  position: relative;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--lp-chip);
+}
+.lp-top-bar::after {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--lp-share);
+  border-radius: 999px;
+  content: "";
+  background: var(--ds-primary);
+}
+.lp-top-share {
+  color: var(--ds-text-muted);
+  font: 0.74rem/1.4 var(--font-mono);
+  text-align: right;
+}
+
+/* ---------- Self-host proof ---------- */
+
+.lp-proof-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+  align-items: start;
+  gap: 44px;
+}
+.lp-proof-list {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.lp-proof-item {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  gap: 16px;
+  padding: 18px;
+  border: 1px solid var(--lp-hairline);
+  border-radius: 14px;
+  background: var(--ds-surface);
+}
+.lp-proof-item strong {
+  display: block;
+  margin-bottom: 5px;
+  font-size: 0.98rem;
+  letter-spacing: -0.02em;
+}
+.lp-proof-item p {
+  margin: 0;
+  color: var(--ds-text-muted);
+  font-size: 0.86rem;
+  line-height: 1.62;
+}
+.lp-deploy-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 22px;
+  margin: 20px 0 0;
+  padding: 0;
+  list-style: none;
+  color: var(--ds-text-secondary);
+  font-size: 0.82rem;
+}
+.lp-deploy-list li {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+.lp-deploy-list svg {
+  color: var(--ds-brand);
+  flex: none;
+}
+
+/* Terminal-styled block carrying the command the quickstart actually runs. */
+.lp-terminal {
+  overflow: hidden;
+  border: 1px solid color-mix(in oklch, var(--ds-border), transparent 10%);
+  border-radius: 15px;
+  background: var(--ds-hero-surface);
+  box-shadow: var(--shadow-elevated);
+}
+.lp-terminal-bar {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 12px 15px;
+  border-bottom: 1px solid color-mix(in oklch, var(--ds-hero-foreground), transparent 88%);
+}
+.lp-terminal-bar span {
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  background: color-mix(in oklch, var(--ds-hero-foreground), transparent 78%);
+}
+.lp-terminal-bar strong {
+  margin-left: 6px;
+  color: color-mix(in oklch, var(--ds-hero-foreground), transparent 42%);
+  font: 600 0.72rem/1 var(--font-mono);
+}
+.lp-terminal pre {
+  margin: 0;
+  overflow-x: auto;
+  padding: 18px;
+  color: var(--ds-hero-foreground);
+  font: 0.79rem/1.85 var(--font-mono);
+}
+/* 55% transparency read as 4.35:1 against the terminal surface, just under the 4.5:1 axe
+   threshold for text this size. 40% keeps the comment visibly dimmer than the command
+   while clearing the threshold. */
+.lp-terminal-comment {
+  color: color-mix(in oklch, var(--ds-hero-foreground), transparent 40%);
+}
+.lp-terminal-flag {
+  color: var(--ds-primary);
+}
+.lp-terminal-note {
+  margin: 14px 0 0;
+  color: var(--ds-text-muted);
+  font-size: 0.82rem;
+  line-height: 1.65;
+}
+
+/* ---------- Closing call to action ---------- */
+
+.lp-closer {
+  position: relative;
+  overflow: hidden;
+  padding: 62px 54px;
+  border: 1px solid color-mix(in oklch, var(--ds-primary), transparent 66%);
+  border-radius: 22px;
+  background: color-mix(in oklch, var(--ds-primary), transparent 92%);
+  text-align: center;
+}
+.lp-closer .lp-eyebrow {
+  position: relative;
+}
+.lp-closer h2 {
+  position: relative;
+  margin: 12px auto 0;
+  max-width: 22ch;
+  font-size: clamp(1.9rem, 3.4vw, 2.9rem);
+  line-height: 1.08;
+  letter-spacing: -0.045em;
+  text-wrap: balance;
+}
+.lp-closer p {
+  position: relative;
+  margin: 18px auto 0;
+  max-width: 46ch;
+  color: var(--ds-text-muted);
+  line-height: 1.7;
+}
+.lp-closer .lp-cta {
+  position: relative;
+  justify-content: center;
+}
+
+/* ---------- Scroll-linked reveal ---------- */
+
+/* Guarded by @supports and expressed only through opacity and transform: browsers
+   without scroll-linked animations render the final state, and no variant can shift
+   layout and spend the page's CLS budget. */
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .lp-reveal {
+      animation: lp-rise linear both;
+      animation-timeline: view();
+      animation-range: entry 8% cover 26%;
+    }
+  }
+}
+@keyframes lp-rise {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ---------- Responsive ---------- */
+
+@media (max-width: 1080px) {
+  .lp-pillars {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 1000px) {
+  .lp-split,
+  .lp-proof-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  /* The reversal only exists to alternate two columns; with one column it would put the
+     interface above the copy that introduces it. */
+  .lp-split-reverse {
+    direction: ltr;
+  }
+}
+@media (max-width: 860px) {
+  /* The sidebar is the first thing to go: it is the least informative part of the
+     picture and the main column needs every pixel at this width. */
+  .lp-app-side {
+    display: none;
+  }
+  .lp-app-shell {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .lp-app-split {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (max-width: 640px) {
+  .lp-error-when {
+    display: none;
+  }
+  .lp-meta > div {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
+  }
+  .lp-section {
+    padding: 72px 0;
+  }
+  .lp-pillars,
+  .lp-stats {
+    grid-template-columns: 1fr 1fr;
+  }
+  .lp-kpis {
+    grid-template-columns: 1fr;
+  }
+  .lp-meta {
+    grid-template-columns: 1fr;
+  }
+  .lp-top-pages li {
+    grid-template-columns: 5rem minmax(0, 1fr) 2.75rem;
+  }
+  .lp-closer {
+    padding: 44px 24px;
+  }
+  .lp-tile-icon {
+    margin-bottom: 22px;
+  }
+  .lp-equation {
+    padding: 18px 14px;
+  }
+}

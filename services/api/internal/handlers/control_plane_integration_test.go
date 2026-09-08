@@ -112,6 +112,7 @@ func TestControlPlaneCRUDAndRBAC(t *testing.T) {
 	organizations := metadata.NewOrganizationRepository(database)
 	projects := metadata.NewProjectRepository(database)
 	keys := metadata.NewProjectKeyRepository(database)
+	inboundFilters := metadata.NewProjectFilterRepository(database)
 	organizationB, err := organizations.Create(ctx, ownerB, "Organization B", "organization-b")
 	if err != nil {
 		t.Fatal(err)
@@ -123,7 +124,7 @@ func TestControlPlaneCRUDAndRBAC(t *testing.T) {
 		"member":  {UserID: member, Email: "member@example.com", DisplayName: "Member"},
 		"viewer":  {UserID: viewer, Email: "viewer@example.com", DisplayName: "Viewer"},
 	}
-	router := controlPlaneTestRouter(organizations, projects, keys, principals)
+	router := controlPlaneTestRouter(organizations, projects, keys, inboundFilters, principals)
 
 	response := performControlPlaneRequest(t, router, "owner-a", http.MethodPost, "/api/v1/organizations",
 		`{"name":"Organization A","slug":"organization-a"}`, true)
@@ -226,7 +227,7 @@ func TestControlPlaneCRUDAndRBAC(t *testing.T) {
 
 	projectB, err := projects.Create(ctx, ownerB, metadata.CreateProjectInput{
 		OrganizationID: organizationB.Organization.ID, Name: "Private B", Slug: "private-b", Environment: "production",
-		RetentionDays: 14, EventSampleRate: 1, APISampleRate: 0.2,
+		RetentionDays: 14, EventSampleRate: 1, APISampleRate: 0.2, ErrorSampleRate: 1,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -245,6 +246,40 @@ func TestControlPlaneCRUDAndRBAC(t *testing.T) {
 	if projectA.RetentionDays != 30 || projectA.Status != metadata.ProjectStatusDisabled {
 		t.Fatalf("updated project=%+v", projectA)
 	}
+
+	filterPath := "/api/v1/projects/" + projectA.ID + "/filters"
+	// A project that has never been configured must read as filtering nothing,
+	// so an upgrade does not silently start discarding events.
+	response = performControlPlaneRequest(t, router, "viewer", http.MethodGet, filterPath, "", false)
+	assertStatus(t, response, http.StatusOK)
+	var filters inboundFiltersDTO
+	decodeResponse(t, response, &filters)
+	for reason, mode := range filters.Builtin {
+		if mode != "off" {
+			t.Fatalf("category %q defaults to %q, want off", reason, mode)
+		}
+	}
+	if len(filters.Rules) != 0 {
+		t.Fatalf("rules=%+v, want none", filters.Rules)
+	}
+	response = performControlPlaneRequest(t, router, "viewer", http.MethodPut, filterPath,
+		`{"builtin":{"bot":"enforced"},"rules":[]}`, true)
+	assertStatus(t, response, http.StatusForbidden)
+	response = performControlPlaneRequest(t, router, "owner-a", http.MethodPut, filterPath,
+		`{"builtin":{"bot":"nuke"},"rules":[]}`, true)
+	assertStatus(t, response, http.StatusBadRequest)
+	response = performControlPlaneRequest(t, router, "owner-a", http.MethodPut, filterPath,
+		`{"builtin":{"bot":"enforced","localhost":"dry_run"},"rules":[{"id":"r1","kind":"error_message","pattern":"ResizeObserver loop*","mode":"enforced","note":"known noise"}]}`, true)
+	assertStatus(t, response, http.StatusOK)
+	decodeResponse(t, response, &filters)
+	if filters.Builtin["bot"] != "enforced" || filters.Builtin["localhost"] != "dry_run" ||
+		filters.Builtin["extension"] != "off" || len(filters.Rules) != 1 {
+		t.Fatalf("stored filters=%+v", filters)
+	}
+	// Browsers poll for these, so a change has to move the version they compare
+	// against or a client would keep enforcing the previous set.
+	response = performControlPlaneRequest(t, router, "owner-a", http.MethodGet, filterPath, "", false)
+	assertStatus(t, response, http.StatusOK)
 
 	response = performControlPlaneRequest(t, router, "owner-a", http.MethodPost, memberPath,
 		`{"email":"admin@example.com","role":"admin"}`, true)
@@ -307,12 +342,13 @@ func (authenticator fixtureAuthenticator) Authenticate(_ context.Context, token 
 	return principal, nil
 }
 
-func controlPlaneTestRouter(organizations *metadata.OrganizationRepository, projects *metadata.ProjectRepository, keys *metadata.ProjectKeyRepository, principals map[string]auth.Principal) http.Handler {
+func controlPlaneTestRouter(organizations *metadata.OrganizationRepository, projects *metadata.ProjectRepository, keys *metadata.ProjectKeyRepository, inboundFilters *metadata.ProjectFilterRepository, principals map[string]auth.Principal) http.Handler {
 	logger := zerolog.Nop()
 	router := httpx.NewRouter(logger)
 	organizationHandler := NewOrganizationHandler(organizations, logger)
 	memberHandler := NewMemberHandler(organizations, logger)
 	projectHandler := NewProjectHandler(organizations, projects, logger)
+	projectFilterHandler := NewProjectFilterHandler(projects, inboundFilters, logger)
 	projectKeyHandler := NewProjectKeyHandler(keys, logger)
 	connectionStatusHandler := NewConnectionStatusHandler(keys, fakeConnectionReader{}, logger)
 	requireSession := httpx.RequireSession(fixtureAuthenticator{principals: principals})
@@ -331,6 +367,8 @@ func controlPlaneTestRouter(organizations *metadata.OrganizationRepository, proj
 	router.Handle("GET /api/v1/projects/{projectId}", read(projectHandler.Get))
 	router.Handle("PATCH /api/v1/projects/{projectId}", write(projectHandler.Update))
 	router.Handle("DELETE /api/v1/projects/{projectId}", write(projectHandler.Delete))
+	router.Handle("GET /api/v1/projects/{projectId}/filters", read(projectFilterHandler.Get))
+	router.Handle("PUT /api/v1/projects/{projectId}/filters", write(projectFilterHandler.Put))
 	router.Handle("GET /api/v1/projects/{projectId}/keys", read(projectKeyHandler.List))
 	router.Handle("GET /api/v1/projects/{projectId}/connection-status", read(connectionStatusHandler.Get))
 	router.Handle("POST /api/v1/projects/{projectId}/keys", write(projectKeyHandler.Create))

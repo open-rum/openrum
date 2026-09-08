@@ -3,7 +3,7 @@ import { calculateSamplingImpact } from "./impact";
 import type { UsageResponse } from "@/lib/api/usage";
 
 describe("sampling impact", () => {
-  it("uses estimated source volume by event class and keeps errors at 100%", () => {
+  it("uses estimated source volume by event class", () => {
     const usage: UsageResponse = {
       from: "2026-09-01T00:00:00.000Z",
       to: "2026-09-03T00:00:00.000Z",
@@ -39,9 +39,14 @@ describe("sampling impact", () => {
         },
       ],
     };
-    const result = calculateSamplingImpact(usage, 0.2, 0.25);
+    const result = calculateSamplingImpact(usage, 0.2, 0.25, 1);
     expect(result.currentDaily).toBe(150);
     expect(result.projectedDaily).toBe(150);
     expect(result.deltaPercent).toBe(0);
+
+    // Errors used to be pinned at 100% here because the server always reported
+    // errorSampleRate as 1; lowering it has to move the projection.
+    const halvedErrors = calculateSamplingImpact(usage, 0.2, 0.25, 0.5);
+    expect(halvedErrors.projectedDaily).toBe(125);
   });
 });

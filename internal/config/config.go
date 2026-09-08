@@ -33,6 +33,7 @@ type Config struct {
 	RedisAddress                string
 	GeoCountryHeader            string
 	GeoTrustedProxies           []string
+	IngestTrustedProxies        []string
 	IngestBaseURL               string
 	ObjectStorageProvider       ObjectStorageProvider
 	ObjectStorageEndpoint       string
@@ -165,6 +166,7 @@ func load(service Service, lookup lookupEnv) (Config, error) {
 		RedisAddress:                values("REDIS_ADDR"),
 		GeoCountryHeader:            strings.TrimSpace(values("GEO_COUNTRY_HEADER")),
 		GeoTrustedProxies:           splitCommaSeparated(values("GEO_TRUSTED_PROXIES")),
+		IngestTrustedProxies:        splitCommaSeparated(values("INGEST_TRUSTED_PROXIES")),
 		IngestBaseURL:               strings.TrimRight(strings.TrimSpace(values("INGEST_BASE_URL")), "/"),
 		ObjectStorageProvider:       storage.provider,
 		ObjectStorageEndpoint:       storage.endpoint,

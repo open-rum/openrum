@@ -10,6 +10,9 @@ data:
   KAFKA_BROKERS: {{ .Values.config.kafkaBrokers | quote }}
   KAFKA_EVENT_TOPIC: {{ .Values.config.kafkaEventTopic | quote }}
   REDIS_ADDR: {{ .Values.config.redisAddress | quote }}
+  INGEST_TRUSTED_PROXIES: {{ .Values.config.ingestTrustedProxies | quote }}
+  GEO_COUNTRY_HEADER: {{ .Values.config.geoCountryHeader | quote }}
+  GEO_TRUSTED_PROXIES: {{ .Values.config.geoTrustedProxies | quote }}
   OBJECT_STORAGE_PROVIDER: {{ .Values.config.objectStorage.provider | quote }}
   OBJECT_STORAGE_ENDPOINT: {{ .Values.config.objectStorage.endpoint | quote }}
   OBJECT_STORAGE_BUCKET: {{ .Values.config.objectStorage.bucket | quote }}

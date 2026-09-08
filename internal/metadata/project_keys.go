@@ -84,7 +84,7 @@ func (repository *ProjectKeyRepository) Create(ctx context.Context, actorID, pro
 		return ProjectKeyCredential{}, err
 	}
 	defer func() { _ = transaction.Rollback() }()
-	organizationID, err := lockProjectForKeyManagement(ctx, transaction, actorID, projectID)
+	organizationID, err := lockProject(ctx, transaction, actorID, projectID, canManageProjectSettings)
 	if err != nil {
 		return ProjectKeyCredential{}, err
 	}
@@ -107,7 +107,7 @@ func (repository *ProjectKeyRepository) Rotate(ctx context.Context, actorID, pro
 		return ProjectKeyCredential{}, err
 	}
 	defer func() { _ = transaction.Rollback() }()
-	organizationID, err := lockProjectForKeyManagement(ctx, transaction, actorID, projectID)
+	organizationID, err := lockProject(ctx, transaction, actorID, projectID, canManageProjectSettings)
 	if err != nil {
 		return ProjectKeyCredential{}, err
 	}
@@ -150,7 +150,7 @@ func (repository *ProjectKeyRepository) Revoke(ctx context.Context, actorID, pro
 		return err
 	}
 	defer func() { _ = transaction.Rollback() }()
-	organizationID, err := lockProjectForKeyManagement(ctx, transaction, actorID, projectID)
+	organizationID, err := lockProject(ctx, transaction, actorID, projectID, canManageProjectSettings)
 	if err != nil {
 		return err
 	}
@@ -189,14 +189,14 @@ func (repository *ProjectKeyRepository) Validate(ctx context.Context, raw string
 		        project_keys.last_used_at, project_keys.revoked_at, project_keys.created_at,
 		        projects.id, projects.organization_id, projects.name, projects.slug, to_json(projects.allowed_origins),
 		        projects.environment, projects.retention_days, projects.event_sample_rate, projects.api_sample_rate,
-		        projects.status, projects.created_at, projects.updated_at
+		        projects.error_sample_rate, projects.status, projects.created_at, projects.updated_at
 		 FROM project_keys JOIN projects ON projects.id=project_keys.project_id
 		 WHERE project_keys.key_hash=$1 AND project_keys.revoked_at IS NULL AND projects.status='active'`, digest[:],
 	).Scan(&access.Key.ID, &access.Key.ProjectID, &access.Key.KeyPrefix, &access.Key.Name, &access.Key.LastUsedAt,
 		&access.Key.RevokedAt, &access.Key.CreatedAt, &access.Project.ID, &access.Project.OrganizationID,
 		&access.Project.Name, &access.Project.Slug, &allowedOriginsJSON, &access.Project.Environment,
 		&access.Project.RetentionDays, &access.Project.EventSampleRate, &access.Project.APISampleRate,
-		&access.Project.Status, &access.Project.CreatedAt, &access.Project.UpdatedAt)
+		&access.Project.ErrorSampleRate, &access.Project.Status, &access.Project.CreatedAt, &access.Project.UpdatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return ProjectKeyAccess{}, ErrInvalidProjectKey
 	}
@@ -235,7 +235,16 @@ func createProjectKeyRecord(ctx context.Context, transaction *sql.Tx, projectID 
 	return credential, nil
 }
 
-func lockProjectForKeyManagement(ctx context.Context, transaction *sql.Tx, actorID, projectID uuid.UUID) (uuid.UUID, error) {
+// lockProject locks the project's organization and membership row, then checks
+// the caller's role against allowed. The predicate is a parameter because
+// role requirements differ per resource: keys are Owner/Admin only, while alert
+// rules are also open to Members.
+func lockProject(
+	ctx context.Context,
+	transaction *sql.Tx,
+	actorID, projectID uuid.UUID,
+	allowed func(OrganizationRole) bool,
+) (uuid.UUID, error) {
 	var organizationID uuid.UUID
 	err := transaction.QueryRowContext(ctx, "SELECT organization_id FROM projects WHERE id=$1", projectID).Scan(&organizationID)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -251,7 +260,7 @@ func lockProjectForKeyManagement(ctx context.Context, transaction *sql.Tx, actor
 	if err != nil {
 		return uuid.Nil, err
 	}
-	if !canManageProjectSettings(role) {
+	if !allowed(role) {
 		return uuid.Nil, ErrForbidden
 	}
 	return organizationID, nil

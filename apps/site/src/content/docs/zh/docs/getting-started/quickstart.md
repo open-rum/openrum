@@ -21,6 +21,8 @@ docker compose -f deploy/compose/docker-compose.yml ps
 curl --fail http://127.0.0.1:4173/health/ready
 ```
 
+如果你是从源码开发而不是评估产品，`pnpm openrum up` 会启动同样的容器，但它等待的是「真正就绪」而不是「已启动」，并把容器和宿主机两半的状态汇总成一张表。它需要 Go 和 Node 工具链，所以本页直接用 Compose。见 [Local development](/zh/docs/contributing/local-development/)。
+
 打开 `http://127.0.0.1:4173`，使用本地演示账号：
 
 ```text

@@ -15,6 +15,6 @@ API Request events capture browser fetch/XHR timing and failure signals without 
 
 ## Privacy defaults
 
-The SDK excludes query strings, bodies, headers and OpenRUM's own ingest endpoint. See [Privacy](/docs/security/privacy/).
+The SDK excludes query strings, bodies, headers and OpenRUM's own ingest endpoint. See [Privacy](/docs/self-hosting/security/privacy/).
 
 Related: [Investigation](/docs/product/investigation/), [Browser SDK](/docs/sdk/browser/).

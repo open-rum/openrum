@@ -109,6 +109,7 @@ func ensureDemoControlPlane(ctx context.Context, database *sql.DB) (uuid.UUID, s
 		RetentionDays:   14,
 		EventSampleRate: 1,
 		APISampleRate:   1,
+		ErrorSampleRate: 1,
 	}, "Demo SDK")
 	if err != nil {
 		return uuid.Nil, "", err

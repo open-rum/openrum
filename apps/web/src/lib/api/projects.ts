@@ -13,6 +13,8 @@ export type Organization = {
 
 export type ProjectStatus = "active" | "disabled" | "deleting";
 
+export type OverLimitBehavior = "reject" | "sample";
+
 export type Project = {
   id: string;
   organizationId: string;
@@ -23,6 +25,12 @@ export type Project = {
   retentionDays: number;
   eventSampleRate: number;
   apiSampleRate: number;
+  errorSampleRate: number;
+  /** Null when the project has no override and the instance default applies. */
+  ingestRateLimit: number | null;
+  overLimitBehavior: OverLimitBehavior;
+  /** What "default" currently means, so the Console does not hard-code it. */
+  defaultIngestRateLimit: number;
   status: ProjectStatus;
   role: OrganizationRole;
   createdAt: string;
@@ -65,6 +73,14 @@ export function listProjects(organizationId: string) {
   );
 }
 
+export function getProject(projectId: string, signal?: AbortSignal) {
+  return apiFetch<Project>(
+    `/api/v1/projects/${encodeURIComponent(projectId)}`,
+    { signal },
+    protectedRequest,
+  );
+}
+
 export function createProject(
   organizationId: string,
   input: {
@@ -75,6 +91,7 @@ export function createProject(
     retentionDays: number;
     eventSampleRate: number;
     apiSampleRate: number;
+    errorSampleRate: number;
   },
 ) {
   return apiFetch<Project>(
@@ -88,10 +105,27 @@ export function createProject(
   );
 }
 
-export function updateProject(
-  projectId: string,
-  input: { eventSampleRate?: number; apiSampleRate?: number },
-) {
+// Every field the PATCH endpoint accepts. Callers send only what changed, so
+// the server keeps the rest untouched via COALESCE.
+export type ProjectUpdate = {
+  name?: string;
+  slug?: string;
+  allowedOrigins?: string[];
+  environment?: string;
+  retentionDays?: number;
+  eventSampleRate?: number;
+  apiSampleRate?: number;
+  errorSampleRate?: number;
+  /**
+   * Omit to leave the override alone; send null to clear it back to the
+   * instance default. The server distinguishes the two.
+   */
+  ingestRateLimit?: number | null;
+  overLimitBehavior?: OverLimitBehavior;
+  status?: Exclude<ProjectStatus, "deleting">;
+};
+
+export function updateProject(projectId: string, input: ProjectUpdate) {
   return apiFetch<Project>(
     `/api/v1/projects/${encodeURIComponent(projectId)}`,
     {

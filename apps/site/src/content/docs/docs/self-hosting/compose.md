@@ -18,6 +18,7 @@ Object storage is optional: Events, Sessions, Issues, analytics, performance and
 
 - Default host ports: console `4173`, PostgreSQL `5433`, ClickHouse `8123`/`9000`, Kafka `9092`, Redis `6379`.
 - Override ports with an untracked `deploy/compose/.env`.
+- Contributors can drive the same topology with `pnpm openrum up`, which adds readiness waiting, aggregated status and port-conflict attribution. It requires the Go and Node toolchains, so this page stays on Compose, where Docker is the only prerequisite. See [Local development](/docs/contributing/local-development/).
 - Compose is not a production high-availability topology. See [Kubernetes](/docs/self-hosting/kubernetes/) and [External dependencies](/docs/self-hosting/dependencies/).
 
-For reset and Demo seed details, see [Deterministic Demo data](/docs/getting-started/demo-data/) and [Troubleshooting](/docs/operations/troubleshooting/).
+For reset and Demo seed details, see [Deterministic Demo data](/docs/getting-started/demo-data/) and [Troubleshooting](/docs/self-hosting/troubleshooting/).

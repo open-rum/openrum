@@ -16,6 +16,7 @@ import {
   type EventPriority,
   type SamplingOptions,
 } from "./sampling.ts";
+import { compileFilters, type CompiledFilters, type FilterSettings } from "./filters.ts";
 import { runSafely, runSafelyAsync, type Diagnostics } from "./safety.ts";
 import { createUUID, SessionManager, type SessionDependencies } from "./session.ts";
 
@@ -77,6 +78,7 @@ export class OpenRUMClient {
     droppedEvents: 0,
     droppedAttributes: 0,
     droppedBreadcrumbs: 0,
+    filteredEvents: 0,
   };
   readonly #context: ContextManager;
   readonly #sink?: EventSink;
@@ -84,6 +86,7 @@ export class OpenRUMClient {
   readonly #randomUUID: () => string;
   readonly #onClose?: () => void;
   #sampling: SamplingOptions;
+  #filters: CompiledFilters | undefined;
   readonly #teardowns: Array<() => void> = [];
   readonly #breadcrumbs: Breadcrumb[] = [];
   #state: "running" | "closed" = "running";
@@ -178,6 +181,12 @@ export class OpenRUMClient {
         this.#diagnostics.droppedEvents += 1;
         return;
       }
+      // Skipping an upload the consumer would discard anyway. The consumer
+      // still applies the full rule set, so this only saves bandwidth.
+      if (this.#filters?.shouldDrop(event as EventV1, context)) {
+        this.#diagnostics.filteredEvents += 1;
+        return;
+      }
       const complete = {
         ...event,
         ...(event.type === "error" && !("breadcrumbs" in event) && this.#breadcrumbs.length
@@ -193,6 +202,18 @@ export class OpenRUMClient {
 
   diagnostics(): Readonly<Diagnostics> {
     return { ...this.#diagnostics };
+  }
+
+  /**
+   * Replaces the client-side filter set. Called by remote configuration; a
+   * document the SDK cannot parse leaves the previous set untouched rather
+   * than clearing it, so a bad response cannot quietly re-enable uploads the
+   * project asked to stop.
+   */
+  updateFilters(settings: FilterSettings | undefined): void {
+    runSafely(this.#diagnostics, undefined, () => {
+      this.#filters = compileFilters(settings);
+    });
   }
 
   updateSampling(options: Partial<SamplingOptions>): void {

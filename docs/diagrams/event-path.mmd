@@ -1,0 +1,15 @@
+%% Rendered to apps/site/src/assets/diagrams/ by scripts/docs/generate-diagrams.mjs.
+%% Run `pnpm docs:generate` after editing.
+%% Laid out top to bottom on purpose: a left-to-right version is about twice as wide as
+%% the documentation prose column and its labels end up unreadably small.
+flowchart TB
+  SDK["Browser SDK"] -->|Envelope| Ingest["Ingest"]
+  Ingest -.->|quotas| Redis[("Redis")]
+  Ingest -->|"validate, scrub"| Kafka[("Kafka")]
+  Kafka --> Consumer["Consumer"]
+  Consumer --> ClickHouse[("ClickHouse")]
+  Worker["Worker"] -->|mapped frames| ClickHouse
+  Storage[("Object storage")] --> Worker
+  ClickHouse --> API["API"]
+  Postgres[("PostgreSQL")] --> API
+  API --> Console["Console"]

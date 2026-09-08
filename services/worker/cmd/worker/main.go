@@ -53,7 +53,36 @@ func registerWorker(ctx context.Context, _ *httpx.Router, configuration config.C
 	}
 	go runProjectDeletionWorker(ctx, deletionJob, logger)
 	go runRetentionWorker(ctx, retentionJob, logger)
+	// The dispatcher is nil until a delivery implementation exists: breaches are
+	// recorded in alert_evaluations and shown in the console, but nothing is
+	// sent to notification channels yet.
+	alertScheduler := worker.NewAlertScheduler(
+		worker.NewPostgresAlertLeader(database),
+		worker.NewAlertEvaluator(
+			worker.NewPostgresAlertStore(database),
+			worker.NewClickHouseAlertMetrics(clickHouse),
+			worker.NewPostgresAlertStore(database),
+			nil,
+		),
+	)
+	go runAlertScheduler(ctx, alertScheduler, logger)
 	return func() error { return errors.Join(database.Close(), clickHouse.Close()) }, nil
+}
+
+// runAlertScheduler keeps the scheduler alive across failures. Run returns on
+// the first evaluation error, but a single unreadable metric must not silence
+// alerting for the rest of the process lifetime.
+func runAlertScheduler(ctx context.Context, scheduler *worker.AlertScheduler, logger zerolog.Logger) {
+	for {
+		if err := scheduler.Run(ctx); err != nil && !errors.Is(err, context.Canceled) {
+			logger.Error().Err(err).Msg("alert evaluation failed")
+		}
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(time.Minute):
+		}
+	}
 }
 
 func runRetentionWorker(ctx context.Context, job *worker.RetentionCleanupJob, logger zerolog.Logger) {

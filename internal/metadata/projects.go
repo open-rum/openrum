@@ -24,6 +24,7 @@ type CreateProjectInput struct {
 	RetentionDays   int16
 	EventSampleRate float64
 	APISampleRate   float64
+	ErrorSampleRate float64
 }
 
 type UpdateProjectInput struct {
@@ -34,7 +35,13 @@ type UpdateProjectInput struct {
 	RetentionDays   *int16
 	EventSampleRate *float64
 	APISampleRate   *float64
-	Status          *ProjectStatus
+	ErrorSampleRate *float64
+	// IngestRateLimit is a pointer to a pointer so that "not mentioned" and
+	// "set back to the instance default" stay distinguishable: the outer
+	// pointer says whether the field was present, the inner one carries null.
+	IngestRateLimit   **int32
+	OverLimitBehavior *OverLimitBehavior
+	Status            *ProjectStatus
 }
 
 type ProjectRepository struct {
@@ -49,6 +56,7 @@ func (repository *ProjectRepository) ListForOrganization(ctx context.Context, us
 	rows, err := repository.database.QueryContext(ctx,
 		`SELECT projects.id, projects.organization_id, projects.name, projects.slug, to_json(projects.allowed_origins),
 		        projects.environment, projects.retention_days, projects.event_sample_rate, projects.api_sample_rate,
+		        projects.error_sample_rate, projects.ingest_rate_limit, projects.over_limit_behavior,
 		        projects.status, projects.created_at, projects.updated_at
 		 FROM projects
 		 JOIN organization_members ON organization_members.organization_id=projects.organization_id
@@ -75,6 +83,7 @@ func (repository *ProjectRepository) GetForUser(ctx context.Context, userID, pro
 	err := repository.database.QueryRowContext(ctx,
 		`SELECT projects.id, projects.organization_id, projects.name, projects.slug, to_json(projects.allowed_origins),
 		        projects.environment, projects.retention_days, projects.event_sample_rate, projects.api_sample_rate,
+		        projects.error_sample_rate, projects.ingest_rate_limit, projects.over_limit_behavior,
 		        projects.status, projects.created_at, projects.updated_at, organization_members.role
 		 FROM projects
 		 JOIN organization_members ON organization_members.organization_id=projects.organization_id
@@ -82,8 +91,8 @@ func (repository *ProjectRepository) GetForUser(ctx context.Context, userID, pro
 		projectID, userID,
 	).Scan(&access.Project.ID, &access.Project.OrganizationID, &access.Project.Name, &access.Project.Slug,
 		&allowedOriginsJSON, &access.Project.Environment, &access.Project.RetentionDays,
-		&access.Project.EventSampleRate, &access.Project.APISampleRate, &access.Project.Status,
-		&access.Project.CreatedAt, &access.Project.UpdatedAt, &access.Role)
+		&access.Project.EventSampleRate, &access.Project.APISampleRate, &access.Project.ErrorSampleRate,
+		&access.Project.IngestRateLimit, &access.Project.OverLimitBehavior, &access.Project.Status, &access.Project.CreatedAt, &access.Project.UpdatedAt, &access.Role)
 	if errors.Is(err, sql.ErrNoRows) {
 		return ProjectAccess{}, ErrNotFound
 	}
@@ -175,14 +184,17 @@ func (repository *ProjectRepository) create(ctx context.Context, actorID uuid.UU
 	var allowedOriginsJSON []byte
 	err = transaction.QueryRowContext(ctx,
 		`INSERT INTO projects
-		 (id, organization_id, name, slug, allowed_origins, environment, retention_days, event_sample_rate, api_sample_rate)
-		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+		 (id, organization_id, name, slug, allowed_origins, environment, retention_days, event_sample_rate, api_sample_rate,
+		  error_sample_rate)
+		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
 		 RETURNING name, slug, to_json(allowed_origins), environment, retention_days, event_sample_rate, api_sample_rate,
-		           status, created_at, updated_at`,
+		           error_sample_rate, ingest_rate_limit, over_limit_behavior, status, created_at, updated_at`,
 		project.ID, input.OrganizationID, input.Name, input.Slug, allowedOrigins, input.Environment,
-		input.RetentionDays, input.EventSampleRate, input.APISampleRate,
+		input.RetentionDays, input.EventSampleRate, input.APISampleRate, input.ErrorSampleRate,
 	).Scan(&project.Name, &project.Slug, &allowedOriginsJSON, &project.Environment, &project.RetentionDays,
-		&project.EventSampleRate, &project.APISampleRate, &project.Status, &project.CreatedAt, &project.UpdatedAt)
+		&project.EventSampleRate, &project.APISampleRate, &project.ErrorSampleRate,
+		&project.IngestRateLimit, &project.OverLimitBehavior, &project.Status,
+		&project.CreatedAt, &project.UpdatedAt)
 	if err != nil {
 		return Project{}, nil, translateConstraintError(err)
 	}
@@ -242,20 +254,39 @@ func (repository *ProjectRepository) Update(ctx context.Context, actorID, projec
 	if input.Status != nil {
 		status = string(*input.Status)
 	}
+	var overLimitBehavior any
+	if input.OverLimitBehavior != nil {
+		overLimitBehavior = string(*input.OverLimitBehavior)
+	}
+	// COALESCE cannot express this one: clearing the override back to the
+	// instance default means writing NULL, which is exactly the value COALESCE
+	// reads as "leave it alone". The presence of the field is passed separately
+	// so an explicit null is distinguishable from an absent field.
+	var ingestRateLimit any
+	if input.IngestRateLimit != nil {
+		ingestRateLimit = *input.IngestRateLimit
+	}
+	// Every sample rate reaches the browser through /api/v1/sdk/config, so any change to
+	// one of them has to bump the version SDKs poll against.
+	samplingChanged := input.EventSampleRate != nil || input.APISampleRate != nil || input.ErrorSampleRate != nil
 	row := transaction.QueryRowContext(ctx,
 		`UPDATE projects SET
 		   name=COALESCE($1, name), slug=COALESCE($2, slug), allowed_origins=COALESCE($3, allowed_origins),
 		   environment=COALESCE($4, environment), retention_days=COALESCE($5, retention_days),
 		   event_sample_rate=COALESCE($6, event_sample_rate), api_sample_rate=COALESCE($7, api_sample_rate),
-		   status=COALESCE($8, status),
-		   sdk_config_version=CASE WHEN $6::double precision IS NOT NULL OR $7::double precision IS NOT NULL THEN sdk_config_version+1 ELSE sdk_config_version END,
-		   sdk_config_effective_at=CASE WHEN $6::double precision IS NOT NULL OR $7::double precision IS NOT NULL THEN now() ELSE sdk_config_effective_at END,
+		   error_sample_rate=COALESCE($8, error_sample_rate), status=COALESCE($9, status),
+		   ingest_rate_limit=CASE WHEN $10 THEN $11::integer ELSE ingest_rate_limit END,
+		   over_limit_behavior=COALESCE($12, over_limit_behavior),
+		   sdk_config_version=CASE WHEN $13 THEN sdk_config_version+1 ELSE sdk_config_version END,
+		   sdk_config_effective_at=CASE WHEN $13 THEN now() ELSE sdk_config_effective_at END,
 		   updated_at=now()
-		 WHERE id=$9
+		 WHERE id=$14
 		 RETURNING id, organization_id, name, slug, to_json(allowed_origins), environment, retention_days,
-		           event_sample_rate, api_sample_rate, status, created_at, updated_at`,
+		           event_sample_rate, api_sample_rate, error_sample_rate, ingest_rate_limit, over_limit_behavior,
+		           status, created_at, updated_at`,
 		input.Name, input.Slug, allowedOrigins, input.Environment, input.RetentionDays, input.EventSampleRate,
-		input.APISampleRate, status, projectID)
+		input.APISampleRate, input.ErrorSampleRate, status, input.IngestRateLimit != nil, ingestRateLimit,
+		overLimitBehavior, samplingChanged, projectID)
 	project, err := scanProject(row)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Project{}, ErrNotFound
@@ -281,7 +312,7 @@ func scanProject(scanner rowScanner) (Project, error) {
 	var allowedOriginsJSON []byte
 	err := scanner.Scan(&project.ID, &project.OrganizationID, &project.Name, &project.Slug, &allowedOriginsJSON,
 		&project.Environment, &project.RetentionDays, &project.EventSampleRate, &project.APISampleRate,
-		&project.Status, &project.CreatedAt, &project.UpdatedAt)
+		&project.ErrorSampleRate, &project.IngestRateLimit, &project.OverLimitBehavior, &project.Status, &project.CreatedAt, &project.UpdatedAt)
 	if err != nil {
 		return Project{}, err
 	}
@@ -293,4 +324,10 @@ func scanProject(scanner rowScanner) (Project, error) {
 
 func canManageProjectSettings(role OrganizationRole) bool {
 	return role == RoleOwner || role == RoleAdmin
+}
+
+// canManageAlerts mirrors auth.ActionManageAlerts, which unlike key management
+// also admits Members.
+func canManageAlerts(role OrganizationRole) bool {
+	return role == RoleOwner || role == RoleAdmin || role == RoleMember
 }

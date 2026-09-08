@@ -1,0 +1,35 @@
+---
+import { palettes, defaultPalette } from "@openrum/design-tokens/catalog";
+const { manageTheme = false } = Astro.props;
+const paletteIds = palettes.map((palette) => palette.id);
+---
+
+<script is:inline define:vars={{ paletteIds, defaultPalette, manageTheme }}>
+  (() => {
+    const params = new URLSearchParams(location.search);
+    let storedPalette, storedTheme;
+    try {
+      storedPalette = localStorage.getItem("openrum-palette");
+      storedTheme = localStorage.getItem("openrum-theme");
+    } catch {}
+    const requested = params.get("palette") || storedPalette;
+    document.documentElement.dataset.palette = paletteIds.includes(requested)
+      ? requested
+      : defaultPalette;
+    if (params.get("embed") === "1") document.documentElement.dataset.designEmbed = "true";
+    if (manageTheme) {
+      const requestedTheme = params.get("theme") || storedTheme;
+      const mode =
+        requestedTheme === "light"
+          ? "light"
+          : requestedTheme === "system"
+            ? matchMedia("(prefers-color-scheme: dark)").matches
+              ? "dark"
+              : "light"
+            : "dark";
+      document.documentElement.classList.toggle("dark", mode === "dark");
+      document.documentElement.dataset.theme = mode;
+      document.documentElement.style.colorScheme = mode;
+    }
+  })();
+</script>

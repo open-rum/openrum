@@ -46,8 +46,8 @@ Add focused Go/React tests for changed behavior. Product journeys belong in Play
 
 - Never collect raw form values, passwords, authorization headers, cookies or unbounded URLs.
 - Normalize routes and API URLs before persistence.
-- Keep terminology aligned with [Domain model](/docs/concepts/domain-model/) and root `CONTEXT.md`.
+- Keep terminology aligned with [Domain model](/docs/getting-started/domain-model/) and root `CONTEXT.md`.
 - Insights must link to inspectable evidence.
 - Maintain keyboard navigation, visible focus, responsive layouts and both color themes.
 
-Keep pull requests scoped. Include motivation, schema/API changes, screenshots for UI work, privacy effects and exact verification commands. Roadmap context lives in `docs/product-roadmap.md`. Instance-level operator boundaries are documented in [System administration](/docs/contributing/system-administration/).
+Keep pull requests scoped. Include motivation, schema/API changes, screenshots for UI work, privacy effects and exact verification commands. Roadmap context lives in `docs/product-roadmap.md`. Instance-level operator boundaries are documented in `docs/system-administration.md`, which stays in the repository as an internal RFC rather than a published page.

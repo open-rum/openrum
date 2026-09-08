@@ -1,0 +1,26 @@
+---
+import "../styles/global.css";
+import "../styles/design/workbench.css";
+import "../styles/design/landing-01.css";
+import PaletteBootstrap from "../components/PaletteBootstrap.astro";
+import AppearanceControls from "../components/design/AppearanceControls.astro";
+---
+
+<!doctype html>
+<html lang="en">
+  <head
+    ><meta charset="UTF-8" /><meta name="viewport" content="width=device-width" /><title>
+      方案 01 · Product first — OpenRUM
+    </title><meta name="description" content="OpenRUM Landing Page Spec v1 静态参考预览。" /><meta
+      name="robots"
+      content="noindex,follow"
+    /><link rel="icon" href="/favicon.svg" /><PaletteBootstrap manageTheme /></head
+  ><body>
+    <div class="p1-preview-tools">
+      <a href="/design/landing/" data-preview-link="/design/landing/">← 方案对比</a><span
+        >方案 01 / 文档原案</span
+      ><AppearanceControls />
+    </div>
+    <div class="p1-page"><slot /></div>
+  </body>
+</html>

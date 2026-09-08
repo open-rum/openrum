@@ -27,6 +27,7 @@ import type { LucideIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChartContainer, ChartTooltip, type ChartConfig } from "@/components/ui/chart";
+import { useChartMotion } from "@/lib/charts/useChartMotion";
 import {
   formatPerformanceMetric,
   type PerformanceMetricName,
@@ -180,13 +181,24 @@ export function PerformanceOverview({
   );
 }
 
-function VitalTrendChart({
+/**
+ * Shared with the project dashboard. The overview endpoint's series carries the
+ * same per-bucket vital shape as the performance trend, so the prop is typed to
+ * the common subset rather than to either response.
+ */
+export function VitalTrendChart({
   trend,
   metric,
 }: {
-  trend: PerformanceResponse["trend"];
+  trend: readonly {
+    bucket: string;
+    lcp: { p75: number | null; samples: number };
+    inp: { p75: number | null; samples: number };
+    cls: { p75: number | null; samples: number };
+  }[];
   metric: PerformanceMetricName;
 }) {
+  const animate = useChartMotion();
   const key = metric.toLowerCase() as "lcp" | "inp" | "cls";
   const data = trend
     .filter((point) => point[key].p75 !== null)
@@ -227,7 +239,9 @@ function VitalTrendChart({
           axisLine={false}
           tickLine={false}
           tickMargin={6}
-          width={metric === "CLS" ? 34 : 42}
+          // CLS ticks read "0.25", which the narrower width used to clip to
+          // ".25" once the poor threshold pushed the domain past 0.1.
+          width={44}
           tickFormatter={(value: number) => formatAxisMetric(value, metric)}
           domain={["auto", "auto"]}
         />
@@ -264,7 +278,7 @@ function VitalTrendChart({
           strokeWidth={2}
           dot={false}
           activeDot={{ r: 3 }}
-          isAnimationActive={false}
+          isAnimationActive={animate}
         />
       </LineChart>
     </ChartContainer>

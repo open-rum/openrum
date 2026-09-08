@@ -1,0 +1,203 @@
+---
+import BrandMark from "../BrandMark.astro";
+import { Activity, Bug, Users, Layers, ChevronDown } from "lucide-astro";
+const { kind = "overview", compact = false } = Astro.props;
+const metrics =
+  kind === "analytics"
+    ? [
+        ["Active users", "12.4k"],
+        ["Sessions", "28.6k"],
+        ["Page views", "142.8k"],
+      ]
+    : [
+        ["Total errors", "428"],
+        ["Active users", "12.4k"],
+        ["Avg. load time", "1.2s"],
+      ];
+---
+
+<div class:list={["p1-mockup", { "p1-mockup-compact": compact }]}>
+  <div class="p1-mock-top">
+    <span><BrandMark size={16} />OpenRUM</span><span class="p1-example">Demo dataset</span><span
+      >Last 7 days<ChevronDown size={10} /></span
+    >
+  </div>
+  <div class="p1-mock-body">
+    {
+      !compact && (
+        <aside class="p1-mock-sidebar">
+          <>
+            <span class:list={[{ active: kind === "overview" }]}>
+              <Activity size={13} />
+              Overview
+            </span>
+            <span class:list={[{ active: kind === "errors" }]}>
+              <Bug size={13} />
+              Errors
+            </span>
+            <span class:list={[{ active: kind === "analytics" }]}>
+              <Users size={13} />
+              Analytics
+            </span>
+            <span>
+              <Layers size={13} />
+              Settings
+            </span>
+          </>
+        </aside>
+      )
+    }
+    <div class="p1-mock-main">
+      {
+        kind === "errors" ? (
+          <>
+            <>
+              <div class="p1-error-title">
+                <>
+                  <span>TypeError</span>
+                  <h3>Cannot read properties of undefined</h3>
+                  <small>ProductList · /products</small>
+                </>
+              </div>
+              <div class="p1-mock-tabs">
+                <>
+                  <span>Details</span>
+                  <span>Breadcrumbs</span>
+                  <span>Tags</span>
+                  <span>User</span>
+                </>
+              </div>
+              <dl class="p1-error-meta">
+                <>
+                  <div>
+                    <>
+                      <dt>Occurred</dt>
+                      <dd>2026-09-08 14:32:18</dd>
+                    </>
+                  </div>
+                  <div>
+                    <>
+                      <dt>Browser</dt>
+                      <dd>Chrome · macOS</dd>
+                    </>
+                  </div>
+                  <div>
+                    <>
+                      <dt>Release</dt>
+                      <dd>web@1.0.0</dd>
+                    </>
+                  </div>
+                </>
+              </dl>
+              <div class="p1-stack">
+                <>
+                  <small>STACK TRACE</small>
+                  <code>
+                    TypeError: Cannot read properties of undefined
+                    <>
+                      <br />
+                      <span>at ProductList (src/pages/products.tsx:45:22)</span>
+                      <br />
+                    </>
+                    at renderWithHooks (react-dom:16067:18)
+                    <br />
+                    at updateFunctionComponent (react-dom:19617:20)
+                  </code>
+                </>
+              </div>
+            </>
+          </>
+        ) : (
+          <>
+            <>
+              <div class="p1-mock-metrics">
+                {metrics.map(([label, value], index) => (
+                  <div>
+                    <span>{label}</span>
+                    <strong>{value}</strong>
+                    <small class:list={[{ error: index === 0 && kind === "overview" }]}>
+                      {index === 0 && kind === "overview" ? "↑ 12%" : "↑ 18.2%"}
+                    </small>
+                  </div>
+                ))}
+              </div>
+              <div class="p1-mock-chart">
+                <>
+                  <span>{kind === "analytics" ? "User activity" : "Error trend"}</span>
+                  <svg viewBox="0 0 480 126" role="img" aria-label="示例趋势：总体上升，期间有波动">
+                    <>
+                      <path class="p1-gridline" d="M0 22H480M0 60H480M0 98H480" />
+                      <path
+                        class="p1-area"
+                        d="M0 100L25 89L48 99L73 73L99 84L120 75L146 53L173 72L197 47L222 60L248 35L270 43L299 25L323 39L350 20L379 33L405 14L432 22L456 8L480 17V126H0Z"
+                      />
+                      <path
+                        class="p1-line"
+                        d="M0 100L25 89L48 99L73 73L99 84L120 75L146 53L173 72L197 47L222 60L248 35L270 43L299 25L323 39L350 20L379 33L405 14L432 22L456 8L480 17"
+                      />
+                    </>
+                  </svg>
+                  <div class="p1-chart-axis">
+                    <>
+                      <span>Sep 02</span>
+                      <span>Sep 04</span>
+                      <span>Sep 06</span>
+                      <span>Sep 08</span>
+                    </>
+                  </div>
+                </>
+              </div>
+              <div class="p1-mock-bottom">
+                <>
+                  <div>
+                    <>
+                      <span>{kind === "analytics" ? "Acquisition" : "Recent errors"}</span>
+                      <ul>
+                        <>
+                          <li>
+                            <>
+                              <b>{kind === "analytics" ? "Direct" : "TypeError"}</b>
+                              <em>264</em>
+                              <small>2m ago</small>
+                            </>
+                          </li>
+                          <li>
+                            <>
+                              <b>{kind === "analytics" ? "Organic search" : "NetworkError"}</b>
+                              <em>98</em>
+                              <small>5m ago</small>
+                            </>
+                          </li>
+                          <li>
+                            <>
+                              <b>{kind === "analytics" ? "Referral" : "ReferenceError"}</b>
+                              <em>66</em>
+                              <small>12m ago</small>
+                            </>
+                          </li>
+                        </>
+                      </ul>
+                    </>
+                  </div>
+                  <div>
+                    <>
+                      <span>Top pages</span>
+                      <ul>
+                        {["/products", "/checkout", "/dashboard"].map((page, index) => (
+                          <li>
+                            <b>{page}</b>
+                            <i style={`width:${48 - index * 12}%`} />
+                          </li>
+                        ))}
+                      </ul>
+                    </>
+                  </div>
+                </>
+              </div>
+            </>
+          </>
+        )
+      }
+    </div>
+  </div>
+</div>
