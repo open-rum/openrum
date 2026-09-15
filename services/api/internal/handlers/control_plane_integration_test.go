@@ -158,30 +158,30 @@ func TestControlPlaneCRUDAndRBAC(t *testing.T) {
 	if got := strings.Join(projectA.AllowedOrigins, ","); got != "https://example.com,http://localhost:3000" {
 		t.Fatalf("normalized origins=%q", got)
 	}
-	if !strings.HasPrefix(projectA.WriteKey, "orr_pk_") {
-		t.Fatalf("initial write key=%q", projectA.WriteKey)
+	if !strings.HasPrefix(projectA.DSN, "https://orr_pk_") {
+		t.Fatalf("initial client DSN=%q", projectA.DSN)
 	}
-	initialWriteKey := projectA.WriteKey
+	initialWriteKey := dsnWriteKey(t, projectA.DSN)
 	validated, err := keys.Validate(ctx, initialWriteKey)
 	if err != nil || validated.Project.ID.String() != projectA.ID {
 		t.Fatalf("validate initial key project=%s err=%v", validated.Project.ID, err)
 	}
 	var initialKeyID uuid.UUID
-	var storedPrefix string
+	var storedPrefix, storedPublicKey string
 	var hashLength int
 	if err := database.QueryRowContext(ctx,
-		"SELECT id, key_prefix, octet_length(key_hash) FROM project_keys WHERE project_id=$1", uuid.MustParse(projectA.ID),
-	).Scan(&initialKeyID, &storedPrefix, &hashLength); err != nil {
+		"SELECT id, key_prefix, public_key, octet_length(key_hash) FROM project_keys WHERE project_id=$1", uuid.MustParse(projectA.ID),
+	).Scan(&initialKeyID, &storedPrefix, &storedPublicKey, &hashLength); err != nil {
 		t.Fatal(err)
 	}
-	if storedPrefix != initialWriteKey[:16] || hashLength != sha256.Size {
-		t.Fatalf("stored key prefix=%q hashLength=%d", storedPrefix, hashLength)
+	if storedPrefix != initialWriteKey[:16] || storedPublicKey != initialWriteKey || hashLength != sha256.Size {
+		t.Fatalf("stored key prefix=%q public=%q hashLength=%d", storedPrefix, storedPublicKey, hashLength)
 	}
 	keyPath := "/api/v1/projects/" + projectA.ID + "/keys"
 	response = performControlPlaneRequest(t, router, "owner-a", http.MethodGet, keyPath, "", false)
 	assertStatus(t, response, http.StatusOK)
-	if strings.Contains(response.Body.String(), initialWriteKey) || strings.Contains(response.Body.String(), "writeKey") {
-		t.Fatalf("key list exposed raw credential: %s", response.Body.String())
+	if !strings.Contains(response.Body.String(), projectA.DSN) {
+		t.Fatalf("key list did not return public DSN: %s", response.Body.String())
 	}
 	response = performControlPlaneRequest(t, router, "viewer", http.MethodGet, keyPath, "", false)
 	assertStatus(t, response, http.StatusForbidden)
@@ -192,27 +192,40 @@ func TestControlPlaneCRUDAndRBAC(t *testing.T) {
 	assertStatus(t, response, http.StatusCreated)
 	var rotatedKey projectKeyResponse
 	decodeResponse(t, response, &rotatedKey)
-	if rotatedKey.WriteKey == "" || rotatedKey.WriteKey == initialWriteKey {
-		t.Fatalf("rotated write key=%q", rotatedKey.WriteKey)
+	if !rotatedKey.IsDefault {
+		t.Fatal("rotating the default DSN did not preserve its role")
+	}
+	rotatedWriteKey := dsnWriteKey(t, rotatedKey.DSN)
+	if rotatedWriteKey == "" || rotatedWriteKey == initialWriteKey {
+		t.Fatalf("rotated write key=%q", rotatedWriteKey)
 	}
 	if _, err := keys.Validate(ctx, initialWriteKey); !errors.Is(err, metadata.ErrInvalidProjectKey) {
 		t.Fatalf("old rotated key validation error=%v", err)
 	}
-	if _, err := keys.Validate(ctx, rotatedKey.WriteKey); err != nil {
+	if _, err := keys.Validate(ctx, rotatedWriteKey); err != nil {
 		t.Fatalf("new rotated key validation error=%v", err)
 	}
 	response = performControlPlaneRequest(t, router, "owner-a", http.MethodDelete, keyPath+"/"+rotatedKey.ID, "", true)
-	assertStatus(t, response, http.StatusNoContent)
-	if _, err := keys.Validate(ctx, rotatedKey.WriteKey); !errors.Is(err, metadata.ErrInvalidProjectKey) {
-		t.Fatalf("revoked key validation error=%v", err)
+	assertStatus(t, response, http.StatusConflict)
+	if _, err := keys.Validate(ctx, rotatedWriteKey); err != nil {
+		t.Fatalf("default key was revoked: %v", err)
 	}
 	response = performControlPlaneRequest(t, router, "owner-a", http.MethodPost, keyPath,
 		`{"name":"CI browser key"}`, true)
 	assertStatus(t, response, http.StatusCreated)
 	var createdKey projectKeyResponse
 	decodeResponse(t, response, &createdKey)
-	if _, err := keys.Validate(ctx, createdKey.WriteKey); err != nil {
+	if createdKey.IsDefault {
+		t.Fatal("additional DSN unexpectedly became the default")
+	}
+	createdWriteKey := dsnWriteKey(t, createdKey.DSN)
+	if _, err := keys.Validate(ctx, createdWriteKey); err != nil {
 		t.Fatalf("created key validation error=%v", err)
+	}
+	response = performControlPlaneRequest(t, router, "owner-a", http.MethodDelete, keyPath+"/"+createdKey.ID, "", true)
+	assertStatus(t, response, http.StatusNoContent)
+	if _, err := keys.Validate(ctx, createdWriteKey); !errors.Is(err, metadata.ErrInvalidProjectKey) {
+		t.Fatalf("additional key revoke error=%v", err)
 	}
 	connectionPath := "/api/v1/projects/" + projectA.ID + "/connection-status"
 	response = performControlPlaneRequest(t, router, "viewer", http.MethodGet, connectionPath, "", false)
@@ -314,7 +327,7 @@ func TestControlPlaneCRUDAndRBAC(t *testing.T) {
 	assertStatus(t, response, http.StatusAccepted)
 	response = performControlPlaneRequest(t, router, "owner-a", http.MethodGet, "/api/v1/projects/"+projectA.ID, "", false)
 	assertStatus(t, response, http.StatusNotFound)
-	if _, err := keys.Validate(ctx, createdKey.WriteKey); !errors.Is(err, metadata.ErrInvalidProjectKey) {
+	if _, err := keys.Validate(ctx, rotatedWriteKey); !errors.Is(err, metadata.ErrInvalidProjectKey) {
 		t.Fatalf("deletion did not revoke project key: %v", err)
 	}
 
@@ -347,9 +360,10 @@ func controlPlaneTestRouter(organizations *metadata.OrganizationRepository, proj
 	router := httpx.NewRouter(logger)
 	organizationHandler := NewOrganizationHandler(organizations, logger)
 	memberHandler := NewMemberHandler(organizations, logger)
-	projectHandler := NewProjectHandler(organizations, projects, logger)
+	const ingestEndpoint = "https://rum.example.test/ingest/v1/envelope"
+	projectHandler := NewProjectHandler(organizations, projects, ingestEndpoint, logger)
 	projectFilterHandler := NewProjectFilterHandler(projects, inboundFilters, logger)
-	projectKeyHandler := NewProjectKeyHandler(keys, logger)
+	projectKeyHandler := NewProjectKeyHandler(keys, ingestEndpoint, logger)
 	connectionStatusHandler := NewConnectionStatusHandler(keys, fakeConnectionReader{}, logger)
 	requireSession := httpx.RequireSession(fixtureAuthenticator{principals: principals})
 	baseURL, _ := url.Parse("http://openrum.test")
@@ -392,6 +406,18 @@ func performControlPlaneRequest(t *testing.T, handler http.Handler, token, metho
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, request)
 	return response
+}
+
+func dsnWriteKey(t *testing.T, value string) string {
+	t.Helper()
+	parsed, err := url.Parse(value)
+	if err != nil || parsed.User == nil || parsed.User.Username() == "" {
+		t.Fatalf("invalid client DSN %q: %v", value, err)
+	}
+	if _, hasPassword := parsed.User.Password(); hasPassword {
+		t.Fatalf("client DSN unexpectedly contains a password: %q", value)
+	}
+	return parsed.User.Username()
 }
 
 func assertStatus(t *testing.T, response *httptest.ResponseRecorder, expected int) {

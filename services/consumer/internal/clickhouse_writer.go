@@ -22,7 +22,7 @@ project_id,event_id,event_type,timestamp,received_at,raw_expires_at,aggregate_ex
 page_url,page_url_normalized,route,referrer,title,navigation_type,sdk_name,sdk_version,schema_version,sample_rate,
 browser,browser_version,os,os_version,device_type,country,trace_id,span_id,error_type,error_message,error_stack,
 error_mechanism,fingerprint,fingerprint_version,handled,api_method,api_url_normalized,api_status,api_failure,duration_ms,transfer_size,
-metric_name,metric_value,metric_delta,metric_rating,custom_name,attributes,measurements,breadcrumbs,ingest_flags
+metric_name,metric_value,metric_delta,metric_rating,custom_name,attributes,measurements,breadcrumbs,ingest_flags,log_level,log_message,log_logger
 )`
 
 var ErrClickHouseWriterClosed = errors.New("ClickHouse writer is closed")
@@ -267,6 +267,7 @@ func (writer *BufferedClickHouseWriter) insert(ctx context.Context, events []eve
 			current.APIMethod, current.APIURLNormalized, current.APIStatus, current.APIFailure, current.DurationMS, current.TransferSize,
 			current.MetricName, current.MetricValue, current.MetricDelta, current.MetricRating, current.CustomName,
 			current.Attributes, current.Measurements, current.Breadcrumbs, current.IngestFlags,
+			current.LogLevel, current.LogMessage, current.LogLogger,
 		); err != nil {
 			return err
 		}
@@ -287,7 +288,7 @@ func estimateEventsBytes(events []event.CanonicalEvent) int {
 	total := 0
 	for _, current := range events {
 		total += 512 + len(current.PageURL) + len(current.PageURLNormalized) + len(current.Title) +
-			len(current.ErrorMessage) + len(current.ErrorStack) + len(current.APIURLNormalized)
+			len(current.ErrorMessage) + len(current.ErrorStack) + len(current.APIURLNormalized) + len(current.LogMessage) + len(current.LogLogger)
 		for key, value := range current.Attributes {
 			total += len(key) + len(value)
 		}

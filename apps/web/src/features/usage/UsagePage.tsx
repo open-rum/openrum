@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { DownloadIcon, GaugeIcon } from "lucide-react";
+import { ConsolePage, ConsolePageHeader } from "@/components/layout/ConsolePage";
 import { AsyncError } from "@/components/ui/AsyncState";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,6 +10,7 @@ import { listOrganizations, listProjects, type Project } from "@/lib/api/project
 import { projectIdFromPathname } from "@/lib/projects/currentProject";
 import { getUsage, usageRange, usageURL } from "@/lib/api/usage";
 import { SamplingForm } from "./SamplingForm";
+import { ProjectSettingsNav } from "@/features/settings/ProjectSettingsNav";
 
 export function UsagePage() {
   const projectId = projectIdFromPathname(window.location.pathname);
@@ -24,10 +26,9 @@ export function UsagePage() {
     projects.data?.projects.find((item) => item.id === projectId) ?? projects.data?.projects[0];
   if (!project)
     return (
-      <div className="mx-auto max-w-6xl p-8">
-        <h1 className="text-2xl font-semibold">用量与采样</h1>
-        <p className="mt-3 text-muted-foreground">请先创建并接入项目。</p>
-      </div>
+      <ConsolePage width="wide">
+        <ConsolePageHeader title="用量与采样" description="请先创建并接入项目。" />
+      </ConsolePage>
     );
   return <ProjectUsage project={project} />;
 }
@@ -39,22 +40,23 @@ function ProjectUsage({ project }: { project: Project }) {
     queryFn: ({ signal }) => getUsage(project.id, range, signal),
   });
   return (
-    <div className="mx-auto w-full max-w-6xl px-6 py-8">
-      <header className="flex flex-col gap-4 border-b border-border pb-6 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className="text-xs text-muted-foreground">项目 / {project.name} / Usage</p>
-          <h1 className="mt-2 text-2xl font-semibold tracking-tight">用量与采样</h1>
-          <p className="mt-2 text-sm leading-6 text-muted-foreground">
-            解释最近 7 天每一类事件的接收、采样丢弃、拒绝与处理失败。
-          </p>
-        </div>
-        <Button asChild variant="outline">
-          <a href={usageURL(project.id, range, true)} download>
-            <DownloadIcon />
-            导出 CSV
-          </a>
-        </Button>
-      </header>
+    <ConsolePage
+      width="wide"
+      rail={<ProjectSettingsNav projectId={project.id} />}
+      railLabel="项目设置导航"
+    >
+      <ConsolePageHeader
+        title="用量与采样"
+        description="解释最近 7 天每一类事件的接收、采样丢弃、拒绝与处理失败。"
+        actions={
+          <Button asChild variant="outline">
+            <a href={usageURL(project.id, range, true)} download>
+              <DownloadIcon data-icon="inline-start" />
+              导出 CSV
+            </a>
+          </Button>
+        }
+      />
       {usage.isLoading ? <UsageSkeleton compact /> : null}
       {usage.error ? (
         <div className="mt-6">
@@ -133,16 +135,16 @@ function ProjectUsage({ project }: { project: Project }) {
           </section>
         </>
       ) : null}
-    </div>
+    </ConsolePage>
   );
 }
 
 function UsageSkeleton({ compact = false }: { compact?: boolean }) {
   return (
-    <div className="mx-auto w-full max-w-6xl space-y-4 p-8" aria-label="正在加载用量">
+    <ConsolePage width="wide" className="flex flex-col gap-4" aria-label="正在加载用量">
       <Skeleton className={compact ? "h-28 w-full" : "h-12 w-64"} />
       <Skeleton className="h-56 w-full" />
-    </div>
+    </ConsolePage>
   );
 }
 

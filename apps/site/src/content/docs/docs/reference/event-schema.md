@@ -17,5 +17,6 @@ An Envelope requires `schema_version`, `sent_at`, `sdk`, `context`, `events`. It
 | `webVitalEvent` | — |
 | `apiEvent` | — |
 | `customEvent` | — |
+| `log` | `event_id`, `type`, `timestamp`, `level`, `message` |
 
 The canonical JSON Schema defines all bounds and formats. Generated Go validation is verified by `pnpm run protocol:check`.

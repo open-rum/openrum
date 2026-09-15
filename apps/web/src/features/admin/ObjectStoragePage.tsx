@@ -41,7 +41,7 @@ import {
   type ObjectStorageProbe,
   type ObjectStorageStatus,
 } from "@/lib/api/admin";
-import { AdminNav } from "./AdminNav";
+import { AdminPageLayout } from "./AdminPageLayout";
 import { ReauthenticationDialog } from "./ReauthenticationDialog";
 
 const sourceLabels: Record<ObjectStorageStatus["credentialSource"], string> = {
@@ -77,18 +77,10 @@ export function ObjectStoragePage() {
   const probe = useMutation({ mutationFn: testObjectStorage });
 
   return (
-    <div className="mx-auto w-full max-w-[1440px] p-5 lg:p-7">
-      <header className="mb-6">
-        <div className="mb-2 flex items-center gap-2 text-xs text-muted-foreground">
-          <CloudIcon className="size-4" /> 系统管理 <span>/</span> 对象存储
-        </div>
-        <h1 className="text-2xl font-semibold tracking-tight">对象存储</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          选择 Alibaba OSS 或 S3-compatible 存储；不配置也不影响核心监控能力。
-        </p>
-      </header>
-      <AdminNav />
-
+    <AdminPageLayout
+      title="对象存储"
+      description="选择 Alibaba OSS 或 S3-compatible 存储；不配置也不影响核心监控能力。"
+    >
       {statusQuery.isLoading ? <AsyncLoading /> : null}
       {statusQuery.error ? (
         <AsyncError
@@ -110,7 +102,7 @@ export function ObjectStoragePage() {
           }
         />
       ) : null}
-    </div>
+    </AdminPageLayout>
   );
 }
 

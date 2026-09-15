@@ -35,7 +35,7 @@ The deterministic ecommerce dataset contains roughly 30,000 sessions, 12,000 ano
 
 ## Send events from the example app
 
-Install dependencies with Node 24 and pnpm 11, then inspect `examples/react-vite/src` for SDK setup. In OpenRUM, open **设置 → 项目密钥**, create or rotate a development key, and place it in the example's local environment. Never commit a write key. The example emits page views, a custom behavior event, API timing and a test error.
+Install dependencies with Node 24 and pnpm 11, then inspect `examples/react-vite/src` for SDK setup. In OpenRUM, open **设置 → 客户端 DSN**, copy the default DSN generated with the Project, and place it in the example's local environment. Do not commit it. The example emits page views, a custom behavior event, API timing and a test error.
 
 ## Troubleshooting
 

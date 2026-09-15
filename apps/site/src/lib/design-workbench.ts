@@ -1,5 +1,3 @@
-import { isPalette, defaultPalette } from "@openrum/design-tokens/catalog";
-
 const root = document.documentElement;
 const colorCanvas = document.createElement("canvas");
 colorCanvas.width = colorCanvas.height = 1;
@@ -23,30 +21,19 @@ const hex = (value: string) => {
   );
 };
 const state = () => ({
-  palette: isPalette(root.dataset.palette) ? root.dataset.palette : defaultPalette,
   theme: root.classList.contains("dark") ? "dark" : "light",
 });
 const previewUrl = (path: string, embedded = false) => {
   const url = new URL(path, location.origin);
   const current = state();
-  url.searchParams.set("palette", current.palette);
   url.searchParams.set("theme", current.theme);
   if (embedded) url.searchParams.set("embed", "1");
   return url.pathname + url.search;
 };
 const sync = () => {
   const current = state();
-  document.querySelectorAll<HTMLSelectElement>("[data-design-palette]").forEach((select) => {
-    select.value = current.palette;
-  });
   document.querySelectorAll<HTMLSelectElement>("[data-design-mode]").forEach((select) => {
     select.value = current.theme;
-  });
-  document.querySelectorAll<HTMLInputElement>("[data-palette-choice]").forEach((input) => {
-    input.checked = input.value === current.palette;
-  });
-  document.querySelectorAll("[data-current-palette]").forEach((label) => {
-    label.textContent = current.palette;
   });
   const styles = getComputedStyle(root);
   document.querySelectorAll<HTMLElement>("[data-token-value]").forEach((label) => {
@@ -65,27 +52,15 @@ const sync = () => {
 const save = () => {
   const current = state();
   try {
-    localStorage.setItem("openrum-palette", current.palette);
+    localStorage.removeItem("openrum-palette");
     localStorage.setItem("openrum-theme", current.theme);
   } catch {}
   const url = new URL(location.href);
-  url.searchParams.set("palette", current.palette);
+  url.searchParams.delete("palette");
   url.searchParams.set("theme", current.theme);
   history.replaceState(null, "", url);
   sync();
 };
-document.querySelectorAll<HTMLSelectElement>("[data-design-palette]").forEach((select) => {
-  select.addEventListener("change", () => {
-    if (isPalette(select.value)) root.dataset.palette = select.value;
-    save();
-  });
-});
-document.querySelectorAll<HTMLInputElement>("[data-palette-choice]").forEach((input) => {
-  input.addEventListener("change", () => {
-    if (isPalette(input.value)) root.dataset.palette = input.value;
-    save();
-  });
-});
 document.querySelectorAll<HTMLSelectElement>("[data-design-mode]").forEach((select) => {
   select.addEventListener("change", () => {
     const dark = select.value === "dark";
@@ -115,16 +90,17 @@ document.querySelectorAll<HTMLButtonElement>("[data-download-logo]").forEach((bu
     svg.setAttribute("width", "512");
     svg.setAttribute("height", "512");
     svg.setAttribute("fill", getComputedStyle(original).color);
+    svg.removeAttribute("style");
     svg.removeAttribute("aria-hidden");
     const url = URL.createObjectURL(
       new Blob([new XMLSerializer().serializeToString(svg)], { type: "image/svg+xml" }),
     );
     const link = document.createElement("a");
     link.href = url;
-    link.download = `openrum-mark-${state().palette}-${state().theme}.svg`;
+    link.download = `openrum-mark-citrus-${state().theme}.svg`;
     link.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
-    announce("已下载当前配色的 SVG 标记");
+    announce("已下载柠檬绿 SVG 标记");
   });
 });
 const resizeFrame = (host: HTMLElement) => {

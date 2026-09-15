@@ -68,7 +68,7 @@ Ingest 完成公钥、Origin、限流、大小和 schema 校验后写 Kafka；�
 | Metadata database        | PostgreSQL                        | 用户、组织、项目、权限、配置、告警和 Source Map 元数据               |
 | Queue                    | Kafka                             | 削峰、重放、解耦接入与存储                                           |
 | Cache                    | Redis                             | 限流、缓存、短期去重和接入状态                                       |
-| Object storage           | Optional OSS or S3-compatible     | Source Map、未来 Replay、附件与冷数据；不阻塞核心监控                 |
+| Object storage           | Optional OSS or S3-compatible     | Source Map、未来 Replay、附件与冷数据；不阻塞核心监控                |
 | Auth                     | Built-in accounts + optional OIDC | 自部署开箱即用，同时预留企业 SSO                                     |
 | Analytics/error tracking | Isolated OpenRUM + Prometheus     | dogfooding 与基础设施旁路监控并存                                    |
 | Notifications            | SMTP + Webhook                    | 自托管、供应商中立                                                   |
@@ -86,19 +86,19 @@ Ingest 完成公钥、Origin、限流、大小和 schema 校验后写 Kafka；�
 
 关键环境变量：
 
-| Variable                                            | Purpose                          |
-| --------------------------------------------------- | -------------------------------- |
-| APP_ENV、PUBLIC_BASE_URL                            | 环境与外部地址                   |
-| POSTGRES_DSN、CLICKHOUSE_DSN                        | 数据库连接                       |
-| KAFKA_BROKERS、KAFKA_EVENT_TOPIC                    | Kafka；topic 默认 rum-events-v1  |
-| REDIS_ADDR                                          | Redis                            |
-| SESSION_SECRET、PASSWORD_PEPPER                     | 会话和密码保护，通过 Secret 注入 |
-| OBJECT_STORAGE_PROVIDER                             | 可选；`oss` 或 `s3`              |
+| Variable                                                              | Purpose                          |
+| --------------------------------------------------------------------- | -------------------------------- |
+| APP_ENV、PUBLIC_BASE_URL                                              | 环境与外部地址                   |
+| POSTGRES_DSN、CLICKHOUSE_DSN                                          | 数据库连接                       |
+| KAFKA_BROKERS、KAFKA_EVENT_TOPIC                                      | Kafka；topic 默认 rum-events-v1  |
+| REDIS_ADDR                                                            | Redis                            |
+| SESSION_SECRET、PASSWORD_PEPPER                                       | 会话和密码保护，通过 Secret 注入 |
+| OBJECT_STORAGE_PROVIDER                                               | 可选；`oss` 或 `s3`              |
 | OBJECT_STORAGE_ENDPOINT、OBJECT_STORAGE_BUCKET、OBJECT_STORAGE_REGION | 所选对象存储连接信息             |
-| OSS_ACCESS_KEY_ID、OSS_ACCESS_KEY_SECRET            | OSS 且无 RAM Role 时使用         |
-| AWS_ACCESS_KEY_ID、AWS_SECRET_ACCESS_KEY            | S3 且无 IAM/Workload Role 时使用 |
-| SMTP_HOST、SMTP_PORT、SMTP_USERNAME、SMTP_PASSWORD  | SMTP                             |
-| OIDC_ISSUER_URL、OIDC_CLIENT_ID、OIDC_CLIENT_SECRET | 可选 OIDC                        |
+| OSS_ACCESS_KEY_ID、OSS_ACCESS_KEY_SECRET                              | OSS 且无 RAM Role 时使用         |
+| AWS_ACCESS_KEY_ID、AWS_SECRET_ACCESS_KEY                              | S3 且无 IAM/Workload Role 时使用 |
+| SMTP_HOST、SMTP_PORT、SMTP_USERNAME、SMTP_PASSWORD                    | SMTP                             |
+| OIDC_ISSUER_URL、OIDC_CLIENT_ID、OIDC_CLIENT_SECRET                   | 可选 OIDC                        |
 
 约束：浏览器 CORS 只允许项目白名单 Origin；不采 Authorization、Cookie、Set-Cookie、body；ClickHouse 必须批量写入；Kafka key 使用 project_id + session hash；URL 聚合前删除 query/hash 并归一化动态段；Redis 丢失只能降级性能，不能损坏正确性。
 
@@ -152,7 +152,7 @@ CI：lint → unit test → protocol compatibility → build → integration tes
 - 256-bit 随机会话，数据库只存哈希；12 小时绝对过期、30 分钟空闲过期。
 - 状态变更校验 Origin 与 CSRF token。
 - owner/admin/member/viewer RBAC 在 API 服务端强制。
-- 项目 write key 只允许 ingest，可轮换/吊销，只存哈希及前缀。
+- Browser SDK 对外只接收一个 DSN；DSN 内的项目 write key 只允许 ingest，可轮换/吊销。作为浏览器公开凭证，其明文与校验哈希同时保存，授权用户可随时复制。
 - 批次上限：100 events、压缩前 1 MB、压缩后 256 KB，并限制解压比。
 - schema 限制嵌套深度、字符串/数组/attributes 数量；未知字段丢弃。
 - 服务端二次脱敏；Source Map bucket 私有，预签名 URL ≤ 15 分钟。
@@ -178,27 +178,27 @@ CI：lint → unit test → protocol compatibility → build → integration tes
 
 PostgreSQL 控制面实体：
 
-| Table                 | Required fields and rules                                                                                                                                             |
-| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| users                 | id UUID PK；email CITEXT unique；display_name varchar(120)；password_hash nullable for OIDC；status active/disabled；auth_source local/oidc；oidc_subject；timestamps |
-| organizations         | id；name；slug unique；created_by；timestamps                                                                                                                         |
-| organization_members  | organization_id + user_id composite PK；role owner/admin/member/viewer                                                                                                |
+| Table                 | Required fields and rules                                                                                                                                                                          |
+| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| users                 | id UUID PK；email CITEXT unique；display_name varchar(120)；password_hash nullable for OIDC；status active/disabled；auth_source local/oidc；oidc_subject；timestamps                              |
+| organizations         | id；name；slug unique；created_by；timestamps                                                                                                                                                      |
+| organization_members  | organization_id + user_id composite PK；role owner/admin/member/viewer                                                                                                                             |
 | projects              | id；organization_id；name；slug；allowed_origins text[]；environment；retention_days 1–90 default 14；event_sample_rate default 1；api_sample_rate default .2；error_sample_rate default 1；status |
-| project_keys          | id；project_id；key_prefix；key_hash unique；name；last_used_at；revoked_at                                                                                           |
-| sessions              | id；user_id；token_hash unique；ip_hash；user_agent；expires_at；idle_expires_at；revoked_at                                                                          |
-| releases              | id；project_id；version；dist；commit_sha；deployed_at；unique(project_id,version,dist)                                                                               |
-| sourcemap_artifacts   | id；release_id；artifact_name；oss_key unique；sha256；size_bytes ≤ 1 GiB；status pending/ready/failed；error_message                                                 |
-| issue_states          | project_id + fingerprint PK；status unresolved/resolved/ignored；assignee；resolved_in_release                                                                        |
-| alert_rules           | id；project_id；metric；operator；threshold；window_minutes；cooldown；filters JSONB；enabled                                                                         |
-| notification_channels | id；organization_id；type smtp/webhook；name；config_encrypted；enabled                                                                                               |
-| alert_rule_channels   | alert_rule_id + channel_id composite PK                                                                                                                               |
-| audit_logs            | bigint id；organization_id；actor；action；resource_type/id；bounded metadata JSONB；created_at                                                                       |
-| instance_members      | user_id PK；role instance_owner/instance_admin；created_by；timestamps；至少保留一名 instance_owner                                                                   |
-| instance_settings     | namespace + key PK；非敏感 value_json；version；source；updated_by；timestamps                                                                                        |
-| instance_secrets      | key PK；ciphertext/nonce/key_version；fingerprint；rotated_at；updated_by；仅在显式启用托管 Secret 时使用                                                             |
-| retention_policies    | scope_type/scope_id；raw_days；aggregate_days；sourcemap_days；继承关系；version；timestamps                                                                          |
-| maintenance_jobs      | id；type；status；progress；bounded payload/error；created_by；started_at；finished_at                                                                                |
-| instance_audit_logs   | bigint id；actor；action；resource_type/id；不含 Secret 的变更摘要；request_id；created_at                                                                            |
+| project_keys          | id；project_id；key_prefix；key_hash unique；name；last_used_at；revoked_at                                                                                                                        |
+| sessions              | id；user_id；token_hash unique；ip_hash；user_agent；expires_at；idle_expires_at；revoked_at                                                                                                       |
+| releases              | id；project_id；version；dist；commit_sha；deployed_at；unique(project_id,version,dist)                                                                                                            |
+| sourcemap_artifacts   | id；release_id；artifact_name；oss_key unique；sha256；size_bytes ≤ 1 GiB；status pending/ready/failed；error_message                                                                              |
+| issue_states          | project_id + fingerprint PK；status unresolved/resolved/ignored；assignee；resolved_in_release                                                                                                     |
+| alert_rules           | id；project_id；metric；operator；threshold；window_minutes；cooldown；filters JSONB；enabled                                                                                                      |
+| notification_channels | id；organization_id；type smtp/webhook；name；config_encrypted；enabled                                                                                                                            |
+| alert_rule_channels   | alert_rule_id + channel_id composite PK                                                                                                                                                            |
+| audit_logs            | bigint id；organization_id；actor；action；resource_type/id；bounded metadata JSONB；created_at                                                                                                    |
+| instance_members      | user_id PK；role instance_owner/instance_admin；created_by；timestamps；至少保留一名 instance_owner                                                                                                |
+| instance_settings     | namespace + key PK；非敏感 value_json；version；source；updated_by；timestamps                                                                                                                     |
+| instance_secrets      | key PK；ciphertext/nonce/key_version；fingerprint；rotated_at；updated_by；仅在显式启用托管 Secret 时使用                                                                                          |
+| retention_policies    | scope_type/scope_id；raw_days；aggregate_days；sourcemap_days；继承关系；version；timestamps                                                                                                       |
+| maintenance_jobs      | id；type；status；progress；bounded payload/error；created_by；started_at；finished_at                                                                                                             |
+| instance_audit_logs   | bigint id；actor；action；resource_type/id；不含 Secret 的变更摘要；request_id；created_at                                                                                                         |
 
 ClickHouse 原始表 rum_events：
 
@@ -262,7 +262,7 @@ Organizations/projects：
 
 - GET/POST /api/v1/organizations。
 - GET/POST /api/v1/organizations/{orgId}/members；PATCH/DELETE /members/{userId}。
-- GET/POST /api/v1/organizations/{orgId}/projects；创建响应只返回一次 raw writeKey。
+- GET/POST /api/v1/organizations/{orgId}/projects；创建项目时自动生成一个可持续查看的默认客户端 DSN。
 - GET/PATCH /api/v1/projects/{projectId}。
 - POST /api/v1/projects/{projectId}/keys；DELETE /keys/{keyId}。
 
@@ -326,7 +326,8 @@ As a 前端基础设施工程师, I want 复制 SDK 配置并看到实时连接�
 
 Acceptance Criteria:
 
-- [ ] write key 仅在创建/轮换时完整显示一次。
+- [ ] 客户端 DSN 可由授权用户持续查看和复制；旧版仅存哈希的 key 轮换后迁移到新模型。
+- [ ] 每个项目自动生成一个默认 DSN；普通接入不要求创建 key，多 DSN 管理收进高级设置。
 - [ ] 展示 SDK seen、event received、event queryable 时间。
 - [ ] Origin、key 或 queue 错误给出可执行修复提示。
 
@@ -838,12 +839,12 @@ Components Used: event-picker, filter-builder, chart, breakdown-table, funnel, s
 
 ### Screen: Sessions
 
-Route: /projects/:projectId/sessions；旧 /insights 重定向至会话页。
+Route: /projects/:projectId/sessions；独立调查页 /projects/:projectId/sessions/:sessionId；旧 /insights 重定向至会话页。
 Purpose: 浏览全部有界 Session，并从用户旅程、环境、地域、设备、错误、API 和 Web Vital 信号进入调查。
-Layout: 搜索与时间/信号筛选、可展开高级 facets、本页摘要、高密度会话表、选中会话详情时间线。
+Layout: 搜索与时间/信号筛选、可展开高级 facets、本页摘要、高密度会话表、右侧快速预览 Drawer；独立详情页使用全宽统一时间线和粘性事件检查器。
 States: Empty=扩大范围/清除筛选；Loading=稳定表格骨架；Populated=会话摘要与时间线；Error=保留筛选并重试。
-Key Interactions: Session ID/用户/路由搜索；国家/设备/浏览器/release/信号/时长筛选；会话 → 完整事件时间线 → Issue。
-Components Used: input, select, badge, table, card, pagination, session-timeline.
+Key Interactions: Session ID/用户/路由搜索；国家/设备/浏览器/release/信号/时长筛选；行点击快速预览；会话 → 可分享的完整事件时间线 → Issue/源码；时间线每次游标加载 100 条。
+Components Used: input, select, badge, table, drawer, card, toggle-group, pagination, session-timeline, event-inspector.
 
 ### Screen: Issues
 

@@ -152,9 +152,9 @@ func (handler *Handler) ServeHTTP(response http.ResponseWriter, request *http.Re
 		handler.writeError(response, request, http.StatusBadRequest, "INVALID_ENVELOPE", "The event envelope does not match a supported schema.")
 		return
 	}
-	if envelope.Context.Environment != access.Project.Environment {
+	if !access.Project.AcceptsEnvironment(envelope.Context.Environment) {
 		handler.markRejected(request.Context(), access.Project.ID, ingest.RejectEnvironmentMismatch)
-		handler.writeError(response, request, http.StatusBadRequest, "ENVIRONMENT_MISMATCH", "The envelope environment does not match the project.")
+		handler.writeError(response, request, http.StatusBadRequest, "ENVIRONMENT_MISMATCH", "The envelope environment is not registered for the project.")
 		return
 	}
 	if len(envelope.Events) == 0 {

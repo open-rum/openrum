@@ -12,6 +12,7 @@ const (
 	EventTypeWebVital EventType = "web_vital"
 	EventTypeAPI      EventType = "api"
 	EventTypeCustom   EventType = "custom"
+	EventTypeLog      EventType = "log"
 )
 
 type EnvelopeV1 struct {
@@ -64,6 +65,9 @@ type EventV1 struct {
 	Metric         *WebVitalMetric    `json:"metric,omitempty"`
 	Request        *APIRequest        `json:"request,omitempty"`
 	Name           string             `json:"name,omitempty"`
+	Level          string             `json:"level,omitempty"`
+	Message        string             `json:"message,omitempty"`
+	Logger         string             `json:"logger,omitempty"`
 	Attributes     map[string]string  `json:"attributes,omitempty"`
 	Measurements   map[string]float64 `json:"measurements,omitempty"`
 }

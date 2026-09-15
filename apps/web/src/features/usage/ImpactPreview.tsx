@@ -14,7 +14,7 @@ export function ImpactPreview({ impact }: { impact: SamplingImpact }) {
         预计每日接收 {formatCount(impact.projectedDaily)} 条
       </h2>
       <p
-        className={`mt-2 text-sm font-medium ${saving ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"}`}
+        className={`mt-2 text-sm font-medium ${saving ? "text-(--ds-success)" : "text-(--ds-warning)"}`}
       >
         较当前 {impact.deltaPercent > 0 ? "+" : ""}
         {impact.deltaPercent.toFixed(1)}% · 约 {formatBytes(impact.projectedDailyBytes)}/天

@@ -33,7 +33,6 @@ export function ProjectURLRulesRoute() {
     <ProjectSettingsLayout
       projectId={projectId}
       titleId="project-url-rules-title"
-      breadcrumb={`项目 / ${project.data?.name ?? "…"} / URL 归一化`}
       title="URL 归一化"
       description="把同一个路由的不同地址合成一行。内置规则已经能认出 UUID、纯数字、长十六进制和长不透明串；这里补的是它认不出来的那些，比如四位短 slug。"
     >

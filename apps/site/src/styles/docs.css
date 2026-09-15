@@ -37,14 +37,39 @@
   background-color: var(--ds-brand-soft);
 }
 
-/* Group labels were 16px/400 against 14px/400 links, a 2px difference at the same
-   weight, so the two tiers collapsed into one flat list. */
+/* Groups render as `<details>`, so their label is a disclosure control, not a caption.
+   The previous tiny-uppercase treatment read as a static section header and gave no
+   hint that the row could be clicked — which was fine while every group was pinned
+   open, and wrong the moment they started collapsing.
+
+   A summary now matches a link row in size, padding and radius, and is separated from
+   its siblings by weight and the caret alone. Same visual weight, different affordance. */
+#starlight__sidebar summary {
+  padding: 0.5rem;
+  border-radius: 0.5rem;
+}
+#starlight__sidebar summary:hover {
+  background: var(--ds-surface-subtle);
+}
 #starlight__sidebar .group-label > .large {
-  color: var(--ds-text-muted);
-  font-size: 0.75rem;
+  color: var(--ds-text);
+  font-size: 0.875rem;
   font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  letter-spacing: 0;
+  text-transform: none;
+}
+/* Starlight sizes the caret at 1.25rem, which next to a 14px label is the largest
+   thing in the row. */
+#starlight__sidebar summary .caret {
+  width: 1rem;
+  height: 1rem;
+  color: var(--ds-text-muted);
+}
+/* The nested rule is 1px of `--sl-color-hairline-light` at the full height of the
+   group. Softening it keeps the indent readable without drawing a ladder down the
+   sidebar once several groups are open. */
+#starlight__sidebar ul ul li {
+  border-inline-start-color: color-mix(in oklch, var(--ds-border), transparent 35%);
 }
 
 /* Every entry was 550 weight because Starlight marks top-level items `.large`, and
@@ -93,15 +118,8 @@
   overflow-x: auto;
 }
 
-/* Two problems, one rule.
-   `a { color: inherit }` in global.css is unlayered, and unlayered declarations beat
-   layered ones at any specificity, so it was silently overriding Starlight's
-   `@layer starlight.core` link colour: every prose link rendered in body-text black.
-   Restoring the colour here — also unlayered, loaded after — is what makes links visible
-   at all.
-   Colour on its own is still one signal, and WCAG 1.4.1 asks for a second, so links are
-   also underlined. The anchor icons beside headings are excluded; they are affordances,
-   not prose. */
+/* Keep this unlayered to match the global anchor reset. Prose links use neutral
+   text and an underline; heading anchor icons are separate affordances. */
 .sl-markdown-content a:not(:where(.not-content *, .sl-anchor-link)) {
   color: var(--sl-color-text-accent);
   text-decoration: underline;

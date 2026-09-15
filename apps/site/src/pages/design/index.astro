@@ -4,6 +4,7 @@ import DesignSection from "../../components/design/DesignSection.astro";
 import BrandMark from "../../components/BrandMark.astro";
 import BrandWordmark from "../../components/BrandWordmark.astro";
 import ChartExamples from "../../components/design/ChartExamples";
+import FontPreview from "../../components/design/FontPreview.astro";
 import { ArrowUpRight, Download, Copy, Check, ArrowRight } from "lucide-astro";
 import { palettes, colorGroups, typeSamples } from "@openrum/design-tokens/catalog";
 const spaces = [
@@ -24,12 +25,12 @@ const spaces = [
       <p class="ds-overline">OPENRUM / VISUAL FOUNDATIONS</p><h1>
         设计规范<span>Design system.</span>
       </h1><p class="ds-intro-copy">
-        从品牌标识到每一条数据曲线。<br />在这里调整配色，查看规则，比较下一版首页。
+        从品牌标识到每一条数据曲线。<br />在这里查看唯一的 Citrus 主题、规则与页面效果。
       </p>
     </div><div class="ds-intro-mark"><BrandMark size={112} /></div>
   </div>
   <div class="ds-summary">
-    <span><strong>03</strong> 配色预设</span><span><strong>02</strong> 明暗模式</span><span
+    <span><strong>01</strong> 唯一主题</span><span><strong>02</strong> 明暗模式</span><span
       ><strong>03</strong> 图表类型</span
     ><span class="ds-summary-live"><i class="ds-status-dot"></i> 与共享 token 同步</span>
   </div>
@@ -38,14 +39,14 @@ const spaces = [
     id="brand"
     index="01"
     title="品牌标识"
-    description="文档中的双段圆角环形，重绘为可缩放的 SVG。保持完整轮廓，避免拉伸、描边和装饰性渐变。"
+    description="双段圆角环形统一使用柠檬绿 Logo Token，亮色和深色模式保持一致。官网、控制台、登录页、favicon 与下载资源使用同一标记；字标使用中性文字色。"
   >
     <div class="ds-brand-board">
       <div class="ds-brand-lockup">
         <span class="brand-mark" data-brand-download><BrandMark size={88} /></span><BrandWordmark />
       </div><span class="ds-board-caption">PRIMARY LOCKUP / SVG</span><button
         class="ds-text-button"
-        data-download-logo><Download size={15} />下载当前配色 SVG</button
+        data-download-logo><Download size={15} />下载柠檬绿 SVG</button
       >
     </div>
     <div class="ds-logo-variants">
@@ -55,13 +56,12 @@ const spaces = [
         >
       </div>
       <div>
-        <div class="ds-logo-sample ds-mono"><BrandMark size={46} /></div><span>单色 · 当前表面</span
+        <div class="ds-logo-sample" data-theme-scope="light"><BrandMark size={46} /></div><span
+          >柠檬绿 · 亮色表面</span
         >
       </div>
       <div>
-        <div class="ds-logo-sample ds-mono ds-inverse"><BrandMark size={46} /></div><span
-          >单色 · 反色表面</span
-        >
+        <div class="ds-logo-sample dark"><BrandMark size={46} /></div><span>柠檬绿 · 深色表面</span>
       </div>
       <div>
         <div class="ds-logo-sample ds-clearspace">
@@ -72,46 +72,68 @@ const spaces = [
   </DesignSection>
 
   <DesignSection
-    id="palettes"
+    id="citrus"
     index="02"
-    title="配色预设"
-    description="选择一套预设，整页、图表与参考方案同时切换。选择会保存在当前浏览器，并跟随预览链接。"
+    title="Citrus 配色"
+    description="Citrus 是 OpenRUM 唯一主题。官网、文档、控制台和图表共同读取这一套语义 Token。"
   >
     <fieldset class="ds-presets">
-      <legend class="sr-only">选择配色方案</legend>
+      <legend class="sr-only">Citrus 主题</legend>
       {
-        palettes.map((palette, index) => (
-          <label class="ds-preset">
-            <>
-              <input type="radio" name="palette" value={palette.id} data-palette-choice />
-              <div>
-                <>
-                  <span class="ds-preset-top">
-                    <>
-                      <small>
-                        0{index + 1} / {palette.label}
-                      </small>
-                      <Check size={15} />
-                    </>
-                  </span>
-                  <strong>{palette.name}</strong>
-                  <p>{palette.description}</p>
-                  <span
-                    class="ds-preset-line"
-                    style={`background:var(--ds-preset-${palette.id})`}
-                  />
-                </>
-              </div>
-            </>
-          </label>
+        palettes.map((palette) => (
+          <div class="ds-preset ds-preset--canonical">
+            <div>
+              <span class="ds-preset-top">
+                <small>01 / {palette.label}</small>
+                <Check size={15} />
+              </span>
+              <strong>{palette.name}</strong>
+              <p>{palette.description}</p>
+              <span class="ds-preset-line" />
+            </div>
+          </div>
         ))
       }
     </fieldset>
     <div class="ds-guidance">
-      <span>亮色原则</span><p>
-        标题、正文、操作和图表轮廓优先用深色。明亮的 Accent
-        用于面积、选中状态与少量重点，避免整页浅绿文字。
+      <span>参考基准</span><p>
+        颜色遵循 <a
+          href="https://www.shadcnblocks.com/block/dashboard9"
+          target="_blank"
+          rel="noreferrer">shadcnblocks dashboard9</a
+        >
+        的 Citrus 截图：中性底色与文字、柠檬绿 Logo 和主系列、蓝绿色辅助系列、淡黄色周期对比。 图表折线与填充使用同一系列色，不使用深橄榄绿文字色描边。
       </p>
+    </div>
+    <div class="ds-color-contract">
+      <h3>页面用色规则</h3>
+      <dl>
+        <div>
+          <dt>标题与数值</dt><dd>
+            标题、KPI、表格主体使用 <code>--ds-text</code
+            >。数值大小不决定颜色；状态通过旁边的文字与徽标表达。
+          </dd>
+        </div>
+        <div>
+          <dt>标签与说明</dt><dd>
+            字段、图例使用 <code>--ds-text-secondary</code>；说明、时间、坐标轴使用 <code
+              >--ds-text-muted</code
+            >。图例只给色点着色。
+          </dd>
+        </div>
+        <div>
+          <dt>导航与控件</dt><dd>
+            选中导航用 <code>--ds-sidebar-accent</code> 浅灰背景和中性文字；普通操作用灰色边框。主操作用
+            Primary 或黑白对比，柠檬绿填充配黑字。
+          </dd>
+        </div>
+        <div>
+          <dt>状态反馈</dt><dd>
+            成功、警告、错误分别使用
+            Success、Warning、Danger，配文字或图标。普通系列不借用红色，淡黄色对比线不表示告警。
+          </dd>
+        </div>
+      </dl>
     </div>
   </DesignSection>
 
@@ -119,7 +141,7 @@ const spaces = [
     id="colors"
     index="03"
     title="语义颜色"
-    description="颜色以用途命名。点击色卡复制 CSS 变量；数值读取当前主题，随预设实时更新。"
+    description="颜色以用途命名。点击色卡复制 CSS 变量；数值读取当前主题，并随明暗模式实时更新。"
   >
     {
       colorGroups.map((group) => (
@@ -159,13 +181,9 @@ const spaces = [
     id="typography"
     index="04"
     title="字体与排版"
-    description="Geist 负责产品与官网正文；品牌字标使用轮廓 SVG。官网强调阅读节奏，控制台保留紧凑的数据密度。"
+    description="比较四款候选字体，分别选择英文与中文，观察正文、KPI、表格和图表的效果。建议先试 Inter + 系统黑体；以下为选型预览，当前规范仍使用 Geist。"
   >
-    <div class="ds-type-family">
-      <strong>Aa <span>字</span></strong><div>
-        <b>Geist Variable</b><p>Sans serif / 系统中文字体回退</p>
-      </div><code>--font-product-sans</code>
-    </div>
+    <FontPreview />
     <div class="ds-type-specimens">
       {
         typeSamples.map((sample) => (
@@ -186,8 +204,7 @@ const spaces = [
       }
     </div>
     <div class="ds-code-sample">
-      <span>CODE / MONOSPACE</span><code
-        >captureException(error, &#123; release: '1.0.0' &#125;)</code
+      <span>CODE / MONOSPACE</span><code>{"captureException(error, { release: '1.0.0' })"}</code
       ><small>堆栈、事件标识与数值对齐使用等宽字体。</small>
     </div>
   </DesignSection>
@@ -259,10 +276,20 @@ const spaces = [
         ))
       }
     </div>
+    <div class="ds-chart-palette">
+      <button data-copy-token="--ds-chart-comparison" aria-label="复制周期对比颜色">
+        <i style="background:var(--ds-chart-comparison)"></i><span>周期对比</span>
+        <code data-token-value="--ds-chart-comparison" data-token-format="color"></code>
+      </button>
+    </div>
     <ChartExamples client:visible />
     <div class="ds-guidance">
       <span>图表规则</span><p>
-        一个面板只展示一种单位。对比系列用中性色或虚线；错误与告警保持语义颜色。所有图表均为固定示例数据。
+        单系列统一用 Chart 1 柠檬绿；不同指标优先用 Chart 2 蓝绿；上一周期用淡黄加虚线。 Chart 3–5
+        保留参考主题色阶，其中 Chart 5 与 Chart 1 相同，不作为独立分类的唯一区分。
+        柱体与面积可降低透明度，折线保留系列色；轴线、网格和标签使用中性色。
+        一个面板只展示一种单位；性能评分柱与仪表使用 Good chart / Warning chart 填充，
+        标签和阈值保留较深的状态色。错误仍用 Danger。所有图表均为固定示例数据。
       </p>
     </div>
   </DesignSection>

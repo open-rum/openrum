@@ -125,9 +125,8 @@ describe("ApiDetail", () => {
     expect(screen.getByText("2.0 KB")).toBeTruthy();
 
     const link = screen.getByRole("link", { name: "查看会话" }) as HTMLAnchorElement;
-    expect(link.getAttribute("href")).toContain(
-      "/sessions?search=018f4d9c-83a1-76c9-81c2-3020ab667099",
-    );
+    expect(link.getAttribute("href")).toContain("/sessions/018f4d9c-83a1-76c9-81c2-3020ab667099?");
+    expect(link.getAttribute("href")).toContain("event=018f4d9c-83a1-76c9-81c2-3020ab667098");
   });
 
   it("flags a dimension whose P95 runs well above the endpoint baseline", () => {

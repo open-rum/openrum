@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
+import { ConsolePage } from "@/components/layout/ConsolePage";
 import { AsyncError } from "@/components/ui/AsyncState";
 import { Skeleton } from "@/components/ui/skeleton";
 import { listOrganizations, listProjects } from "@/lib/api/projects";
@@ -43,7 +44,7 @@ export function ProjectEntryPage() {
 
   if (organizations.error || projects.error) {
     return (
-      <section className="mx-auto w-full max-w-6xl px-6 py-8">
+      <ConsolePage width="wide">
         <AsyncError
           error={organizations.error ?? projects.error}
           title="无法确定默认项目"
@@ -53,14 +54,14 @@ export function ProjectEntryPage() {
             void projects.refetch();
           }}
         />
-      </section>
+      </ConsolePage>
     );
   }
 
   return (
-    <section className="mx-auto flex w-full max-w-6xl flex-col gap-4 px-6 py-8">
+    <ConsolePage width="wide" aria-label="正在打开项目">
       <Skeleton className="h-20" />
       <Skeleton className="h-64" />
-    </section>
+    </ConsolePage>
   );
 }

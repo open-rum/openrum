@@ -82,7 +82,7 @@ export function SamplingForm({ project, usage }: { project: Project; usage: Usag
             <span className="text-sm text-muted-foreground">Member / Viewer 仅可查看</span>
           ) : null}
           {mutation.isSuccess ? (
-            <span className="text-sm text-emerald-600" role="status">
+            <span className="text-sm text-(--ds-success)" role="status">
               已保存并开始分发
             </span>
           ) : null}

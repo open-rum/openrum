@@ -20,9 +20,10 @@ import (
 var environmentPattern = regexp.MustCompile(`^[a-z][a-z0-9_-]{0,63}$`)
 
 type ProjectHandler struct {
-	organizations *metadata.OrganizationRepository
-	projects      *metadata.ProjectRepository
-	logger        zerolog.Logger
+	organizations  *metadata.OrganizationRepository
+	projects       *metadata.ProjectRepository
+	ingestEndpoint string
+	logger         zerolog.Logger
 }
 
 type createProjectRequest struct {
@@ -30,6 +31,7 @@ type createProjectRequest struct {
 	Slug            string   `json:"slug"`
 	AllowedOrigins  []string `json:"allowedOrigins"`
 	Environment     string   `json:"environment"`
+	Environments    []string `json:"environments"`
 	RetentionDays   *int16   `json:"retentionDays"`
 	EventSampleRate *float64 `json:"eventSampleRate"`
 	APISampleRate   *float64 `json:"apiSampleRate"`
@@ -41,6 +43,7 @@ type updateProjectRequest struct {
 	Slug            *string   `json:"slug"`
 	AllowedOrigins  *[]string `json:"allowedOrigins"`
 	Environment     *string   `json:"environment"`
+	Environments    *[]string `json:"environments"`
 	RetentionDays   *int16    `json:"retentionDays"`
 	EventSampleRate *float64  `json:"eventSampleRate"`
 	APISampleRate   *float64  `json:"apiSampleRate"`
@@ -60,6 +63,7 @@ type projectResponse struct {
 	Slug            string   `json:"slug"`
 	AllowedOrigins  []string `json:"allowedOrigins"`
 	Environment     string   `json:"environment"`
+	Environments    []string `json:"environments"`
 	RetentionDays   int16    `json:"retentionDays"`
 	EventSampleRate float64  `json:"eventSampleRate"`
 	APISampleRate   float64  `json:"apiSampleRate"`
@@ -75,11 +79,11 @@ type projectResponse struct {
 	Role                   metadata.OrganizationRole `json:"role,omitempty"`
 	CreatedAt              string                    `json:"createdAt"`
 	UpdatedAt              string                    `json:"updatedAt"`
-	WriteKey               string                    `json:"writeKey,omitempty"`
+	DSN                    string                    `json:"dsn,omitempty"`
 }
 
-func NewProjectHandler(organizations *metadata.OrganizationRepository, projects *metadata.ProjectRepository, logger zerolog.Logger) *ProjectHandler {
-	return &ProjectHandler{organizations: organizations, projects: projects, logger: logger}
+func NewProjectHandler(organizations *metadata.OrganizationRepository, projects *metadata.ProjectRepository, ingestEndpoint string, logger zerolog.Logger) *ProjectHandler {
+	return &ProjectHandler{organizations: organizations, projects: projects, ingestEndpoint: ingestEndpoint, logger: logger}
 }
 
 func (handler *ProjectHandler) List(writer http.ResponseWriter, request *http.Request) {
@@ -133,7 +137,7 @@ func (handler *ProjectHandler) Create(writer http.ResponseWriter, request *http.
 		return
 	}
 	response := projectDTO(project, access.Role)
-	response.WriteKey = credential.Raw
+	response.DSN = clientDSN(handler.ingestEndpoint, credential.Raw)
 	writeJSON(writer, http.StatusCreated, response)
 }
 
@@ -224,8 +228,15 @@ func validateCreateProject(payload createProjectRequest, organizationID uuid.UUI
 	if payload.Environment == "" {
 		payload.Environment = "production"
 	}
+	environments := payload.Environments
+	if len(environments) == 0 {
+		environments = []string{payload.Environment}
+	}
+	environments, environmentsOK := normalizeEnvironments(environments)
+	environments = ensureEnvironment(environments, payload.Environment)
 	origins, ok := normalizeOrigins(payload.AllowedOrigins)
-	if !validName(payload.Name) || !validSlug(payload.Slug) || !environmentPattern.MatchString(payload.Environment) || !ok {
+	if !validName(payload.Name) || !validSlug(payload.Slug) || !environmentPattern.MatchString(payload.Environment) ||
+		!environmentsOK || len(environments) > 16 || !ok {
 		return metadata.CreateProjectInput{}, false
 	}
 	retentionDays, eventSampleRate, apiSampleRate, errorSampleRate := int16(14), 1.0, 0.2, 1.0
@@ -247,13 +258,13 @@ func validateCreateProject(payload createProjectRequest, organizationID uuid.UUI
 	}
 	return metadata.CreateProjectInput{
 		OrganizationID: organizationID, Name: payload.Name, Slug: payload.Slug, AllowedOrigins: origins,
-		Environment: payload.Environment, RetentionDays: retentionDays, EventSampleRate: eventSampleRate,
+		Environment: payload.Environment, Environments: environments, RetentionDays: retentionDays, EventSampleRate: eventSampleRate,
 		APISampleRate: apiSampleRate, ErrorSampleRate: errorSampleRate,
 	}, true
 }
 
 func validateUpdateProject(payload updateProjectRequest) (metadata.UpdateProjectInput, bool) {
-	if payload.Name == nil && payload.Slug == nil && payload.AllowedOrigins == nil && payload.Environment == nil &&
+	if payload.Name == nil && payload.Slug == nil && payload.AllowedOrigins == nil && payload.Environment == nil && payload.Environments == nil &&
 		payload.RetentionDays == nil && payload.EventSampleRate == nil && payload.APISampleRate == nil &&
 		payload.ErrorSampleRate == nil && payload.Status == nil {
 		return metadata.UpdateProjectInput{}, false
@@ -285,6 +296,19 @@ func validateUpdateProject(payload updateProjectRequest) (metadata.UpdateProject
 		if !environmentPattern.MatchString(trimmed) {
 			return metadata.UpdateProjectInput{}, false
 		}
+	}
+	if payload.Environments != nil {
+		environments, ok := normalizeEnvironments(*payload.Environments)
+		if !ok {
+			return metadata.UpdateProjectInput{}, false
+		}
+		if payload.Environment != nil {
+			environments = ensureEnvironment(environments, *payload.Environment)
+		}
+		if len(environments) > 16 {
+			return metadata.UpdateProjectInput{}, false
+		}
+		payload.Environments = &environments
 	}
 	if payload.RetentionDays != nil && !validRetention(*payload.RetentionDays) {
 		return metadata.UpdateProjectInput{}, false
@@ -338,6 +362,37 @@ func normalizeOrigins(values []string) ([]string, bool) {
 	return result, true
 }
 
+func normalizeEnvironments(values []string) ([]string, bool) {
+	if len(values) == 0 || len(values) > 16 {
+		return nil, false
+	}
+	result := make([]string, 0, len(values))
+	seen := make(map[string]struct{}, len(values))
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if !environmentPattern.MatchString(value) {
+			return nil, false
+		}
+		if _, exists := seen[value]; exists {
+			continue
+		}
+		seen[value] = struct{}{}
+		result = append(result, value)
+	}
+	return result, true
+}
+
+func ensureEnvironment(values []string, environment string) []string {
+	result := make([]string, 0, len(values)+1)
+	result = append(result, environment)
+	for _, value := range values {
+		if value != environment {
+			result = append(result, value)
+		}
+	}
+	return result
+}
+
 func validRetention(value int16) bool {
 	return value >= 1 && value <= 90
 }
@@ -356,7 +411,7 @@ func validSampleRate(value float64) bool {
 func projectDTO(project metadata.Project, role metadata.OrganizationRole) projectResponse {
 	return projectResponse{
 		ID: project.ID.String(), OrganizationID: project.OrganizationID.String(), Name: project.Name, Slug: project.Slug,
-		AllowedOrigins: project.AllowedOrigins, Environment: project.Environment, RetentionDays: project.RetentionDays,
+		AllowedOrigins: project.AllowedOrigins, Environment: project.Environment, Environments: project.Environments, RetentionDays: project.RetentionDays,
 		EventSampleRate: project.EventSampleRate, APISampleRate: project.APISampleRate,
 		ErrorSampleRate: project.ErrorSampleRate, IngestRateLimit: project.IngestRateLimit,
 		OverLimitBehavior: project.OverLimitBehavior, DefaultIngestRateLimit: ingest.DefaultProjectRequestsPerSecond,

@@ -1,4 +1,4 @@
-import type { CapturedEvent, ClientOptions, EventSink } from "../client.ts";
+import type { CapturedEvent, EventSink, ResolvedClientOptions } from "../client.ts";
 import type { StorageLike } from "../session.ts";
 import {
   buildEnvelope,
@@ -234,7 +234,7 @@ type SendOutcome =
   | { kind: "disabled" }
   | { kind: "retry"; retryAfterMs?: number };
 
-export function createBrowserSender(options: ClientOptions): Sender | undefined {
+export function createBrowserSender(options: ResolvedClientOptions): Sender | undefined {
   if (typeof window === "undefined" || typeof window.fetch !== "function") return undefined;
   let storage: StorageLike | undefined;
   try {

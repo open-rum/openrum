@@ -30,19 +30,19 @@ docker compose -f deploy/compose/docker-compose.yml down -v
 
 ## Events do not appear
 
-1. Confirm Browser SDK `endpoint` and `writeKey`.
+1. Confirm the Browser SDK `dsn` and the Project's allowed Origin.
 2. Check ingest logs and Origin allowlist for the Project key.
 3. Confirm Kafka, Consumer and ClickHouse are healthy; wait for Demo seed completion on first boot.
 4. Open **Events** with a wide time range, then inspect **Sessions** for the same `session_id`.
 
 ## Investigation path incomplete
 
-| Symptom | Likely cause | Next step |
-| --- | --- | --- |
-| Behavior charts empty | Seed unfinished or ClickHouse unhealthy | Wait, then check Consumer/ClickHouse |
-| Session without errors | Selected Session has no error Events | Filter Sessions with errors on `/checkout` in Demo |
-| Issue missing Source Map frames | Optional object storage not configured | Expected; core monitoring still works |
-| API panel empty | No fetch/XHR captured or sampling disabled | Trigger traffic from the React example |
+| Symptom                         | Likely cause                               | Next step                                          |
+| ------------------------------- | ------------------------------------------ | -------------------------------------------------- |
+| Behavior charts empty           | Seed unfinished or ClickHouse unhealthy    | Wait, then check Consumer/ClickHouse               |
+| Session without errors          | Selected Session has no error Events       | Filter Sessions with errors on `/checkout` in Demo |
+| Issue missing Source Map frames | Optional object storage not configured     | Expected; core monitoring still works              |
+| API panel empty                 | No fetch/XHR captured or sampling disabled | Trigger traffic from the React example             |
 
 ## Source Map upload fails
 

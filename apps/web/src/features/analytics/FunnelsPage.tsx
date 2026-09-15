@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useParams } from "@tanstack/react-router";
 import { ArrowDownIcon, FilterIcon, PlusIcon, RefreshCwIcon, Trash2Icon } from "lucide-react";
 import { useMemo, useState } from "react";
+import { ConsolePage, ConsolePageHeader, ConsolePageTabs } from "@/components/layout/ConsolePage";
 import { AsyncError } from "@/components/ui/AsyncState";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -128,26 +129,25 @@ function ProjectFunnels({ project }: { project: Project }) {
   };
 
   return (
-    <div className="behavior-page funnel-page">
-      <header className="behavior-header">
-        <div>
-          <div className="breadcrumb">
-            项目 <span>/</span> {project.name} <span>/</span> 分析 <span>/</span> 漏斗
-          </div>
-          <h1>漏斗分析</h1>
-          <p>观察同一会话内用户按顺序完成关键行为的转化和流失。</p>
-        </div>
-        <Button
-          size="icon"
-          variant="outline"
-          aria-label="刷新漏斗"
-          onClick={() => void result.refetch()}
-          disabled={result.isFetching}
-        >
-          <RefreshCwIcon />
-        </Button>
-      </header>
-      <AnalysisTabs projectId={project.id} active="funnels" />
+    <ConsolePage width="fluid">
+      <ConsolePageHeader
+        title="漏斗分析"
+        description="观察同一会话内用户按顺序完成关键行为的转化和流失。"
+        actions={
+          <Button
+            size="icon"
+            variant="outline"
+            aria-label="刷新漏斗"
+            onClick={() => void result.refetch()}
+            disabled={result.isFetching}
+          >
+            <RefreshCwIcon />
+          </Button>
+        }
+      />
+      <ConsolePageTabs>
+        <AnalysisTabs projectId={project.id} active="funnels" />
+      </ConsolePageTabs>
 
       <section className="funnel-builder" aria-labelledby="funnel-builder-title">
         <div className="behavior-panel__header">
@@ -269,7 +269,7 @@ function ProjectFunnels({ project }: { project: Project }) {
         />
       ) : null}
       {result.data ? <FunnelResults data={result.data} /> : null}
-    </div>
+    </ConsolePage>
   );
 }
 

@@ -1,4 +1,4 @@
-import type { ClientOptions } from "./client.ts";
+import type { ResolvedClientOptions } from "./client.ts";
 import { parseFilterSettings, type FilterSettings } from "./filters.ts";
 import type { SamplingOptions } from "./sampling.ts";
 
@@ -54,7 +54,7 @@ export function resolveConfigEndpoint(
 
 export function startRemoteConfig(
   target: SamplingTarget,
-  options: Pick<ClientOptions, "writeKey" | "endpoint" | "configEndpoint">,
+  options: Pick<ResolvedClientOptions, "writeKey" | "endpoint" | "configEndpoint">,
   runtime: ConfigRuntime | undefined = browserRuntime(),
 ): () => void {
   const endpoint = resolveConfigEndpoint(

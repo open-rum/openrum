@@ -3,6 +3,8 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BehaviorTimeline } from "@/features/events/BehaviorTimeline";
 import { getSessionTimeline, type EventDetail } from "@/lib/api/issues";
+import { sessionEventHref } from "@/lib/api/sessions";
+import { Button } from "@/components/ui/button";
 
 export function EventContext({ event }: { event: EventDetail }) {
   const anchor = new Date(event.timestamp);
@@ -34,6 +36,18 @@ export function EventContext({ event }: { event: EventDetail }) {
           <h2 id="context-title">事件上下文</h2>
           <p>用于复现问题的安全、脱敏客户端信息。</p>
         </div>
+        <Button asChild variant="outline" size="sm">
+          <a
+            href={sessionEventHref(
+              event.projectId,
+              event.sessionId,
+              event.timestamp,
+              event.eventId,
+            )}
+          >
+            打开完整会话
+          </a>
+        </Button>
       </div>
       <Tabs defaultValue="context">
         <TabsList variant="line">

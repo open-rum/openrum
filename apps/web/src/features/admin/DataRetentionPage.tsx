@@ -2,7 +2,6 @@ import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArchiveIcon,
-  CalendarClockIcon,
   DatabaseZapIcon,
   HardDriveIcon,
   HistoryIcon,
@@ -42,7 +41,7 @@ import {
   type RetentionPreview,
 } from "@/lib/api/admin";
 import { listOrganizations, listProjects, type Project } from "@/lib/api/projects";
-import { AdminNav } from "./AdminNav";
+import { AdminPageLayout } from "./AdminPageLayout";
 import { ReauthenticationDialog } from "./ReauthenticationDialog";
 
 const definitions = {
@@ -162,17 +161,10 @@ export function DataRetentionPage() {
 
   const loadError = configuration.error ?? projects.error;
   return (
-    <div className="mx-auto w-full max-w-[1440px] p-5 lg:p-7">
-      <header className="mb-6">
-        <div className="mb-2 flex items-center gap-2 text-xs text-muted-foreground">
-          <CalendarClockIcon className="size-4" /> 系统管理 <span>/</span> 数据生命周期
-        </div>
-        <h1 className="text-2xl font-semibold tracking-tight">数据生命周期</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          统一管理 Instance 默认保留期，并在确认影响后逐月处理历史数据。
-        </p>
-      </header>
-      <AdminNav />
+    <AdminPageLayout
+      title="数据生命周期"
+      description="统一管理 Instance 默认保留期，并在确认影响后逐月处理历史数据。"
+    >
       {configuration.isLoading || projects.isLoading ? <AsyncLoading /> : null}
       {loadError ? (
         <AsyncError
@@ -329,7 +321,7 @@ export function DataRetentionPage() {
         description="该修改影响整个 Instance 的新数据。请重新验证 Instance Owner 身份。"
         confirmLabel="验证并保存"
       />
-    </div>
+    </AdminPageLayout>
   );
 }
 

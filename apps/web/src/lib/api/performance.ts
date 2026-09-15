@@ -3,7 +3,11 @@ import { requestJSON } from "./client";
 
 const isoTime = z.iso.datetime({ offset: true });
 const metric = z.object({
+  p50: z.number().nullable().optional(),
   p75: z.number().nullable(),
+  p90: z.number().nullable().optional(),
+  p95: z.number().nullable().optional(),
+  p99: z.number().nullable().optional(),
   samples: z.number().int().nonnegative(),
   sufficient: z.boolean(),
 });
@@ -13,13 +17,20 @@ const route = z.object({
   lcp: metric,
   inp: metric,
   cls: metric,
+  fcp: metric.optional(),
+  ttfb: metric.optional(),
 });
 const detail = z.object({
   route: z.string(),
-  metric: z.enum(["LCP", "INP", "CLS"]),
+  metric: z.enum(["LCP", "INP", "CLS", "FCP", "TTFB"]),
   trend: z.array(z.object({ bucket: isoTime, metric })),
   distribution: z.array(
-    z.object({ from: z.number(), to: z.number(), samples: z.number().int().nonnegative() }),
+    z.object({
+      from: z.number(),
+      to: z.number(),
+      samples: z.number().int().nonnegative(),
+      overflow: z.boolean().optional(),
+    }),
   ),
   browsers: z.array(z.object({ value: z.string(), metric })),
   deviceTypes: z.array(z.object({ value: z.string(), metric })),
@@ -46,12 +57,28 @@ export const performanceResponseSchema = z.object({
       lcp: metric,
       inp: metric,
       cls: metric,
+      fcp: metric.optional(),
+      ttfb: metric.optional(),
     }),
   ),
   detail: detail.optional(),
+  summary: route.optional(),
+  facets: z
+    .object({
+      routes: z.array(z.object({ value: z.string(), samples: z.number() })),
+      browsers: z.array(z.object({ value: z.string(), samples: z.number() })),
+      deviceTypes: z.array(z.object({ value: z.string(), samples: z.number() })),
+      countries: z.array(z.object({ value: z.string(), samples: z.number() })),
+      releases: z.array(z.object({ value: z.string(), samples: z.number() })),
+    })
+    .optional(),
 });
 export type PerformanceResponse = z.infer<typeof performanceResponseSchema>;
-export type PerformanceMetricName = "LCP" | "INP" | "CLS";
+export const performanceMetricNames = ["LCP", "INP", "CLS", "FCP", "TTFB"] as const;
+export type PerformanceMetricName = (typeof performanceMetricNames)[number];
+export type PerformanceMetricKey = Lowercase<PerformanceMetricName>;
+export const performancePercentiles = ["p50", "p75", "p95"] as const;
+export type PerformancePercentile = (typeof performancePercentiles)[number];
 export type PerformanceFilters = {
   projectId: string;
   from: Date;
@@ -60,6 +87,10 @@ export type PerformanceFilters = {
   release?: string;
   route?: string;
   metric: PerformanceMetricName;
+  percentile?: PerformancePercentile;
+  browser?: string;
+  deviceType?: string;
+  country?: string;
 };
 
 export function getPerformance(filters: PerformanceFilters, signal?: AbortSignal) {
@@ -75,7 +106,7 @@ export function defaultPerformanceFilters(
   search = new URLSearchParams(),
   now = new Date(),
 ): PerformanceFilters {
-  const to = parseTime(search.get("to")) ?? new Date(now.setUTCSeconds(0, 0));
+  const to = parseTime(search.get("to")) ?? new Date(Math.floor(now.getTime() / 60000) * 60000);
   const candidateFrom = parseTime(search.get("from"));
   const from =
     candidateFrom && candidateFrom < to && to.getTime() - candidateFrom.getTime() <= 30 * 86400000
@@ -89,7 +120,11 @@ export function defaultPerformanceFilters(
     environment: clean(search.get("environment")),
     release: clean(search.get("release")),
     route: clean(search.get("route")),
-    metric: candidateMetric === "INP" || candidateMetric === "CLS" ? candidateMetric : "LCP",
+    metric: performanceMetricNames.find((value) => value === candidateMetric) ?? "LCP",
+    percentile: performancePercentiles.find((value) => value === search.get("percentile")) ?? "p75",
+    browser: clean(search.get("browser")),
+    deviceType: clean(search.get("deviceType")),
+    country: clean(search.get("country"))?.toUpperCase(),
   };
 }
 export function serializePerformanceFilters(filters: PerformanceFilters) {
@@ -101,6 +136,10 @@ export function serializePerformanceFilters(filters: PerformanceFilters) {
   if (filters.environment) parameters.set("environment", filters.environment);
   if (filters.release) parameters.set("release", filters.release);
   if (filters.route) parameters.set("route", filters.route);
+  parameters.set("percentile", filters.percentile ?? "p75");
+  if (filters.browser) parameters.set("browser", filters.browser);
+  if (filters.deviceType) parameters.set("deviceType", filters.deviceType);
+  if (filters.country) parameters.set("country", filters.country);
   return parameters;
 }
 export function formatPerformanceMetric(value: number | null, metric: string) {

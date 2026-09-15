@@ -159,24 +159,32 @@ const flushDefaultMs = Number(
 // Defaults and notes the type declaration cannot express. Every option must appear
 // here; the generator fails otherwise.
 const sdkOptionNotes = {
-  writeKey: ["—", "Project write key, sent as the `x-openrum-key` header. Safe to expose."],
-  endpoint: ["—", "Full Envelope URL, ending in `/ingest/v1/envelope`."],
+  dsn: [
+    "—",
+    "Public Project connection string containing the Ingest URL and write-only client key.",
+  ],
   environment: ['`"production"`', "Separates Events from staging and production."],
   release: ["unset", "Required for mapped stack frames. Must match the uploaded Release."],
   dist: ["unset", "Distinguishes builds that share one Release."],
   eventSampleRate: [
     `\`${samplingDefaults.eventSampleRate}\``,
-    "Page Views, interactions and Custom Events.",
+    "Page Views, interactions, Custom Events and opted-in Logs.",
   ],
   apiSampleRate: [`\`${samplingDefaults.apiSampleRate}\``, "fetch and XHR timing."],
   errorSampleRate: [`\`${samplingDefaults.errorSampleRate}\``, "Errors and unhandled rejections."],
   captureClicks: ["`true`", "Privacy-safe descriptions of interactive elements."],
-  flushIntervalMs: [`\`${flushDefaultMs}\``, "Also flushed on `pagehide` and on reconnect."],
-  beaconEndpoint: ["unset", "Pre-authenticated `sendBeacon` URL. Never gets the write key."],
-  configEndpoint: [
-    "endpoint origin",
-    "Remote sampling from `/api/v1/sdk/config`. `false` disables it.",
+  enableLogs: [
+    "ignored",
+    "Compatibility-only; logger calls and captureConsole are independently explicit.",
   ],
+  captureConsole: ["unset", "Opt-in console methods: debug, log, info, warn, error."],
+  beforeSendLog: [
+    "unset",
+    "Transforms a log or returns null to drop it; final privacy scrubbing still applies.",
+  ],
+  flushIntervalMs: [`\`${flushDefaultMs}\``, "Also flushed on `pagehide` and on reconnect."],
+  beaconEndpoint: ["unset", "Pre-authenticated `sendBeacon` URL. Never gets the DSN credential."],
+  configEndpoint: ["DSN origin", "Remote sampling from `/api/v1/sdk/config`. `false` disables it."],
   integrations: ["all of the above", "Replaces the default set rather than adding to it."],
 };
 

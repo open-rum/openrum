@@ -1,6 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
 import { useParams } from "@tanstack/react-router";
 import { ChartNoAxesCombinedIcon, RefreshCwIcon } from "lucide-react";
+import {
+  ConsoleFilterBar,
+  ConsolePage,
+  ConsolePageHeader,
+  ConsolePageTabs,
+} from "@/components/layout/ConsolePage";
 import { AsyncError } from "@/components/ui/AsyncState";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -53,27 +59,28 @@ function ProjectAnalysis({ project }: { project: Project }) {
   });
   const data = query.data;
   return (
-    <div className="behavior-page">
-      <header className="behavior-header">
-        <div>
-          <div className="breadcrumb">
-            项目 <span>/</span> {project.name} <span>/</span> 分析
-          </div>
-          <h1>用户行为分析</h1>
-          <p>从访问、用户和会话趋势理解产品使用情况，再按受控维度定位差异。</p>
-        </div>
-        <Button
-          size="icon"
-          variant="outline"
-          aria-label="刷新行为分析"
-          onClick={() => void query.refetch()}
-          disabled={query.isFetching}
-        >
-          <RefreshCwIcon />
-        </Button>
-      </header>
-      <AnalysisTabs projectId={project.id} active="overview" />
-      <BehaviorControls filters={filters} data={data} onChange={update} />
+    <ConsolePage width="fluid">
+      <ConsolePageHeader
+        title="用户行为分析"
+        description="从访问、用户和会话趋势理解产品使用情况，再按受控维度定位差异。"
+        actions={
+          <Button
+            size="icon"
+            variant="outline"
+            aria-label="刷新行为分析"
+            onClick={() => void query.refetch()}
+            disabled={query.isFetching}
+          >
+            <RefreshCwIcon />
+          </Button>
+        }
+      />
+      <ConsolePageTabs>
+        <AnalysisTabs projectId={project.id} active="overview" />
+      </ConsolePageTabs>
+      <ConsoleFilterBar
+        primary={<BehaviorControls filters={filters} data={data} onChange={update} />}
+      />
       {query.isLoading ? <AnalysisSkeleton compact /> : null}
       {query.error ? (
         <AsyncError
@@ -133,6 +140,13 @@ function ProjectAnalysis({ project }: { project: Project }) {
               onSelect={(kind, name) => update({ eventKind: kind, eventName: name })}
             />
           </div>
+          {data.measurements.length > 0 ? (
+            <MeasurementTable
+              data={data}
+              selected={filters.measurement}
+              onSelect={(name) => update({ measurement: name })}
+            />
+          ) : null}
         </>
       ) : null}
       {data && data.totals.events === 0 ? (
@@ -144,7 +158,7 @@ function ProjectAnalysis({ project }: { project: Project }) {
           />
         </div>
       ) : null}
-    </div>
+    </ConsolePage>
   );
 }
 
@@ -243,9 +257,100 @@ function EventTable({
   );
 }
 
+// Numeric Custom Event measurements. Hidden entirely when a Project sends none, which is
+// most of them: an empty table here would read as a broken panel rather than an unused
+// capability.
+function MeasurementTable({
+  data,
+  selected,
+  onSelect,
+}: {
+  data: Awaited<ReturnType<typeof getBehaviorAnalytics>>;
+  selected?: string;
+  onSelect: (name: string | undefined) => void;
+}) {
+  const breakdown = data.measurementBreakdown ?? [];
+  return (
+    <section className="behavior-panel" aria-labelledby="measurements-title">
+      <div className="behavior-panel__header">
+        <div>
+          <h2 id="measurements-title">数值指标</h2>
+          <p>自定义事件 measurements 的汇总。点击一行按{dimensionLabel(data.dimension)}拆分。</p>
+        </div>
+      </div>
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>指标</TableHead>
+            <TableHead>样本</TableHead>
+            <TableHead>总和</TableHead>
+            <TableHead>估算总和</TableHead>
+            <TableHead>平均</TableHead>
+            <TableHead>中位数</TableHead>
+            <TableHead>P90</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {data.measurements.map((item) => (
+            <TableRow
+              key={item.name}
+              tabIndex={0}
+              className="cursor-pointer"
+              aria-selected={item.name === selected}
+              onClick={() => onSelect(item.name === selected ? undefined : item.name)}
+              onKeyDown={(key) => {
+                if (key.key === "Enter") onSelect(item.name === selected ? undefined : item.name);
+              }}
+            >
+              <TableCell>
+                <strong>{item.name}</strong>
+              </TableCell>
+              <TableCell>{item.samples.toLocaleString()}</TableCell>
+              <TableCell>{formatCompact(item.total)}</TableCell>
+              <TableCell>{formatCompact(item.estimated)}</TableCell>
+              <TableCell>{formatCompact(item.average)}</TableCell>
+              <TableCell>{formatCompact(item.p50)}</TableCell>
+              <TableCell>{formatCompact(item.p90)}</TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+      {selected && breakdown.length > 0 ? (
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>
+                {selected} · {dimensionLabel(data.dimension)}
+              </TableHead>
+              <TableHead>样本</TableHead>
+              <TableHead>总和</TableHead>
+              <TableHead>平均</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {breakdown.slice(0, 12).map((row) => (
+              <TableRow key={row.value}>
+                <TableCell>
+                  <strong>{displayDimension(row.value, data.dimension)}</strong>
+                </TableCell>
+                <TableCell>{row.samples.toLocaleString()}</TableCell>
+                <TableCell>{formatCompact(row.total)}</TableCell>
+                <TableCell>{formatCompact(row.average)}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      ) : null}
+    </section>
+  );
+}
+
 function AnalysisSkeleton({ compact = false }: { compact?: boolean }) {
   return (
-    <div className={compact ? "grid gap-4" : "behavior-page"} aria-label="正在加载行为分析">
+    <div
+      className={compact ? "grid gap-4" : "px-4 py-6 sm:px-6 lg:px-8 lg:py-8"}
+      aria-label="正在加载行为分析"
+    >
       <Skeleton className="h-24" />
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <Skeleton className="h-28" />

@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { CartesianGrid, Line, LineChart, XAxis } from "recharts";
 import { AsyncError } from "@/components/ui/AsyncState";
+import { ConsolePage, ConsolePageHeader } from "@/components/layout/ConsolePage";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -76,7 +77,7 @@ const dateTimeFormatter = new Intl.DateTimeFormat("zh-CN", {
 const activityChartConfig = {
   pageViews: {
     label: "PV",
-    color: "var(--ds-brand)",
+    color: "var(--ds-chart-1)",
   },
 } satisfies ChartConfig;
 
@@ -100,47 +101,44 @@ export function ProjectListPage() {
   const projects = projectsQuery.data?.projects ?? [];
 
   return (
-    <section className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-6 py-8">
-      <header className="flex flex-col gap-4 border-b border-border pb-6 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className="text-xs text-muted-foreground">工作区 / 项目</p>
-          <h1 className="mt-2 text-2xl font-semibold tracking-tight">项目</h1>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
-            快速确认项目是否持续上报、最近 24 小时的访问规模与错误情况。
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {organizations.length > 1 ? (
-            <Select value={organizationId} onValueChange={setSelectedOrganizationId}>
-              <SelectTrigger aria-label="组织" className="min-w-44">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  {organizations.map((item) => (
-                    <SelectItem key={item.id} value={item.id}>
-                      {item.name}
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-              </SelectContent>
-            </Select>
-          ) : null}
-          {organization && !canManageProjects(organization.role) ? (
-            <Button disabled>
-              <PlusIcon data-icon="inline-start" />
-              创建项目
-            </Button>
-          ) : (
-            <Button asChild>
-              <Link to="/projects/new">
+    <ConsolePage width="wide">
+      <ConsolePageHeader
+        title="项目"
+        description="快速确认项目是否持续上报、最近 24 小时的访问规模与错误情况。"
+        actions={
+          <>
+            {organizations.length > 1 ? (
+              <Select value={organizationId} onValueChange={setSelectedOrganizationId}>
+                <SelectTrigger aria-label="组织" className="min-w-44">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    {organizations.map((item) => (
+                      <SelectItem key={item.id} value={item.id}>
+                        {item.name}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            ) : null}
+            {organization && !canManageProjects(organization.role) ? (
+              <Button disabled>
                 <PlusIcon data-icon="inline-start" />
                 创建项目
-              </Link>
-            </Button>
-          )}
-        </div>
-      </header>
+              </Button>
+            ) : (
+              <Button asChild>
+                <Link to="/projects/new">
+                  <PlusIcon data-icon="inline-start" />
+                  创建项目
+                </Link>
+              </Button>
+            )}
+          </>
+        }
+      />
 
       {organizationsQuery.isLoading || (organizationId && projectsQuery.isLoading) ? (
         <ProjectListSkeleton />
@@ -186,7 +184,7 @@ export function ProjectListPage() {
           ))}
         </div>
       ) : null}
-    </section>
+    </ConsolePage>
   );
 }
 
@@ -217,7 +215,7 @@ function ProjectCard({ project }: { project: Project }) {
       <CardHeader className="border-b">
         <CardTitle>{project.name}</CardTitle>
         <CardDescription>
-          {project.slug} · {project.environment}
+          {project.slug} · {project.environments?.length ?? 1} 个环境
         </CardDescription>
         <CardAction>
           <Badge variant={project.status === "active" ? "secondary" : "outline"}>
@@ -237,7 +235,7 @@ function ProjectCard({ project }: { project: Project }) {
       <CardFooter className="flex-wrap justify-between gap-2">
         <div className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
           <span className="flex items-center gap-1">
-            <ActivityIcon /> {project.environment}
+            <ActivityIcon /> 默认 {project.environment}
           </span>
           <span aria-hidden="true">·</span>
           <span>{project.retentionDays} 天保留</span>

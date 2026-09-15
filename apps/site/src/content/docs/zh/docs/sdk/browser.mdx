@@ -45,7 +45,7 @@ yarn add @openrum/browser
 
 <Steps>
 
-1. 创建一个 Project 并复制它的 write key，见[创建第一个项目](/zh/docs/getting-started/create-first-project/)。
+1. 创建一个 Project 并复制它的客户端 DSN，见[创建第一个项目](/zh/docs/getting-started/create-first-project/)。
 
 2. 把应用的 origin 加入该 Project 的允许列表。SDK 以 `mode: "cors"` 和
    `credentials: "omit"` 发送请求，未被 Instance 允许的 origin 会在浏览器侧就被拒绝。
@@ -62,8 +62,7 @@ yarn add @openrum/browser
 import { init } from "@openrum/browser";
 
 init({
-  endpoint: import.meta.env.VITE_OPENRUM_ENDPOINT,
-  writeKey: import.meta.env.VITE_OPENRUM_WRITE_KEY,
+  dsn: import.meta.env.VITE_OPENRUM_DSN,
   environment: import.meta.env.MODE,
   release: import.meta.env.VITE_APP_RELEASE,
 });
@@ -93,8 +92,7 @@ pnpm --filter @openrum/example-react-vite dev
 import { init } from "@openrum/browser";
 
 init({
-  endpoint: import.meta.env.VITE_OPENRUM_ENDPOINT,
-  writeKey: import.meta.env.VITE_OPENRUM_WRITE_KEY,
+  dsn: import.meta.env.VITE_OPENRUM_DSN,
   environment: import.meta.env.MODE,
   release: import.meta.env.VITE_APP_RELEASE,
 });
@@ -117,8 +115,7 @@ Page View。hash 模式不会被采集，见[支持矩阵](#支持矩阵)。
 import { init } from "@openrum/browser";
 
 init({
-  endpoint: import.meta.env.VITE_OPENRUM_ENDPOINT,
-  writeKey: import.meta.env.VITE_OPENRUM_WRITE_KEY,
+  dsn: import.meta.env.VITE_OPENRUM_DSN,
   environment: import.meta.env.MODE,
   release: import.meta.env.VITE_APP_RELEASE,
 });
@@ -155,6 +152,58 @@ TanStack Router 通过 `history.pushState` 提交导航，每次导航都会产�
 query、URL fragment、请求与响应 body、header、输入框原始值，都会在 Event 入队之前于浏览器侧
 清除。
 
+## 结构化日志
+
+日志不会自动采集：仅调用 `init()` 不会产生应用日志。可以导入单例 `logger`，也可以使用
+`init()` 返回的 client，在业务事件发生的位置主动调用对应级别的方法。
+
+```ts
+import { init, logger, setUser } from "@openrum/browser";
+
+init({ dsn: import.meta.env.VITE_OPENRUM_DSN });
+
+setUser("customer-123"); // 业务中的不透明用户 ID，不要传邮箱。
+logger.info("checkout started", {
+  "order.id": "order-123",
+  items: 3,
+});
+logger.error("payment failed", {
+  "error.code": "UPSTREAM_TIMEOUT",
+});
+
+// 用户退出登录时清除身份。
+setUser(undefined);
+```
+
+支持 `trace`、`debug`、`info`、`warn`、`error`、`fatal`。属性最多 20 项，值可以是
+string、number 或 boolean。error/fatal 日志仍是诊断 Log，不会创建 Issue。
+
+### 转发指定的 console 方法
+
+`captureConsole` 是独立的显式配置，只转发列出的方法，同时保留浏览器原本的控制台输出。
+
+```ts
+init({
+  dsn: import.meta.env.VITE_OPENRUM_DSN,
+  captureConsole: ["warn", "error"],
+  beforeSendLog: (log) =>
+    log.message.includes("ResizeObserver loop") ? null : log,
+});
+```
+
+不配置 `captureConsole` 时，全部 console 输出只留在本地。对象参数只记录为 `[Object]`，不会
+序列化。旧的 `enableLogs` 已废弃并被忽略；现有配置可以暂时保留，等待未来破坏性版本再删除。
+
+<Aside type="caution" title="日志文本仍可能包含敏感信息">
+  不要记录凭证、个人信息、请求 body 或访问令牌。OpenRUM 会在客户端和服务端做限长与脱敏，
+  但模式匹配无法保证完全匿名化。
+</Aside>
+
+验证接入时，可临时发送 `logger.info("openrum setup check")`，然后在同一 Project、Environment
+和时间范围的 Console「日志」页面搜索 `message:"openrum setup check"`。按用户排查时搜索
+`user.id:"customer-123"`。完整搜索字段、限制、Session/Trace 关联与隐私边界见
+[日志](/zh/docs/product/logs/)。
+
 ## 支持矩阵
 
 以下针对 `@openrum/browser 0.1.0`。"计划中"表示这项工作已排期但尚未实现；表里没有任何一条是因为
@@ -187,10 +236,10 @@ Page View 已经带着解析后的路径发出去了，而 `startPage` 又会开
 和它之后的 Event 会落在不同的 `page_id` 上。要正确记录路由模式需要改动 SDK，记在
 `docs/product-roadmap.md` 的 Phase 10。
 
-### write key 被拒绝会让整个页面停止上报
+### DSN 被拒绝会让整个页面停止上报
 
 ingest 返回 `401` 或 `403` 会被当作永久失败：SDK 清空队列，并在该页面剩余生命周期内停止发送，
-且不打日志。收不到 Event 时，请在 Console 里检查 write key 和该 Project 的允许 origin。
+且不打日志。收不到 Event 时，请在 Console 里检查 DSN 和该 Project 的允许 origin。
 
 ## 自定义事件
 

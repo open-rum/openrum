@@ -40,8 +40,7 @@ function harness(runtime: FakeRuntime, maxClicksPerMinute = 60) {
   let now = 1_000;
   const client = new OpenRUMClient(
     {
-      writeKey: "test",
-      endpoint: "/ingest",
+      dsn: "https://test@rum.example.test/ingest",
       integrations: [behaviorIntegration(runtime, { maxClicksPerMinute, now: () => now })],
     },
     {

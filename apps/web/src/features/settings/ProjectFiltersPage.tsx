@@ -36,7 +36,6 @@ export function ProjectFiltersRoute() {
     <ProjectSettingsLayout
       projectId={projectId}
       titleId="project-filters-title"
-      breadcrumb={`项目 / ${project.data?.name ?? "…"} / 入站过滤`}
       title="入站过滤"
       description="决定哪些上报不进入你的数据。规则由 Consumer 权威执行；浏览器 SDK 会提前丢弃其中一部分，那只是省带宽。"
     >

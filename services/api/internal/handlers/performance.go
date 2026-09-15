@@ -78,5 +78,6 @@ func parsePerformanceFilters(request *http.Request, projectID uuid.UUID) (query.
 	return query.NormalizePerformanceFilters(query.PerformanceFilters{
 		ProjectID: projectID, From: from, To: to, Environment: values.Get("environment"),
 		Release: values.Get("release"), Route: values.Get("route"), Metric: values.Get("metric"),
+		Percentile: values.Get("percentile"), Browser: values.Get("browser"), DeviceType: values.Get("deviceType"), Country: values.Get("country"),
 	})
 }

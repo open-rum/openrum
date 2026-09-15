@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { Check, Copy, Key, Plus, Warning } from "@phosphor-icons/react";
+import { ConsolePage, ConsolePageHeader } from "@/components/layout/ConsolePage";
 import { Button } from "@/components/ui/button";
 import {
   canManageProjects,
@@ -50,29 +51,24 @@ export function ProjectCreatePage() {
       recordProductEvent("project_created", project.id);
       setCopied(false);
       setCreatedProject(project);
-      if (project.writeKey)
-        sessionStorage.setItem(`openrum:write-key:${project.id}`, project.writeKey);
       await queryClient.invalidateQueries({ queryKey: ["projects", activeOrganizationId] });
       await navigate({ to: "/projects/$projectId/onboarding", params: { projectId: project.id } });
     },
   });
 
   return (
-    <section className="mx-auto w-full max-w-6xl px-6 py-8">
-      <header className="border-b border-border pb-6">
-        <p className="text-xs text-muted-foreground">项目 / 接入向导</p>
-        <h1 className="mt-2 text-2xl font-semibold tracking-tight text-foreground">创建监控项目</h1>
-        <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
-          配置允许上报的站点 Origin、环境、数据保留与采样率，然后复制仅显示一次的 Write Key。
-        </p>
-      </header>
+    <ConsolePage width="wide">
+      <ConsolePageHeader
+        title="创建监控项目"
+        description="配置允许上报的站点 Origin、环境、数据保留与采样率，然后复制客户端 DSN。"
+      />
 
-      {createdProject?.writeKey ? (
+      {createdProject?.dsn ? (
         <OneTimeProjectKey
           project={createdProject}
           copied={copied}
           onCopy={async () => {
-            await navigator.clipboard.writeText(createdProject.writeKey ?? "");
+            await navigator.clipboard.writeText(createdProject.dsn ?? "");
             setCopied(true);
           }}
           onDismiss={() => setCreatedProject(null)}
@@ -93,6 +89,7 @@ export function ProjectCreatePage() {
                 .map((value) => value.trim())
                 .filter(Boolean),
               environment: String(form.get("environment") ?? "production"),
+              environments: parseEnvironments(String(form.get("environments") ?? "production")),
               retentionDays: Number(form.get("retentionDays") ?? 14),
               eventSampleRate: Number(form.get("eventSampleRate") ?? 1),
               apiSampleRate: Number(form.get("apiSampleRate") ?? 0.2),
@@ -125,12 +122,21 @@ export function ProjectCreatePage() {
             </FormField>
           </div>
           <div className="mt-5 grid gap-5 sm:grid-cols-2">
-            <FormField label="环境">
+            <FormField label="默认环境" hint="进入项目时默认选择">
               <input
                 name="environment"
                 required
                 defaultValue="production"
                 pattern="[a-z][a-z0-9_-]{0,63}"
+              />
+            </FormField>
+            <FormField label="可用环境" hint="每行一个，最多 16 个">
+              <textarea
+                name="environments"
+                required
+                rows={4}
+                defaultValue={"production\ntest\ndevelopment"}
+                placeholder={"production\ncanary\ntest\ndevelopment"}
               />
             </FormField>
             <FormField label="原始数据保留天数" hint="1–90 天">
@@ -179,7 +185,7 @@ export function ProjectCreatePage() {
           </div>
 
           {!canCreate && organization ? (
-            <p className="mt-5 border border-amber-300 bg-amber-50 px-3 py-2.5 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100">
+            <p className="mt-5 border border-(--ds-warning)/30 bg-(--ds-warning-soft) px-3 py-2.5 text-sm text-(--ds-warning) dark:text-(--ds-warning)">
               当前角色为 {organization.role}，只有 Owner 或 Admin 可以创建项目。
             </p>
           ) : null}
@@ -278,8 +284,19 @@ export function ProjectCreatePage() {
           ) : null}
         </aside>
       </div>
-    </section>
+    </ConsolePage>
   );
+}
+
+function parseEnvironments(value: string) {
+  return [
+    ...new Set(
+      value
+        .split("\n")
+        .map((line) => line.trim())
+        .filter(Boolean),
+    ),
+  ];
 }
 
 function FormField({
@@ -313,35 +330,35 @@ function OneTimeProjectKey({
   onCopy: () => void;
   onDismiss: () => void;
 }) {
-  const writeKey = project.writeKey ?? "";
-  const snippet = `import { init } from "@openrum/browser";\n\ninit({\n  writeKey: "${writeKey}",\n  endpoint: window.location.origin + "/ingest/v1/envelope"\n});`;
+  const dsn = project.dsn ?? "";
+  const snippet = `import { init } from "@openrum/browser";\n\ninit({\n  dsn: "${dsn}"\n});`;
   return (
     <section
-      className="mt-6 border border-amber-300 bg-amber-50 p-5 text-amber-950 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100"
-      aria-labelledby="write-key-created"
+      className="mt-6 border border-(--ds-warning)/30 bg-(--ds-warning-soft) p-5 text-(--ds-warning) dark:text-(--ds-warning)"
+      aria-labelledby="dsn-created"
     >
       <div className="flex items-start gap-3">
         <Warning className="mt-0.5 size-5 shrink-0" weight="fill" />
         <div className="min-w-0 flex-1">
-          <h2 id="write-key-created" className="text-base font-semibold">
-            {project.name} 已创建，请立即保存 Write Key
+          <h2 id="dsn-created" className="text-base font-semibold">
+            {project.name} 已创建
           </h2>
           <p className="mt-1 text-sm leading-6 opacity-80">
-            完整 Key 只显示这一次。关闭后只能轮换，无法找回。
+            DSN 是浏览器公开的只写连接串，之后也可以在项目设置中查看和复制。
           </p>
-          <code className="mt-4 block overflow-x-auto border border-amber-300 bg-white px-3 py-2.5 font-mono text-sm whitespace-nowrap text-slate-950 dark:border-amber-800 dark:bg-black/30 dark:text-white">
-            {writeKey}
+          <code className="mt-4 block overflow-x-auto border border-(--ds-warning)/30 bg-white px-3 py-2.5 font-mono text-sm whitespace-nowrap text-slate-950 dark:bg-black/30 dark:text-white">
+            {dsn}
           </code>
-          <pre className="mt-3 overflow-x-auto border border-amber-300/70 bg-white/70 p-3 font-mono text-xs leading-5 text-slate-800 dark:border-amber-800 dark:bg-black/20 dark:text-slate-200">
+          <pre className="mt-3 overflow-x-auto border border-(--ds-warning)/30/70 bg-white/70 p-3 font-mono text-xs leading-5 text-slate-800 dark:bg-black/20 dark:text-slate-200">
             {snippet}
           </pre>
           <div className="mt-4 flex flex-wrap gap-2">
             <Button type="button" variant="outline" onClick={onCopy}>
               {copied ? <Check weight="bold" /> : <Copy />}
-              {copied ? "已复制" : "复制 Write Key"}
+              {copied ? "已复制" : "复制 DSN"}
             </Button>
             <Button type="button" variant="ghost" onClick={onDismiss}>
-              <Key /> 我已安全保存
+              <Key /> 关闭
             </Button>
           </div>
         </div>

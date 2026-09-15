@@ -26,30 +26,21 @@ import {
 } from "@/components/ui/card";
 import { adminOverviewQueryOptions, type AdminOverview } from "@/lib/api/admin";
 import { cn } from "@/lib/utils";
-import { AdminNav } from "./AdminNav";
+import { AdminPageLayout } from "./AdminPageLayout";
 
 export function AdminOverviewPage() {
   const query = useQuery(adminOverviewQueryOptions());
 
   return (
-    <div className="mx-auto w-full max-w-[1440px] p-5 lg:p-7">
-      <header className="mb-6 flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <div className="mb-2 flex items-center gap-2 text-xs text-muted-foreground">
-            <ServerCogIcon className="size-4" /> 系统管理 <span>/</span> 实例概览
-          </div>
-          <h1 className="text-2xl font-semibold tracking-tight">实例运行概览</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            检查 OpenRUM 控制面、数据链路和依赖状态。页面不会显示连接串或凭证。
-          </p>
-        </div>
+    <AdminPageLayout
+      title="实例运行概览"
+      description="检查 OpenRUM 控制面、数据链路和依赖状态。页面不会显示连接串或凭证。"
+      actions={
         <Button variant="outline" onClick={() => void query.refetch()} disabled={query.isFetching}>
           <RefreshCwIcon data-icon="inline-start" /> {query.isFetching ? "刷新中…" : "刷新状态"}
         </Button>
-      </header>
-
-      <AdminNav />
-
+      }
+    >
       {query.isLoading ? <AdminOverviewSkeleton /> : null}
       {query.error ? (
         <AsyncError
@@ -60,7 +51,7 @@ export function AdminOverviewPage() {
         />
       ) : null}
       {query.data ? <AdminOverviewContent overview={query.data} /> : null}
-    </div>
+    </AdminPageLayout>
   );
 }
 

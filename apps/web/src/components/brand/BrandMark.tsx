@@ -3,6 +3,7 @@ import { cn } from "@/lib/utils";
 
 const sizes = {
   sm: "size-5 [&_svg]:size-5",
+  nav: "size-6 [&_svg]:size-6",
   md: "size-9 [&_svg]:size-9",
 } as const;
 
@@ -17,7 +18,7 @@ export function BrandMark({
     <span
       aria-hidden="true"
       data-slot="brand-mark"
-      className={cn("grid shrink-0 place-items-center text-(--ds-brand)", sizes[size], className)}
+      className={cn("grid shrink-0 place-items-center text-(--ds-logo)", sizes[size], className)}
     >
       <svg viewBox={brandMarkViewBox} fill="currentColor" focusable="false">
         <path d={brandMarkPath} />

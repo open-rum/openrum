@@ -105,7 +105,7 @@ export function ApiFilterBar({
         </Button>
       ) : null}
       <span>
-        URL 已归一化 · 时间与环境沿用全局分析范围
+        URL 已归一化
         {filters.sort === "p95" || filters.sort === "failureRate"
           ? ` · 不足 ${minimumAPISamples} 次请求的 endpoint 排在末尾`
           : ""}

@@ -38,3 +38,4 @@ kafka-topics.sh --bootstrap-server <broker> --topic rum-events-v1 --describe
 ```
 
 Save the output in the incident timeline. Never paste credentials or event payloads. Any offset reset requires a reviewed replay window, a backup of the current offsets and explicit approval from the incident commander.
+

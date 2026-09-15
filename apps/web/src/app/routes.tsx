@@ -36,8 +36,16 @@ const RetentionPage = lazy(() =>
 const SessionsPage = lazy(() =>
   import("@/features/sessions/SessionsPage").then((module) => ({ default: module.SessionsPage })),
 );
+const SessionDetailPage = lazy(() =>
+  import("@/features/sessions/SessionDetailPage").then((module) => ({
+    default: module.SessionDetailPage,
+  })),
+);
 const EventsPage = lazy(() =>
   import("@/features/events/EventsPage").then((module) => ({ default: module.EventsPage })),
+);
+const LogsPage = lazy(() =>
+  import("@/features/logs/LogsPage").then((module) => ({ default: module.LogsPage })),
 );
 const OnboardingPage = lazy(() =>
   import("@/features/onboarding/OnboardingPage").then((module) => ({
@@ -86,6 +94,9 @@ const AlertsPage = lazy(() =>
 );
 const ChannelsPage = lazy(() =>
   import("@/features/settings/ChannelsPage").then((module) => ({ default: module.ChannelsPage })),
+);
+const AccountPage = lazy(() =>
+  import("@/features/settings/AccountPage").then((module) => ({ default: module.AccountPage })),
 );
 const MembersPage = lazy(() =>
   import("@/features/settings/MembersPage").then((module) => ({ default: module.MembersPage })),
@@ -285,6 +296,12 @@ const projectSessionsRoute = createRoute({
   component: SessionsPage,
 });
 
+const projectSessionDetailRoute = createRoute({
+  getParentRoute: () => protectedRoute,
+  path: "/projects/$projectId/sessions/$sessionId",
+  component: SessionDetailPage,
+});
+
 const legacyInsightsRoute = createRoute({
   getParentRoute: () => protectedRoute,
   path: "/insights",
@@ -314,6 +331,11 @@ const projectEventsRoute = createRoute({
   getParentRoute: () => protectedRoute,
   path: "/projects/$projectId/events",
   component: EventsPage,
+});
+const projectLogsRoute = createRoute({
+  getParentRoute: () => protectedRoute,
+  path: "/projects/$projectId/logs",
+  component: LogsPage,
 });
 
 const onboardingRoute = createRoute({
@@ -420,6 +442,12 @@ const settingsRoute = createRoute({
   getParentRoute: () => protectedRoute,
   path: "/settings",
   component: MembersPage,
+});
+
+const accountRoute = createRoute({
+  getParentRoute: () => protectedRoute,
+  path: "/account",
+  component: AccountPage,
 });
 
 const adminRoute = createRoute({
@@ -556,10 +584,12 @@ const routeTree = rootRoute.addChildren([
     projectRetentionRoute,
     sessionsRoute,
     projectSessionsRoute,
+    projectSessionDetailRoute,
     legacyInsightsRoute,
     legacyProjectInsightsRoute,
     eventsRoute,
     projectEventsRoute,
+    projectLogsRoute,
     onboardingRoute,
     projectOnboardingRoute,
     projectOverviewRoute,
@@ -578,6 +608,7 @@ const routeTree = rootRoute.addChildren([
     projectAlertsRoute,
     channelsRoute,
     settingsRoute,
+    accountRoute,
     adminRoute,
     adminObjectStorageRoute,
     adminDataRetentionRoute,

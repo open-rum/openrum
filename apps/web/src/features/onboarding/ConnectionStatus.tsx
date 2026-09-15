@@ -6,10 +6,10 @@ import type { ConnectionStatus as ConnectionStatusData } from "@/lib/api/client"
 type ConnectionStatusProps = {
   status?: ConnectionStatusData;
   loading: boolean;
-  hasInstallKey: boolean;
+  hasInstallDSN: boolean;
 };
 
-export function ConnectionStatus({ status, loading, hasInstallKey }: ConnectionStatusProps) {
+export function ConnectionStatus({ status, loading, hasInstallDSN }: ConnectionStatusProps) {
   if (loading && !status) {
     return (
       <div className="grid gap-3 sm:grid-cols-2" aria-label="正在检查接入状态">
@@ -21,8 +21,8 @@ export function ConnectionStatus({ status, loading, hasInstallKey }: ConnectionS
   }
   const stages = [
     {
-      title: "1. Write Key",
-      description: "项目具备可用的浏览器写入凭证",
+      title: "1. 客户端 DSN",
+      description: "项目具备可用的浏览器连接字符串",
       complete: status?.keyConfigured ?? false,
       time: null,
     },
@@ -30,7 +30,7 @@ export function ConnectionStatus({ status, loading, hasInstallKey }: ConnectionS
       title: "2. SDK 配置",
       description: "配置已复制到前端应用并准备发布",
       complete: Boolean(status?.lastSdkSeenAt),
-      active: hasInstallKey && !status?.lastSdkSeenAt,
+      active: hasInstallDSN && !status?.lastSdkSeenAt,
       time: null,
     },
     {

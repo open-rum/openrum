@@ -32,6 +32,7 @@ import {
   type BehaviorSample,
 } from "@/lib/api/analytics";
 import { getSessionTimeline } from "@/lib/api/issues";
+import { sessionEventHref } from "@/lib/api/sessions";
 import { BehaviorTimeline } from "./BehaviorTimeline";
 import { sessionTimelineRange } from "./timeline";
 
@@ -302,6 +303,13 @@ function SampleDetail({
             </div>
             {timeline.data ? <span>{timeline.data.events.length} 个事件</span> : null}
           </div>
+          <Button asChild variant="outline" size="sm">
+            <a
+              href={sessionEventHref(projectId, sample.sessionId, sample.timestamp, sample.eventId)}
+            >
+              打开完整会话详情
+            </a>
+          </Button>
           {timeline.isLoading ? <Skeleton className="h-64" /> : null}
           {timeline.error ? (
             <AsyncError

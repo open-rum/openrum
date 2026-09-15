@@ -1,48 +1,47 @@
 import { Link } from "@tanstack/react-router";
+import { ConsolePageRail } from "@/components/layout/ConsolePage";
 
 const upcomingSections = ["认证与访问", "通知"];
 
 export function AdminNav() {
   return (
-    <nav className="mb-6 flex gap-1 overflow-x-auto border-b" aria-label="系统管理分区">
-      <Link
-        to="/admin"
-        activeOptions={{ exact: true }}
-        className="whitespace-nowrap px-3 py-2 text-sm text-muted-foreground"
-        activeProps={{ className: "border-b-2 border-primary font-medium text-foreground" }}
-      >
-        实例概览
-      </Link>
-      <Link
-        to="/admin/data-retention"
-        className="whitespace-nowrap px-3 py-2 text-sm text-muted-foreground"
-        activeProps={{ className: "border-b-2 border-primary font-medium text-foreground" }}
-      >
-        数据生命周期
-      </Link>
-      <Link
-        to="/admin/audit"
-        className="whitespace-nowrap px-3 py-2 text-sm text-muted-foreground"
-        activeProps={{ className: "border-b-2 border-primary font-medium text-foreground" }}
-      >
-        维护与审计
-      </Link>
-      <Link
-        to="/admin/object-storage"
-        className="whitespace-nowrap px-3 py-2 text-sm text-muted-foreground"
-        activeProps={{ className: "border-b-2 border-primary font-medium text-foreground" }}
-      >
-        对象存储
-      </Link>
-      {upcomingSections.map((section) => (
-        <span
-          key={section}
-          className="whitespace-nowrap px-3 py-2 text-sm text-muted-foreground"
-          aria-disabled="true"
-        >
-          {section}
-        </span>
-      ))}
-    </nav>
+    <ConsolePageRail>
+      <div>
+        <p className="mb-2 px-2 text-xs font-medium text-muted-foreground">系统设置</p>
+        <nav className="grid gap-1" aria-label="系统设置分区">
+          <AdminLink to="/admin" label="实例概览" exact />
+          <AdminLink to="/admin/data-retention" label="数据生命周期" />
+          <AdminLink to="/admin/audit" label="维护与审计" />
+          <AdminLink to="/admin/object-storage" label="对象存储" />
+        </nav>
+      </div>
+      <div>
+        <p className="mb-2 px-2 text-xs font-medium text-muted-foreground">待开放</p>
+        <div className="grid gap-1">
+          {upcomingSections.map((section) => (
+            <span
+              key={section}
+              className="flex min-h-10 items-center rounded-md px-3 text-sm text-muted-foreground/70"
+              aria-disabled="true"
+            >
+              {section}
+            </span>
+          ))}
+        </div>
+      </div>
+    </ConsolePageRail>
+  );
+}
+
+function AdminLink({ to, label, exact = false }: { to: string; label: string; exact?: boolean }) {
+  return (
+    <Link
+      to={to}
+      activeOptions={{ exact }}
+      className="flex min-h-10 items-center rounded-md px-3 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+      activeProps={{ className: "bg-muted font-medium text-foreground" }}
+    >
+      {label}
+    </Link>
   );
 }

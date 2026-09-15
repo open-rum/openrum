@@ -37,8 +37,7 @@ browser.
    export function Monitoring() {
      useEffect(() => {
        init({
-         endpoint: process.env.NEXT_PUBLIC_OPENRUM_ENDPOINT!,
-         writeKey: process.env.NEXT_PUBLIC_OPENRUM_WRITE_KEY!,
+         dsn: process.env.NEXT_PUBLIC_OPENRUM_DSN!,
          environment: process.env.NODE_ENV,
          release: process.env.NEXT_PUBLIC_APP_RELEASE,
        });
@@ -69,9 +68,8 @@ browser.
    }
    ```
 
-3. Expose the values with the `NEXT_PUBLIC_` prefix. A write key is meant to be public — it
-   only authorizes appending Events to one Project — but it still has to reach the browser
-   bundle, and the prefix is what puts it there.
+3. Expose the DSN with the `NEXT_PUBLIC_` prefix. It contains a browser-public, write-only
+   credential, so it has to reach the browser bundle; the prefix is what puts it there.
 
 </Steps>
 
@@ -88,8 +86,7 @@ import { useEffect } from "react";
 export default function App({ Component, pageProps }: AppProps) {
   useEffect(() => {
     init({
-      endpoint: process.env.NEXT_PUBLIC_OPENRUM_ENDPOINT!,
-      writeKey: process.env.NEXT_PUBLIC_OPENRUM_WRITE_KEY!,
+      dsn: process.env.NEXT_PUBLIC_OPENRUM_DSN!,
       environment: process.env.NODE_ENV,
       release: process.env.NEXT_PUBLIC_APP_RELEASE,
     });

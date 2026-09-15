@@ -1,0 +1,222 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1200" viewBox="0 0 1600 1200" role="img" aria-labelledby="title desc">
+  <title id="title">OpenRUM 分层架构</title>
+  <desc id="desc">展示 OpenRUM 从浏览器采集、数据接入、异步处理、存储查询到控制台体验的分层架构。</desc>
+  <defs>
+    <marker id="arrow-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#6d9914"/>
+    </marker>
+    <marker id="arrow-gray" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#7a7a73"/>
+    </marker>
+    <filter id="soft-shadow" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="5" stdDeviation="10" flood-color="#151712" flood-opacity="0.07"/>
+    </filter>
+    <style>
+      .canvas { fill: #f8f8f5; }
+      .title { fill: #171914; font: 700 42px Inter, ui-sans-serif, system-ui, sans-serif; letter-spacing: -1.4px; }
+      .subtitle { fill: #666961; font: 400 18px Inter, ui-sans-serif, system-ui, sans-serif; }
+      .layer { fill: #ffffff; stroke: #dbddd6; stroke-width: 1.5; }
+      .layer-accent { fill: #b7ef52; }
+      .layer-index { fill: #171914; font: 700 15px Inter, ui-sans-serif, system-ui, sans-serif; letter-spacing: 1.2px; }
+      .layer-title { fill: #171914; font: 650 22px Inter, ui-sans-serif, system-ui, sans-serif; }
+      .layer-note { fill: #777a72; font: 400 14px Inter, ui-sans-serif, system-ui, sans-serif; }
+      .node { fill: #fafbf8; stroke: #d6d9d0; stroke-width: 1.5; }
+      .node-primary { fill: #effbd8; stroke: #8dbd31; stroke-width: 1.5; }
+      .node-optional { fill: #fafbf8; stroke: #a9ada4; stroke-width: 1.5; stroke-dasharray: 7 6; }
+      .node-title { fill: #171914; font: 650 18px Inter, ui-sans-serif, system-ui, sans-serif; }
+      .node-copy { fill: #666961; font: 400 14px Inter, ui-sans-serif, system-ui, sans-serif; }
+      .tag { fill: #e9ebe5; }
+      .tag-text { fill: #555850; font: 600 12px Inter, ui-sans-serif, system-ui, sans-serif; }
+      .arrow-event { fill: none; stroke: #6d9914; stroke-width: 3; marker-end: url(#arrow-green); }
+      .arrow-support { fill: none; stroke: #7a7a73; stroke-width: 2; stroke-dasharray: 7 6; marker-end: url(#arrow-gray); }
+      .arrow-label { fill: #575a52; font: 600 12px Inter, ui-sans-serif, system-ui, sans-serif; }
+      .deployment { fill: #171914; }
+      .deployment-title { fill: #f7f8f4; font: 650 18px Inter, ui-sans-serif, system-ui, sans-serif; }
+      .deployment-copy { fill: #bec2b8; font: 400 14px Inter, ui-sans-serif, system-ui, sans-serif; }
+      .legend { fill: #696c64; font: 500 13px Inter, ui-sans-serif, system-ui, sans-serif; }
+    </style>
+  </defs>
+
+  <rect class="canvas" width="1600" height="1200"/>
+  <g transform="translate(64 54)">
+    <rect class="layer-accent" x="0" y="7" width="13" height="37" rx="6"/>
+    <text class="title" x="30" y="40">OpenRUM 分层架构</text>
+    <text class="subtitle" x="31" y="72">开源 · 自部署 · 前端真实用户监控平台 · Alpha</text>
+    <g transform="translate(1048 22)">
+      <line class="arrow-event" x1="0" y1="0" x2="56" y2="0"/>
+      <text class="legend" x="68" y="5">事件主链路</text>
+      <line class="arrow-support" x1="185" y1="0" x2="241" y2="0"/>
+      <text class="legend" x="253" y="5">控制 / 制品</text>
+    </g>
+  </g>
+
+  <!-- 01 Collection -->
+  <g filter="url(#soft-shadow)">
+    <rect class="layer" x="64" y="148" width="1472" height="154" rx="18"/>
+  </g>
+  <rect class="layer-accent" x="64" y="148" width="12" height="154" rx="6"/>
+  <text class="layer-index" x="102" y="184">01 · CLIENT</text>
+  <text class="layer-title" x="102" y="216">采集与构建层</text>
+  <text class="layer-note" x="102" y="242">数据离开页面前完成隐私过滤</text>
+  <g>
+    <rect class="node-primary" x="375" y="176" width="405" height="98" rx="14"/>
+    <text class="node-title" x="402" y="207">Browser SDK · TypeScript</text>
+    <text class="node-copy" x="402" y="234">Page View · 点击 · 自定义事件 · 错误 · Web Vitals</text>
+    <text class="node-copy" x="402" y="256">API Request · Log · Session · 浏览器端脱敏</text>
+  </g>
+  <g>
+    <rect class="node" x="895" y="176" width="365" height="98" rx="14"/>
+    <text class="node-title" x="922" y="207">Vite Plugin · Build / CI</text>
+    <text class="node-copy" x="922" y="234">按 Release 上传 Source Map Artifact</text>
+    <rect class="tag" x="922" y="246" width="98" height="20" rx="10"/>
+    <text class="tag-text" x="971" y="260" text-anchor="middle">可独立接入</text>
+  </g>
+
+  <!-- 02 Ingestion -->
+  <g filter="url(#soft-shadow)">
+    <rect class="layer" x="64" y="326" width="1472" height="164" rx="18"/>
+  </g>
+  <rect class="layer-accent" x="64" y="326" width="12" height="164" rx="6"/>
+  <text class="layer-index" x="102" y="362">02 · INGESTION</text>
+  <text class="layer-title" x="102" y="394">接入与缓冲层</text>
+  <text class="layer-note" x="102" y="420">收到 202 仅代表事件已进入 Kafka</text>
+  <g>
+    <rect class="node" x="375" y="354" width="235" height="108" rx="14"/>
+    <text class="node-title" x="402" y="386">Ingress / Nginx</text>
+    <text class="node-copy" x="402" y="413">TLS · 路由 · 可信代理头</text>
+    <text class="node-copy" x="402" y="436">Console / API / Ingest 入口</text>
+  </g>
+  <g>
+    <rect class="node-primary" x="686" y="354" width="305" height="108" rx="14"/>
+    <text class="node-title" x="713" y="386">Go Ingest</text>
+    <text class="node-copy" x="713" y="413">DSN 鉴权 · Schema 校验 · 脱敏</text>
+    <text class="node-copy" x="713" y="436">Issue 指纹 · Environment 校验</text>
+  </g>
+  <g>
+    <rect class="node-primary" x="1124" y="354" width="250" height="108" rx="14"/>
+    <text class="node-title" x="1151" y="386">Kafka</text>
+    <text class="node-copy" x="1151" y="413">12 Partitions · Durable Buffer</text>
+    <text class="node-copy" x="1151" y="436">rum-events-v1 + DLQ</text>
+  </g>
+
+  <!-- 03 Processing -->
+  <g filter="url(#soft-shadow)">
+    <rect class="layer" x="64" y="514" width="1472" height="154" rx="18"/>
+  </g>
+  <rect class="layer-accent" x="64" y="514" width="12" height="154" rx="6"/>
+  <text class="layer-index" x="102" y="550">03 · PROCESSING</text>
+  <text class="layer-title" x="102" y="582">异步处理层</text>
+  <text class="layer-note" x="102" y="608">采集与查询解耦，故障可由 Kafka 缓冲</text>
+  <g>
+    <rect class="node-primary" x="510" y="542" width="335" height="98" rx="14"/>
+    <text class="node-title" x="537" y="573">Go Consumer</text>
+    <text class="node-copy" x="537" y="600">消费、规范化、批量写入 Event</text>
+    <text class="node-copy" x="537" y="622">生成分析与性能聚合</text>
+  </g>
+  <g>
+    <rect class="node" x="1005" y="542" width="369" height="98" rx="14"/>
+    <text class="node-title" x="1032" y="573">Go Worker</text>
+    <text class="node-copy" x="1032" y="600">Source Map 映射 · 数据生命周期</text>
+    <text class="node-copy" x="1032" y="622">告警通知 · Project 删除任务</text>
+  </g>
+
+  <!-- 04 Data -->
+  <g filter="url(#soft-shadow)">
+    <rect class="layer" x="64" y="692" width="1472" height="188" rx="18"/>
+  </g>
+  <rect class="layer-accent" x="64" y="692" width="12" height="188" rx="6"/>
+  <text class="layer-index" x="102" y="728">04 · DATA</text>
+  <text class="layer-title" x="102" y="760">数据与依赖层</text>
+  <text class="layer-note" x="102" y="786">业务数据按职责分开存储</text>
+  <g>
+    <rect class="node-primary" x="340" y="724" width="255" height="126" rx="14"/>
+    <text class="node-title" x="367" y="756">ClickHouse</text>
+    <text class="node-copy" x="367" y="783">Event · Aggregate</text>
+    <text class="node-copy" x="367" y="806">行为 · 错误 · 性能 · API</text>
+    <rect class="tag" x="367" y="818" width="112" height="20" rx="10"/>
+    <text class="tag-text" x="423" y="832" text-anchor="middle">分析数据面</text>
+  </g>
+  <g>
+    <rect class="node" x="625" y="724" width="255" height="126" rx="14"/>
+    <text class="node-title" x="652" y="756">PostgreSQL</text>
+    <text class="node-copy" x="652" y="783">Organization · Project · User</text>
+    <text class="node-copy" x="652" y="806">Release · Alert · Settings</text>
+    <rect class="tag" x="652" y="818" width="112" height="20" rx="10"/>
+    <text class="tag-text" x="708" y="832" text-anchor="middle">控制平面</text>
+  </g>
+  <g>
+    <rect class="node" x="910" y="724" width="210" height="126" rx="14"/>
+    <text class="node-title" x="937" y="756">Redis</text>
+    <text class="node-copy" x="937" y="783">Quota · Status</text>
+    <text class="node-copy" x="937" y="806">短期缓存</text>
+  </g>
+  <g>
+    <rect class="node-optional" x="1150" y="724" width="270" height="126" rx="14"/>
+    <text class="node-title" x="1177" y="756">Object Storage</text>
+    <text class="node-copy" x="1177" y="783">Alibaba OSS / Amazon S3</text>
+    <text class="node-copy" x="1177" y="806">Source Map Artifact</text>
+    <rect class="tag" x="1177" y="818" width="66" height="20" rx="10"/>
+    <text class="tag-text" x="1210" y="832" text-anchor="middle">可选</text>
+  </g>
+
+  <!-- 05 Application -->
+  <g filter="url(#soft-shadow)">
+    <rect class="layer" x="64" y="904" width="1472" height="154" rx="18"/>
+  </g>
+  <rect class="layer-accent" x="64" y="904" width="12" height="154" rx="6"/>
+  <text class="layer-index" x="102" y="940">05 · EXPERIENCE</text>
+  <text class="layer-title" x="102" y="972">查询与体验层</text>
+  <text class="layer-note" x="102" y="998">面向开发者与 Instance 管理员</text>
+  <g>
+    <rect class="node-primary" x="410" y="932" width="290" height="98" rx="14"/>
+    <text class="node-title" x="437" y="963">Go API</text>
+    <text class="node-copy" x="437" y="990">查询聚合 · Auth · Control Plane</text>
+    <text class="node-copy" x="437" y="1012">Project / Instance 配置</text>
+  </g>
+  <g>
+    <rect class="node-primary" x="810" y="932" width="315" height="98" rx="14"/>
+    <text class="node-title" x="837" y="963">React Console</text>
+    <text class="node-copy" x="837" y="990">Vite · TypeScript · shadcn/ui</text>
+    <text class="node-copy" x="837" y="1012">分析 · Issue · 性能 · 会话 · 管理</text>
+  </g>
+  <g>
+    <rect class="node" x="1190" y="932" width="245" height="98" rx="14"/>
+    <text class="node-title" x="1217" y="963">Website &amp; Docs</text>
+    <text class="node-copy" x="1217" y="990">Astro · Starlight</text>
+    <text class="node-copy" x="1217" y="1012">独立静态发布</text>
+  </g>
+
+  <!-- Main data flow -->
+  <path class="arrow-event" d="M 580 274 L 580 314 L 492 314 L 492 354"/>
+  <text class="arrow-label" x="597" y="317">Envelope</text>
+  <path class="arrow-event" d="M 610 408 L 686 408"/>
+  <path class="arrow-event" d="M 991 408 L 1124 408"/>
+  <path class="arrow-event" d="M 1249 462 L 1249 498 L 678 498 L 678 542"/>
+  <path class="arrow-event" d="M 678 640 L 678 678 L 468 678 L 468 724"/>
+  <path class="arrow-event" d="M 468 850 L 468 890 L 555 890 L 555 932"/>
+  <path class="arrow-event" d="M 700 981 L 810 981"/>
+
+  <!-- Supporting dependencies and artifacts -->
+  <path class="arrow-support" d="M 1078 274 L 1078 678 L 1285 678 L 1285 724"/>
+  <text class="arrow-label" x="1094" y="670">Source Map Artifact</text>
+  <path class="arrow-support" d="M 838 462 L 838 682 L 1015 682 L 1015 724"/>
+  <text class="arrow-label" x="854" y="674">Quota / Cache</text>
+  <path class="arrow-support" d="M 1285 724 L 1285 686 L 1190 686 L 1190 640"/>
+  <path class="arrow-support" d="M 1190 640 L 1190 674 L 520 674 L 520 724"/>
+  <text class="arrow-label" x="1030" y="665">Mapped Frames</text>
+  <path class="arrow-support" d="M 752 850 L 752 892 L 610 892 L 610 932"/>
+  <path class="arrow-support" d="M 1015 850 L 1015 892 L 650 892 L 650 932"/>
+
+  <!-- Deployment ribbon -->
+  <g transform="translate(64 1082)">
+    <rect class="deployment" width="1472" height="74" rx="16"/>
+    <text class="deployment-title" x="30" y="33">SELF-HOSTED INSTANCE</text>
+    <text class="deployment-copy" x="30" y="54">边界与数据所有权归部署方</text>
+    <rect x="430" y="17" width="260" height="40" rx="20" fill="#2a2d27"/>
+    <text class="deployment-title" x="560" y="43" text-anchor="middle">Docker Compose · 本地</text>
+    <rect x="716" y="17" width="300" height="40" rx="20" fill="#2a2d27"/>
+    <text class="deployment-title" x="866" y="43" text-anchor="middle">Kubernetes + Helm · 生产</text>
+    <rect x="1042" y="17" width="380" height="40" rx="20" fill="#2a2d27"/>
+    <text class="deployment-title" x="1232" y="43" text-anchor="middle">Prometheus Rules · Service Dashboards</text>
+  </g>
+</svg>

@@ -116,6 +116,18 @@ export function logout() {
   );
 }
 
+export function changePassword(input: { currentPassword: string; newPassword: string }) {
+  return apiFetch<void>(
+    "/api/v1/auth/password",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...csrfHeaders() },
+      body: JSON.stringify(input),
+    },
+    { redirectOnUnauthorized: true },
+  );
+}
+
 export function csrfHeaders(): HeadersInit {
   return { "X-CSRF-Token": readCookie("openrum_csrf") };
 }

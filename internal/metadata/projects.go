@@ -21,6 +21,7 @@ type CreateProjectInput struct {
 	Slug            string
 	AllowedOrigins  []string
 	Environment     string
+	Environments    []string
 	RetentionDays   int16
 	EventSampleRate float64
 	APISampleRate   float64
@@ -32,6 +33,7 @@ type UpdateProjectInput struct {
 	Slug            *string
 	AllowedOrigins  *[]string
 	Environment     *string
+	Environments    *[]string
 	RetentionDays   *int16
 	EventSampleRate *float64
 	APISampleRate   *float64
@@ -55,7 +57,7 @@ func NewProjectRepository(database *sql.DB) *ProjectRepository {
 func (repository *ProjectRepository) ListForOrganization(ctx context.Context, userID, organizationID uuid.UUID) ([]Project, error) {
 	rows, err := repository.database.QueryContext(ctx,
 		`SELECT projects.id, projects.organization_id, projects.name, projects.slug, to_json(projects.allowed_origins),
-		        projects.environment, projects.retention_days, projects.event_sample_rate, projects.api_sample_rate,
+		        projects.environment, `+projectEnvironmentsSQL+`, projects.retention_days, projects.event_sample_rate, projects.api_sample_rate,
 		        projects.error_sample_rate, projects.ingest_rate_limit, projects.over_limit_behavior,
 		        projects.status, projects.created_at, projects.updated_at
 		 FROM projects
@@ -80,9 +82,10 @@ func (repository *ProjectRepository) ListForOrganization(ctx context.Context, us
 func (repository *ProjectRepository) GetForUser(ctx context.Context, userID, projectID uuid.UUID) (ProjectAccess, error) {
 	var access ProjectAccess
 	var allowedOriginsJSON []byte
+	var environmentsJSON []byte
 	err := repository.database.QueryRowContext(ctx,
 		`SELECT projects.id, projects.organization_id, projects.name, projects.slug, to_json(projects.allowed_origins),
-		        projects.environment, projects.retention_days, projects.event_sample_rate, projects.api_sample_rate,
+		        projects.environment, `+projectEnvironmentsSQL+`, projects.retention_days, projects.event_sample_rate, projects.api_sample_rate,
 		        projects.error_sample_rate, projects.ingest_rate_limit, projects.over_limit_behavior,
 		        projects.status, projects.created_at, projects.updated_at, organization_members.role
 		 FROM projects
@@ -90,7 +93,7 @@ func (repository *ProjectRepository) GetForUser(ctx context.Context, userID, pro
 		 WHERE projects.id=$1 AND organization_members.user_id=$2 AND projects.status!='deleting'`,
 		projectID, userID,
 	).Scan(&access.Project.ID, &access.Project.OrganizationID, &access.Project.Name, &access.Project.Slug,
-		&allowedOriginsJSON, &access.Project.Environment, &access.Project.RetentionDays,
+		&allowedOriginsJSON, &access.Project.Environment, &environmentsJSON, &access.Project.RetentionDays,
 		&access.Project.EventSampleRate, &access.Project.APISampleRate, &access.Project.ErrorSampleRate,
 		&access.Project.IngestRateLimit, &access.Project.OverLimitBehavior, &access.Project.Status, &access.Project.CreatedAt, &access.Project.UpdatedAt, &access.Role)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -101,6 +104,9 @@ func (repository *ProjectRepository) GetForUser(ctx context.Context, userID, pro
 	}
 	if err := json.Unmarshal(allowedOriginsJSON, &access.Project.AllowedOrigins); err != nil {
 		return ProjectAccess{}, fmt.Errorf("decode allowed origins: %w", err)
+	}
+	if err := json.Unmarshal(environmentsJSON, &access.Project.Environments); err != nil {
+		return ProjectAccess{}, fmt.Errorf("decode project environments: %w", err)
 	}
 	return access, nil
 }
@@ -201,12 +207,29 @@ func (repository *ProjectRepository) create(ctx context.Context, actorID uuid.UU
 	if err := json.Unmarshal(allowedOriginsJSON, &project.AllowedOrigins); err != nil {
 		return Project{}, nil, fmt.Errorf("decode allowed origins: %w", err)
 	}
+	environments := make([]string, 0, len(input.Environments)+1)
+	environments = append(environments, project.Environment)
+	seenEnvironments := map[string]struct{}{project.Environment: {}}
+	for _, environment := range input.Environments {
+		if _, exists := seenEnvironments[environment]; exists {
+			continue
+		}
+		seenEnvironments[environment] = struct{}{}
+		environments = append(environments, environment)
+	}
+	for _, environment := range environments {
+		if _, err := transaction.ExecContext(ctx,
+			"INSERT INTO project_environments (project_id,name) VALUES ($1,$2)", project.ID, environment); err != nil {
+			return Project{}, nil, translateConstraintError(err)
+		}
+	}
+	project.Environments = environments
 	if err := insertAudit(ctx, transaction, input.OrganizationID, actorID, "project.created", "project", project.ID); err != nil {
 		return Project{}, nil, err
 	}
 	var credential *ProjectKeyCredential
 	if keyName != "" {
-		created, err := createProjectKeyRecord(ctx, transaction, project.ID, keyName)
+		created, err := createProjectKeyRecord(ctx, transaction, project.ID, keyName, true)
 		if err != nil {
 			return Project{}, nil, err
 		}
@@ -281,7 +304,7 @@ func (repository *ProjectRepository) Update(ctx context.Context, actorID, projec
 		   sdk_config_effective_at=CASE WHEN $13 THEN now() ELSE sdk_config_effective_at END,
 		   updated_at=now()
 		 WHERE id=$14
-		 RETURNING id, organization_id, name, slug, to_json(allowed_origins), environment, retention_days,
+		 RETURNING id, organization_id, name, slug, to_json(allowed_origins), environment, json_build_array(environment), retention_days,
 		           event_sample_rate, api_sample_rate, error_sample_rate, ingest_rate_limit, over_limit_behavior,
 		           status, created_at, updated_at`,
 		input.Name, input.Slug, allowedOrigins, input.Environment, input.RetentionDays, input.EventSampleRate,
@@ -293,6 +316,27 @@ func (repository *ProjectRepository) Update(ctx context.Context, actorID, projec
 	}
 	if err != nil {
 		return Project{}, translateConstraintError(err)
+	}
+	if input.Environments != nil {
+		if _, err := transaction.ExecContext(ctx, "DELETE FROM project_environments WHERE project_id=$1", projectID); err != nil {
+			return Project{}, err
+		}
+		for _, environment := range *input.Environments {
+			if _, err := transaction.ExecContext(ctx,
+				"INSERT INTO project_environments (project_id,name) VALUES ($1,$2)", projectID, environment); err != nil {
+				return Project{}, translateConstraintError(err)
+			}
+		}
+	}
+	if input.Environments != nil || input.Environment != nil {
+		if _, err := transaction.ExecContext(ctx,
+			"INSERT INTO project_environments (project_id,name) VALUES ($1,$2) ON CONFLICT DO NOTHING", projectID, project.Environment); err != nil {
+			return Project{}, translateConstraintError(err)
+		}
+	}
+	project.Environments, err = listProjectEnvironments(ctx, transaction, projectID, project.Environment)
+	if err != nil {
+		return Project{}, err
 	}
 	if err := insertAudit(ctx, transaction, organizationID, actorID, "project.updated", "project", projectID); err != nil {
 		return Project{}, err
@@ -310,8 +354,9 @@ type rowScanner interface {
 func scanProject(scanner rowScanner) (Project, error) {
 	var project Project
 	var allowedOriginsJSON []byte
+	var environmentsJSON []byte
 	err := scanner.Scan(&project.ID, &project.OrganizationID, &project.Name, &project.Slug, &allowedOriginsJSON,
-		&project.Environment, &project.RetentionDays, &project.EventSampleRate, &project.APISampleRate,
+		&project.Environment, &environmentsJSON, &project.RetentionDays, &project.EventSampleRate, &project.APISampleRate,
 		&project.ErrorSampleRate, &project.IngestRateLimit, &project.OverLimitBehavior, &project.Status, &project.CreatedAt, &project.UpdatedAt)
 	if err != nil {
 		return Project{}, err
@@ -319,7 +364,37 @@ func scanProject(scanner rowScanner) (Project, error) {
 	if err := json.Unmarshal(allowedOriginsJSON, &project.AllowedOrigins); err != nil {
 		return Project{}, fmt.Errorf("decode allowed origins: %w", err)
 	}
+	if err := json.Unmarshal(environmentsJSON, &project.Environments); err != nil {
+		return Project{}, fmt.Errorf("decode project environments: %w", err)
+	}
 	return project, nil
+}
+
+const projectEnvironmentsSQL = `COALESCE((
+	SELECT json_agg(project_environments.name ORDER BY
+		CASE WHEN project_environments.name=projects.environment THEN 0 ELSE 1 END,
+		project_environments.name)
+	FROM project_environments
+	WHERE project_environments.project_id=projects.id
+), json_build_array(projects.environment))`
+
+func listProjectEnvironments(ctx context.Context, transaction *sql.Tx, projectID uuid.UUID, defaultEnvironment string) ([]string, error) {
+	rows, err := transaction.QueryContext(ctx,
+		`SELECT name FROM project_environments WHERE project_id=$1
+		 ORDER BY CASE WHEN name=$2 THEN 0 ELSE 1 END, name`, projectID, defaultEnvironment)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+	environments := make([]string, 0)
+	for rows.Next() {
+		var environment string
+		if err := rows.Scan(&environment); err != nil {
+			return nil, err
+		}
+		environments = append(environments, environment)
+	}
+	return environments, rows.Err()
 }
 
 func canManageProjectSettings(role OrganizationRole) bool {

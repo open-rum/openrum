@@ -12,7 +12,7 @@ This guide assumes you already started a local Instance with the [Five-minute Qu
 1. Sign in to the Console at `http://127.0.0.1:4173`.
 2. Open **Settings → Projects** and create a Project for one web product.
 3. Choose an Environment such as `development` or `production`.
-4. Create a write key under **Settings → Project keys**. Copy it once; treat it as a browser-public key protected by Origin allowlists and rate limits, not by secrecy alone.
+4. Open **Settings → Client DSN** and copy the default DSN generated with the Project. The single string contains the public Ingest URL and a write-only key protected by Origin allowlists and rate limits.
 
 ## 2. Install the Browser SDK
 
@@ -24,8 +24,7 @@ pnpm add @openrum/browser
 import { captureEvent, init } from "@openrum/browser";
 
 init({
-  endpoint: "http://127.0.0.1:8081/ingest/v1/envelope",
-  writeKey: import.meta.env.VITE_OPENRUM_WRITE_KEY,
+  dsn: import.meta.env.VITE_OPENRUM_DSN,
   environment: "development",
   release: "storefront@0.1.0",
 });
@@ -35,7 +34,7 @@ captureEvent("first_event", {
 });
 ```
 
-For a runnable example, copy `examples/react-vite/.env.example` to `.env.local`, set the write key, then run:
+For a runnable example, copy `examples/react-vite/.env.example` to `.env.local`, set the DSN, then run:
 
 ```sh
 pnpm --filter @openrum/example-react-vite dev
@@ -55,7 +54,7 @@ server.
 ## Troubleshooting
 
 - Event missing: confirm ingest health, write-key Origin allowlist and that Consumer / ClickHouse are healthy.
-- CORS or network failure: the browser endpoint must match the public ingest URL and allowed Origins.
+- CORS or network failure: the DSN address must match the public Ingest URL and allowed Origins.
 - Source Map frames unavailable: expected until optional object storage is configured. Core monitoring still works.
 
 Next: [Domain model](/docs/getting-started/domain-model/), [Self-hosting overview](/docs/self-hosting/overview/), or [Investigation](/docs/product/investigation/).

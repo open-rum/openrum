@@ -1,0 +1,183 @@
+package metadata
+
+import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"io"
+	"reflect"
+	"regexp"
+	"slices"
+	"strings"
+	"unicode/utf8"
+)
+
+const MaxDashboardWidgets = 24
+
+type DashboardConfig struct {
+	SchemaVersion int               `json:"schemaVersion"`
+	Widgets       []json.RawMessage `json:"widgets"`
+}
+
+type dashboardWidget struct {
+	ID      string `json:"id"`
+	Type    string `json:"type"`
+	Version int    `json:"version"`
+	Title   string `json:"title"`
+	Size    string `json:"size"`
+	View    string `json:"view"`
+	Data    struct {
+		Source    string   `json:"source"`
+		Metrics   []string `json:"metrics"`
+		Release   string   `json:"release,omitempty"`
+		Route     string   `json:"route,omitempty"`
+		EventKind string   `json:"eventKind,omitempty"`
+		EventName string   `json:"eventName,omitempty"`
+		Dimension string   `json:"dimension,omitempty"`
+	} `json:"data"`
+}
+
+var dashboardID = regexp.MustCompile(`^[A-Za-z0-9_-]{1,80}$`)
+var dashboardProperty = regexp.MustCompile(`^property:[a-zA-Z][a-zA-Z0-9_.-]{0,63}$`)
+
+// Unknown modules from a newer deployment may be retained verbatim or removed,
+// but clients cannot register executable modules or invent query capabilities.
+func ValidateDashboardConfig(raw, previous json.RawMessage) error {
+	var config DashboardConfig
+	if len(raw) > 65536 || strictDashboardJSON(raw, &config) != nil || config.SchemaVersion != 1 || config.Widgets == nil || len(config.Widgets) > MaxDashboardWidgets {
+		return fmt.Errorf("dashboard must use schema version 1 and contain at most %d modules", MaxDashboardWidgets)
+	}
+	var old DashboardConfig
+	_ = json.Unmarshal(previous, &old)
+	seen := map[string]bool{}
+	for _, rawWidget := range config.Widgets {
+		var identity struct {
+			ID      string `json:"id"`
+			Type    string `json:"type"`
+			Version int    `json:"version"`
+		}
+		if json.Unmarshal(rawWidget, &identity) != nil || !dashboardID.MatchString(identity.ID) || seen[identity.ID] {
+			return fmt.Errorf("module IDs must be valid and unique")
+		}
+		seen[identity.ID] = true
+		if identity.Version != 1 || !slices.Contains([]string{"stat", "timeseries", "breakdown", "top-issues", "slow-apis"}, identity.Type) {
+			if !unchangedDashboardWidget(rawWidget, old.Widgets) {
+				return fmt.Errorf("unsupported module type or version")
+			}
+			continue
+		}
+		var widget dashboardWidget
+		if strictDashboardJSON(rawWidget, &widget) != nil {
+			return fmt.Errorf("invalid module configuration")
+		}
+		if err := validateDashboardWidget(widget); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func validateDashboardWidget(w dashboardWidget) error {
+	if !dashboardText(w.Title, 80) || strings.TrimSpace(w.Title) == "" || !slices.Contains([]string{"compact", "half", "full"}, w.Size) {
+		return fmt.Errorf("module title or size is invalid")
+	}
+	if w.Type == "stat" {
+		if w.Size == "full" || w.View != "number" {
+			return fmt.Errorf("stat modules require a compact or half-width number view")
+		}
+	} else if w.Size == "compact" {
+		return fmt.Errorf("chart and list modules require half or full width")
+	}
+	switch w.Type {
+	case "timeseries":
+		if !slices.Contains([]string{"area", "line", "bar"}, w.View) {
+			return fmt.Errorf("invalid time-series view")
+		}
+	case "breakdown":
+		if w.Data.Source != "events" || !slices.Contains([]string{"bar", "table", "map"}, w.View) {
+			return fmt.Errorf("distributions require event data and a bar, table or country map view")
+		}
+		if w.View == "map" && w.Data.Dimension != "country" {
+			return fmt.Errorf("map views require the country dimension")
+		}
+	case "top-issues", "slow-apis":
+		if w.Data.Source != "overview" || w.View != "table" || len(w.Data.Metrics) != 0 {
+			return fmt.Errorf("invalid list configuration")
+		}
+	}
+	d := w.Data
+	if d.Metrics == nil {
+		return fmt.Errorf("a metrics array is required")
+	}
+	if !dashboardText(d.Release, 128) || !dashboardText(d.Route, 512) || !dashboardText(d.EventName, 80) {
+		return fmt.Errorf("data filters exceed their bounds")
+	}
+	if d.Source == "overview" {
+		if d.EventKind != "" || d.EventName != "" || d.Dimension != "" {
+			return fmt.Errorf("overview does not support event filters")
+		}
+	} else if d.Source == "events" {
+		if d.Release != "" || d.Route != "" {
+			return fmt.Errorf("events do not support release or route filters")
+		}
+		if !slices.Contains([]string{"", "page_view", "navigation", "click", "custom"}, d.EventKind) {
+			return fmt.Errorf("invalid event kind")
+		}
+		if !slices.Contains([]string{"country", "device", "browser", "source"}, d.Dimension) && !dashboardProperty.MatchString(d.Dimension) {
+			return fmt.Errorf("invalid event dimension")
+		}
+	} else {
+		return fmt.Errorf("unsupported data source")
+	}
+	if w.Type == "top-issues" || w.Type == "slow-apis" {
+		return nil
+	}
+	if len(d.Metrics) < 1 || len(d.Metrics) > 2 || ((w.Type == "stat" || w.Type == "breakdown") && len(d.Metrics) != 1) {
+		return fmt.Errorf("invalid metric selection")
+	}
+	if len(d.Metrics) == 2 {
+		if d.Source != "overview" || !((d.Metrics[0] == "pageViews" && d.Metrics[1] == "uniqueUsers") || (d.Metrics[0] == "errorRate" && d.Metrics[1] == "apiFailureRate")) {
+			return fmt.Errorf("only traffic and stability metric pairs can share a chart")
+		}
+	}
+	allowed := []string{"pageViews", "uniqueUsers", "errorRate", "apiFailureRate", "lcp", "inp", "cls"}
+	if d.Source == "events" {
+		allowed = []string{"estimated", "uniqueUsers", "uniqueSessions"}
+	}
+	for _, metric := range d.Metrics {
+		if !slices.Contains(allowed, metric) {
+			return fmt.Errorf("unsupported metric")
+		}
+	}
+	return nil
+}
+
+func dashboardText(value string, limit int) bool {
+	return utf8.RuneCountInString(value) <= limit && !strings.ContainsAny(value, "\x00\r\n")
+}
+
+func strictDashboardJSON(raw []byte, target any) error {
+	decoder := json.NewDecoder(bytes.NewReader(raw))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(target); err != nil {
+		return err
+	}
+	if err := decoder.Decode(new(any)); err != io.EOF {
+		return fmt.Errorf("unexpected trailing JSON")
+	}
+	return nil
+}
+
+func unchangedDashboardWidget(raw json.RawMessage, previous []json.RawMessage) bool {
+	var current any
+	if json.Unmarshal(raw, &current) != nil {
+		return false
+	}
+	for _, entry := range previous {
+		var old any
+		if json.Unmarshal(entry, &old) == nil && reflect.DeepEqual(current, old) {
+			return true
+		}
+	}
+	return false
+}

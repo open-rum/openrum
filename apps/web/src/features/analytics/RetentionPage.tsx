@@ -2,6 +2,12 @@ import { useQuery } from "@tanstack/react-query";
 import { useParams } from "@tanstack/react-router";
 import { RefreshCwIcon, UsersRoundIcon } from "lucide-react";
 import { useMemo } from "react";
+import {
+  ConsoleFilterBar,
+  ConsolePage,
+  ConsolePageHeader,
+  ConsolePageTabs,
+} from "@/components/layout/ConsolePage";
 import { AsyncError } from "@/components/ui/AsyncState";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -49,31 +55,32 @@ function ProjectRetention({ project }: { project: Project }) {
     queryFn: ({ signal }) => getRetention(input, signal),
   });
   return (
-    <div className="behavior-page retention-page">
-      <header className="behavior-header">
-        <div>
-          <div className="breadcrumb">
-            项目 <span>/</span> {project.name} <span>/</span> 分析 <span>/</span> 留存
-          </div>
-          <h1>周留存</h1>
-          <p>按用户首次出现在所选范围的自然周分组，观察后续每周是否再次活跃。</p>
-        </div>
-        <Button
-          size="icon"
-          variant="outline"
-          aria-label="刷新周留存"
-          onClick={() => void query.refetch()}
-          disabled={query.isFetching}
-        >
-          <RefreshCwIcon />
-        </Button>
-      </header>
-      <AnalysisTabs projectId={project.id} active="retention" />
-      <div className="behavior-toolbar" aria-label="留存查询配置">
-        <span className="behavior-toolbar__note">
-          展示 4 个自然周 · 首次出现基于全局范围 · 不进行跨设备合并
-        </span>
-      </div>
+    <ConsolePage width="fluid">
+      <ConsolePageHeader
+        title="周留存"
+        description="按用户首次出现在所选范围的自然周分组，观察后续每周是否再次活跃。"
+        actions={
+          <Button
+            size="icon"
+            variant="outline"
+            aria-label="刷新周留存"
+            onClick={() => void query.refetch()}
+            disabled={query.isFetching}
+          >
+            <RefreshCwIcon />
+          </Button>
+        }
+      />
+      <ConsolePageTabs>
+        <AnalysisTabs projectId={project.id} active="retention" />
+      </ConsolePageTabs>
+      <ConsoleFilterBar
+        primary={
+          <span className="behavior-toolbar__note">
+            展示 4 个自然周 · 首次出现基于全局范围 · 不进行跨设备合并
+          </span>
+        }
+      />
       {query.isLoading ? <RetentionSkeleton compact /> : null}
       {query.error ? (
         <AsyncError
@@ -84,7 +91,7 @@ function ProjectRetention({ project }: { project: Project }) {
         />
       ) : null}
       {query.data ? <RetentionMatrix data={query.data} /> : null}
-    </div>
+    </ConsolePage>
   );
 }
 

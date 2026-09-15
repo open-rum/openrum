@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams } from "@tanstack/react-router";
 import {
@@ -13,9 +13,14 @@ import {
   TriangleAlertIcon,
 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import {
+  ConsolePage,
+  ConsolePageContent,
+  ConsolePageHeader,
+} from "@/components/layout/ConsolePage";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
 import {
   Select,
   SelectContent,
@@ -29,14 +34,18 @@ import {
   getEvent,
   getIssueDetail,
   getIssueEvents,
-  parseIssueFilters,
+  serializeIssueFilters,
   updateIssue,
   type IssueDetailResponse,
   type IssueStatus,
+  type IssueFilters,
 } from "@/lib/api/issues";
 import { listMembers, listOrganizations, listProjects, type Project } from "@/lib/api/projects";
 import { EventContext } from "./EventContext";
 import { StackTrace } from "./StackTrace";
+import { useIssueFilters } from "./useIssueFilters";
+import { IssueTrend } from "./IssueTrend";
+import "./issues.css";
 
 export function IssueDetailPage() {
   const { projectId, fingerprint } = useParams({ strict: false }) as {
@@ -76,11 +85,44 @@ function ProjectIssueDetail({
   organizationId: string;
   fingerprint: string;
 }) {
-  const queryClient = useQueryClient();
-  const filters = useMemo(
-    () => parseIssueFilters(project.id, new URLSearchParams(window.location.search)),
-    [project.id],
+  const { filters } = useIssueFilters(project.id);
+  // A changed analysis context owns a fresh sample selection and pagination.
+  const scope = JSON.stringify([
+    project.id,
+    fingerprint,
+    filters.from,
+    filters.to,
+    filters.environment,
+    filters.release,
+    filters.browser,
+    filters.deviceType,
+    filters.country,
+    filters.route,
+  ]);
+  return (
+    <IssueInvestigation
+      key={scope}
+      project={project}
+      organizationId={organizationId}
+      fingerprint={fingerprint}
+      filters={filters}
+    />
   );
+}
+
+function IssueInvestigation({
+  project,
+  organizationId,
+  fingerprint,
+  filters,
+}: {
+  project: Project;
+  organizationId: string;
+  fingerprint: string;
+  filters: IssueFilters;
+}) {
+  const queryClient = useQueryClient();
+  const [copyFeedback, setCopyFeedback] = useState("");
   const detailKey = [
     "issue",
     project.id,
@@ -92,6 +134,7 @@ function ProjectIssueDetail({
     filters.browser,
     filters.deviceType,
     filters.country,
+    filters.route,
   ] as const;
   const detail = useQuery({
     queryKey: detailKey,
@@ -106,11 +149,19 @@ function ProjectIssueDetail({
       fingerprint,
       filters.from.toISOString(),
       filters.to.toISOString(),
+      filters.environment,
+      filters.release,
+      filters.browser,
+      filters.deviceType,
+      filters.country,
+      filters.route,
       eventCursor,
     ],
     queryFn: ({ signal }) => getIssueEvents(filters, fingerprint, eventCursor, signal),
   });
-  const [selectedEventId, setSelectedEventId] = useState<string>();
+  const [selectedEventId, setSelectedEventId] = useState<string | undefined>(
+    () => new URLSearchParams(window.location.search).get("event") ?? undefined,
+  );
   const eventId = selectedEventId ?? samples.data?.events[0]?.eventId;
   const event = useQuery({
     queryKey: ["event", eventId],
@@ -145,7 +196,10 @@ function ProjectIssueDetail({
       return { previous };
     },
     onError: (_error, _patch, context) => queryClient.setQueryData(detailKey, context?.previous),
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["issues", project.id] }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["issues", project.id] });
+      void queryClient.invalidateQueries({ queryKey: ["issue", project.id, fingerprint] });
+    },
   });
   const canChange = project.role !== "viewer";
 
@@ -160,150 +214,188 @@ function ProjectIssueDetail({
     );
   const issue = detail.data.issue;
   return (
-    <div className="issue-detail-page">
-      <a className="issue-back-link" href={`/issues?${window.location.search.slice(1)}`}>
-        <ArrowLeftIcon />
-        返回问题列表
-      </a>
-      <header className="issue-detail-header">
-        <div className="issue-detail-header__identity">
-          <div className="breadcrumb">
-            项目 <span>/</span> {project.name} <span>/</span> 问题详情
-          </div>
-          <div className="issue-title-row">
+    <ConsolePage width="fluid" className="issue-investigation">
+      <ConsolePageHeader
+        back={
+          <a
+            className="issue-back-link"
+            href={`/projects/${encodeURIComponent(project.id)}/issues?${serializeIssueFilters(filters)}`}
+          >
+            <ArrowLeftIcon />
+            返回问题列表
+          </a>
+        }
+        title={
+          <span className="issue-title-row">
             <IssueStatusBadge status={issue.status} />
-            <h1>{issue.title}</h1>
-          </div>
+            <span>{issue.title}</span>
+          </span>
+        }
+        description={
           <code>
             {issue.errorType} · {issue.fingerprint}
           </code>
-        </div>
-        <div className="issue-actions">
-          <Button
-            variant="outline"
-            size="icon"
-            aria-label="复制问题链接"
-            onClick={() => void navigator.clipboard.writeText(window.location.href)}
-          >
-            <ClipboardIcon />
-          </Button>
-          {issue.status === "unresolved" ? (
-            <>
-              <Button
-                variant="outline"
-                disabled={!canChange || mutation.isPending}
-                onClick={() => mutation.mutate({ status: "ignored" })}
-              >
-                <EyeOffIcon />
-                忽略
-              </Button>
-              <Button
-                disabled={!canChange || mutation.isPending}
-                onClick={() => mutation.mutate({ status: "resolved" })}
-              >
-                <CheckIcon />
-                标记解决
-              </Button>
-            </>
-          ) : (
+        }
+        actions={
+          <>
             <Button
-              disabled={!canChange || mutation.isPending}
-              onClick={() => mutation.mutate({ status: "unresolved" })}
-            >
-              <RotateCcwIcon />
-              重新打开
-            </Button>
-          )}
-        </div>
-      </header>
-      {mutation.error ? (
-        <Alert variant="destructive">
-          <TriangleAlertIcon />
-          <AlertTitle>更新失败，已恢复原状态</AlertTitle>
-          <AlertDescription>请确认权限与服务状态后重试。</AlertDescription>
-        </Alert>
-      ) : null}
-      <section className="issue-impact-grid" aria-label="问题影响">
-        <ImpactMetric label="事件" value={issue.events} />
-        <ImpactMetric label="用户" value={issue.users} />
-        <ImpactMetric label="会话" value={issue.sessions} />
-        <Card size="sm">
-          <CardHeader>
-            <CardDescription>负责人</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {canChange ? (
-              <Select
-                value={issue.assigneeUserId ?? "none"}
-                onValueChange={(value) =>
-                  mutation.mutate({ assigneeUserId: value === "none" ? "" : value })
+              variant="outline"
+              size="icon"
+              aria-label="复制问题链接"
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(window.location.href);
+                  setCopyFeedback("问题链接已复制");
+                } catch {
+                  setCopyFeedback("复制失败，请从地址栏复制链接");
                 }
-              >
-                <SelectTrigger aria-label="负责人">
-                  <SelectValue placeholder="未分配" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    <SelectItem value="none">未分配</SelectItem>
-                    {members.data?.members.map((member) => (
-                      <SelectItem key={member.userId} value={member.userId}>
-                        {member.displayName || member.email}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
+              }}
+            >
+              <ClipboardIcon />
+            </Button>
+            {issue.status === "unresolved" ? (
+              <>
+                <Button
+                  variant="outline"
+                  disabled={!canChange || mutation.isPending}
+                  onClick={() => mutation.mutate({ status: "ignored" })}
+                >
+                  <EyeOffIcon />
+                  忽略
+                </Button>
+                <Button
+                  disabled={!canChange || mutation.isPending}
+                  onClick={() => mutation.mutate({ status: "resolved" })}
+                >
+                  <CheckIcon />
+                  标记解决
+                </Button>
+              </>
             ) : (
-              <strong>{issue.assigneeUserId ? "已分配" : "未分配"}</strong>
+              <Button
+                disabled={!canChange || mutation.isPending}
+                onClick={() => mutation.mutate({ status: "unresolved" })}
+              >
+                <RotateCcwIcon />
+                重新打开
+              </Button>
             )}
-          </CardContent>
-        </Card>
-      </section>
-      <div className="issue-detail-grid">
-        <section className="issue-main-column">
-          <IssueTrend trend={detail.data.trend} />
-          {event.isLoading ? <Skeleton className="h-96" /> : null}
-          {event.error ? (
-            <IssueDetailError
-              title="事件上下文暂不可用"
-              description="Issue 聚合数据仍然可用；可切换其他样本或稍后重试。"
-              onRetry={() => void event.refetch()}
-              compact
-            />
-          ) : null}
-          {event.data ? (
-            <>
-              <StackTrace event={event.data} />
-              <EventContext event={event.data} />
-            </>
-          ) : null}
+          </>
+        }
+      />
+      <ConsolePageContent className="grid gap-6">
+        {copyFeedback ? (
+          <p role="status" className="text-sm text-muted-foreground">
+            {copyFeedback}
+          </p>
+        ) : null}
+        {mutation.error ? (
+          <Alert variant="destructive">
+            <TriangleAlertIcon />
+            <AlertTitle>更新失败，已恢复原状态</AlertTitle>
+            <AlertDescription>请确认权限与服务状态后重试。</AlertDescription>
+          </Alert>
+        ) : null}
+        <section className="issue-impact-grid" aria-label="问题影响">
+          <ImpactMetric label="事件" value={issue.events} />
+          <ImpactMetric label="用户" value={issue.users} />
+          <ImpactMetric label="会话" value={issue.sessions} />
+          <Card size="sm">
+            <CardHeader>
+              <CardDescription>负责人</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {canChange ? (
+                <Select
+                  value={issue.assigneeUserId ?? "none"}
+                  disabled={mutation.isPending || members.isLoading || Boolean(members.error)}
+                  onValueChange={(value) =>
+                    mutation.mutate({ assigneeUserId: value === "none" ? "" : value })
+                  }
+                >
+                  <SelectTrigger aria-label="负责人">
+                    <SelectValue placeholder="未分配" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      <SelectItem value="none">未分配</SelectItem>
+                      {issue.assigneeUserId &&
+                      !members.data?.members.some(
+                        (member) => member.userId === issue.assigneeUserId,
+                      ) ? (
+                        <SelectItem value={issue.assigneeUserId}>已分配成员</SelectItem>
+                      ) : null}
+                      {members.data?.members.map((member) => (
+                        <SelectItem key={member.userId} value={member.userId}>
+                          {member.displayName || member.email}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+              ) : (
+                <strong>{issue.assigneeUserId ? "已分配" : "未分配"}</strong>
+              )}
+              {members.error ? (
+                <p className="mt-2 text-xs text-muted-foreground">成员列表加载失败，暂不可分配。</p>
+              ) : null}
+            </CardContent>
+          </Card>
         </section>
-        <aside className="issue-side-column">
-          <SamplesPanel
-            loading={samples.isLoading}
-            events={samples.data?.events ?? []}
-            selected={eventId}
-            onSelect={setSelectedEventId}
-            hasPrevious={cursorHistory.length > 0}
-            hasNext={Boolean(samples.data?.nextCursor)}
-            onPrevious={() => {
-              const history = [...cursorHistory];
-              const previous = history.pop();
-              setCursorHistory(history);
-              setEventCursor(previous || undefined);
-              setSelectedEventId(undefined);
-            }}
-            onNext={() => {
-              if (!samples.data?.nextCursor) return;
-              setCursorHistory((current) => [...current, eventCursor ?? ""]);
-              setEventCursor(samples.data.nextCursor);
-              setSelectedEventId(undefined);
-            }}
-          />
-          <FacetsPanel facets={detail.data.facets} />
-        </aside>
-      </div>
-    </div>
+        <div className="issue-detail-grid">
+          <section className="issue-main-column">
+            <IssueTrend trend={detail.data.trend} />
+            {event.isLoading ? <Skeleton className="h-96" /> : null}
+            {event.error ? (
+              <IssueDetailError
+                title="事件上下文暂不可用"
+                description="Issue 聚合数据仍然可用；可切换其他样本或稍后重试。"
+                onRetry={() => void event.refetch()}
+                compact
+              />
+            ) : null}
+            {event.data ? (
+              <>
+                <StackTrace event={event.data} />
+                <EventContext event={event.data} />
+              </>
+            ) : null}
+          </section>
+          <aside className="issue-side-column">
+            {samples.error ? (
+              <IssueDetailError
+                title="无法加载事件样本"
+                description="可重试加载；问题影响与趋势仍然可用。"
+                onRetry={() => void samples.refetch()}
+                compact
+              />
+            ) : null}
+            <SamplesPanel
+              loading={samples.isLoading}
+              events={samples.data?.events ?? []}
+              selected={eventId}
+              onSelect={setSelectedEventId}
+              hasPrevious={!samples.isFetching && cursorHistory.length > 0}
+              hasNext={!samples.isFetching && Boolean(samples.data?.nextCursor)}
+              onPrevious={() => {
+                const history = [...cursorHistory];
+                const previous = history.pop();
+                setCursorHistory(history);
+                setEventCursor(previous || undefined);
+                setSelectedEventId(undefined);
+              }}
+              onNext={() => {
+                if (!samples.data?.nextCursor) return;
+                setCursorHistory((current) => [...current, eventCursor ?? ""]);
+                setEventCursor(samples.data.nextCursor);
+                setSelectedEventId(undefined);
+              }}
+            />
+            <FacetsPanel facets={detail.data.facets} />
+          </aside>
+        </div>
+      </ConsolePageContent>
+    </ConsolePage>
   );
 }
 
@@ -312,8 +404,10 @@ function ImpactMetric({ label, value }: { label: string; value: number }) {
     <Card size="sm">
       <CardHeader>
         <CardDescription>{label}</CardDescription>
-        <CardTitle className="text-2xl tabular-nums">{value.toLocaleString()}</CardTitle>
       </CardHeader>
+      <CardContent>
+        <strong className="issue-impact-value">{value.toLocaleString()}</strong>
+      </CardContent>
     </Card>
   );
 }
@@ -327,40 +421,6 @@ function IssueStatusBadge({ status }: { status: IssueStatus }) {
     >
       {status === "unresolved" ? "待处理" : status === "resolved" ? "已解决" : "已忽略"}
     </Badge>
-  );
-}
-
-function IssueTrend({ trend }: { trend: IssueDetailResponse["trend"] }) {
-  const maximum = Math.max(1, ...trend.map((point) => point.events));
-  return (
-    <section className="issue-panel issue-trend" aria-labelledby="issue-trend-title">
-      <div className="issue-panel__header">
-        <div>
-          <h2 id="issue-trend-title">发生趋势</h2>
-          <p>当前筛选范围内的错误事件与受影响用户。</p>
-        </div>
-      </div>
-      {trend.length ? (
-        <div className="issue-trend__chart" role="img" aria-label="错误事件趋势">
-          {trend.map((point) => (
-            <div
-              key={point.bucket}
-              title={`${new Date(point.bucket).toLocaleString("zh-CN")} · ${point.events} 个事件`}
-            >
-              <i style={{ height: `${Math.max(4, (point.events / maximum) * 100)}%` }} />
-              <span>
-                {new Date(point.bucket).toLocaleDateString("zh-CN", {
-                  month: "numeric",
-                  day: "numeric",
-                })}
-              </span>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <p className="issue-empty-copy">这个时间范围内没有趋势数据。</p>
-      )}
-    </section>
   );
 }
 
@@ -398,6 +458,7 @@ function SamplesPanel({
             type="button"
             key={item.eventId}
             className={selected === item.eventId ? "is-active" : undefined}
+            aria-pressed={selected === item.eventId}
             onClick={() => onSelect(item.eventId)}
           >
             <span>
@@ -460,7 +521,7 @@ function FacetsPanel({ facets }: { facets: IssueDetailResponse["facets"] }) {
 
 function IssueDetailSkeleton() {
   return (
-    <div className="issue-detail-page" aria-label="正在加载问题详情">
+    <ConsolePage width="wide" aria-label="正在加载问题详情">
       <Skeleton className="h-6 w-36" />
       <Skeleton className="h-28" />
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
@@ -469,7 +530,7 @@ function IssueDetailSkeleton() {
         ))}
       </div>
       <Skeleton className="h-96" />
-    </div>
+    </ConsolePage>
   );
 }
 
@@ -484,7 +545,7 @@ function IssueDetailError({
   onRetry?: () => void;
   compact?: boolean;
 }) {
-  return (
+  const alert = (
     <Alert variant="destructive" className={compact ? "my-0" : "my-8"}>
       <TriangleAlertIcon />
       <AlertTitle>{title}</AlertTitle>
@@ -498,4 +559,5 @@ function IssueDetailError({
       </AlertDescription>
     </Alert>
   );
+  return compact ? alert : <ConsolePage width="wide">{alert}</ConsolePage>;
 }

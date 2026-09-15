@@ -33,3 +33,4 @@ Do not automatically reverse migrations: stored events or newer writers may alre
 - Preserve Job logs and database migration-table state.
 - Fix forward whenever possible and rerun the upgrade; migration locks and version rows prevent double application.
 - Restore a backup only after stopping all writers and confirming the recovery point objective. Reconcile Kafka offsets before reopening ingest.
+

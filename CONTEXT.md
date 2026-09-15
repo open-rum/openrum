@@ -4,6 +4,10 @@ OpenRUM observes real-user behavior and frontend reliability across monitored we
 
 ## Ownership and Delivery
 
+**Console**:
+The authenticated operator interface for inspecting project observations and managing Project, Organization, and Instance configuration.
+_Avoid_: Dashboard, admin panel, back office
+
 **Instance**:
 One self-hosted OpenRUM installation and its global operational policy boundary.
 _Avoid_: Tenant, cluster, workspace
@@ -17,12 +21,20 @@ A team boundary that owns monitored projects, members, and access policies.
 _Avoid_: Tenant, account, workspace
 
 **Project**:
-A web product whose browser activity is monitored as one reporting boundary.
+A web product whose browser activity is monitored as one reporting boundary. A Project can contain several Environments.
 _Avoid_: App, application, service
 
 **Environment**:
-A deployment scope within a project, such as production or staging.
+A deployment scope within a Project, such as production, canary, test, or development.
 _Avoid_: Stage, namespace
+
+**Project Settings**:
+Configuration and operating tools whose scope is the currently selected Project.
+_Avoid_: App settings, project management
+
+**Instance Settings**:
+Configuration and maintenance controls whose scope is the whole Instance and which are visible only to an Instance Administrator.
+_Avoid_: System management, super-admin settings
 
 **Release**:
 A deployed build identity used to relate observations to a specific delivery of a project.
@@ -34,12 +46,16 @@ _Avoid_: Version, deployment
 An immutable observation captured from a monitored project at a point in time.
 _Avoid_: Log, record, message
 
+**Log**:
+A diagnostic Event (`type=log`) with a severity, message and structured attributes. Logs are explicitly emitted through the Browser SDK logger or selected `captureConsole` methods and can be related by Session or supplied trace context; they do not create an Issue or count as a Custom Event.
+_Avoid_: Error, Issue, Custom Event
+
 **Page View**:
 An event representing a browser page or client-side route becoming visible to a visitor.
 _Avoid_: Hit, impression
 
 **Session**:
-A bounded period of browser activity that relates a visitor's events into one journey.
+A bounded period of browser activity that relates a visitor's events into one journey. It ends after 30 minutes of inactivity and rotates after 24 hours of continuous activity. A Session is not the visitor's full lifecycle.
 _Avoid_: Visit, replay
 
 **Issue**:

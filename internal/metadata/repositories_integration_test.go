@@ -58,16 +58,33 @@ func TestRepositoryIsolationAndLastOwnerInvariant(t *testing.T) {
 	if _, err := projects.GetForUser(ctx, ownerA, projectB); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("cross-organization project error=%v", err)
 	}
-	projectA, err := projects.Create(ctx, ownerA, CreateProjectInput{
+	projectA, credential, err := projects.CreateWithKey(ctx, ownerA, CreateProjectInput{
 		OrganizationID: organizationA, Name: "Web", Slug: "web", AllowedOrigins: []string{"https://example.com"},
-		Environment: "production", RetentionDays: 14, EventSampleRate: 1, APISampleRate: 0.2, ErrorSampleRate: 1,
-	})
+		Environment: "production", Environments: []string{"production", "staging"}, RetentionDays: 14,
+		EventSampleRate: 1, APISampleRate: 0.2, ErrorSampleRate: 1,
+	}, "Integration")
 	if err != nil {
 		t.Fatal(err)
 	}
 	access, err := projects.GetForUser(ctx, ownerA, projectA.ID)
-	if err != nil || access.Role != RoleOwner || len(access.Project.AllowedOrigins) != 1 {
+	if err != nil || access.Role != RoleOwner || len(access.Project.AllowedOrigins) != 1 ||
+		!access.Project.AcceptsEnvironment("staging") {
 		t.Fatalf("project access=%+v err=%v", access, err)
+	}
+	defaultEnvironment := "staging"
+	environments := []string{"production", "staging", "development"}
+	updatedProject, err := projects.Update(ctx, ownerA, projectA.ID, UpdateProjectInput{
+		Environment:  &defaultEnvironment,
+		Environments: &environments,
+	})
+	if err != nil || updatedProject.Environment != defaultEnvironment ||
+		len(updatedProject.Environments) != len(environments) || !updatedProject.AcceptsEnvironment("development") {
+		t.Fatalf("updated project environments=%+v err=%v", updatedProject, err)
+	}
+	keyAccess, err := NewProjectKeyRepository(database).Validate(ctx, credential.Raw)
+	if err != nil || !keyAccess.Project.AcceptsEnvironment("production") ||
+		!keyAccess.Project.AcceptsEnvironment("development") {
+		t.Fatalf("project key environments=%+v err=%v", keyAccess.Project.Environments, err)
 	}
 	configs := NewProjectConfigRepository(database)
 	initialConfig, err := configs.Get(ctx, projectA.ID, time.Now())
@@ -100,7 +117,7 @@ func TestRepositoryIsolationAndLastOwnerInvariant(t *testing.T) {
 	}
 	var auditCount int
 	if err := database.QueryRowContext(ctx, `SELECT count(*) FROM audit_logs WHERE resource_id=$1
-		AND action IN ('project.updated','project.sdk_config.emergency_updated')`, projectA.ID).Scan(&auditCount); err != nil || auditCount != 3 {
+		AND action IN ('project.updated','project.sdk_config.emergency_updated')`, projectA.ID).Scan(&auditCount); err != nil || auditCount != 4 {
 		t.Fatalf("SDK config audit count=%d err=%v", auditCount, err)
 	}
 	oldEncryptionKey := secure.Key{ID: "integration-old", Material: bytes.Repeat([]byte{7}, 32)}

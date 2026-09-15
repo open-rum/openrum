@@ -12,7 +12,7 @@ description: 创建 Project、安装 Browser SDK，并验证第一个 Event。
 1. 打开 `http://127.0.0.1:4173` 并登录控制台。
 2. 进入 **设置 → 项目**，为单个 Web 产品创建一个 Project。
 3. 选择 Environment，例如 `development` 或 `production`。
-4. 在 **设置 → 项目密钥** 创建 write key，并立即复制保存。它是浏览器侧公开密钥，主要依赖 Origin 白名单与限流，而不是保密本身。
+4. 在 **设置 → 客户端 DSN** 复制随项目自动生成的默认 DSN。这个字符串已包含公开 Ingest 地址和只写凭证，主要依赖 Origin 白名单与限流。
 
 ## 2. 安装 Browser SDK
 
@@ -24,8 +24,7 @@ pnpm add @openrum/browser
 import { captureEvent, init } from "@openrum/browser";
 
 init({
-  endpoint: "http://127.0.0.1:8081/ingest/v1/envelope",
-  writeKey: import.meta.env.VITE_OPENRUM_WRITE_KEY,
+  dsn: import.meta.env.VITE_OPENRUM_DSN,
   environment: "development",
   release: "storefront@0.1.0",
 });
@@ -35,7 +34,7 @@ captureEvent("first_event", {
 });
 ```
 
-可运行示例见仓库 `examples/react-vite`。复制 `.env.example` 为 `.env.local`，填入 write key 后执行：
+可运行示例见仓库 `examples/react-vite`。复制 `.env.example` 为 `.env.local`，填入 DSN 后执行：
 
 ```sh
 pnpm --filter @openrum/example-react-vite dev
@@ -52,6 +51,6 @@ pnpm --filter @openrum/example-react-vite dev
 
 ## 故障排查
 
-- 事件缺失：检查 ingest 健康、write key Origin 白名单，以及 Consumer / ClickHouse。
-- CORS 或网络失败：浏览器 endpoint 必须匹配公开 ingest 地址与允许的 Origin。
+- 事件缺失：检查 Ingest 健康、DSN、Origin 白名单，以及 Consumer / ClickHouse。
+- CORS 或网络失败：DSN 中的地址必须匹配公开 Ingest 地址与允许的 Origin。
 - Source Map 不可用：未配置对象存储时属预期；核心监控仍可用。

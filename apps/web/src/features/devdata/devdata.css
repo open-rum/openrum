@@ -20,7 +20,7 @@
 }
 .devdata-header h1 > svg {
   width: 20px;
-  color: var(--ds-brand);
+  color: var(--ds-text);
 }
 .devdata-header p {
   max-width: 72ch;
@@ -87,7 +87,7 @@
 }
 .devdata-presets button[data-active="true"],
 .devdata-windows button[data-active="true"] {
-  border-color: var(--ds-brand);
+  border-color: var(--ds-text);
   background: var(--ds-surface-hover);
   color: var(--ds-text);
 }

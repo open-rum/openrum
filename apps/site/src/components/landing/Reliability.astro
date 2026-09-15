@@ -1,0 +1,442 @@
+---
+import { Container, Layers, ShieldCheck } from "lucide-astro";
+import evidence from "../../content/evidence/local-overload-2026-09-03.json";
+
+// The reliability floor: how an Event travels, what it takes to run, and what
+// has actually been measured.
+//
+// Every number here is either a design fact (the ack semantics), a declared
+// default (the Helm resource requests) or a figure from the one benchmark the
+// repository has published — which failed its release gate. That failure is
+// stated on the page rather than hidden, because `capacity.md` records that no
+// throughput figure has been published and this page must not be the first
+// place one appears. The argument for reliability is made from behaviour under
+// failure, which is the part a developer can verify by reading the code.
+const { lang = "en" } = Astro.props;
+const zh = lang === "zh";
+const docs = zh ? "/zh/docs" : "/docs";
+const prefix = zh ? "/zh" : "";
+
+// Mirrors deploy/helm/openrum/values.yaml `services.*.resources.requests` and
+// `services.*.replicas`. Summed here so the headline figure follows the table if
+// a row is edited; the table itself has to be kept in step with the chart.
+const workloads = [
+  { name: "api", replicas: 2, cpu: 200, memory: 256 },
+  { name: "ingest", replicas: 3, cpu: 500, memory: 512 },
+  { name: "consumer", replicas: 2, cpu: 500, memory: 512 },
+  { name: "worker", replicas: 1, cpu: 200, memory: 256 },
+  { name: "web", replicas: 2, cpu: 100, memory: 128 },
+];
+const totalCPU = workloads.reduce((sum, w) => sum + w.replicas * w.cpu, 0) / 1000;
+const totalMemory = workloads.reduce((sum, w) => sum + w.replicas * w.memory, 0) / 1024;
+const integer = new Intl.NumberFormat(zh ? "zh-CN" : "en-US");
+
+const copy = zh
+  ? {
+      eyebrow: "架构与可靠性",
+      title: "为出问题的那一天而设计。",
+      lead: "Ingest 只在 Kafka 落盘后才返回 202，之后的每一步都是异步的。流量尖峰或 ClickHouse 重启只会让数据晚一点出现，不会让它消失。",
+      diagramLabel: "事件从浏览器到控制台的路径",
+      ack: "202 · acks=all",
+      legendEvents: "事件流",
+      legendQuota: "配额检查",
+      legendAck: "在这里确认",
+      nodes: [
+        ["Browser SDK", "采集 · 脱敏"],
+        ["Ingest", "校验 · 鉴权"],
+        ["Kafka", "持久缓冲"],
+        ["Consumer", "写入事件"],
+        ["ClickHouse", "事件 · 聚合"],
+        ["API · Console", "查询 · 调查"],
+      ],
+      side: [
+        ["Redis", "配额"],
+        ["Object storage", "Source Map"],
+        ["Worker", "映射堆栈帧"],
+        ["PostgreSQL", "控制面"],
+      ],
+      principles: [
+        [
+          "先落盘，再确认",
+          "Kafka 全部副本确认之后，浏览器才收到应答。202 的含义是「已持久接收」，不是「已可查询」。",
+        ],
+        [
+          "只有一个会丢数据的依赖",
+          "ClickHouse、PostgreSQL、Redis、对象存储任何一个不可用都不丢事件，只有 Kafka 会。所以容量规划从 Kafka 的保留余量开始，而不是从 ClickHouse 的磁盘。",
+        ],
+        [
+          "按事件 ID 幂等",
+          "重试的 Envelope 只会存一份。超时后服务端仍完成的请求被单独记为「结果不明」，不混进成功数里。",
+        ],
+      ],
+      runTitle: "两种运行方式",
+      evaluate: "评估",
+      evaluateBody:
+        "Docker 是唯一前置条件。一条命令拉起全部服务，首次启动自动迁移并载入确定性 Demo 数据。",
+      evaluateStat: ["1", "条命令"],
+      evaluateHost: ["1", "台主机"],
+      evaluateDemo: [integer.format(30000), "Demo 会话"],
+      production: "生产",
+      productionBody:
+        "Helm 部署五个工作负载，带滚动更新、健康探针、自动扩缩容和迁移钩子。PostgreSQL、ClickHouse、Kafka、Redis 由你单独提供。",
+      productionNote: "五个 OpenRUM 工作负载的默认资源请求，不含依赖。",
+      autoscale: "api 2–8 · ingest 3–20 · web 2–6 副本，按 CPU 自动扩缩",
+      evidenceTitle: "证据，不是容量承诺",
+      evidenceLead:
+        "这是仓库里唯一一次公开的压测——单机 Compose、刻意打到 3 倍假设负载。它没有通过发布门禁。通过的部分才写在这里。",
+      stats: [
+        [
+          `${integer.format(evidence.storedEvents)} = ${integer.format(evidence.uniqueEventIds)}`,
+          "过载下，存储行数等于唯一事件数。零重复。",
+        ],
+        [`${evidence.kafkaPartitions} / ${evidence.kafkaPartitions}`, "个分区的消费 lag 回到零。"],
+        [`≤ ${evidence.lagRecoveryUpperBoundMinutes} 分钟`, "从停止施压到 lag 归零。"],
+      ],
+      footnote: `${evidence.date} 演练，运行 ID ${evidence.id}。方法、拓扑与原始输出已公开。`,
+      link: "阅读完整基准记录",
+    }
+  : {
+      eyebrow: "Architecture & reliability",
+      title: "Built for the day something breaks.",
+      lead: "Ingest returns 202 only after Kafka has the Envelope, and every step after that is asynchronous. A traffic spike or a ClickHouse restart delays visibility instead of dropping Events.",
+      diagramLabel: "The path an Event takes from the browser to the Console",
+      ack: "202 · acks=all",
+      legendEvents: "Event flow",
+      legendQuota: "Quota check",
+      legendAck: "Acknowledged here",
+      nodes: [
+        ["Browser SDK", "capture · scrub"],
+        ["Ingest", "validate · auth"],
+        ["Kafka", "durable buffer"],
+        ["Consumer", "write Events"],
+        ["ClickHouse", "Events · aggregates"],
+        ["API · Console", "query · investigate"],
+      ],
+      side: [
+        ["Redis", "quotas"],
+        ["Object storage", "Source Maps"],
+        ["Worker", "mapped frames"],
+        ["PostgreSQL", "control plane"],
+      ],
+      principles: [
+        [
+          "Durable before acknowledged",
+          "Every Kafka replica confirms before the browser hears back. A 202 means durably received, not yet queryable — and that distinction is what lets the Instance absorb a spike.",
+        ],
+        [
+          "One lossy dependency, by design",
+          "ClickHouse, PostgreSQL, Redis and object storage can each be unavailable without dropping an Event. Only Kafka can. Capacity planning therefore starts with Kafka retention headroom, not ClickHouse disk.",
+        ],
+        [
+          "Idempotent by Event ID",
+          "A retried Envelope is stored once. Requests that completed server-side after the client timed out are reported as ambiguous, never counted as successes.",
+        ],
+      ],
+      runTitle: "Run it two ways",
+      evaluate: "Evaluate",
+      evaluateBody:
+        "Docker is the only prerequisite. One command brings up every service, migrates both databases and loads a deterministic Demo on first start.",
+      evaluateStat: ["1", "command"],
+      evaluateHost: ["1", "host"],
+      evaluateDemo: [integer.format(30000), "Demo sessions"],
+      production: "Production",
+      productionBody:
+        "Helm deploys five workloads with rolling updates, health probes, autoscaling and a migration hook. PostgreSQL, ClickHouse, Kafka and Redis are yours to provision.",
+      productionNote:
+        "Default resource requests for the five OpenRUM workloads. Dependencies not included.",
+      autoscale: "api 2–8 · ingest 3–20 · web 2–6 replicas, autoscaled on CPU",
+      evidenceTitle: "Evidence, not a capacity claim",
+      evidenceLead:
+        "The one benchmark this repository has published: a single-machine Compose topology, pushed to a deliberate 3× of the assumed load. It failed its release gate. What held is what appears here.",
+      stats: [
+        [
+          `${integer.format(evidence.storedEvents)} = ${integer.format(evidence.uniqueEventIds)}`,
+          "Events stored equals unique Event IDs, under overload. Zero duplicates.",
+        ],
+        [
+          `${evidence.kafkaPartitions} / ${evidence.kafkaPartitions}`,
+          "partitions back to zero consumer lag.",
+        ],
+        [`≤ ${evidence.lagRecoveryUpperBoundMinutes} min`, "from load stopping to lag draining."],
+      ],
+      footnote: `From the ${evidence.date} rehearsal, run ${evidence.id}. Method, topology and raw output are published.`,
+      link: "Read the full benchmark record",
+    };
+
+// Diagram geometry, in viewBox units. Six spine nodes and four side nodes laid out
+// once here so the edges, the packet path and the labels cannot disagree about
+// where a node is. Widths are chosen so the two labelled spine edges have room
+// for their labels at the size the container renders the SVG.
+const W = 140;
+const H = 54;
+const spineY = 92;
+const spineX = [57, 254, 451, 648, 845, 1042];
+const sideY = 262;
+const sideH = 48;
+// Redis under Ingest, Object storage left of Worker, Worker under ClickHouse,
+// PostgreSQL under API · Console.
+const sideX = [254, 648, 845, 1042];
+const mid = (x: number) => x + W / 2;
+const spineTop = spineY - H / 2;
+const spineBottom = spineY + H / 2;
+const sideTop = sideY - sideH / 2;
+const packetPath = `M${spineX[0] + W} ${spineY} H${spineX[5]}`;
+---
+
+<section class="lp-section lp-rule lp-reliability" aria-labelledby="lp-reliability-title">
+  <div class="site-container">
+    <div class="lp-head lp-reveal">
+      <p class="lp-eyebrow">{copy.eyebrow}</p>
+      <h2 id="lp-reliability-title">{copy.title}</h2>
+      <p>{copy.lead}</p>
+    </div>
+
+    <figure class="lp-pipeline lp-reveal">
+      <svg
+        class="lp-pipeline-svg"
+        viewBox="0 0 1240 330"
+        aria-hidden="true"
+        focusable="false"
+        style={`--lp-packet-path: path("${packetPath}")`}
+      >
+        <defs>
+          <marker
+            id="lp-arrow"
+            viewBox="0 0 10 10"
+            refX="9"
+            refY="5"
+            markerWidth="7"
+            markerHeight="7"
+            orient="auto-start-reverse"
+          >
+            <path class="lp-edge-head" d="M1 1 L9 5 L1 9 Z"></path>
+          </marker>
+        </defs>
+
+        <!-- Spine edges -->
+        {
+          spineX
+            .slice(0, -1)
+            .map((x, index) => (
+              <line
+                class="lp-edge"
+                x1={x + W}
+                y1={spineY}
+                x2={spineX[index + 1] - 1}
+                y2={spineY}
+                marker-end="url(#lp-arrow)"
+              />
+            ))
+        }
+        <!-- The one edge where acceptance becomes durable -->
+        <line
+          class="lp-edge lp-edge-ack"
+          x1={spineX[1] + W}
+          y1={spineY}
+          x2={spineX[2] - 1}
+          y2={spineY}></line>
+
+        <!-- Side edges -->
+        <line
+          class="lp-edge lp-edge-quota"
+          x1={mid(sideX[0])}
+          y1={spineBottom}
+          x2={mid(sideX[0])}
+          y2={sideTop - 1}
+          marker-end="url(#lp-arrow)"></line>
+        <line
+          class="lp-edge"
+          x1={sideX[1] + W}
+          y1={sideY}
+          x2={sideX[2] - 1}
+          y2={sideY}
+          marker-end="url(#lp-arrow)"></line>
+        <line
+          class="lp-edge"
+          x1={mid(sideX[2])}
+          y1={sideTop}
+          x2={mid(sideX[2])}
+          y2={spineBottom + 1}
+          marker-end="url(#lp-arrow)"></line>
+        <line
+          class="lp-edge"
+          x1={mid(sideX[3])}
+          y1={sideTop}
+          x2={mid(sideX[3])}
+          y2={spineBottom + 1}
+          marker-end="url(#lp-arrow)"></line>
+
+        <!-- Edge labels -->
+        <text class="lp-edge-label" x={mid(sideX[0]) + 10} y={(spineBottom + sideTop) / 2}
+          >{copy.side[0][1]}</text
+        >
+        <text class="lp-edge-label" x={mid(sideX[2]) + 10} y={(spineBottom + sideTop) / 2}
+          >{copy.side[2][1]}</text
+        >
+        <text class="lp-edge-label" x={mid(sideX[3]) + 10} y={(spineBottom + sideTop) / 2}
+          >{copy.side[3][1]}</text
+        >
+
+        <!-- Kafka gets a pulse ring: it is where an Envelope becomes durable -->
+        <rect
+          class="lp-node-pulse"
+          x={spineX[2] - 6}
+          y={spineTop - 6}
+          width={W + 12}
+          height={H + 12}
+          rx="16"></rect>
+
+        <!-- Spine nodes -->
+        {
+          spineX.map((x, index) => (
+            <g class={`lp-node ${index === 2 ? "lp-node-kafka" : ""}`}>
+              <rect x={x} y={spineTop} width={W} height={H} rx="12" />
+              <text class="lp-node-title" x={mid(x)} y={spineY - 4}>
+                {copy.nodes[index][0]}
+              </text>
+              <text class="lp-node-sub" x={mid(x)} y={spineY + 15}>
+                {copy.nodes[index][1]}
+              </text>
+            </g>
+          ))
+        }
+
+        <!-- Side nodes -->
+        {
+          sideX.map((x, index) => (
+            <g class="lp-node lp-node-side">
+              <rect x={x} y={sideTop} width={W} height={sideH} rx="11" />
+              <text class="lp-node-title" x={mid(x)} y={sideY + 5}>
+                {copy.side[index][0]}
+              </text>
+            </g>
+          ))
+        }
+
+        <!-- Acknowledgement badge above the Ingest → Kafka edge -->
+        <g class="lp-ack">
+          <rect
+            x={(spineX[1] + W + spineX[2]) / 2 - 52}
+            y={spineY - 46}
+            width="104"
+            height="22"
+            rx="11"></rect>
+          <text x={(spineX[1] + W + spineX[2]) / 2} y={spineY - 31}>{copy.ack}</text>
+        </g>
+
+        <!-- Packets travelling the spine. Three on one loop, offset a third apart. -->
+        {
+          [0, 1, 2].map((n) => (
+            <circle class="lp-packet" r="4.5" style={`--lp-packet-delay:${n * 2}s`} />
+          ))
+        }
+      </svg>
+
+      <ol class="lp-pipeline-list">
+        {
+          copy.nodes.map(([title, sub]) => (
+            <li>
+              <strong>{title}</strong>
+              <span>{sub}</span>
+            </li>
+          ))
+        }
+      </ol>
+
+      <figcaption class="lp-pipeline-legend">
+        <span><i class="lp-legend-line"></i>{copy.legendEvents}</span>
+        <span><i class="lp-legend-line lp-legend-dashed"></i>{copy.legendQuota}</span>
+        <span><i class="lp-legend-ack"></i>{copy.legendAck}</span>
+      </figcaption>
+    </figure>
+
+    <ol class="lp-principles">
+      {
+        copy.principles.map(([title, body], index) => (
+          <li class="lp-principle lp-reveal" style={`--lp-order:${index}`}>
+            <span class="lp-principle-index">{String(index + 1).padStart(2, "0")}</span>
+            <h3>{title}</h3>
+            <p>{body}</p>
+          </li>
+        ))
+      }
+    </ol>
+
+    <div class="lp-reliability-grid">
+      <div class="lp-run lp-reveal">
+        <h3 class="lp-block-title">{copy.runTitle}</h3>
+        <div class="lp-tiers">
+          <article class="lp-tier">
+            <header>
+              <span class="lp-tier-icon"><Container size={18} /></span>
+              <span class="lp-tier-name">{copy.evaluate}</span>
+              <span class="lp-tier-stack">Docker Compose</span>
+            </header>
+            <p>{copy.evaluateBody}</p>
+            <dl class="lp-tier-figures">
+              <div>
+                <dd>{copy.evaluateStat[0]}</dd>
+                <dt>{copy.evaluateStat[1]}</dt>
+              </div>
+              <div>
+                <dd>{copy.evaluateHost[0]}</dd>
+                <dt>{copy.evaluateHost[1]}</dt>
+              </div>
+              <div>
+                <dd>{copy.evaluateDemo[0]}</dd>
+                <dt>{copy.evaluateDemo[1]}</dt>
+              </div>
+            </dl>
+            <a class="lp-tile-link" href={`${docs}/self-hosting/compose/`}>Docker Compose →</a>
+          </article>
+          <article class="lp-tier lp-tier-production">
+            <header>
+              <span class="lp-tier-icon"><Layers size={18} /></span>
+              <span class="lp-tier-name">{copy.production}</span>
+              <span class="lp-tier-stack">Kubernetes · Helm</span>
+            </header>
+            <p>{copy.productionBody}</p>
+            <dl class="lp-tier-figures">
+              <div>
+                <dd>{totalCPU.toFixed(1)}</dd>
+                <dt>vCPU</dt>
+              </div>
+              <div>
+                <dd>{totalMemory.toFixed(1)}</dd>
+                <dt>GiB</dt>
+              </div>
+              <div>
+                <dd>{workloads.length}</dd>
+                <dt>{zh ? "工作负载" : "workloads"}</dt>
+              </div>
+            </dl>
+            <p class="lp-tier-note">{copy.productionNote}</p>
+            <p class="lp-tier-note">{copy.autoscale}</p>
+            <a class="lp-tile-link" href={`${docs}/self-hosting/kubernetes/`}>Kubernetes · Helm →</a
+            >
+          </article>
+        </div>
+      </div>
+
+      <div class="lp-evidence lp-reveal">
+        <h3 class="lp-block-title"><ShieldCheck size={17} />{copy.evidenceTitle}</h3>
+        <p class="lp-evidence-lead">{copy.evidenceLead}</p>
+        <dl class="lp-evidence-stats">
+          {
+            copy.stats.map(([figure, label], index) => (
+              <div class="lp-evidence-stat" style={`--lp-order:${index}`}>
+                <dd>{figure}</dd>
+                <dt>{label}</dt>
+              </div>
+            ))
+          }
+        </dl>
+        <p class="lp-evidence-footnote">
+          <span class="lp-evidence-status">{zh ? "门禁未通过" : "gate failed"}</span>
+          {copy.footnote}
+        </p>
+        <a class="lp-tile-link" href={`${prefix}/benchmarks`}>{copy.link} →</a>
+      </div>
+    </div>
+  </div>
+</section>

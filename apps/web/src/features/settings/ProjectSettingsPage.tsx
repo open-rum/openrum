@@ -23,7 +23,6 @@ export function ProjectSettingsRoute() {
     <ProjectSettingsLayout
       projectId={projectId}
       titleId="project-settings-title"
-      breadcrumb={`项目 / ${query.data?.name ?? "…"} / Settings`}
       title="项目设置"
       description="这些设置决定哪些站点可以上报、事件归属哪个环境，以及原始数据保留多久。"
     >
@@ -87,6 +86,7 @@ function GeneralForm({ project, canManage }: { project: Project; canManage: bool
           slug: String(form.get("slug") ?? "").trim(),
           allowedOrigins: parseOrigins(String(form.get("allowedOrigins") ?? "")),
           environment: String(form.get("environment") ?? "").trim(),
+          environments: parseEnvironments(String(form.get("environments") ?? "")),
           retentionDays: Number(form.get("retentionDays") ?? project.retentionDays),
         });
       }}
@@ -121,13 +121,25 @@ function GeneralForm({ project, canManage }: { project: Project; canManage: bool
         </p>
       </div>
       <div className="mt-5 grid gap-5 sm:grid-cols-2">
-        <Field label="环境" hint="小写字母开头">
+        <Field label="默认环境" hint="进入项目时默认选择">
           <input
             name="environment"
             required
             maxLength={64}
             pattern="[a-z][a-z0-9_-]{0,63}"
             defaultValue={project.environment}
+          />
+        </Field>
+        <Field label="可用环境" hint="每行一个，最多 16 个">
+          <textarea
+            name="environments"
+            required
+            rows={4}
+            defaultValue={(project.environments?.length
+              ? project.environments
+              : [project.environment]
+            ).join("\n")}
+            placeholder={"production\ncanary\ntest\ndevelopment"}
           />
         </Field>
         <Field label="原始数据保留天数" hint="1–90 天">
@@ -141,11 +153,11 @@ function GeneralForm({ project, canManage }: { project: Project; canManage: bool
           />
         </Field>
       </div>
-      <div className="mt-3 flex items-start gap-2 border border-amber-300 bg-amber-50 px-3 py-2.5 text-xs leading-5 text-amber-900 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100">
+      <div className="mt-3 flex items-start gap-2 border border-(--ds-warning)/30 bg-(--ds-warning-soft) px-3 py-2.5 text-xs leading-5 text-(--ds-warning) dark:text-(--ds-warning)">
         <Warning className="mt-0.5 size-4 shrink-0" weight="fill" aria-hidden="true" />
         <span>
-          环境名必须与 SDK <code>init()</code> 里的 <code>environment</code>{" "}
-          完全一致。改了这里而没有同步发版， 上报会被 Ingest 拒绝，而页面上只会表现为「没有数据」。
+          SDK <code>init()</code> 里的 <code>environment</code> 必须存在于可用环境列表。
+          未注册的环境会被 Ingest 拒绝，页面上只会表现为「没有数据」。
         </span>
       </div>
       <p className="mt-3 text-xs leading-5 text-muted-foreground">
@@ -157,7 +169,7 @@ function GeneralForm({ project, canManage }: { project: Project; canManage: bool
           {mutation.isPending ? "保存中…" : "保存设置"}
         </Button>
         {saved && !mutation.isPending ? (
-          <span className="text-sm text-emerald-600" role="status">
+          <span className="text-sm text-(--ds-success)" role="status">
             已保存
           </span>
         ) : null}
@@ -191,7 +203,7 @@ function DangerZone({ project, canManage }: { project: Project; canManage: boole
           <p className="mt-1 text-sm leading-6 text-muted-foreground">
             {isDisabled
               ? "该项目当前拒绝所有上报。已入库的数据仍可查询，并继续按保留策略过期。"
-              : "停用后 Ingest 会拒绝该项目的全部上报，Write Key 不会被吊销。适合先止住噪声，再决定是否删除。"}
+              : "停用后 Ingest 会拒绝该项目的全部上报，客户端 DSN 不会被吊销。适合先止住噪声，再决定是否删除。"}
           </p>
         </div>
         <Button
@@ -226,6 +238,17 @@ function parseOrigins(value: string) {
     .split("\n")
     .map((line) => line.trim())
     .filter(Boolean);
+}
+
+function parseEnvironments(value: string) {
+  return [
+    ...new Set(
+      value
+        .split("\n")
+        .map((line) => line.trim())
+        .filter(Boolean),
+    ),
+  ];
 }
 
 function Field({

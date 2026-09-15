@@ -21,8 +21,9 @@ this document records the equivalent local review required by the roadmap.
   membership, audit record, and authenticated session.
 - Cross-organization resource access returns not-found, CSRF is enforced on
   mutations, and the last-owner invariant remains valid under concurrency.
-- Raw write keys are returned only at creation or rotation; PostgreSQL stores
-  only their prefix and SHA-256 hash. Rotated and revoked keys fail validation.
+- Browser-public write keys are returned to authorized users and PostgreSQL
+  stores their public value, prefix, and SHA-256 validation hash. Rotated and
+  revoked keys fail validation.
 - Browser verification covered bootstrap, login, logout, expired-session
   redirect, safe same-origin return paths, and rejection of external return URLs.
 - Browser role verification covered Owner, Admin, Member, and Viewer behavior

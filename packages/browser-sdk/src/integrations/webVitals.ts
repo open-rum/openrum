@@ -1,4 +1,4 @@
-import { onCLS, onINP, onLCP, type Metric } from "web-vitals";
+import { onCLS, onINP, onLCP, onFCP, onTTFB, type Metric } from "web-vitals";
 import type { NavigationType } from "@openrum/protocol";
 import type { Integration } from "../client.ts";
 
@@ -14,13 +14,15 @@ export interface WebVitalsRuntime {
   onCLS: Reporter;
   onINP: Reporter;
   onLCP: Reporter;
+  onFCP?: Reporter;
+  onTTFB?: Reporter;
 }
 
 interface RuntimeHub {
   subscribers: Set<(metric: CoreMetric) => void>;
 }
 
-const defaultRuntime: WebVitalsRuntime = { onCLS, onINP, onLCP };
+const defaultRuntime: WebVitalsRuntime = { onCLS, onINP, onLCP, onFCP, onTTFB };
 const runtimeHubs = new WeakMap<WebVitalsRuntime, RuntimeHub>();
 
 export function webVitalsIntegration(runtime: WebVitalsRuntime = defaultRuntime): Integration {
@@ -30,7 +32,14 @@ export function webVitalsIntegration(runtime: WebVitalsRuntime = defaultRuntime)
       const hub = getRuntimeHub(runtime);
       const subscriber = (metric: CoreMetric) => {
         try {
-          if (metric.name !== "LCP" && metric.name !== "INP" && metric.name !== "CLS") return;
+          if (
+            metric.name !== "LCP" &&
+            metric.name !== "INP" &&
+            metric.name !== "CLS" &&
+            metric.name !== "FCP" &&
+            metric.name !== "TTFB"
+          )
+            return;
           if (!Number.isFinite(metric.value) || metric.value < 0) return;
           client.capture({
             type: "web_vital",
@@ -61,7 +70,14 @@ function getRuntimeHub(runtime: WebVitalsRuntime): RuntimeHub {
     for (const subscriber of hub.subscribers) subscriber(metric);
   };
   const options: WebVitalOptions = { reportAllChanges: false, reportSoftNavs: true };
-  for (const register of [runtime.onCLS, runtime.onINP, runtime.onLCP]) {
+  for (const register of [
+    runtime.onCLS,
+    runtime.onINP,
+    runtime.onLCP,
+    runtime.onFCP,
+    runtime.onTTFB,
+  ]) {
+    if (!register) continue;
     try {
       register(publish, options);
     } catch {

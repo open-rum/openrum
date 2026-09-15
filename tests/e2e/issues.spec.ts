@@ -13,9 +13,17 @@ test("issues filters, rows and themes remain usable", async ({ page }) => {
   await rows.first().press("ArrowDown");
   await expect(rows.nth(1)).toBeFocused();
 
-  await page.getByLabel("处理状态").click();
-  await page.getByRole("option", { name: "待处理" }).click();
+  await page
+    .getByRole("radiogroup", { name: "处理状态" })
+    .getByRole("radio", { name: "待处理", exact: true })
+    .click();
   await expect(page).toHaveURL(/status=unresolved/);
+  await page.getByRole("searchbox", { name: "搜索本页问题" }).fill("checkout");
+  await expect(rows).toHaveCount(1);
+  await page.getByRole("searchbox").fill("no-match");
+  await expect(page.getByText("本页没有匹配的搜索结果")).toBeVisible();
+  await page.getByRole("button", { name: "清除搜索" }).click();
+  await expect(rows).toHaveCount(3);
 
   if (process.env.OPENRUM_ISSUES_LIGHT)
     await page.screenshot({ path: process.env.OPENRUM_ISSUES_LIGHT, fullPage: true });

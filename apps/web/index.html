@@ -9,11 +9,8 @@
     <title>OpenRUM · 生产环境概览</title>
     <script>
       try {
-        const palettes = ["acid", "citrus", "graphite"];
-        const palette =
-          new URLSearchParams(location.search).get("palette") ||
-          localStorage.getItem("openrum-palette");
-        document.documentElement.dataset.palette = palettes.includes(palette) ? palette : "acid";
+        document.documentElement.dataset.palette = "citrus";
+        localStorage.removeItem("openrum-palette");
         const saved = localStorage.getItem("openrum-theme") || "system";
         const resolved =
           saved === "system"

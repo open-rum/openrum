@@ -27,6 +27,7 @@ import {
   type APIsResponse,
 } from "@/lib/api/apis";
 import { ApiTrend } from "./ApiTrend";
+import { sessionEventHref } from "@/lib/api/sessions";
 
 type Detail = NonNullable<APIsResponse["detail"]>;
 
@@ -153,7 +154,15 @@ export function ApiDetail({
                     </TableCell>
                     <TableCell>{new Date(sample.timestamp).toLocaleString("zh-CN")}</TableCell>
                     <TableCell>
-                      <a href={sessionHref(projectId, sample.sessionId)} title={sample.sessionId}>
+                      <a
+                        href={sessionEventHref(
+                          projectId,
+                          sample.sessionId,
+                          sample.timestamp,
+                          sample.eventId,
+                        )}
+                        title={sample.sessionId}
+                      >
                         查看会话
                       </a>
                       {sample.traceId ? <small title={sample.traceId}>trace 已关联</small> : null}
@@ -289,17 +298,6 @@ function DimensionBreakdown({
       </Table>
     </div>
   );
-}
-
-/** Seeds the sessions workspace with this session while keeping the analysis range. */
-function sessionHref(projectId: string, sessionId: string) {
-  const parameters = new URLSearchParams(window.location.search);
-  parameters.delete("method");
-  parameters.delete("url");
-  parameters.delete("sort");
-  parameters.delete("search");
-  parameters.set("search", sessionId);
-  return `/projects/${encodeURIComponent(projectId)}/sessions?${parameters}`;
 }
 
 export function MethodBadge({ method }: { method: string }) {

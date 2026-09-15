@@ -42,7 +42,7 @@ export function shouldSample(
 
 export function eventPriority(eventType: EventType): EventPriority {
   if (eventType === "error") return "critical";
-  if (eventType === "api") return "low";
+  if (eventType === "api" || eventType === "log") return "low";
   return "normal";
 }
 

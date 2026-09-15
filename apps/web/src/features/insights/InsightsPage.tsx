@@ -10,6 +10,11 @@ import {
 } from "lucide-react";
 import { useMemo } from "react";
 import { AsyncError } from "@/components/ui/AsyncState";
+import {
+  ConsolePage,
+  ConsolePageContent,
+  ConsolePageHeader,
+} from "@/components/layout/ConsolePage";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getBehaviorAnalytics } from "@/lib/api/analytics";
@@ -44,11 +49,13 @@ export function InsightsPage() {
     projects.data?.projects.find((item) => item.id === projectId) ?? projects.data?.projects[0];
   if (!project) {
     return (
-      <EmptyState
-        icon={LightbulbIcon}
-        title="尚未接入项目"
-        description="接入行为、错误、性能与 API 数据后即可生成可验证洞察。"
-      />
+      <ConsolePage width="wide">
+        <EmptyState
+          icon={LightbulbIcon}
+          title="尚未接入项目"
+          description="接入行为、错误、性能与 API 数据后即可生成可验证洞察。"
+        />
+      </ConsolePage>
     );
   }
   return <ProjectInsights project={project} />;
@@ -88,61 +95,58 @@ function ProjectInsights({ project }: { project: Project }) {
     apis: apis.data,
   });
   return (
-    <div className="behavior-page insights-page">
-      <header className="behavior-header">
-        <div>
-          <div className="breadcrumb">
-            项目 <span>/</span> {project.name} <span>/</span> 洞察
+    <ConsolePage width="wide">
+      <ConsolePageHeader
+        title="洞察"
+        description="用明确指标说明为什么值得关注，并保留时间与分群上下文直达原始证据。"
+      />
+      <ConsolePageContent className="grid gap-6">
+        <div className="insights-summary">
+          <div>
+            <span>分析范围</span>
+            <strong>过去 24 小时</strong>
           </div>
-          <h1>洞察</h1>
-          <p>用明确指标说明为什么值得关注，并保留时间与分群上下文直达原始证据。</p>
+          <div>
+            <span>生成方式</span>
+            <strong>确定性规则</strong>
+          </div>
+          <p>这里没有黑盒评分；每条结论都展示样本、阈值或周期变化。</p>
         </div>
-      </header>
-      <div className="insights-summary">
-        <div>
-          <span>分析范围</span>
-          <strong>过去 24 小时</strong>
-        </div>
-        <div>
-          <span>生成方式</span>
-          <strong>确定性规则</strong>
-        </div>
-        <p>这里没有黑盒评分；每条结论都展示样本、阈值或周期变化。</p>
-      </div>
-      {loading ? <InsightsSkeleton compact /> : null}
-      {!loading && all.every((item) => item.error) ? (
-        <AsyncError
-          error={overview.error}
-          title="洞察暂不可用"
-          remediation="基础数据仍可从分析、错误、性能与 API 页面分别查看。"
-          onRetry={() => all.forEach((item) => void item.refetch())}
-        />
-      ) : null}
-      {insights.length ? (
-        <section className="insight-grid" aria-label="有证据的产品洞察">
-          {insights.map((insight) => {
-            const Icon = insight.icon;
-            return (
-              <article className="insight-card" data-tone={insight.tone} key={insight.id}>
-                <div className="insight-card__icon">
-                  <Icon />
-                </div>
-                <div className="insight-card__body">
-                  <span>{insight.eyebrow}</span>
-                  <h2>{insight.title}</h2>
-                  <strong>{insight.evidence}</strong>
-                  <p>{insight.explanation}</p>
-                </div>
-                <a href={insight.href}>
-                  {insight.linkLabel}
-                  <ArrowUpRightIcon />
-                </a>
-              </article>
-            );
-          })}
-        </section>
-      ) : null}
-    </div>
+        {loading ? <InsightsSkeleton compact /> : null}
+        {!loading && all.every((item) => item.error) ? (
+          <AsyncError
+            error={overview.error}
+            title="洞察暂不可用"
+            remediation="基础数据仍可从分析、错误、性能与 API 页面分别查看。"
+            onRetry={() => all.forEach((item) => void item.refetch())}
+          />
+        ) : null}
+        {insights.length ? (
+          <section className="insight-grid" aria-label="有证据的产品洞察">
+            {insights.map((insight) => {
+              const Icon = insight.icon;
+              return (
+                <article className="insight-card" data-tone={insight.tone} key={insight.id}>
+                  <div className="insight-card__icon">
+                    <Icon />
+                  </div>
+                  <div className="insight-card__body">
+                    <span>{insight.eyebrow}</span>
+                    <h2>{insight.title}</h2>
+                    <strong>{insight.evidence}</strong>
+                    <p>{insight.explanation}</p>
+                  </div>
+                  <a href={insight.href}>
+                    {insight.linkLabel}
+                    <ArrowUpRightIcon />
+                  </a>
+                </article>
+              );
+            })}
+          </section>
+        ) : null}
+      </ConsolePageContent>
+    </ConsolePage>
   );
 }
 
@@ -242,7 +246,7 @@ function buildInsights(input: {
 }
 
 function InsightsSkeleton({ compact = false }: { compact?: boolean }) {
-  return (
+  const content = (
     <div className={compact ? "insight-grid" : "behavior-page"} aria-label="正在生成洞察">
       <Skeleton className="h-52" />
       <Skeleton className="h-52" />
@@ -250,6 +254,7 @@ function InsightsSkeleton({ compact = false }: { compact?: boolean }) {
       <Skeleton className="h-52" />
     </div>
   );
+  return compact ? content : <ConsolePage width="wide">{content}</ConsolePage>;
 }
 function roundedMinute(value: Date) {
   const result = new Date(value);

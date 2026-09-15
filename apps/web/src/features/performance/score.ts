@@ -1,12 +1,29 @@
-import type { PerformanceMetricName, PerformanceResponse } from "@/lib/api/performance";
+import {
+  performanceMetricNames,
+  type PerformanceMetricKey,
+  type PerformanceMetricName,
+  type PerformanceResponse,
+} from "@/lib/api/performance";
 
 export type PerformanceRating = "good" | "needs-improvement" | "poor" | "unknown";
+
+// Sentry's default weights; OpenRUM retains its own overall-P75 scoring curve.
+// https://docs.sentry.io/product/dashboards/sentry-dashboards/frontend/web-vitals/#performance-score
+export const performanceScoreWeights = {
+  LCP: 30,
+  INP: 30,
+  CLS: 15,
+  FCP: 15,
+  TTFB: 10,
+} as const satisfies Record<PerformanceMetricName, number>;
 
 export const performanceThresholds: Record<PerformanceMetricName, { good: number; poor: number }> =
   {
     LCP: { good: 2500, poor: 4000 },
     INP: { good: 200, poor: 500 },
     CLS: { good: 0.1, poor: 0.25 },
+    FCP: { good: 1800, poor: 3000 },
+    TTFB: { good: 800, poor: 1800 },
   };
 
 export function performanceRating(
@@ -35,6 +52,38 @@ export function performanceScore(value: number | null, metric: PerformanceMetric
 }
 
 type RoutePerformance = PerformanceResponse["routes"][number];
+
+/** Preserve the existing scoring curve, using the actual filtered overall P75s. */
+export function overallPerformanceScore(summary: PerformanceResponse["summary"]) {
+  const metrics = performanceMetricNames.map((name) => {
+    const metric = summary?.[name.toLowerCase() as PerformanceMetricKey];
+    const valid =
+      metric &&
+      metric.samples > 0 &&
+      metric.p75 !== null &&
+      Number.isFinite(metric.p75) &&
+      metric.p75 >= 0;
+    return {
+      name,
+      weight: performanceScoreWeights[name],
+      score: valid ? performanceScore(metric.p75, name) : null,
+      sufficient: Boolean(valid && metric.sufficient),
+    };
+  });
+  const available = metrics.filter((metric) => metric.score !== null);
+  const availableWeight = available.reduce((total, metric) => total + metric.weight, 0);
+  return {
+    score: availableWeight
+      ? Math.round(
+          available.reduce((total, metric) => total + metric.score! * metric.weight, 0) /
+            availableWeight,
+        )
+      : null,
+    complete: available.length === metrics.length && metrics.every((metric) => metric.sufficient),
+    available: available.length,
+    metrics,
+  };
+}
 
 export function summarizePerformance(routes: RoutePerformance[]) {
   const metrics = (["LCP", "INP", "CLS"] as PerformanceMetricName[]).map((name) => {

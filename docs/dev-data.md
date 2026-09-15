@@ -17,7 +17,7 @@ validation at the ingest endpoint, then Kafka, then the consumer, which performs
 URL normalization, route templating, error fingerprinting, sampling arithmetic
 and the materialized-view rollups.
 
-That costs a write key and a few seconds of consumer lag. In exchange, data
+That costs a client DSN and a few seconds of consumer lag. In exchange, data
 generated here cannot disagree with production data about the shape of a row. A
 generator that wrote ClickHouse directly could produce combinations the pipeline
 never emits, and a query validated against those would be wrong in production.
@@ -38,26 +38,28 @@ guarded elsewhere:
 Callers still need a session and the `project.test-event.send` permission, which
 owners, admins and members hold.
 
-## The write key
+## The client DSN
 
-You have to supply a project write key once. `project_keys` stores only a
-32-byte hash of each key, so the server genuinely cannot recover one to send
-traffic with — minting a throwaway key on every run would be the only
-alternative, and that writes to the control plane for a read-only-looking
-action.
+You have to supply the Project's client DSN. The Console extracts its write-only
+credential before calling the development-only API. Public DSNs can also be
+copied again from Project settings; their ingest capability is bounded by
+Origin checks, rate limits, rotation, and revocation.
 
-The console keeps the key in `localStorage` so it is entered once per browser.
-Create one under **项目设置 → Keys** if you do not have it.
+The development-data form keeps the DSN in `localStorage` so it is entered once
+per browser.
+Copy the Project's default value under **项目设置 → 客户端 DSN**.
 
 ## Presets
 
-| Preset | What it is for |
-| --- | --- |
-| `storefront` | A broad mix across browse and checkout: page views, vitals, a wide API surface, errors and funnel events. The default. |
-| `api-surface` | Every endpoint in one journey, including the planted browser and release regressions. |
-| `failing-release` | Checkout only, where the newest release fails far more often. |
-| `web-vitals` | Page views and vitals only, spread across all three rating bands. |
-| `error-burst` | A narrow window dominated by a few recurring exceptions, for issue grouping. |
+The `logs` preset (**结构化应用日志**) generates trace/debug/info/warn/error/fatal logs with payment attributes and Session/Trace context. Use it to validate the Logs explorer after deploying ClickHouse migration `0008_logs` and updated ingest/consumer services.
+
+| Preset            | What it is for                                                                                                         |
+| ----------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `storefront`      | A broad mix across browse and checkout: page views, vitals, a wide API surface, errors and funnel events. The default. |
+| `api-surface`     | Every endpoint in one journey, including the planted browser and release regressions.                                  |
+| `failing-release` | Checkout only, where the newest release fails far more often.                                                          |
+| `web-vitals`      | Page views and vitals only, spread across all three rating bands.                                                      |
+| `error-burst`     | A narrow window dominated by a few recurring exceptions, for issue grouping.                                           |
 
 Presets deliberately plant findings rather than only producing volume:
 
@@ -93,8 +95,8 @@ is the same structure the API accepts. Its shape:
 
 ```jsonc
 {
-  "seed": 1757030400000000000,   // the same seed replays the same dataset
-  "environment": "production",   // overwritten by the server from the project
+  "seed": 1757030400000000000, // the same seed replays the same dataset
+  "environment": "production", // overwritten by the server from the project
   "baseUrl": "https://shop.example.com", // must be an origin the project allows
   "sessions": 300,
   "from": "2026-09-04T12:00:00Z",
@@ -102,11 +104,11 @@ is the same structure the API accepts. Its shape:
   "releases": [{ "value": "web@2026.09.3", "weight": 35 }],
   "clients": [
     {
-      "name": "safari-mobile",   // referenced by an api's slowClients
+      "name": "safari-mobile", // referenced by an api's slowClients
       "userAgent": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) ...",
       "country": "JP",
-      "weight": 16
-    }
+      "weight": 16,
+    },
   ],
   "journeys": [
     {
@@ -114,7 +116,7 @@ is the same structure the API accepts. Its shape:
       "weight": 35,
       "pages": [
         {
-          "route": "/products/:id",       // the normalized template
+          "route": "/products/:id", // the normalized template
           "path": "/products/8f3a-runner-pro", // the concrete URL
           "title": "Runner Pro",
           "vitals": [{ "name": "LCP", "odds": 1, "value": { "min": 900, "max": 4800 } }],
@@ -130,20 +132,20 @@ is the same structure the API accepts. Its shape:
                 { "value": "200", "weight": 975 },
                 { "value": "404", "weight": 15 },
                 { "value": "500", "weight": 10 },
-                { "value": "0:network", "weight": 5 }
+                { "value": "0:network", "weight": 5 },
               ],
               "slowClients": { "safari-mobile": 3.8 },
               "failingReleases": {
-                "web@2026.09.3": [{ "value": "500", "weight": 140 }]
-              }
-            }
+                "web@2026.09.3": [{ "value": "500", "weight": 140 }],
+              },
+            },
           ],
           "errors": [{ "name": "TypeError", "message": "...", "stack": "...", "odds": 0.04 }],
-          "custom": [{ "name": "add_to_cart", "odds": 0.35, "measurements": { "price": 129.9 } }]
-        }
-      ]
-    }
-  ]
+          "custom": [{ "name": "add_to_cart", "odds": 0.35, "measurements": { "price": 129.9 } }],
+        },
+      ],
+    },
+  ],
 }
 ```
 
@@ -183,10 +185,10 @@ request:
 
 Country resolution needs configuration, and it is off unless you provide it:
 
-| Variable | Meaning |
-| --- | --- |
-| `GEO_COUNTRY_HEADER` | The header carrying the country, injected by the edge proxy. Unset disables resolution and every event stores `ZZ`. |
-| `GEO_TRUSTED_PROXIES` | CIDRs or addresses whose forwarded country header is believed. Required when the header is set. |
+| Variable              | Meaning                                                                                                             |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `GEO_COUNTRY_HEADER`  | The header carrying the country, injected by the edge proxy. Unset disables resolution and every event stores `ZZ`. |
+| `GEO_TRUSTED_PROXIES` | CIDRs or addresses whose forwarded country header is believed. Required when the header is set.                     |
 
 The trust boundary is not optional. The ingest rate limiter identifies callers
 by their socket peer address precisely because that cannot be forged; a country
@@ -240,5 +242,5 @@ is `202`, not a promise that a query will already return them.
 
 A non-zero rejected count means individual events failed schema validation; a
 non-zero failed count means whole envelopes were refused, most often because the
-write key is wrong, the origin is not in the project's allowlist, or the
+DSN is wrong, the origin is not in the project's allowlist, or the
 scenario's environment does not match the project's.

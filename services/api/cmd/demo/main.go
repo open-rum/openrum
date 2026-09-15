@@ -55,7 +55,7 @@ func main() {
 
 	fmt.Printf("OpenRUM demo ready\nemail: %s\npassword: %s\nproject: %s\n", demoEmail, demoPassword, projectID)
 	if writeKey != "" {
-		fmt.Printf("write key (shown once): %s\n", writeKey)
+		fmt.Printf("public write key: %s\n", writeKey)
 	}
 }
 
@@ -106,6 +106,7 @@ func ensureDemoControlPlane(ctx context.Context, database *sql.DB) (uuid.UUID, s
 		Slug:            "demo-storefront",
 		AllowedOrigins:  []string{"http://localhost:4173", "http://127.0.0.1:4173"},
 		Environment:     "production",
+		Environments:    []string{"production", "canary", "test", "development"},
 		RetentionDays:   14,
 		EventSampleRate: 1,
 		APISampleRate:   1,

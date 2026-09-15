@@ -55,3 +55,14 @@ func TestBehaviorFreshness(t *testing.T) {
 		t.Fatalf("freshness=%+v", result)
 	}
 }
+
+func TestBehaviorCountryBudgetFitsWorldMap(t *testing.T) {
+	if got := behaviorDimensionLimit("country"); got != 250 {
+		t.Fatalf("country row limit=%d", got)
+	}
+	for _, dimension := range []string{"device", "browser", "source", "property:plan"} {
+		if got := behaviorDimensionLimit(dimension); got != 100 {
+			t.Fatalf("%s row limit=%d", dimension, got)
+		}
+	}
+}
