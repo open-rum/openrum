@@ -9,27 +9,24 @@ import {
   useSyncExternalStore,
   type ReactNode,
 } from "react";
-import { CalendarRangeIcon, ServerIcon } from "lucide-react";
+import { ArrowLeftIcon, CalendarRangeIcon } from "lucide-react";
+import type { DateRange } from "react-day-picker";
+import { zhCN } from "react-day-picker/locale";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Calendar } from "@/components/ui/calendar";
+import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  Popover,
+  PopoverContent,
+  PopoverDescription,
+  PopoverHeader,
+  PopoverTitle,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Separator } from "@/components/ui/separator";
 import type { Project } from "@/lib/api/projects";
+import { cn } from "@/lib/utils";
 
 const DAY = 24 * 60 * 60 * 1000;
 const MAX_RANGE = 30 * DAY;
@@ -44,9 +41,16 @@ export const analysisRangePresets = [
   { value: "12h", label: "最近 12 小时", duration: 12 * 60 * 60 * 1000 },
   { value: "24h", label: "最近 24 小时", duration: DAY },
   { value: "7d", label: "最近 7 天", duration: 7 * DAY },
-  { value: "14d", label: "最近 14 天", duration: 14 * DAY },
   { value: "30d", label: "最近 30 天", duration: MAX_RANGE },
+  { value: "yesterday", label: "昨天", calendar: "yesterday" },
+  { value: "day-before-yesterday", label: "前天", calendar: "day-before-yesterday" },
+  { value: "same-day-last-week", label: "上周的今天", calendar: "same-day-last-week" },
+  { value: "last-week", label: "上周", calendar: "last-week" },
+  { value: "today", label: "今天", calendar: "today" },
+  { value: "month-to-date", label: "本月", calendar: "month-to-date" },
 ] as const;
+
+type AnalysisRangePreset = (typeof analysisRangePresets)[number];
 
 type AnalysisContextValue = {
   projectId: string;
@@ -60,7 +64,7 @@ const AnalysisContext = createContext<AnalysisContextValue | null>(null);
 
 export function isAnalysisRoute(pathname: string) {
   return (
-    /^\/projects\/[^/]+\/(?:analytics(?:\/(?:funnels|paths|retention))?|overview|issues(?:\/[^/]+)?|performance|events|apis|sessions)\/?$/.test(
+    /^\/projects\/[^/]+\/(?:analytics(?:\/(?:funnels|paths|retention))?|overview|issues(?:\/[^/]+)?|performance|events|logs|apis|sessions)\/?$/.test(
       pathname,
     ) || /^\/(?:funnels|paths|retention|sessions|events|issues|performance|apis)\/?$/.test(pathname)
   );
@@ -106,144 +110,184 @@ export function useAnalysisContext() {
   return useContext(AnalysisContext);
 }
 
-export function AnalysisContextControls({
-  context,
-  project,
-}: {
-  context: AnalysisContextValue;
-  project: Project;
-}) {
-  const [customOpen, setCustomOpen] = useState(false);
-  const [fromDraft, setFromDraft] = useState(() => toLocalInput(context.from));
-  const [toDraft, setToDraft] = useState(() => toLocalInput(context.to));
-  const preset = matchingPreset(context.from, context.to);
-  const customError = validateDraft(fromDraft, toDraft);
-  const environments = [...new Set([project.environment, "production", "test"])];
+export function AnalysisTimeFilter() {
+  const context = useAnalysisContext();
+  return context ? <AnalysisContextControls context={context} /> : null;
+}
 
-  const openCustomRange = () => {
-    setFromDraft(toLocalInput(context.from));
-    setToDraft(toLocalInput(context.to));
-    setCustomOpen(true);
+export function AnalysisContextControls({ context }: { context: AnalysisContextValue }) {
+  const [popoverOpen, setPopoverOpen] = useState(false);
+  const [view, setView] = useState<"presets" | "custom">("presets");
+  const [dateDraft, setDateDraft] = useState<DateRange>(() => ({
+    from: context.from,
+    to: context.to,
+  }));
+  const [fromTimeDraft, setFromTimeDraft] = useState(() => toTimeInput(context.from));
+  const [toTimeDraft, setToTimeDraft] = useState(() => toTimeInput(context.to));
+  const preset = matchingPreset(context.from, context.to);
+  const draftFrom = combineDateAndTime(dateDraft.from, fromTimeDraft);
+  const draftTo = combineDateAndTime(dateDraft.to, toTimeDraft);
+  const customError = validateDraft(draftFrom, draftTo);
+
+  const resetDraft = () => {
+    setDateDraft({ from: context.from, to: context.to });
+    setFromTimeDraft(toTimeInput(context.from));
+    setToTimeDraft(toTimeInput(context.to));
+  };
+
+  const applyPreset = (item: AnalysisRangePreset) => {
+    const range = resolvePresetRange(item, roundedMinute(new Date()));
+    if (!validRange(range.from, range.to)) return;
+    context.update(range);
+    setPopoverOpen(false);
   };
 
   return (
-    <>
-      <div className="analysis-context-bar__title">
-        <span>分析范围</span>
-        <small>切换页面时保持</small>
-      </div>
-      <div className="analysis-context-bar__controls" role="group" aria-label="全局分析筛选">
-        <div className="analysis-context-control">
-          <CalendarRangeIcon aria-hidden="true" />
-          <span>时间</span>
-          <Select
-            value={preset?.value ?? "custom"}
-            onValueChange={(value) => {
-              if (value === "custom") return openCustomRange();
-              const selected = analysisRangePresets.find((item) => item.value === value);
-              if (!selected) return;
-              const to = roundedMinute(new Date());
-              context.update({ from: new Date(to.getTime() - selected.duration), to });
-            }}
-          >
-            <SelectTrigger size="sm" aria-label="全局时间范围">
-              <SelectValue>
-                {preset?.label ?? formatAbsoluteRange(context.from, context.to)}
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent align="start">
-              <SelectGroup>
-                {analysisRangePresets.map((item) => (
-                  <SelectItem key={item.value} value={item.value}>
-                    {item.label}
-                  </SelectItem>
-                ))}
-                <SelectItem value="custom">自定义绝对时间…</SelectItem>
-              </SelectGroup>
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="analysis-context-control">
-          <ServerIcon aria-hidden="true" />
-          <span>环境</span>
-          <Select
-            value={context.environment ?? "all"}
-            onValueChange={(value) =>
-              context.update({ environment: value === "all" ? undefined : value })
-            }
-          >
-            <SelectTrigger size="sm" aria-label="全局环境">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent align="end">
-              <SelectGroup>
-                <SelectItem value="all">全部环境</SelectItem>
-                {environments.map((environment) => (
-                  <SelectItem key={environment} value={environment}>
-                    {environmentLabel(environment)}
-                  </SelectItem>
-                ))}
-              </SelectGroup>
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-
-      <Dialog open={customOpen} onOpenChange={setCustomOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>自定义时间范围</DialogTitle>
-            <DialogDescription>
-              使用本地时区 {resolvedTimeZone()}，最长可查询 30 天。
-            </DialogDescription>
-          </DialogHeader>
-          <FieldGroup>
-            <Field data-invalid={Boolean(customError)}>
-              <FieldLabel htmlFor="analysis-range-from">开始时间</FieldLabel>
-              <Input
-                id="analysis-range-from"
-                type="datetime-local"
-                value={fromDraft}
-                max={toDraft}
-                aria-invalid={Boolean(customError)}
-                onChange={(event) => setFromDraft(event.target.value)}
-              />
-            </Field>
-            <Field data-invalid={Boolean(customError)}>
-              <FieldLabel htmlFor="analysis-range-to">结束时间</FieldLabel>
-              <Input
-                id="analysis-range-to"
-                type="datetime-local"
-                value={toDraft}
-                min={fromDraft}
-                aria-invalid={Boolean(customError)}
-                onChange={(event) => setToDraft(event.target.value)}
-              />
-              <FieldDescription>绝对时间会保留在 URL 中，方便分享同一分析范围。</FieldDescription>
-              <FieldError>{customError}</FieldError>
-            </Field>
-          </FieldGroup>
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setCustomOpen(false)}>
-              取消
-            </Button>
+    <div className="analysis-context-bar__controls" role="group" aria-label="全局分析筛选">
+      <div className="analysis-time-filter">
+        <Popover
+          open={popoverOpen}
+          onOpenChange={(open) => {
+            if (open) setView("presets");
+            setPopoverOpen(open);
+          }}
+        >
+          <PopoverTrigger asChild>
             <Button
               type="button"
-              disabled={Boolean(customError)}
-              onClick={() => {
-                const from = new Date(fromDraft);
-                const to = new Date(toDraft);
-                if (!validRange(from, to)) return;
-                context.update({ from, to });
-                setCustomOpen(false);
-              }}
+              size="sm"
+              variant="outline"
+              className="analysis-time-filter__trigger"
+              aria-label={`选择时间范围，当前为 ${formatAbsoluteRange(context.from, context.to)}`}
             >
-              应用时间
+              <CalendarRangeIcon data-icon="inline-start" aria-hidden="true" />
+              <span>{preset?.label ?? formatCompactRange(context.from, context.to)}</span>
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </>
+          </PopoverTrigger>
+          <PopoverContent
+            className={cn(
+              "analysis-time-popover",
+              view === "presets"
+                ? "analysis-time-popover--presets"
+                : "analysis-time-popover--custom",
+            )}
+            align="start"
+            sideOffset={8}
+          >
+            {view === "presets" ? (
+              <div
+                className="analysis-time-popover__preset-grid"
+                role="group"
+                aria-label="快捷时间范围"
+              >
+                {analysisRangePresets.map((item) => {
+                  const available = validRangeForPreset(item);
+                  return (
+                    <Button
+                      key={item.value}
+                      type="button"
+                      variant={preset?.value === item.value ? "secondary" : "ghost"}
+                      disabled={!available}
+                      title={
+                        available ? undefined : "当前月份已超过 30 天，请改用最近 30 天或自定义范围"
+                      }
+                      onClick={() => applyPreset(item)}
+                    >
+                      {item.label}
+                    </Button>
+                  );
+                })}
+                <Button
+                  type="button"
+                  variant={preset ? "ghost" : "secondary"}
+                  onClick={() => {
+                    resetDraft();
+                    setView("custom");
+                  }}
+                >
+                  自定义
+                </Button>
+              </div>
+            ) : (
+              <>
+                <PopoverHeader className="analysis-time-popover__header">
+                  <Button
+                    type="button"
+                    size="icon-sm"
+                    variant="ghost"
+                    aria-label="返回快捷时间范围"
+                    onClick={() => setView("presets")}
+                  >
+                    <ArrowLeftIcon />
+                  </Button>
+                  <div>
+                    <PopoverTitle>自定义时间范围</PopoverTitle>
+                    <PopoverDescription>
+                      {resolvedTimeZone()} · 最长 30 天 · 应用后会写入当前 URL
+                    </PopoverDescription>
+                  </div>
+                </PopoverHeader>
+                <Separator />
+                <div className="analysis-time-popover__calendar">
+                  <Calendar
+                    mode="range"
+                    selected={dateDraft}
+                    onSelect={(range) => setDateDraft(range ?? { from: undefined, to: undefined })}
+                    numberOfMonths={2}
+                    max={30}
+                    defaultMonth={context.from}
+                    locale={zhCN}
+                    className="analysis-time-popover__calendar-grid"
+                  />
+                  <Separator />
+                  <FieldGroup className="analysis-time-popover__times">
+                    <Field data-invalid={Boolean(customError)}>
+                      <FieldLabel htmlFor="analysis-range-from-time">开始时间</FieldLabel>
+                      <Input
+                        id="analysis-range-from-time"
+                        type="time"
+                        value={fromTimeDraft}
+                        aria-invalid={Boolean(customError)}
+                        onChange={(event) => setFromTimeDraft(event.target.value)}
+                      />
+                    </Field>
+                    <Field data-invalid={Boolean(customError)}>
+                      <FieldLabel htmlFor="analysis-range-to-time">结束时间</FieldLabel>
+                      <Input
+                        id="analysis-range-to-time"
+                        type="time"
+                        value={toTimeDraft}
+                        aria-invalid={Boolean(customError)}
+                        onChange={(event) => setToTimeDraft(event.target.value)}
+                      />
+                    </Field>
+                  </FieldGroup>
+                  <div className="analysis-time-popover__footer">
+                    <FieldError>{customError}</FieldError>
+                    <div>
+                      <Button type="button" variant="outline" onClick={() => setPopoverOpen(false)}>
+                        取消
+                      </Button>
+                      <Button
+                        type="button"
+                        disabled={Boolean(customError)}
+                        onClick={() => {
+                          if (!draftFrom || !draftTo || !validRange(draftFrom, draftTo)) return;
+                          context.update({ from: draftFrom, to: draftTo });
+                          setPopoverOpen(false);
+                        }}
+                      >
+                        应用时间
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
+          </PopoverContent>
+        </Popover>
+      </div>
+    </div>
   );
 }
 
@@ -286,6 +330,27 @@ function writeContextToURL(
   url.searchParams.delete("page");
   window.history[mode === "push" ? "pushState" : "replaceState"]({}, "", url);
   window.dispatchEvent(new Event("openrum:urlchange"));
+}
+
+function formatCompactRange(from: Date, to: Date) {
+  const sameDay = from.toDateString() === to.toDateString();
+  const formatDateTime = (value: Date) =>
+    new Intl.DateTimeFormat("zh-CN", {
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }).format(value);
+  if (sameDay) {
+    const endTime = new Intl.DateTimeFormat("zh-CN", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }).format(to);
+    return `${formatDateTime(from)} – ${endTime}`;
+  }
+  return `${formatDateTime(from)} – ${formatDateTime(to)}`;
 }
 
 function persistContext(context: Omit<AnalysisContextValue, "update">) {
@@ -358,9 +423,64 @@ function cleanEnvironment(value: string | null) {
 }
 
 function matchingPreset(from: Date, to: Date) {
-  const duration = to.getTime() - from.getTime();
-  const nearNow = Math.abs(roundedMinute(new Date()).getTime() - to.getTime()) <= 2 * 60 * 1000;
-  return nearNow ? analysisRangePresets.find((item) => item.duration === duration) : undefined;
+  const now = roundedMinute(new Date());
+  return analysisRangePresets.find((item) => {
+    if ("duration" in item) {
+      const duration = to.getTime() - from.getTime();
+      return item.duration === duration && nearInstant(now, to);
+    }
+    const range = resolvePresetRange(item, now);
+    const endsNow = item.calendar === "today" || item.calendar === "month-to-date";
+    return (
+      sameInstant(range.from, from) && (endsNow ? nearInstant(now, to) : sameInstant(range.to, to))
+    );
+  });
+}
+
+function validRangeForPreset(item: AnalysisRangePreset) {
+  const range = resolvePresetRange(item, roundedMinute(new Date()));
+  return validRange(range.from, range.to);
+}
+
+function resolvePresetRange(item: AnalysisRangePreset, now: Date) {
+  if ("duration" in item) return { from: new Date(now.getTime() - item.duration), to: now };
+
+  const today = startOfLocalDay(now);
+  if (item.calendar === "yesterday") {
+    return { from: addLocalDays(today, -1), to: today };
+  }
+  if (item.calendar === "day-before-yesterday") {
+    return { from: addLocalDays(today, -2), to: addLocalDays(today, -1) };
+  }
+  if (item.calendar === "same-day-last-week") {
+    return { from: addLocalDays(today, -7), to: addLocalDays(today, -6) };
+  }
+  if (item.calendar === "last-week") {
+    const currentWeek = addLocalDays(today, -((today.getDay() + 6) % 7));
+    return { from: addLocalDays(currentWeek, -7), to: currentWeek };
+  }
+  if (item.calendar === "today") return { from: today, to: now };
+  return { from: new Date(now.getFullYear(), now.getMonth(), 1), to: now };
+}
+
+function startOfLocalDay(value: Date) {
+  const result = new Date(value);
+  result.setHours(0, 0, 0, 0);
+  return result;
+}
+
+function addLocalDays(value: Date, days: number) {
+  const result = new Date(value);
+  result.setDate(result.getDate() + days);
+  return result;
+}
+
+function sameInstant(left: Date, right: Date) {
+  return Math.abs(left.getTime() - right.getTime()) < 1000;
+}
+
+function nearInstant(left: Date, right: Date) {
+  return Math.abs(left.getTime() - right.getTime()) <= 2 * 60 * 1000;
 }
 
 function roundedMinute(value: Date) {
@@ -369,16 +489,20 @@ function roundedMinute(value: Date) {
   return result;
 }
 
-function toLocalInput(value: Date) {
-  const offset = value.getTimezoneOffset() * 60 * 1000;
-  return new Date(value.getTime() - offset).toISOString().slice(0, 16);
+function toTimeInput(value: Date) {
+  return `${String(value.getHours()).padStart(2, "0")}:${String(value.getMinutes()).padStart(2, "0")}`;
 }
 
-function validateDraft(fromValue: string, toValue: string) {
-  if (!fromValue || !toValue) return "请选择完整的开始和结束时间。";
-  const from = new Date(fromValue);
-  const to = new Date(toValue);
-  if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) return "时间格式无效。";
+function combineDateAndTime(date: Date | undefined, time: string) {
+  if (!date || !/^\d{2}:\d{2}$/.test(time)) return undefined;
+  const [hours, minutes] = time.split(":").map(Number);
+  const result = new Date(date);
+  result.setHours(hours, minutes, 0, 0);
+  return Number.isNaN(result.getTime()) ? undefined : result;
+}
+
+function validateDraft(from: Date | undefined, to: Date | undefined) {
+  if (!from || !to) return "请在日历中选择完整的开始和结束日期。";
   if (to <= from) return "结束时间必须晚于开始时间。";
   if (to.getTime() - from.getTime() > MAX_RANGE) return "时间范围不能超过 30 天。";
   return undefined;
@@ -397,10 +521,4 @@ function formatAbsoluteRange(from: Date, to: Date) {
 
 function resolvedTimeZone() {
   return Intl.DateTimeFormat().resolvedOptions().timeZone || "本地时区";
-}
-
-function environmentLabel(value: string) {
-  if (value === "production") return "Production";
-  if (value === "test") return "Test";
-  return value;
 }

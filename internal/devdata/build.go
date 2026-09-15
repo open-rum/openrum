@@ -107,6 +107,12 @@ func buildSession(scenario Scenario, session sessionSeed, random *rand.Rand) []B
 		events = append(events, pageAPIs(page, session, at, scenario.BaseURL, random)...)
 		events = append(events, pageErrors(page, at, random)...)
 		events = append(events, pageCustom(page, at, random)...)
+		for _, log := range page.Logs {
+			if !occurs(log.Odds, random) {
+				continue
+			}
+			events = append(events, event.EventV1{EventID: uuid.NewString(), Type: event.EventTypeLog, Timestamp: timestamp(at.Add(time.Duration(random.Intn(6000)) * time.Millisecond)), Level: log.Level, Message: log.Message, Logger: log.Logger, Attributes: log.Attributes})
+		}
 
 		context := event.EventContext{
 			Environment: scenario.Environment, Release: session.release,

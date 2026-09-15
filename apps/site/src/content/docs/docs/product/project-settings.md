@@ -10,7 +10,7 @@ Project settings define how a monitored web product sends and retains telemetry.
 ## Common settings
 
 - **Environments** such as development, staging and production
-- **Write keys** with Origin allowlists, rotation and revocation
+- **Client DSNs** with Origin allowlists, rotation and revocation
 - **Sampling** for Events, API Requests and errors
 - **Retention** for raw and aggregate data
 - **Releases** used to associate Source Map Artifacts
@@ -20,7 +20,7 @@ Project settings define how a monitored web product sends and retains telemetry.
 In the Console, open a project and go to **Settings**:
 
 - **General** (`/projects/<id>/settings`) — name, slug, allowed Origins, environment, retention days, and a danger zone to disable or re-enable the project.
-- **Write Keys** (`/projects/<id>/settings/keys`) — create, rotate and revoke keys.
+- **Client DSN** (`/projects/<id>/settings/keys`) — copy or rotate the Project's automatic default connection string; additional DSNs are advanced configuration.
 - **Inbound filters** (`/projects/<id>/settings/filters`) — drop crawler, extension and localhost traffic, plus custom patterns.
 - **URL normalization** (`/projects/<id>/settings/url-rules`) — path templates that collapse one route into one row.
 - **Scrubbing** (`/projects/<id>/settings/scrubbing`) — regular expressions and attribute keys to redact on top of the built-in list.
@@ -36,7 +36,7 @@ show you the result as an absence of data:
 - The environment name must match the `environment` passed to the SDK's `init()`. Changing
   it here without shipping a matching SDK release means every report is rejected.
 
-Disabling a project rejects all of its reports but leaves write keys intact, so it is the
+Disabling a project rejects all of its reports but leaves client DSNs intact, so it is the
 reversible way to stop a noisy project before deciding whether to delete it.
 
 ## Rewriting rules
@@ -78,7 +78,7 @@ Both answer `429`. The difference is which reports are lost, not whether any are
 
 - Prefer opaque account IDs with `setUser`; never send emails as identity.
 - Keep Origin allowlists tight in production.
-- Treat write keys as browser-public credentials protected by Origin and rate limits.
+- Treat DSNs as browser-public connection strings protected by Origin and rate limits.
 - Configure object storage only when Source Map upload is required.
 
 Related: [Create your first project](/docs/getting-started/create-first-project/), [Data lifecycle](/docs/self-hosting/data-lifecycle/), [Privacy](/docs/self-hosting/security/privacy/).

@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { FileClockIcon, SearchIcon, ShieldCheckIcon } from "lucide-react";
+import { SearchIcon, ShieldCheckIcon } from "lucide-react";
 import { AsyncError, AsyncLoading } from "@/components/ui/AsyncState";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,7 +14,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { instanceAuditQueryOptions } from "@/lib/api/admin";
-import { AdminNav } from "./AdminNav";
+import { AdminPageLayout } from "./AdminPageLayout";
 
 export function AuditPage() {
   const audit = useQuery(instanceAuditQueryOptions());
@@ -30,17 +30,10 @@ export function AuditPage() {
   }, [audit.data, query]);
 
   return (
-    <div className="mx-auto w-full max-w-[1440px] p-5 lg:p-7">
-      <header className="mb-6">
-        <div className="mb-2 flex items-center gap-2 text-xs text-muted-foreground">
-          <FileClockIcon className="size-4" /> 系统管理 <span>/</span> 维护与审计
-        </div>
-        <h1 className="text-2xl font-semibold tracking-tight">Instance 审计日志</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          追踪全局配置和危险操作。密码、Token 与 Secret 永不写入审计摘要。
-        </p>
-      </header>
-      <AdminNav />
+    <AdminPageLayout
+      title="Instance 审计日志"
+      description="追踪全局配置和危险操作。密码、Token 与 Secret 永不写入审计摘要。"
+    >
       <Card>
         <CardHeader className="border-b">
           <CardTitle className="flex items-center gap-2">
@@ -117,6 +110,6 @@ export function AuditPage() {
           ) : null}
         </CardContent>
       </Card>
-    </div>
+    </AdminPageLayout>
   );
 }

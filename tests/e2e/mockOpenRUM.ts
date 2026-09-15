@@ -626,6 +626,14 @@ function sessionTimeline(parameters: URLSearchParams) {
     sessionId: "018f4d9c-83a1-76c9-81c2-3020ab667094",
     from: parameters.get("from") ?? "2026-09-02T23:45:00.000Z",
     to: parameters.get("to") ?? "2026-09-03T00:05:00.000Z",
+    session: sessions().sessions[0],
+    nextCursor: undefined,
+    availability: {
+      sampled: false,
+      expiredLogs: false,
+      timelineExact: true,
+      replay: false,
+    },
     truncated: false,
     events: [
       {
@@ -701,7 +709,11 @@ function sessions() {
 
 function performance(route: string | null, selectedMetric: string | null) {
   const metric = (p75: number | null, samples: number) => ({
+    p50: p75 === null ? null : p75 * 0.7,
     p75,
+    p90: p75 === null ? null : p75 * 1.25,
+    p95: p75 === null ? null : p75 * 1.5,
+    p99: p75 === null ? null : p75 * 2.1,
     samples,
     sufficient: samples >= 75,
   });
@@ -712,6 +724,8 @@ function performance(route: string | null, selectedMetric: string | null) {
       lcp: metric(2180, 920),
       inp: metric(184, 64),
       cls: metric(0.082, 910),
+      fcp: metric(1200, 930),
+      ttfb: metric(400, 930),
     },
     {
       route: "/products/:id",
@@ -719,6 +733,8 @@ function performance(route: string | null, selectedMetric: string | null) {
       lcp: metric(2860, 620),
       inp: metric(242, 48),
       cls: metric(0.12, 618),
+      fcp: metric(1900, 630),
+      ttfb: metric(950, 630),
     },
   ];
   const trend = [
@@ -734,17 +750,46 @@ function performance(route: string | null, selectedMetric: string | null) {
     lcp: metric(lcp as number, 760 + index * 24),
     inp: metric(inp as number, 710 + index * 21),
     cls: metric(cls as number, 750 + index * 22),
+    fcp: metric((lcp as number) * 0.6, 770 + index * 24),
+    ttfb: metric((lcp as number) * 0.2, 770 + index * 24),
   }));
   return {
     from: "2026-09-02T00:00:00.000Z",
     to: now,
     routes,
     trend,
+    summary: {
+      route: route ?? "",
+      pageViews: 28070,
+      lcp: metric(2410, 1540),
+      inp: metric(204, 112),
+      cls: metric(0.094, 1528),
+      fcp: metric(1480, 1560),
+      ttfb: metric(620, 1560),
+    },
+    facets: {
+      countries: [
+        { value: "CN", samples: 920 },
+        { value: "US", samples: 620 },
+      ],
+      deviceTypes: [
+        { value: "desktop", samples: 920 },
+        { value: "mobile", samples: 620 },
+      ],
+      browsers: [
+        { value: "Chrome", samples: 920 },
+        { value: "Safari", samples: 620 },
+      ],
+      routes: routes.map(({ route: value }) => ({ value, samples: 600 })),
+      releases: [{ value: "web@2026.09.03", samples: 1540 }],
+    },
     ...(route
       ? {
           detail: {
             route,
-            metric: selectedMetric === "INP" || selectedMetric === "CLS" ? selectedMetric : "LCP",
+            metric: ["LCP", "INP", "CLS", "FCP", "TTFB"].includes(selectedMetric ?? "")
+              ? selectedMetric
+              : "LCP",
             trend: [
               { bucket: "2026-09-02T22:00:00.000Z", metric: metric(1900, 80) },
               { bucket: "2026-09-02T23:00:00.000Z", metric: metric(2180, 92) },
@@ -1064,7 +1109,7 @@ function overviewKpis(series: ReturnType<typeof overviewSeries>) {
   };
 }
 
-function overview() {
+export function overview() {
   const series = overviewSeries();
   const kpis = overviewKpis(series);
   return {

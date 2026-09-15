@@ -22,7 +22,6 @@ export function ProjectQuotaRoute() {
     <ProjectSettingsLayout
       projectId={projectId}
       titleId="project-quota-title"
-      breadcrumb={`项目 / ${project.data?.name ?? "…"} / 配额`}
       title="配额"
       description="限制这个项目每秒能提交多少次上报。没有项目级配额时，一个项目的突发流量会挤占同一实例上其他项目的余量。"
     >

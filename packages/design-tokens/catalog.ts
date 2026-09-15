@@ -1,36 +1,25 @@
 export const palettes = [
   {
-    id: "acid",
-    name: "Acid Green",
-    label: "文档原案",
-    description: "酸橙绿、冷黑底色。来自 Landing Page Spec v1。",
-  },
-  {
     id: "citrus",
     name: "Citrus",
-    label: "现有配色",
-    description: "柠檬绿与中性灰，保留当前产品的视觉基础。",
-  },
-  {
-    id: "graphite",
-    name: "Graphite",
-    label: "克制一些",
-    description: "石墨灰与柔和鼠尾草绿，适合长时间阅读数据。",
+    label: "唯一主题",
+    description: "明亮青柠绿、中性灰与蓝绿色辅助色，统一官网、文档和控制台。",
   },
 ] as const;
 export type Palette = (typeof palettes)[number]["id"];
-export const defaultPalette: Palette = "acid";
+export const defaultPalette: Palette = "citrus";
 export const isPalette = (value: unknown): value is Palette =>
   palettes.some((item) => item.id === value);
 
 export const colorGroups = [
   {
     title: "品牌与强调",
-    description: "大面积填充与小字号文字各有角色。亮色模式使用深色强调文字。",
+    description: "Logo 与主系列保持柠檬绿；普通文字、导航和控件使用中性色。",
     tokens: [
-      ["--ds-primary", "Accent", "品牌填充、数据重点"],
-      ["--ds-brand", "Brand ink", "链接、细线与图标"],
-      ["--ds-brand-soft", "Brand subtle", "选中状态、轻背景"],
+      ["--ds-logo", "Logo", "所有模式的品牌标记"],
+      ["--ds-primary", "Primary", "主操作填充，配黑色文字"],
+      ["--ds-brand", "Link ink", "中性文字色，正文链接用下划线区分"],
+      ["--ds-secondary", "Secondary", "蓝绿色辅助系列"],
       ["--ds-action-contrast", "Action", "主要操作，随主题反转"],
     ],
   },
@@ -42,6 +31,9 @@ export const colorGroups = [
       ["--ds-surface", "Surface", "卡片与内容面板"],
       ["--ds-surface-subtle", "Subtle", "代码、嵌套区域"],
       ["--ds-border", "Border", "分割与边界"],
+      ["--ds-sidebar-accent", "Navigation", "导航选中背景，配中性文字"],
+      ["--ds-input", "Input", "输入框边界"],
+      ["--ds-ring", "Focus", "键盘焦点"],
     ],
   },
   {
@@ -49,11 +41,14 @@ export const colorGroups = [
     description: "状态颜色配合文字或图标使用，不依靠颜色单独传达含义。",
     tokens: [
       ["--ds-text", "Primary text", "标题与主要内容"],
+      ["--ds-text-secondary", "Secondary text", "字段标签、图例、表格辅助列"],
       ["--ds-text-muted", "Muted text", "辅助说明"],
       ["--ds-success", "Success", "正常与成功"],
       ["--ds-warning", "Warning", "需留意"],
       ["--ds-danger", "Error", "错误与失败"],
       ["--ds-info", "Info", "信息提示"],
+      ["--ds-chart-success", "Good chart", "达标评分柱、仪表盘填充"],
+      ["--ds-chart-warning", "Warning chart", "待优化评分柱、仪表盘填充"],
     ],
   },
 ] as const;
@@ -99,6 +94,6 @@ export const typeSamples = [
     weight: 500,
     text: "LAST UPDATED 2 MINUTES AGO · 最近更新",
     size: "--text-caption",
-    detail: "辅助信息 · 11 · 500",
+    detail: "辅助信息 · 12 · 500",
   },
 ] as const;

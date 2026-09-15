@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -73,6 +74,9 @@ type CanonicalEvent struct {
 	MetricDelta        float64
 	MetricRating       string
 	CustomName         string
+	LogLevel           string
+	LogMessage         string
+	LogLogger          string
 	Attributes         map[string]string
 	Measurements       map[string]float64
 	Breadcrumbs        []string
@@ -274,6 +278,20 @@ func normalizeEvent(input normalizeInput) (CanonicalEvent, error) {
 		result.DurationMS = input.event.Request.DurationMS
 		if input.event.Request.TransferSize != nil && *input.event.Request.TransferSize >= 0 {
 			result.TransferSize = uint64(*input.event.Request.TransferSize)
+		}
+	case EventTypeLog:
+		if !ValidLogLevel(input.event.Level) || strings.TrimSpace(input.event.Message) == "" {
+			return CanonicalEvent{}, errors.New("invalid log level or message")
+		}
+		result.LogLevel = input.event.Level
+		result.LogMessage, titleChanged = privacy.ScrubString(input.event.Message, 4096)
+		result.LogLogger, userChanged = privacy.ScrubString(input.event.Logger, 80)
+		logAttributes, logChanged := privacy.ScrubAttributes(input.event.Attributes, 20)
+		for key, value := range logAttributes {
+			result.Attributes[key] = value
+		}
+		if titleChanged || userChanged || logChanged {
+			result.IngestFlags = appendFlag(result.IngestFlags, "pii_scrubbed")
 		}
 	case EventTypeCustom:
 		if input.event.Name == "" {

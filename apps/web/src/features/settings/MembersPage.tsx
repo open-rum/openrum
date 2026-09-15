@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { Key, Plus, Trash, UsersThree } from "@phosphor-icons/react";
+import { ConsolePage, ConsolePageHeader } from "@/components/layout/ConsolePage";
 import { Button } from "@/components/ui/button";
 import {
   addMember,
@@ -14,6 +15,7 @@ import {
   type OrganizationRole,
 } from "@/lib/api/projects";
 import { sessionQueryOptions } from "@/lib/auth/session";
+import { AccountSettingsNav } from "./AccountSettingsNav";
 
 const roleLabels: Record<OrganizationRole, string> = {
   owner: "Owner",
@@ -64,32 +66,29 @@ export function MembersPage() {
   const busy = addMutation.isPending || roleMutation.isPending || removeMutation.isPending;
 
   return (
-    <section className="mx-auto w-full max-w-6xl px-6 py-8">
-      <header className="flex flex-col gap-4 border-b border-border pb-6 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className="text-xs text-muted-foreground">设置 / 组织成员</p>
-          <h1 className="mt-2 text-2xl font-semibold tracking-tight text-foreground">成员与权限</h1>
-          <p className="mt-2 text-sm leading-6 text-muted-foreground">
-            角色权限在服务端逐 API 校验；组织始终必须保留至少一名 Owner。
-          </p>
-        </div>
-        <label className="text-sm font-medium text-foreground">
-          组织
-          <select
-            className="mt-2 block h-10 min-w-64 rounded-md border border-input bg-background px-3 text-sm"
-            value={activeOrganizationId}
-            onChange={(event) => setOrganizationId(event.target.value)}
-          >
-            {organizations.map((item) => (
-              <option key={item.id} value={item.id}>
-                {item.name} · {roleLabels[item.role]}
-              </option>
-            ))}
-          </select>
-        </label>
-      </header>
+    <ConsolePage width="wide" rail={<AccountSettingsNav />} railLabel="账户设置">
+      <ConsolePageHeader
+        title="成员与权限"
+        description="角色权限在服务端逐 API 校验；组织始终必须保留至少一名 Owner。"
+        actions={
+          <label className="text-sm font-medium text-foreground">
+            组织
+            <select
+              className="mt-2 block h-10 min-w-64 rounded-md border border-input bg-background px-3 text-sm"
+              value={activeOrganizationId}
+              onChange={(event) => setOrganizationId(event.target.value)}
+            >
+              {organizations.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.name} · {roleLabels[item.role]}
+                </option>
+              ))}
+            </select>
+          </label>
+        }
+      />
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
         <div>
           {canManage ? (
             <form
@@ -261,7 +260,7 @@ export function MembersPage() {
           <div className="border border-border bg-card p-5">
             <h2 className="text-base font-semibold">项目设置</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Origin、环境、保留与 Write Key 都按项目配置。
+              Origin、环境、保留与客户端 DSN 都按项目配置。
             </p>
             <div className="mt-3 space-y-2">
               {projectsQuery.data?.projects.map((project) => (
@@ -283,7 +282,7 @@ export function MembersPage() {
           </div>
         </aside>
       </div>
-    </section>
+    </ConsolePage>
   );
 }
 

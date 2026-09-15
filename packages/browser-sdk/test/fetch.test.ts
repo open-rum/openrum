@@ -15,8 +15,7 @@ function createHarness(fetchImplementation: typeof fetch) {
   const sink: EventSink = { add: (event) => captured.push(event) };
   const client = new OpenRUMClient(
     {
-      writeKey: "test",
-      endpoint: "https://rum.example.test/ingest/v1/envelope",
+      dsn: "https://test@rum.example.test/ingest/v1/envelope",
       apiSampleRate: 1,
       integrations: [fetchIntegration("https://rum.example.test/ingest/v1/envelope", runtime)],
     },

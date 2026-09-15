@@ -35,8 +35,7 @@ Next.js 会在服务端渲染，而 `@openrum/browser` 是浏览器 SDK，所以
    export function Monitoring() {
      useEffect(() => {
        init({
-         endpoint: process.env.NEXT_PUBLIC_OPENRUM_ENDPOINT!,
-         writeKey: process.env.NEXT_PUBLIC_OPENRUM_WRITE_KEY!,
+         dsn: process.env.NEXT_PUBLIC_OPENRUM_DSN!,
          environment: process.env.NODE_ENV,
          release: process.env.NEXT_PUBLIC_APP_RELEASE,
        });
@@ -67,8 +66,8 @@ Next.js 会在服务端渲染，而 `@openrum/browser` 是浏览器 SDK，所以
    }
    ```
 
-3. 用 `NEXT_PUBLIC_` 前缀暴露这些值。write key 本来就是公开的 —— 它只授权向一个 Project 追加
-   Event —— 但它仍然需要进入浏览器 bundle，而这正是前缀的作用。
+3. 用 `NEXT_PUBLIC_` 前缀暴露 DSN。它包含浏览器公开的只写凭证，需要进入浏览器 bundle，而这正是
+   前缀的作用。
 
 </Steps>
 
@@ -85,8 +84,7 @@ import { useEffect } from "react";
 export default function App({ Component, pageProps }: AppProps) {
   useEffect(() => {
     init({
-      endpoint: process.env.NEXT_PUBLIC_OPENRUM_ENDPOINT!,
-      writeKey: process.env.NEXT_PUBLIC_OPENRUM_WRITE_KEY!,
+      dsn: process.env.NEXT_PUBLIC_OPENRUM_DSN!,
       environment: process.env.NODE_ENV,
       release: process.env.NEXT_PUBLIC_APP_RELEASE,
     });

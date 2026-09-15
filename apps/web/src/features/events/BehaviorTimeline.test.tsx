@@ -56,6 +56,24 @@ describe("behavior timeline", () => {
           sessionId: "018f4d9c-83a1-76c9-81c2-3020ab660001",
           from: "2026-09-03T00:00:00Z",
           to: "2026-09-04T00:00:00Z",
+          session: {
+            sessionId: "018f4d9c-83a1-76c9-81c2-3020ab660001",
+            startedAt: "2026-09-03T00:00:00Z",
+            endedAt: "2026-09-03T09:00:00Z",
+            durationSeconds: 32400,
+            events: 1,
+            pageViews: 0,
+            errors: 0,
+            apiFailures: 0,
+            customEvents: 1,
+            slowestApiMs: 0,
+          },
+          availability: {
+            sampled: false,
+            expiredLogs: false,
+            timelineExact: true,
+            replay: false,
+          },
           truncated: false,
           events: [
             {

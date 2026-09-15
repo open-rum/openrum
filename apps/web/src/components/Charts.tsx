@@ -60,7 +60,12 @@ function TrendTooltip({ active, payload, label }: TooltipContentProps) {
       {label === "14:20" && <div className="chart-tooltip__release">● 发布 v2.18.0</div>}
       {payload.map((entry) => (
         <div className="chart-tooltip__row" key={String(entry.dataKey)}>
-          <span style={{ color: entry.color }}>● {entry.name}</span>
+          <span>
+            <span style={{ color: entry.color }} aria-hidden="true">
+              ●
+            </span>{" "}
+            {entry.name}
+          </span>
           <strong>
             {entry.dataKey === "errorRate"
               ? `${entry.value}%`
@@ -85,8 +90,8 @@ export function QualityTrend({ compare }: { compare: boolean }) {
         <LineChart data={trendData} margin={{ top: 14, right: 4, bottom: 0, left: -18 }}>
           <defs>
             <linearGradient id="pvWash" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="var(--ds-brand)" stopOpacity={0.16} />
-              <stop offset="100%" stopColor="var(--ds-brand)" stopOpacity={0} />
+              <stop offset="0%" stopColor="var(--ds-chart-1)" stopOpacity={0.16} />
+              <stop offset="100%" stopColor="var(--ds-chart-1)" stopOpacity={0} />
             </linearGradient>
           </defs>
           <CartesianGrid stroke="var(--ds-border-soft)" strokeDasharray="2 3" vertical={false} />
@@ -102,7 +107,7 @@ export function QualityTrend({ compare }: { compare: boolean }) {
             domain={[0, 850]}
             ticks={[0, 200, 400, 600, 800]}
             tickFormatter={(value) => (value === 0 ? "0" : `${value}K`)}
-            tick={{ fill: "var(--ds-brand)", fontSize: 11 }}
+            tick={{ fill: "var(--ds-text-muted)", fontSize: 11 }}
             tickLine={false}
             axisLine={false}
           />
@@ -112,20 +117,25 @@ export function QualityTrend({ compare }: { compare: boolean }) {
             domain={[0, 2.5]}
             ticks={[0, 0.5, 1, 1.5, 2]}
             tickFormatter={(value) => `${value}%`}
-            tick={{ fill: "var(--ds-danger)", fontSize: 11 }}
+            tick={{ fill: "var(--ds-text-muted)", fontSize: 11 }}
             tickLine={false}
             axisLine={false}
           />
           <Tooltip
             content={(props) => <TrendTooltip {...props} />}
-            cursor={{ stroke: "var(--ds-brand)", strokeDasharray: "3 3" }}
+            cursor={{ stroke: "var(--ds-border)", strokeDasharray: "3 3" }}
           />
           <ReferenceLine
             x="14:20"
             yAxisId="traffic"
-            stroke="var(--ds-brand)"
+            stroke="var(--ds-border)"
             strokeDasharray="3 3"
-            label={{ value: "v2.18.0", position: "top", fill: "var(--ds-brand)", fontSize: 11 }}
+            label={{
+              value: "v2.18.0",
+              position: "top",
+              fill: "var(--ds-text-muted)",
+              fontSize: 11,
+            }}
           />
           {compare && (
             <Area
@@ -143,7 +153,7 @@ export function QualityTrend({ compare }: { compare: boolean }) {
             type="monotone"
             dataKey="pv"
             name="PV"
-            stroke="var(--ds-brand)"
+            stroke="var(--ds-chart-1)"
             strokeWidth={2}
             dot={false}
             activeDot={{ r: 3 }}

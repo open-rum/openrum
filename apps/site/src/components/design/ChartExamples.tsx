@@ -23,15 +23,15 @@ const visits = [
 const latency = visits.map((row, index) => ({
   day: row.day,
   p50: [124, 142, 136, 164, 138, 152, 128][index],
-  p95: [265, 286, 242, 328, 274, 312, 252][index],
+  previous: [165, 186, 142, 228, 174, 212, 152][index],
 }));
 const trafficConfig = {
   web: { label: "Web", color: "var(--ds-chart-1)" },
   mobile: { label: "Mobile web", color: "var(--ds-chart-2)" },
 } satisfies ChartConfig;
 const latencyConfig = {
-  p50: { label: "P50", color: "var(--ds-chart-1)" },
-  p95: { label: "P95", color: "var(--ds-chart-2)" },
+  p50: { label: "本周期 P50", color: "var(--ds-chart-1)" },
+  previous: { label: "上周期 P50", color: "var(--ds-chart-comparison)" },
 } satisfies ChartConfig;
 const xAxis = {
   dataKey: "day",
@@ -51,7 +51,7 @@ export default function ChartExamples() {
           <figcaption>
             <span>01 / AREA</span>
             <h3>访问趋势</h3>
-            <p>填充表现体量，深色轮廓保持清晰。</p>
+            <p>柠檬绿主系列，蓝绿辅助系列，浅色填充表现体量。</p>
           </figcaption>
           <ChartContainer config={trafficConfig} className="ds-chart" id="design-area">
             <AreaChart
@@ -143,7 +143,7 @@ export default function ChartExamples() {
           <figcaption>
             <span>03 / LINE</span>
             <h3>响应耗时</h3>
-            <p>颜色与虚实线区分系列，变化一目了然。</p>
+            <p>同一指标按周期对比：柠檬绿实线与淡黄虚线。</p>
           </figcaption>
           <ChartContainer config={latencyConfig} className="ds-chart" id="design-line">
             <LineChart
@@ -164,9 +164,9 @@ export default function ChartExamples() {
                 isAnimationActive={false}
               />
               <Line
-                dataKey="p95"
+                dataKey="previous"
                 type="monotone"
-                stroke="var(--color-p95)"
+                stroke="var(--color-previous)"
                 strokeWidth={2}
                 strokeDasharray="5 4"
                 dot={false}
@@ -177,11 +177,11 @@ export default function ChartExamples() {
           <div className="ds-chart-legend">
             <span>
               <i />
-              P50
+              本周期 P50
             </span>
             <span>
-              <i />
-              P95
+              <i style={{ background: "var(--ds-chart-comparison)" }} />
+              上周期 P50
             </span>
             <em>单位：毫秒</em>
           </div>
@@ -197,8 +197,8 @@ export default function ChartExamples() {
                 <th>日期</th>
                 <th>Web 页面浏览</th>
                 <th>Mobile web 页面浏览</th>
-                <th>P50 / ms</th>
-                <th>P95 / ms</th>
+                <th>本周期 P50 / ms</th>
+                <th>上周期 P50 / ms</th>
               </tr>
             </thead>
             <tbody>
@@ -208,7 +208,7 @@ export default function ChartExamples() {
                   <td>{row.web}</td>
                   <td>{row.mobile}</td>
                   <td>{latency[index].p50}</td>
-                  <td>{latency[index].p95}</td>
+                  <td>{latency[index].previous}</td>
                 </tr>
               ))}
             </tbody>

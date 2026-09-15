@@ -1,220 +1,213 @@
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Cell,
-  Line,
-  LineChart,
-  RadialBar,
-  RadialBarChart,
-  ReferenceLine,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
-import {
-  CircleAlertIcon,
-  CircleCheckIcon,
-  CircleXIcon,
-  GaugeIcon,
-  MousePointerClickIcon,
-  MoveIcon,
-  PanelTopIcon,
-  RouteIcon,
-} from "lucide-react";
-import type { LucideIcon } from "lucide-react";
+import { CartesianGrid, Line, LineChart, ReferenceLine, XAxis, YAxis } from "recharts";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { ChartContainer, ChartTooltip, type ChartConfig } from "@/components/ui/chart";
 import { useChartMotion } from "@/lib/charts/useChartMotion";
 import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
   formatPerformanceMetric,
+  performancePercentiles,
   type PerformanceMetricName,
+  type PerformanceMetricKey,
+  type PerformancePercentile,
   type PerformanceResponse,
 } from "@/lib/api/performance";
 import {
+  overallPerformanceScore,
   performanceRating,
   performanceScore,
   performanceThresholds,
   ratingLabel,
   scoreRating,
-  summarizePerformance,
-  type PerformanceRating,
 } from "./score";
+import { formatTrendDate } from "./trendTime";
+import { CombinedVitalTrend } from "./CombinedVitalTrend";
+import { PerformanceScoreRing } from "./PerformanceScoreRing";
+import { vitalSeries } from "./combinedTrend";
 
-const metricIcons: Record<PerformanceMetricName, LucideIcon> = {
-  LCP: PanelTopIcon,
-  INP: MousePointerClickIcon,
-  CLS: MoveIcon,
+const metricDescriptions = {
+  LCP: "主要内容加载",
+  INP: "交互响应",
+  CLS: "视觉稳定性",
+  FCP: "首次内容绘制",
+  TTFB: "首字节响应",
 };
-
-const ratingIcons: Record<PerformanceRating, LucideIcon> = {
-  good: CircleCheckIcon,
-  "needs-improvement": CircleAlertIcon,
-  poor: CircleXIcon,
-  unknown: GaugeIcon,
-};
-
-const axisDateFormatter = new Intl.DateTimeFormat("zh-CN", {
-  month: "2-digit",
-  day: "2-digit",
-});
-const tooltipDateFormatter = new Intl.DateTimeFormat("zh-CN", {
-  month: "2-digit",
-  day: "2-digit",
-  hour: "2-digit",
-  minute: "2-digit",
-});
 
 export function PerformanceOverview({
-  routes,
+  summary,
   trend,
-  selectedMetric,
+  percentile,
+  onPercentileChange,
 }: {
-  routes: PerformanceResponse["routes"];
+  summary: PerformanceResponse["summary"];
   trend: PerformanceResponse["trend"];
-  selectedMetric: PerformanceMetricName;
+  percentile: PerformancePercentile;
+  onPercentileChange: (value: PerformancePercentile) => void;
 }) {
-  const summary = summarizePerformance(routes);
-  const overallRating = scoreRating(summary.score);
-  const RatingIcon = ratingIcons[overallRating];
+  const scoring = overallPerformanceScore(summary);
   return (
-    <section className="performance-overview" aria-label="性能健康概览">
-      <Card className="performance-score-card">
-        <CardHeader>
-          <div className="performance-card-heading">
-            <span className="performance-icon performance-icon--brand">
-              <GaugeIcon />
-            </span>
-            <div>
-              <CardTitle>体验健康度</CardTitle>
-              <CardDescription>基于三个 Core Web Vitals 的样本加权评分</CardDescription>
-            </div>
-          </div>
-          <Badge
-            className={`performance-rating performance-rating--${overallRating}`}
-            variant="outline"
-          >
-            <RatingIcon />
-            {ratingLabel(overallRating)}
-          </Badge>
-        </CardHeader>
-        <CardContent className="performance-score-content">
-          <ScoreGauge score={summary.score} rating={overallRating} />
-          <div className="performance-score-facts">
-            <div>
-              <RouteIcon />
-              <span>已测 Route</span>
-              <strong>{summary.measuredRoutes}</strong>
-            </div>
-            <div>
-              <PanelTopIcon />
-              <span>页面访问</span>
-              <strong>{summary.pageViews.toLocaleString()}</strong>
-            </div>
-          </div>
-          <p>OpenRUM 评分用于排序优化优先级；达标判断遵循 CWV P75 阈值。</p>
-        </CardContent>
-      </Card>
-
-      <div className="performance-metric-grid">
-        {summary.metrics.map((metric) => {
-          const Icon = metricIcons[metric.name];
-          const rating = performanceRating(metric.p75, metric.name);
-          const RatingStatusIcon = ratingIcons[rating];
-          const passRate = metric.measuredRoutes
-            ? Math.round((metric.goodRoutes / metric.measuredRoutes) * 100)
-            : 0;
+    <section className="performance-summary" aria-label="性能指标概览">
+      <div className="performance-overview-top">
+        <PerformanceScoreCard scoring={scoring} />
+        <CombinedVitalTrend
+          trend={trend}
+          percentile={percentile}
+          onPercentileChange={onPercentileChange}
+        />
+      </div>
+      <div className="performance-summary-stats">
+        {vitalSeries.map(({ key, name }) => {
+          const metric = summary?.[key];
+          const rating = performanceRating(metric?.sufficient ? metric.p75 : null, name);
+          const score = metric && metric.samples > 0 ? performanceScore(metric.p75, name) : null;
           return (
-            <Card key={metric.name} className="performance-metric-card" size="sm">
+            <Card key={name} className="performance-metric-card" size="sm">
               <CardHeader>
-                <span className={`performance-icon performance-icon--${rating}`}>
-                  <Icon />
-                </span>
-                <div>
-                  <CardTitle>{metric.name} P75</CardTitle>
-                  <CardDescription>{metric.samples.toLocaleString()} 个有效样本</CardDescription>
-                </div>
-                <Badge
-                  className={`performance-rating performance-rating--${rating}`}
-                  variant="outline"
-                >
-                  <RatingStatusIcon />
-                  {ratingLabel(rating)}
-                </Badge>
+                <CardTitle>
+                  {name}{" "}
+                  <span className="performance-metric-percentile">{percentile.toUpperCase()}</span>
+                </CardTitle>
+                <CardDescription>{metricDescriptions[name]}</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="performance-metric-value">
-                  <strong>{formatPerformanceMetric(metric.p75, metric.name)}</strong>
-                  <span>{metric.score ?? "—"} 分</span>
-                </div>
-                <VitalTrendChart trend={trend} metric={metric.name} />
-                <div className="performance-pass-rate">
-                  <span>Route 达标率</span>
-                  <strong>{metric.measuredRoutes ? `${passRate}%` : "—"}</strong>
+                  <strong>{formatPerformanceMetric(metric?.[percentile] ?? null, name)}</strong>
+                  <span>{(metric?.samples ?? 0).toLocaleString()} 样本</span>
                 </div>
               </CardContent>
+              <CardFooter className="performance-metric-footer" data-rating={rating}>
+                {metric?.sufficient
+                  ? `P75 ${ratingLabel(rating)} · ${score ?? "—"} 分`
+                  : (metric?.samples ?? 0) > 0
+                    ? "样本不足 · 暂不判定"
+                    : "暂无数据"}
+              </CardFooter>
             </Card>
           );
         })}
       </div>
-
-      <Card className="performance-route-chart-card">
-        <CardHeader>
-          <div className="performance-card-heading">
-            <span className="performance-icon performance-icon--brand">
-              <RouteIcon />
-            </span>
-            <div>
-              <CardTitle>Route 体验评分</CardTitle>
-              <CardDescription>按样本量展示主要 Route，分数越低越值得优先排查</CardDescription>
-            </div>
-          </div>
-          <Badge variant="secondary">{selectedMetric}</Badge>
-        </CardHeader>
-        <CardContent>
-          <RouteScoreChart routes={routes} metric={selectedMetric} />
-        </CardContent>
-      </Card>
+      <details className="performance-score-method">
+        <summary>评分口径与分位数对比</summary>
+        <p>
+          P50 看典型体验，P75 用于体验判定，P95 看长尾。图表展示原始值：耗时共用左侧毫秒轴，CLS
+          使用右侧无单位轴； 两轴独立缩放，曲线高低不可跨轴比较。时间桶缺失不补零。
+          整体值按当前筛选下保留期内的原始样本计算，不是路由分位数的平均；更长时间范围可能缺少历史样本。
+        </p>
+        <p>
+          性能评分沿用 OpenRUM 原有 0–100 分曲线：良好阈值为 90 分，较差阈值为 50
+          分，再分段线性变化。整体 P75 分别评分后按 Sentry 默认权重加权：
+          {scoring.metrics.map(({ name, weight }) => `${name} ${weight}%`).join("、")}。
+          环段大小表示默认权重，彩色长度表示单项得分比例，灰色为剩余部分。
+          切换分位数或隐藏曲线不会改变评分。
+          缺失项保留灰色环段，不填零或满分；总分按可用项权重重新归一。五项不全或任一项少于 75
+          个样本时仅显示参考评分。仅权重参考 Sentry，不采用其对数正态评分模型。 此分数不是 Sentry 或
+          Lighthouse 分数，也不等于 CWV 达标结论；建议分别筛选电脑与手机查看。
+        </p>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>指标</TableHead>
+              {performancePercentiles.map((p) => (
+                <TableHead key={p}>{p.toUpperCase()}</TableHead>
+              ))}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {vitalSeries.map(({ key, name }) => (
+              <TableRow key={name}>
+                <TableCell>{name}</TableCell>
+                {performancePercentiles.map((p) => (
+                  <TableCell key={p}>
+                    {formatPerformanceMetric(summary?.[key]?.[p] ?? null, name)}
+                  </TableCell>
+                ))}
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </details>
     </section>
   );
 }
 
-/**
- * Shared with the project dashboard. The overview endpoint's series carries the
- * same per-bucket vital shape as the performance trend, so the prop is typed to
- * the common subset rather than to either response.
- */
+function PerformanceScoreCard({
+  scoring,
+}: {
+  scoring: ReturnType<typeof overallPerformanceScore>;
+}) {
+  const rating = scoreRating(scoring.score);
+  return (
+    <Card className="performance-summary-score" size="sm">
+      <CardHeader>
+        <div>
+          <CardTitle>性能评分</CardTitle>
+          <CardDescription>加权评分 · P75</CardDescription>
+        </div>
+        <Badge variant="outline">
+          {scoring.score === null
+            ? "暂无数据"
+            : scoring.complete
+              ? ratingLabel(rating)
+              : "参考评分"}
+        </Badge>
+      </CardHeader>
+      <CardContent>
+        <PerformanceScoreRing scoring={scoring} />
+        {!scoring.complete ? (
+          <p>
+            {scoring.available}/{scoring.metrics.length} 项有数据 · 仅供参考
+          </p>
+        ) : null}
+      </CardContent>
+    </Card>
+  );
+}
+
+// The project dashboard also consumes this chart with its P75-only response.
+type TrendMetric = { p75: number | null; samples: number } & Partial<
+  Record<PerformancePercentile, number | null>
+>;
 export function VitalTrendChart({
   trend,
   metric,
+  percentile = "p75",
 }: {
   trend: readonly {
     bucket: string;
-    lcp: { p75: number | null; samples: number };
-    inp: { p75: number | null; samples: number };
-    cls: { p75: number | null; samples: number };
+    lcp: TrendMetric;
+    inp: TrendMetric;
+    cls: TrendMetric;
+    fcp?: TrendMetric;
+    ttfb?: TrendMetric;
   }[];
   metric: PerformanceMetricName;
+  percentile?: PerformancePercentile;
 }) {
   const animate = useChartMotion();
-  const key = metric.toLowerCase() as "lcp" | "inp" | "cls";
-  const data = trend
-    .filter((point) => point[key].p75 !== null)
-    .map((point) => ({
-      bucket: point.bucket,
-      value: point[key].p75,
-      samples: point[key].samples,
-    }));
-  if (!data.length) {
+  const key = metric.toLowerCase() as PerformanceMetricKey;
+  const data = trend.map((point) => ({
+    bucket: point.bucket,
+    value: point[key]?.[percentile] ?? null,
+    samples: point[key]?.samples ?? 0,
+  }));
+  if (!data.some((point) => point.value !== null))
     return <div className="performance-metric-trend-empty">当前范围暂无趋势数据</div>;
-  }
   const config = {
-    value: {
-      label: `${metric} P75`,
-      color: "var(--ds-brand)",
-    },
+    value: { label: `${metric} ${percentile.toUpperCase()}`, color: "var(--ds-chart-1)" },
   } satisfies ChartConfig;
   const threshold = performanceThresholds[metric];
   return (
@@ -223,7 +216,7 @@ export function VitalTrendChart({
       config={config}
       initialDimension={{ width: 360, height: 176 }}
       role="img"
-      aria-label={`${metric} P75 日期趋势`}
+      aria-label={`${metric} ${percentile.toUpperCase()} 日期趋势`}
     >
       <LineChart accessibilityLayer data={data} margin={{ top: 10, right: 6, bottom: 0, left: 0 }}>
         <CartesianGrid vertical={false} stroke="var(--ds-border-soft)" strokeDasharray="2 3" />
@@ -233,30 +226,43 @@ export function VitalTrendChart({
           tickLine={false}
           tickMargin={8}
           minTickGap={32}
-          tickFormatter={formatAxisDate}
+          tickFormatter={(value) =>
+            formatTrendDate(
+              value,
+              Date.parse(data[data.length - 1].bucket) - Date.parse(data[0].bucket) < 2 * 86400000,
+            )
+          }
         />
         <YAxis
           axisLine={false}
           tickLine={false}
           tickMargin={6}
-          // CLS ticks read "0.25", which the narrower width used to clip to
-          // ".25" once the poor threshold pushed the domain past 0.1.
           width={44}
-          tickFormatter={(value: number) => formatAxisMetric(value, metric)}
-          domain={["auto", "auto"]}
+          tickFormatter={(value: number) =>
+            metric === "CLS"
+              ? value.toFixed(2)
+              : value >= 1000
+                ? `${(value / 1000).toFixed(1)}s`
+                : `${Math.round(value)}`
+          }
+          domain={[0, "auto"]}
         />
-        <ReferenceLine
-          y={threshold.good}
-          stroke="var(--ds-success)"
-          strokeDasharray="3 3"
-          ifOverflow="extendDomain"
-        />
-        <ReferenceLine
-          y={threshold.poor}
-          stroke="var(--ds-danger)"
-          strokeDasharray="3 3"
-          ifOverflow="extendDomain"
-        />
+        {percentile === "p75" ? (
+          <>
+            <ReferenceLine
+              y={threshold.good}
+              stroke="var(--ds-success)"
+              strokeDasharray="3 3"
+              ifOverflow="extendDomain"
+            />
+            <ReferenceLine
+              y={threshold.poor}
+              stroke="var(--ds-danger)"
+              strokeDasharray="3 3"
+              ifOverflow="extendDomain"
+            />
+          </>
+        ) : null}
         <ChartTooltip
           cursor={{ stroke: "var(--ds-border)" }}
           content={({ active, payload }) => {
@@ -264,8 +270,10 @@ export function VitalTrendChart({
             if (!active || !point) return null;
             return (
               <div className="performance-chart-tooltip">
-                <strong>{formatTooltipDate(point.bucket)}</strong>
-                <span>{formatPerformanceMetric(point.value, metric)} P75</span>
+                <strong>{formatTrendDate(point.bucket, true)}</strong>
+                <span>
+                  {formatPerformanceMetric(point.value, metric)} · {percentile.toUpperCase()}
+                </span>
                 <span>{point.samples.toLocaleString()} 个样本</span>
               </div>
             );
@@ -276,142 +284,12 @@ export function VitalTrendChart({
           dataKey="value"
           stroke="var(--color-value)"
           strokeWidth={2}
-          dot={false}
+          dot={data.length === 1}
           activeDot={{ r: 3 }}
+          connectNulls={false}
           isAnimationActive={animate}
         />
       </LineChart>
     </ChartContainer>
   );
-}
-
-function ScoreGauge({ score, rating }: { score: number | null; rating: PerformanceRating }) {
-  const value = score ?? 0;
-  return (
-    <div className="performance-score-gauge" aria-label={`体验健康度 ${score ?? "暂无数据"} 分`}>
-      <ResponsiveContainer width="100%" height="100%" minWidth={180} minHeight={180}>
-        <RadialBarChart
-          data={[{ value, fill: ratingColor(rating) }]}
-          innerRadius="76%"
-          outerRadius="100%"
-          startAngle={210}
-          endAngle={-30}
-          barSize={12}
-        >
-          <RadialBar dataKey="value" background cornerRadius={8} isAnimationActive={false} />
-        </RadialBarChart>
-      </ResponsiveContainer>
-      <div>
-        <strong>{score ?? "—"}</strong>
-        <span>/ 100</span>
-      </div>
-    </div>
-  );
-}
-
-function RouteScoreChart({
-  routes,
-  metric,
-}: {
-  routes: PerformanceResponse["routes"];
-  metric: PerformanceMetricName;
-}) {
-  const key = metric.toLowerCase() as "lcp" | "inp" | "cls";
-  const data = routes
-    .filter((route) => route[key].p75 !== null && route[key].samples > 0)
-    .sort((left, right) => right[key].samples - left[key].samples)
-    .slice(0, 7)
-    .map((route) => ({
-      route: route.route,
-      score: performanceScore(route[key].p75, metric) ?? 0,
-      value: route[key].p75,
-      samples: route[key].samples,
-      rating: performanceRating(route[key].p75, metric),
-    }));
-  if (!data.length) {
-    return <div className="performance-chart-empty">当前指标还没有可绘制的 Route 样本。</div>;
-  }
-  return (
-    <div className="performance-route-chart" role="img" aria-label={`${metric} Route 性能评分排行`}>
-      <ResponsiveContainer
-        width="100%"
-        height="100%"
-        minWidth={0}
-        minHeight={260}
-        initialDimension={{ width: 840, height: 286 }}
-      >
-        <BarChart data={data} layout="vertical" margin={{ top: 6, right: 18, bottom: 8, left: 8 }}>
-          <CartesianGrid horizontal={false} stroke="var(--ds-border-soft)" strokeDasharray="2 3" />
-          <XAxis
-            type="number"
-            domain={[0, 100]}
-            ticks={[0, 50, 90, 100]}
-            axisLine={false}
-            tickLine={false}
-            tick={{ fill: "var(--ds-text-muted)", fontSize: 11 }}
-          />
-          <YAxis
-            type="category"
-            dataKey="route"
-            width={132}
-            axisLine={false}
-            tickLine={false}
-            tick={{ fill: "var(--ds-text-secondary)", fontSize: 12 }}
-          />
-          <ReferenceLine x={50} stroke="var(--ds-danger)" strokeDasharray="3 3" />
-          <ReferenceLine x={90} stroke="var(--ds-success)" strokeDasharray="3 3" />
-          <Tooltip
-            cursor={{ fill: "var(--ds-surface-subtle)" }}
-            content={({ active, payload }) => {
-              const item = payload?.[0]?.payload as (typeof data)[number] | undefined;
-              if (!active || !item) return null;
-              return (
-                <div className="performance-chart-tooltip">
-                  <strong>{item.route}</strong>
-                  <span>
-                    {formatPerformanceMetric(item.value, metric)} · {item.samples} 样本
-                  </span>
-                  <span>
-                    {item.score} 分 · {ratingLabel(item.rating)}
-                  </span>
-                </div>
-              );
-            }}
-          />
-          <Bar dataKey="score" radius={[0, 5, 5, 0]} isAnimationActive={false}>
-            {data.map((item) => (
-              <Cell key={item.route} fill={ratingColor(item.rating)} />
-            ))}
-          </Bar>
-        </BarChart>
-      </ResponsiveContainer>
-    </div>
-  );
-}
-
-function ratingColor(rating: PerformanceRating) {
-  switch (rating) {
-    case "good":
-      return "var(--ds-success)";
-    case "needs-improvement":
-      return "var(--ds-warning)";
-    case "poor":
-      return "var(--ds-danger)";
-    default:
-      return "var(--ds-text-muted)";
-  }
-}
-
-function formatAxisDate(value: string) {
-  return axisDateFormatter.format(new Date(value));
-}
-
-function formatTooltipDate(value: string) {
-  return tooltipDateFormatter.format(new Date(value));
-}
-
-function formatAxisMetric(value: number, metric: PerformanceMetricName) {
-  if (metric === "CLS") return value.toFixed(2);
-  if (value >= 1000) return `${(value / 1000).toFixed(1)}s`;
-  return `${Math.round(value)}`;
 }

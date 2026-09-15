@@ -5,6 +5,12 @@ import { AsyncError } from "@/components/ui/AsyncState";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  ConsoleFilterBar,
+  ConsolePage,
+  ConsolePageContent,
+  ConsolePageHeader,
+} from "@/components/layout/ConsolePage";
 import { BehaviorControls } from "@/features/analytics/BehaviorControls";
 import { useBehaviorFilters } from "@/features/analytics/useBehaviorFilters";
 import { getBehaviorAnalytics } from "@/lib/api/analytics";
@@ -41,44 +47,45 @@ function ProjectEvents({ project }: { project: Project }) {
     queryFn: ({ signal }) => getBehaviorAnalytics(filters, signal),
   });
   return (
-    <div className="behavior-page events-page">
-      <header className="behavior-header">
-        <div>
-          <div className="breadcrumb">
-            项目 <span>/</span> {project.name} <span>/</span> 事件
-          </div>
-          <h1>事件管理与探索</h1>
-          <p>检查事件目录、趋势、属性定义和脱敏原始样本，并沿会话时间线复现行为。</p>
-        </div>
-        <Button
-          size="icon"
-          variant="outline"
-          aria-label="刷新事件数据"
-          onClick={() => void query.refetch()}
-          disabled={query.isFetching}
-        >
-          <RefreshCwIcon />
-        </Button>
-      </header>
-      <BehaviorControls filters={filters} data={query.data} onChange={update} />
-      {query.isLoading ? <EventsSkeleton compact /> : null}
-      {query.error ? (
-        <AsyncError
-          error={query.error}
-          title="事件探索加载失败"
-          remediation="筛选已保留；请缩短范围、改用内置维度或清除高基数属性。"
-          onRetry={() => void query.refetch()}
-        />
-      ) : null}
-      {query.data ? (
-        <EventExplorer
-          data={query.data}
-          filters={filters}
-          onSelectEvent={(eventKind, eventName) => update({ eventKind, eventName })}
-          onSelectProperty={(name) => update({ dimension: `property:${name}` })}
-        />
-      ) : null}
-    </div>
+    <ConsolePage width="fluid">
+      <ConsolePageHeader
+        title="事件管理与探索"
+        description="检查事件目录、趋势、属性定义和脱敏原始样本，并沿会话时间线复现行为。"
+        actions={
+          <Button
+            size="icon"
+            variant="outline"
+            aria-label="刷新事件数据"
+            onClick={() => void query.refetch()}
+            disabled={query.isFetching}
+          >
+            <RefreshCwIcon />
+          </Button>
+        }
+      />
+      <ConsoleFilterBar
+        primary={<BehaviorControls filters={filters} data={query.data} onChange={update} />}
+      />
+      <ConsolePageContent className="grid gap-6">
+        {query.isLoading ? <EventsSkeleton compact /> : null}
+        {query.error ? (
+          <AsyncError
+            error={query.error}
+            title="事件探索加载失败"
+            remediation="筛选已保留；请缩短范围、改用内置维度或清除高基数属性。"
+            onRetry={() => void query.refetch()}
+          />
+        ) : null}
+        {query.data ? (
+          <EventExplorer
+            data={query.data}
+            filters={filters}
+            onSelectEvent={(eventKind, eventName) => update({ eventKind, eventName })}
+            onSelectProperty={(name) => update({ dimension: `property:${name}` })}
+          />
+        ) : null}
+      </ConsolePageContent>
+    </ConsolePage>
   );
 }
 

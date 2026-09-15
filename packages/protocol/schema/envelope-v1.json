@@ -19,12 +19,28 @@
           { "$ref": "#/$defs/errorEvent" },
           { "$ref": "#/$defs/webVitalEvent" },
           { "$ref": "#/$defs/apiEvent" },
-          { "$ref": "#/$defs/customEvent" }
+          { "$ref": "#/$defs/customEvent" },
+          { "$ref": "#/$defs/logEvent" }
         ]
       }
     }
   },
   "$defs": {
+    "logEvent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["event_id", "type", "timestamp", "level", "message"],
+      "properties": {
+        "event_id": { "$ref": "#/$defs/id" },
+        "type": { "const": "log" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "sample_rate": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 },
+        "level": { "enum": ["trace", "debug", "info", "warn", "error", "fatal"] },
+        "message": { "type": "string", "minLength": 1, "maxLength": 4096 },
+        "logger": { "type": "string", "maxLength": 80 },
+        "attributes": { "$ref": "#/$defs/attributes" }
+      }
+    },
     "sdk": {
       "type": "object",
       "additionalProperties": false,

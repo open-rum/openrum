@@ -36,8 +36,7 @@ the browser.
       import { init } from "@openrum/browser";
 
       init({
-        endpoint: import.meta.env.PUBLIC_OPENRUM_ENDPOINT,
-        writeKey: import.meta.env.PUBLIC_OPENRUM_WRITE_KEY,
+        dsn: import.meta.env.PUBLIC_OPENRUM_DSN,
         environment: import.meta.env.MODE,
         release: import.meta.env.PUBLIC_APP_RELEASE,
       });
@@ -46,8 +45,8 @@ the browser.
 </html>
 ```
 
-The `PUBLIC_` prefix is what makes a value reachable from browser code. A write key is meant
-to be public — it only authorizes appending Events to one Project.
+The `PUBLIC_` prefix is what makes a value reachable from browser code. A DSN contains a
+browser-public credential that only authorizes appending Events to one Project.
 
   </TabItem>
   <TabItem label="Island">
@@ -63,8 +62,7 @@ import { useEffect } from "react";
 export function Monitoring() {
   useEffect(() => {
     init({
-      endpoint: import.meta.env.PUBLIC_OPENRUM_ENDPOINT,
-      writeKey: import.meta.env.PUBLIC_OPENRUM_WRITE_KEY,
+      dsn: import.meta.env.PUBLIC_OPENRUM_DSN,
       environment: import.meta.env.MODE,
       release: import.meta.env.PUBLIC_APP_RELEASE,
     });

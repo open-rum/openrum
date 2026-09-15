@@ -9,5 +9,8 @@
   "queryP95Seconds": 21.21,
   "queryFailurePercent": 40.56,
   "lagRecoveryUpperBoundMinutes": 7,
+  "storedEvents": 158300,
+  "uniqueEventIds": 158300,
+  "kafkaPartitions": 12,
   "source": "docs/benchmarks/initial-capacity.md"
 }

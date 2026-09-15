@@ -42,3 +42,4 @@ Alert when a deletion is `failed`, passes `deadline_at`, or remains `running` fo
 ## Local drill evidence
 
 On 2026-09-03, `openrum_test` was dumped in PostgreSQL custom format and restored into a new `openrum_restore_drill` database. The restored database matched the source at 7 applied migrations, 103 public constraints and 4 deletion tombstones. `/app/migrate status postgres` reported migrations 0000–0006 applied. A transactional write canary succeeded and rollback left zero canary rows. The isolated restored database was removed after validation; the source database was not modified by the drill.
+

@@ -1,7 +1,8 @@
 // Code generated from schema/envelope-v1.json; DO NOT EDIT BY HAND.
 
 export type SchemaVersion = "1.0";
-export type EventType = "page_view" | "error" | "web_vital" | "api" | "custom";
+export type EventType = "page_view" | "error" | "web_vital" | "api" | "custom" | "log";
+export type LogLevel = "trace" | "debug" | "info" | "warn" | "error" | "fatal";
 export type NavigationType = "navigate" | "reload" | "back_forward" | "prerender" | "route_change";
 export type Attributes = Record<string, string>;
 export type Measurements = Record<string, number>;
@@ -81,4 +82,13 @@ export interface CustomEvent extends EventBase {
   measurements?: Measurements;
 }
 
-export type EventV1 = PageViewEvent | ErrorEvent | WebVitalEvent | APIEvent | CustomEvent;
+export interface LogEvent extends EventBase {
+  type: "log";
+  level: LogLevel;
+  message: string;
+  logger?: string;
+  attributes?: Attributes;
+}
+
+export type EventV1 =
+  PageViewEvent | ErrorEvent | WebVitalEvent | APIEvent | CustomEvent | LogEvent;

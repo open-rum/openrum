@@ -1,9 +1,11 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CheckCircle2Icon, WebhookIcon } from "lucide-react";
+import { ConsolePage, ConsolePageHeader } from "@/components/layout/ConsolePage";
 import { Button } from "@/components/ui/button";
 import { createWebhookChannel, getChannels } from "@/lib/api/alerts";
 import { listOrganizations } from "@/lib/api/projects";
+import { AccountSettingsNav } from "./AccountSettingsNav";
 
 export function ChannelsPage() {
   const queryClient = useQueryClient();
@@ -24,15 +26,12 @@ export function ChannelsPage() {
     },
   });
   return (
-    <div className="mx-auto w-full max-w-5xl px-6 py-8">
-      <header className="border-b border-border pb-6">
-        <p className="text-xs text-muted-foreground">设置 / 通知渠道</p>
-        <h1 className="mt-2 text-2xl font-semibold">通知渠道</h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Webhook 密钥加密保存，发送时签名；目标地址会执行 SSRF 防护。
-        </p>
-      </header>
-      <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+    <ConsolePage width="narrow" rail={<AccountSettingsNav />} railLabel="账户设置">
+      <ConsolePageHeader
+        title="通知渠道"
+        description="Webhook 密钥加密保存，发送时签名；目标地址会执行 SSRF 防护。"
+      />
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
         <form
           className="rounded-lg border border-border bg-card p-5"
           onSubmit={(event) => {
@@ -70,7 +69,7 @@ export function ChannelsPage() {
             保存渠道
           </Button>
           {saved ? (
-            <p className="mt-3 flex items-center gap-2 text-sm text-emerald-600" role="status">
+            <p className="mt-3 flex items-center gap-2 text-sm text-(--ds-success)" role="status">
               <CheckCircle2Icon className="size-4" />
               渠道已加密保存
             </p>
@@ -95,6 +94,6 @@ export function ChannelsPage() {
           </div>
         </aside>
       </div>
-    </div>
+    </ConsolePage>
   );
 }

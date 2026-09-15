@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { createOpenRUMDSNForInstance, parseOpenRUMDSN } from "@openrum/protocol/dsn";
 import { csrfHeaders } from "@/lib/auth/session";
 import { requestJSON } from "./client";
 
@@ -44,7 +45,7 @@ export type DevDataPresetsResponse = z.infer<typeof presetsResponseSchema>;
 export type DevDataResult = z.infer<typeof resultSchema>;
 
 export type DevDataRequest = {
-  writeKey: string;
+  dsn: string;
   preset?: string;
   sessions?: number;
   minutes?: number;
@@ -65,30 +66,36 @@ export function getDevDataPresets(
 }
 
 export function generateDevData(projectId: string, body: DevDataRequest): Promise<DevDataResult> {
+  const { writeKey } = parseOpenRUMDSN(body.dsn);
   return requestJSON(resultSchema, `/api/v1/projects/${projectId}/dev-data`, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...csrfHeaders() },
-    body: JSON.stringify(body),
+    body: JSON.stringify({ ...body, dsn: undefined, writeKey }),
   });
 }
 
-const writeKeyStorageKey = "openrum.devdata.writeKey";
+const dsnStorageKey = "openrum.devdata.dsn";
 
-// The write key lives in the browser because project keys are stored hashed and
-// the server cannot supply one. Keeping it here spares re-entry on every run;
-// it is only ever a development project's key.
-export function readStoredWriteKey(): string {
+// Keep the DSN locally to spare re-entry on every development-data run.
+export function readStoredDSN(): string {
   try {
-    return window.localStorage.getItem(writeKeyStorageKey) ?? "";
+    const current = window.localStorage.getItem(dsnStorageKey);
+    if (current) return current;
+    const legacyKey = window.localStorage.getItem("openrum.devdata.writeKey");
+    if (!legacyKey) return "";
+    const dsn = createOpenRUMDSNForInstance(window.location.origin, legacyKey);
+    window.localStorage.setItem(dsnStorageKey, dsn);
+    window.localStorage.removeItem("openrum.devdata.writeKey");
+    return dsn;
   } catch {
     return "";
   }
 }
 
-export function storeWriteKey(value: string): void {
+export function storeDSN(value: string): void {
   try {
-    if (value) window.localStorage.setItem(writeKeyStorageKey, value);
-    else window.localStorage.removeItem(writeKeyStorageKey);
+    if (value) window.localStorage.setItem(dsnStorageKey, value);
+    else window.localStorage.removeItem(dsnStorageKey);
   } catch {
     // A blocked storage API only costs convenience, so it is not worth
     // surfacing as an error.

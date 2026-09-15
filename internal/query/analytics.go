@@ -34,6 +34,9 @@ type BehaviorFilters struct {
 	EventKind   string
 	EventName   string
 	Dimension   string
+	// Measurement names a Custom Event measurement to break down by Dimension. Empty
+	// leaves the breakdown out; the per-key summary is returned either way.
+	Measurement string
 }
 
 type BehaviorMetric struct {
@@ -73,18 +76,22 @@ type BehaviorFreshness struct {
 }
 
 type BehaviorAnalytics struct {
-	From        time.Time                 `json:"from"`
-	To          time.Time                 `json:"to"`
-	Dimension   string                    `json:"dimension"`
-	Interval    string                    `json:"interval"`
-	Totals      BehaviorMetric            `json:"totals"`
-	Trend       []BehaviorTrendPoint      `json:"trend"`
-	Breakdown   []BehaviorBreakdown       `json:"breakdown"`
-	Catalog     []BehaviorEventSummary    `json:"catalog"`
-	Properties  []BehaviorPropertySummary `json:"properties"`
-	Freshness   BehaviorFreshness         `json:"freshness"`
-	SampleCount uint64                    `json:"sampleCount"`
-	RowLimit    int                       `json:"rowLimit"`
+	From       time.Time                 `json:"from"`
+	To         time.Time                 `json:"to"`
+	Dimension  string                    `json:"dimension"`
+	Interval   string                    `json:"interval"`
+	Totals     BehaviorMetric            `json:"totals"`
+	Trend      []BehaviorTrendPoint      `json:"trend"`
+	Breakdown  []BehaviorBreakdown       `json:"breakdown"`
+	Catalog    []BehaviorEventSummary    `json:"catalog"`
+	Properties []BehaviorPropertySummary `json:"properties"`
+	// Numeric Custom Event measurements. Summary is every key; Breakdown is the one
+	// named by the Measurement filter, split by Dimension, and is null without it.
+	Measurements         []BehaviorMeasurementSummary `json:"measurements"`
+	MeasurementBreakdown []MeasurementBreakdownRow    `json:"measurementBreakdown,omitempty"`
+	Freshness            BehaviorFreshness            `json:"freshness"`
+	SampleCount          uint64                       `json:"sampleCount"`
+	RowLimit             int                          `json:"rowLimit"`
 }
 
 type BehaviorSample struct {
@@ -132,6 +139,12 @@ func NormalizeBehaviorFilters(filters BehaviorFilters) (BehaviorFilters, error) 
 		containsControl(filters.EventKind+filters.Dimension) || !validBehaviorKind(filters.EventKind) || !validBehaviorDimension(filters.Dimension) {
 		return BehaviorFilters{}, ErrInvalidBehaviorFilters
 	}
+	filters.Measurement = strings.TrimSpace(filters.Measurement)
+	// A breakdown needs a real dimension to split on, and `all` is not one.
+	if filters.Measurement != "" &&
+		(!ValidMeasurementName(filters.Measurement) || !measurementDimensionSupported(filters.Dimension)) {
+		return BehaviorFilters{}, ErrInvalidBehaviorFilters
+	}
 	return filters, nil
 }
 
@@ -149,6 +162,11 @@ func CheckBehaviorBudget(requested BehaviorFilters) error {
 	}
 	if filters.EventKind != "" || filters.EventName != "" {
 		units = max(1, units/4)
+	}
+	// The measurement breakdown adds a scan of a second aggregate. It is charged rather
+	// than exempted so a wide range cannot be made affordable by moving to it.
+	if filters.Measurement != "" {
+		units += units / 2
 	}
 	if units > behaviorBudgetUnits {
 		return ErrBehaviorQueryTooExpensive
@@ -185,11 +203,23 @@ func (repository *BehaviorRepository) Get(ctx context.Context, requested Behavio
 	if err != nil {
 		return BehaviorAnalytics{}, err
 	}
+	measurements, err := repository.measurements(ctx, filters)
+	if err != nil {
+		return BehaviorAnalytics{}, err
+	}
+	var measurementBreakdown []MeasurementBreakdownRow
+	if filters.Measurement != "" {
+		measurementBreakdown, err = repository.measurementBreakdown(ctx, filters)
+		if err != nil {
+			return BehaviorAnalytics{}, err
+		}
+	}
 	return BehaviorAnalytics{
 		From: filters.From, To: filters.To, Dimension: filters.Dimension, Interval: interval,
 		Totals: totals, Trend: trend, Breakdown: breakdown, Catalog: catalog, Properties: properties,
+		Measurements: measurements, MeasurementBreakdown: measurementBreakdown,
 		Freshness:   behaviorFreshness(latest, repository.now()),
-		SampleCount: totals.Events, RowLimit: behaviorBreakdownLimit,
+		SampleCount: totals.Events, RowLimit: behaviorDimensionLimit(filters.Dimension),
 	}, nil
 }
 
@@ -319,17 +349,27 @@ func (repository *BehaviorRepository) trend(ctx context.Context, filters Behavio
 	return result, rows.Err()
 }
 
+func behaviorDimensionLimit(dimension string) int {
+	// Allow the full set of ISO countries/regions plus unknown on a world map.
+	// Higher-cardinality device, browser and custom dimensions keep their budget.
+	if dimension == "country" {
+		return 250
+	}
+	return behaviorBreakdownLimit
+}
+
 func (repository *BehaviorRepository) breakdown(ctx context.Context, filters BehaviorFilters) ([]BehaviorBreakdown, error) {
+	limit := behaviorDimensionLimit(filters.Dimension)
 	where, arguments := behaviorWhere(filters, filters.Dimension)
 	rows, err := repository.database.QueryContext(ctx, `SELECT dimension_value,
 		uniqCombined64Merge(events) AS event_count,sumMerge(estimated),coalesce(uniqCombined64Merge(unique_users),0),coalesce(uniqCombined64Merge(unique_sessions),0)
 		FROM behavior_metrics_1m WHERE `+where+`
-		GROUP BY dimension_value ORDER BY event_count DESC,dimension_value LIMIT ?`, append(arguments, behaviorBreakdownLimit+1)...)
+		GROUP BY dimension_value ORDER BY event_count DESC,dimension_value LIMIT ?`, append(arguments, limit+1)...)
 	if err != nil {
 		return nil, fmt.Errorf("query behavior breakdown: %w", err)
 	}
 	defer func() { _ = rows.Close() }()
-	result := make([]BehaviorBreakdown, 0, behaviorBreakdownLimit)
+	result := make([]BehaviorBreakdown, 0, limit)
 	for rows.Next() {
 		var item BehaviorBreakdown
 		if err := rows.Scan(&item.Value, &item.Metric.Events, &item.Metric.Estimated, &item.Metric.UniqueUsers, &item.Metric.UniqueSessions); err != nil {
@@ -337,7 +377,7 @@ func (repository *BehaviorRepository) breakdown(ctx context.Context, filters Beh
 		}
 		item.Metric.Approximate = true
 		result = append(result, item)
-		if len(result) > behaviorBreakdownLimit {
+		if len(result) > limit {
 			return nil, ErrBehaviorCardinalityExceeded
 		}
 	}

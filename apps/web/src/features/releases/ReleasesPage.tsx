@@ -11,6 +11,7 @@ import {
   UploadCloudIcon,
 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { ConsolePage, ConsolePageHeader } from "@/components/layout/ConsolePage";
 import { AsyncError } from "@/components/ui/AsyncState";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -41,6 +42,7 @@ import {
   type Release,
 } from "@/lib/api/releases";
 import { listOrganizations, listProjects, type Project } from "@/lib/api/projects";
+import { ProjectSettingsNav } from "@/features/settings/ProjectSettingsNav";
 
 export function ReleasesPage() {
   const { projectId } = useParams({ strict: false }) as { projectId?: string };
@@ -88,16 +90,15 @@ function ProjectReleases({ project }: { project: Project }) {
     },
   });
   return (
-    <div className="releases-page">
-      <header className="releases-header">
-        <div>
-          <div className="breadcrumb">
-            项目 <span>/</span> {project.name} <span>/</span> Releases
-          </div>
-          <h1>Release 与 Source Map</h1>
-          <p>将压缩代码安全还原到源码；Source Map 只上传到私有 OSS，不进入公开构建。</p>
-        </div>
-      </header>
+    <ConsolePage
+      width="wide"
+      rail={<ProjectSettingsNav projectId={project.id} />}
+      railLabel="项目设置导航"
+    >
+      <ConsolePageHeader
+        title="Release 与 Source Map"
+        description="将压缩代码安全还原到源码；Source Map 只上传到私有 OSS，不进入公开构建。"
+      />
       {releases.error ? (
         <AsyncError
           error={releases.error}
@@ -129,7 +130,7 @@ function ProjectReleases({ project }: { project: Project }) {
           <MatchTester projectId={project.id} release={selected} />
         </aside>
       </div>
-    </div>
+    </ConsolePage>
   );
 }
 
@@ -437,13 +438,13 @@ function ReleaseEmpty() {
 }
 function ReleasesSkeleton() {
   return (
-    <div className="releases-page" aria-label="正在加载 Releases">
+    <ConsolePage width="wide" aria-label="正在加载 Releases">
       <Skeleton className="h-28" />
       <div className="grid gap-4 lg:grid-cols-2">
         <Skeleton className="h-80" />
         <Skeleton className="h-80" />
       </div>
-    </div>
+    </ConsolePage>
   );
 }
 function formatBytes(bytes: number) {

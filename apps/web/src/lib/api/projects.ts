@@ -21,7 +21,10 @@ export type Project = {
   name: string;
   slug: string;
   allowedOrigins: string[];
+  /** Default environment selected when the project opens. */
   environment: string;
+  /** Environments accepted by Ingest for this project. */
+  environments: string[];
   retentionDays: number;
   eventSampleRate: number;
   apiSampleRate: number;
@@ -35,7 +38,7 @@ export type Project = {
   role: OrganizationRole;
   createdAt: string;
   updatedAt: string;
-  writeKey?: string;
+  dsn?: string;
 };
 
 export type OrganizationMember = {
@@ -88,6 +91,7 @@ export function createProject(
     slug: string;
     allowedOrigins: string[];
     environment: string;
+    environments: string[];
     retentionDays: number;
     eventSampleRate: number;
     apiSampleRate: number;
@@ -112,6 +116,7 @@ export type ProjectUpdate = {
   slug?: string;
   allowedOrigins?: string[];
   environment?: string;
+  environments?: string[];
   retentionDays?: number;
   eventSampleRate?: number;
   apiSampleRate?: number;

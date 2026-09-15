@@ -1,15 +1,10 @@
 import {
   Bell,
-  ChartBar,
   ChartPieSlice,
-  Flask,
+  CaretUpDown,
   Gauge,
-  GearSix,
   ListBullets,
-  Package,
-  Plug,
   Pulse,
-  ShieldCheck,
   SidebarSimple,
   Sliders,
   SquaresFour,
@@ -17,6 +12,7 @@ import {
   UsersThree,
 } from "@phosphor-icons/react";
 import { useEffect, useState, type ReactElement } from "react";
+import { LogsIcon } from "lucide-react";
 import { useMutation, useQuery, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { Link, useParams, useRouterState } from "@tanstack/react-router";
 import { AccountMenu } from "@/components/account/AccountMenu";
@@ -25,8 +21,8 @@ import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ProjectSwitcher } from "@/features/projects/ProjectSwitcher";
 import {
-  AnalysisContextControls,
   AnalysisContextProvider,
+  AnalysisTimeFilter,
   isAnalysisRoute,
   useAnalysisContextState,
 } from "@/features/filters/AnalysisContextBar";
@@ -38,26 +34,23 @@ import { AppStatusBar } from "./AppStatusBar";
 
 const SIDEBAR_STORAGE_KEY = "openrum-sidebar-collapsed";
 
+function formatEnvironmentLabel(value?: string) {
+  if (!value) return "全部环境";
+  if (value === "production") return "Production";
+  if (value === "test") return "Test";
+  return value;
+}
+
 const primaryNavigation = [
   { label: "数据大盘", icon: SquaresFour, to: "/projects/$projectId/overview" },
   { label: "分析", icon: ChartPieSlice, to: "/projects/$projectId/analytics" },
   { label: "错误", icon: WarningCircle, to: "/projects/$projectId/issues" },
+  { label: "日志", icon: LogsIcon, to: "/projects/$projectId/logs" },
   { label: "性能", icon: Gauge, to: "/projects/$projectId/performance" },
   { label: "事件", icon: ListBullets, to: "/projects/$projectId/events" },
   { label: "API", icon: Pulse, to: "/projects/$projectId/apis" },
   { label: "告警", icon: Bell, to: "/projects/$projectId/alerts" },
   { label: "会话", icon: UsersThree, to: "/projects/$projectId/sessions" },
-] as const;
-
-const utilityNavigation = [
-  { label: "接入", icon: Plug, to: "/projects/$projectId/onboarding" },
-  { label: "发布", icon: Package, to: "/projects/$projectId/releases" },
-  { label: "用量", icon: ChartBar, to: "/projects/$projectId/usage" },
-  { label: "项目设置", icon: Sliders, to: "/projects/$projectId/settings" },
-  // Only reachable in a development build, matching the route registration.
-  ...(import.meta.env.DEV
-    ? ([{ label: "造数据", icon: Flask, to: "/projects/$projectId/dev-data" }] as const)
-    : []),
 ] as const;
 
 export function App() {
@@ -82,6 +75,15 @@ export function App() {
     ? selectProject(projects, organization.id, routeProjectId)
     : undefined;
   const analysisContext = useAnalysisContextState(project, isAnalysisRoute(pathname));
+  const currentEnvironment = formatEnvironmentLabel(analysisContext?.environment);
+  const projectSettingsActive = Boolean(
+    routeProjectId &&
+    (pathname.includes("/settings") ||
+      pathname.includes("/onboarding") ||
+      pathname.includes("/releases") ||
+      pathname.includes("/usage") ||
+      pathname.includes("/dev-data")),
+  );
   useEffect(() => {
     if (project) rememberProject(project);
   }, [project]);
@@ -112,32 +114,11 @@ export function App() {
         statusBar={
           <AppStatusBar
             context={
-              project && analysisContext && isAnalysisRoute(pathname) ? (
-                <AnalysisContextControls context={analysisContext} project={project} />
-              ) : undefined
+              analysisContext && isAnalysisRoute(pathname) ? <AnalysisTimeFilter /> : undefined
             }
-          />
-        }
-        navigation={
-          <TooltipProvider>
-            <div className="sidebar__brand-row">
-              <ProjectSwitcher
-                organization={organization}
-                projects={projects}
-                project={project}
-                loading={organizationsQuery.isLoading || projectsQuery.isLoading}
-              >
-                <Link
-                  className="brand"
-                  to="/projects"
-                  aria-label={project ? `OpenRUM，当前项目 ${project.name}` : "OpenRUM 项目"}
-                >
-                  <BrandMark />
-                  <span>OpenRUM</span>
-                </Link>
-              </ProjectSwitcher>
+            navigationToggle={
               <Button
-                className="sidebar__toggle"
+                className="app-status-bar__sidebar-toggle"
                 type="button"
                 variant="ghost"
                 size="icon"
@@ -149,6 +130,47 @@ export function App() {
               >
                 <SidebarSimple weight="regular" />
               </Button>
+            }
+          />
+        }
+        navigation={
+          <TooltipProvider>
+            <div className="sidebar__brand-row">
+              <ProjectSwitcher
+                organization={organization}
+                projects={projects}
+                project={project}
+                loading={organizationsQuery.isLoading || projectsQuery.isLoading}
+                currentEnvironment={analysisContext?.environment}
+                onEnvironmentChange={
+                  routeProjectId && analysisContext
+                    ? (environment) => analysisContext.update({ environment })
+                    : undefined
+                }
+              >
+                <Link
+                  className="brand"
+                  to="/projects"
+                  aria-label={
+                    routeProjectId && project
+                      ? `切换项目，当前为 ${project.name}，环境 ${currentEnvironment}`
+                      : "OpenRUM 项目列表"
+                  }
+                >
+                  <BrandMark size="nav" />
+                  <span className="brand__identity">
+                    {routeProjectId && project ? (
+                      <>
+                        <strong>{project.name}</strong>
+                        <small>{currentEnvironment}</small>
+                      </>
+                    ) : (
+                      <strong>OpenRUM</strong>
+                    )}
+                  </span>
+                  <CaretUpDown className="brand__switcher-icon" aria-hidden="true" />
+                </Link>
+              </ProjectSwitcher>
             </div>
 
             <nav className="sidebar__nav" aria-label="主导航">
@@ -173,60 +195,27 @@ export function App() {
                   )}
                 </SidebarTooltip>
               ))}
-              <SidebarTooltip label="设置" enabled={sidebarCollapsed}>
-                <Link
-                  className="nav-item"
-                  to="/settings"
-                  activeProps={{ className: "is-active" }}
-                  aria-label="设置"
-                >
-                  <GearSix size={17} />
-                  <span>设置</span>
-                </Link>
-              </SidebarTooltip>
-              {user.instanceRole ? (
-                <SidebarTooltip label="系统管理" enabled={sidebarCollapsed}>
+              <SidebarTooltip label="项目设置" enabled={sidebarCollapsed}>
+                {project ? (
                   <Link
-                    className="nav-item"
-                    to="/admin"
-                    activeProps={{ className: "is-active" }}
-                    aria-label="系统管理"
+                    className={projectSettingsActive ? "nav-item is-active" : "nav-item"}
+                    to="/projects/$projectId/settings"
+                    params={{ projectId: project.id }}
+                    aria-label="项目设置"
                   >
-                    <ShieldCheck size={17} />
-                    <span>系统管理</span>
+                    <Sliders size={17} />
+                    <span>项目设置</span>
                   </Link>
-                </SidebarTooltip>
-              ) : null}
+                ) : (
+                  <Link className="nav-item" to="/projects/new" aria-label="项目设置">
+                    <Sliders size={17} />
+                    <span>项目设置</span>
+                  </Link>
+                )}
+              </SidebarTooltip>
             </nav>
 
             <div className="sidebar__footer">
-              <nav className="sidebar__utility-nav" aria-label="项目管理">
-                <small>项目管理</small>
-                {utilityNavigation.map(({ label, icon: Icon, to }) => (
-                  <SidebarTooltip key={to} label={label} enabled={sidebarCollapsed}>
-                    {project ? (
-                      <Link
-                        className="nav-item nav-item--utility"
-                        to={to}
-                        params={{ projectId: project.id }}
-                        aria-label={label}
-                      >
-                        <Icon size={16} />
-                        <span>{label}</span>
-                      </Link>
-                    ) : (
-                      <Link
-                        className="nav-item nav-item--utility"
-                        to="/projects/new"
-                        aria-label={label}
-                      >
-                        <Icon size={16} />
-                        <span>{label}</span>
-                      </Link>
-                    )}
-                  </SidebarTooltip>
-                ))}
-              </nav>
               <div className="account-panel">
                 <AccountMenu
                   displayName={user.displayName}

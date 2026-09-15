@@ -86,6 +86,19 @@ func TestApplyProcessingRulesRedactsAndFlags(t *testing.T) {
 	}
 }
 
+func TestLogProjectScrubbingIncludesMessageLoggerAndAttributes(t *testing.T) {
+	compiled := compileProcessing(t, processing.Settings{Scrub: processing.ScrubRules{Patterns: []processing.ScrubPattern{{ID: "order", Expression: `ORD-[0-9]{6}`}}, SensitiveKeys: []string{"internal_id"}}})
+	events := []event.CanonicalEvent{{EventType: event.EventTypeLog, LogLevel: "error", LogMessage: "failed ORD-123456", LogLogger: "ORD-123456", Attributes: map[string]string{"internal_id": "private", "order": "ORD-123456"}}}
+	applyProcessingRules(events, compiled, nil)
+	encoded, _ := json.Marshal(events)
+	if strings.Contains(string(encoded), "ORD-123456") || strings.Contains(string(encoded), "private") {
+		t.Fatalf("unscrubbed log: %s", encoded)
+	}
+	if events[0].LogLevel != "error" {
+		t.Fatal("level must remain queryable")
+	}
+}
+
 func TestApplyProcessingRulesKeepsBreadcrumbsDecodable(t *testing.T) {
 	// Running the pattern over the encoded form could replace the punctuation
 	// holding the document together, so the breadcrumb is decoded first.

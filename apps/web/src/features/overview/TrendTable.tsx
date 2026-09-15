@@ -19,7 +19,7 @@ export function TrendTable({ series }: { series: OverviewResponse["series"] }) {
   if (series.length === 0) return null;
   return (
     <details className="border border-border bg-card p-4">
-      <summary className="cursor-pointer text-sm font-medium text-primary">
+      <summary className="cursor-pointer text-sm font-medium text-foreground">
         查看趋势表格数据
       </summary>
       <div className="mt-3 overflow-x-auto">

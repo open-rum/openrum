@@ -45,3 +45,4 @@ For Helm, add the key under the configured `existingSecret` using the name mappe
 ## Evidence and canary boundaries
 
 Use a unique key such as `runbook-canary/<incident-id>/<uuid>.txt` and record its SHA-256 before upload. Grant only `PutObject`, `GetObject`, `HeadObject` and exact-key `DeleteObject` for the drill prefix. Confirm public ACL remains disabled before and after the test. Never test recovery by changing the production bucket ACL, lifecycle rules or encryption policy.
+

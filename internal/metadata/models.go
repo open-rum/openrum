@@ -91,12 +91,15 @@ type InstanceMember struct {
 }
 
 type Project struct {
-	ID              uuid.UUID
-	OrganizationID  uuid.UUID
-	Name            string
-	Slug            string
-	AllowedOrigins  []string
-	Environment     string
+	ID             uuid.UUID
+	OrganizationID uuid.UUID
+	Name           string
+	Slug           string
+	AllowedOrigins []string
+	// Environment is the default Environment selected when a project opens.
+	Environment string
+	// Environments is the bounded set accepted by Ingest for this Project.
+	Environments    []string
 	RetentionDays   int16
 	EventSampleRate float64
 	APISampleRate   float64
@@ -111,11 +114,28 @@ type Project struct {
 	UpdatedAt         time.Time
 }
 
+func (project Project) AcceptsEnvironment(environment string) bool {
+	if len(project.Environments) == 0 {
+		return environment == project.Environment
+	}
+	for _, candidate := range project.Environments {
+		if candidate == environment {
+			return true
+		}
+	}
+	return false
+}
+
 type ProjectKey struct {
-	ID         uuid.UUID
-	ProjectID  uuid.UUID
-	KeyPrefix  string
-	KeyHash    []byte
+	ID        uuid.UUID
+	ProjectID uuid.UUID
+	KeyPrefix string
+	KeyHash   []byte
+	// PublicKey is the browser-public ingest credential embedded in the DSN.
+	// Legacy rows created before migration 0018 leave it empty and must be
+	// rotated before their complete DSN can be shown again.
+	PublicKey  string
+	IsDefault  bool
 	Name       string
 	LastUsedAt *time.Time
 	RevokedAt  *time.Time

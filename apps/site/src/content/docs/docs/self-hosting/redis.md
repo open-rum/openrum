@@ -42,3 +42,4 @@ docker exec openrum-api-1 wget -qO- http://127.0.0.1:8080/health/ready
 Expected: readiness returns HTTP 503 while Redis is stopped; after restart it returns HTTP 200 without event replay or database repair. Replace container names with those from `docker compose ps` when a project prefix is configured.
 
 Last verified on 2026-09-03 with an isolated Compose project: the stopped dependency produced HTTP 503, Redis restarted with its volume, and API readiness immediately returned all four dependency checks as `ok`.
+

@@ -1,6 +1,10 @@
 import { z } from "zod";
 import { csrfHeaders } from "@/lib/auth/session";
 import { requestJSON } from "./client";
+import { getSessionTimeline, sessionTimelineSchema, type SessionTimeline } from "./sessions";
+
+export { getSessionTimeline, sessionTimelineSchema };
+export type { SessionTimeline };
 
 const isoTime = z.iso.datetime({ offset: true });
 const facet = z.object({
@@ -129,31 +133,6 @@ export const eventDetailSchema = z.object({
   mappedStack: mappedStackSchema.optional(),
 });
 
-export const sessionTimelineSchema = z.object({
-  projectId: z.uuid(),
-  sessionId: z.uuid(),
-  from: isoTime,
-  to: isoTime,
-  events: z
-    .array(
-      z.object({
-        eventId: z.uuid(),
-        timestamp: isoTime,
-        kind: z.enum(["page_view", "navigation", "click", "custom", "error", "api"]),
-        title: z.string(),
-        route: z.string().optional(),
-        fingerprint: z.string().optional(),
-        errorMessage: z.string().optional(),
-        apiMethod: z.string().optional(),
-        apiUrl: z.string().optional(),
-        apiStatus: z.number().int().nonnegative().optional(),
-        attributes: z.record(z.string(), z.string()),
-      }),
-    )
-    .max(100),
-  truncated: z.boolean(),
-});
-
 export const issueEventsResponseSchema = z.object({
   events: z.array(eventDetailSchema),
   nextCursor: z.string().optional(),
@@ -161,7 +140,6 @@ export const issueEventsResponseSchema = z.object({
 
 export type IssueDetailResponse = z.infer<typeof issueDetailResponseSchema>;
 export type EventDetail = z.infer<typeof eventDetailSchema>;
-export type SessionTimeline = z.infer<typeof sessionTimelineSchema>;
 
 export type IssueFilters = {
   projectId: string;
@@ -172,9 +150,12 @@ export type IssueFilters = {
   browser?: string;
   deviceType?: string;
   country?: string;
+  route?: string;
   status?: IssueStatus;
   sort: "events" | "users" | "last_seen";
   cursor?: string;
+  /** Local, current-page search; the query API does not provide full-text search. */
+  search?: string;
 };
 
 export function getIssues(filters: IssueFilters, signal?: AbortSignal) {
@@ -214,21 +195,6 @@ export function getEvent(eventId: string, signal?: AbortSignal) {
   return requestJSON(eventDetailSchema, `/api/v1/events/${encodeURIComponent(eventId)}`, {
     signal,
   });
-}
-
-export function getSessionTimeline(
-  projectId: string,
-  sessionId: string,
-  from: Date,
-  to: Date,
-  signal?: AbortSignal,
-) {
-  const parameters = new URLSearchParams({ from: from.toISOString(), to: to.toISOString() });
-  return requestJSON(
-    sessionTimelineSchema,
-    `/api/v1/projects/${encodeURIComponent(projectId)}/analytics/sessions/${encodeURIComponent(sessionId)}?${parameters}`,
-    { signal },
-  );
 }
 
 const issueStateSchema = z.object({
@@ -288,8 +254,10 @@ export function parseIssueFilters(
     browser: clean(search.get("browser")),
     deviceType: clean(search.get("deviceType")),
     country: clean(search.get("country")),
+    route: clean(search.get("route")),
     status: status.success ? status.data : undefined,
     sort,
+    search: clean(search.get("search"))?.slice(0, 200),
     cursor: cursor && /^[A-Za-z0-9_-]{1,512}$/.test(cursor) ? cursor : undefined,
   };
 }
@@ -306,8 +274,10 @@ export function serializeIssueFilters(filters: IssueFilters) {
     ["browser", filters.browser],
     ["deviceType", filters.deviceType],
     ["country", filters.country],
+    ["route", filters.route],
     ["status", filters.status],
     ["cursor", filters.cursor],
+    ["search", filters.search],
   ] as const) {
     if (value) parameters.set(key, value);
   }

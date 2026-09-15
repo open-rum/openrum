@@ -1,6 +1,6 @@
 # `@openrum/browser`
 
-Privacy-bounded Browser SDK for OpenRUM Alpha. It captures Page Views, safe click descriptors, JavaScript errors and unhandled rejections, fetch/XHR timings, Core Web Vitals and governed Custom Events.
+Privacy-bounded Browser SDK for OpenRUM Alpha. It captures Page Views, safe click descriptors, JavaScript errors and unhandled rejections, fetch/XHR timings, Web Vitals (LCP, INP, CLS, FCP and TTFB) and governed Custom Events.
 
 ## Install and initialize
 
@@ -12,8 +12,7 @@ pnpm add @openrum/browser
 import { captureEvent, init, setTag, setUser } from "@openrum/browser";
 
 const client = init({
-  endpoint: "https://rum.example.com/ingest/v1/envelope",
-  writeKey: import.meta.env.VITE_OPENRUM_WRITE_KEY,
+  dsn: import.meta.env.VITE_OPENRUM_DSN,
   environment: "production",
   release: "storefront@1.8.0",
   eventSampleRate: 0.25,
@@ -32,6 +31,33 @@ await client.close();
 ```
 
 `init()` installs the default integrations and returns the active client. Repeated calls while it is running return the same client. Use `captureEvent`, `setUser`, `setTag`, `addBreadcrumb`, `getClient` and `close` for the shipped singleton API; advanced integrations can use `OpenRUMClient` directly.
+
+## Structured logs
+
+Logs are explicit by use: calling `logger.*` emits a log, while initialization by itself collects none. The Console's **日志** page searches the same Project, Environment and time range as other analysis pages.
+
+```ts
+import { init, logger } from "@openrum/browser";
+
+init({
+  dsn: import.meta.env.VITE_OPENRUM_DSN,
+  // Optional: leave unset to keep all console output local.
+  captureConsole: ["warn", "error"],
+  beforeSendLog: (log) => log.level === "debug" ? null : log,
+});
+logger.info("checkout started", { "order.id": "order-123", items: 3 });
+logger.error("payment failed", { "error.code": "UPSTREAM_TIMEOUT" });
+```
+
+Both the singleton `logger` and `client.logger` support `trace`, `debug`, `info`, `warn`, `error`, and `fatal`. Messages are bounded to 4,096 characters; up to 20 primitive attributes are converted to bounded strings. Sensitive keys and values are scrubbed again after `beforeSendLog`. Never pass credentials or personal data intentionally: pattern-based scrubbing is not a guarantee of anonymization.
+
+`captureConsole` is an independent opt-in and does not require another flag. The former `enableLogs` option remains accepted for configuration compatibility but no longer gates explicit logger calls or console forwarding.
+
+Set an opaque application identity with `setUser("customer-123")` before logging and clear it with `setUser(undefined)` on logout. Each log snapshots that ID and the anonymous visitor ID at capture time. Search the Console with `user.id:"customer-123"` (`user_id` / `userId` also work), or `anonymous_user_id:"visitor-id"`. Log details show both identifiers and provide same-user/visitor actions. `setUser` accepts only an ID; it does not collect a name/email profile.
+
+Logs share `eventSampleRate`, remote sampling and the bounded low-priority sender queue. Error/fatal **logs do not create Issues**; exceptions remain separate. Console forwarding preserves the original output and represents objects as `[Object]` instead of serializing arbitrary objects. Remove `captureConsole` to disable forwarding. No server stdout collector or automatic distributed-trace instrumentation is installed.
+
+See [Logs](../../docs/logs.md) for search syntax, limits and rollout order.
 
 ## Privacy defaults
 

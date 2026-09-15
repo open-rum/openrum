@@ -62,3 +62,4 @@ LIMIT 100;
 Do not run broad `MATERIALIZE TTL` mutations during routine verification. Historical policy application is handled by the previewed, rate-limited maintenance workflow so ingestion merges retain capacity.
 
 Historical retention jobs execute at most one project/table/month step globally at a time, with a five-second cooldown between successful steps. A step uses a deterministic Worker timestamp, performs a bounded delete followed by an expiry update, and waits synchronously for each mutation. Inspect progress through `GET /api/v1/admin/maintenance-jobs`; do not bypass a failed job with an ad-hoc cluster-wide mutation.
+

@@ -20,6 +20,7 @@ const projectKeyPrefix = "orr_pk_"
 var (
 	ErrInvalidProjectKey = errors.New("invalid project key")
 	ErrProjectKeyRevoked = errors.New("project key is revoked")
+	ErrDefaultProjectKey = errors.New("default project key cannot be revoked")
 )
 
 type ProjectKeyCredential struct {
@@ -42,13 +43,13 @@ func NewProjectKeyRepository(database *sql.DB) *ProjectKeyRepository {
 
 func (repository *ProjectKeyRepository) ListForUser(ctx context.Context, userID, projectID uuid.UUID) ([]ProjectKey, OrganizationRole, error) {
 	rows, err := repository.database.QueryContext(ctx,
-		`SELECT project_keys.id, project_keys.project_id, project_keys.key_prefix, project_keys.name,
+		`SELECT project_keys.id, project_keys.project_id, project_keys.key_prefix, COALESCE(project_keys.public_key, ''), project_keys.is_default, project_keys.name,
 		        project_keys.last_used_at, project_keys.revoked_at, project_keys.created_at, organization_members.role
 		 FROM project_keys
 		 JOIN projects ON projects.id=project_keys.project_id
 		 JOIN organization_members ON organization_members.organization_id=projects.organization_id
 		 WHERE project_keys.project_id=$1 AND organization_members.user_id=$2
-		 ORDER BY project_keys.created_at DESC, project_keys.id`, projectID, userID)
+		 ORDER BY project_keys.is_default DESC, project_keys.revoked_at NULLS FIRST, project_keys.created_at DESC, project_keys.id`, projectID, userID)
 	if err != nil {
 		return nil, "", err
 	}
@@ -58,7 +59,7 @@ func (repository *ProjectKeyRepository) ListForUser(ctx context.Context, userID,
 	for rows.Next() {
 		var key ProjectKey
 		var rowRole OrganizationRole
-		if err := rows.Scan(&key.ID, &key.ProjectID, &key.KeyPrefix, &key.Name, &key.LastUsedAt,
+		if err := rows.Scan(&key.ID, &key.ProjectID, &key.KeyPrefix, &key.PublicKey, &key.IsDefault, &key.Name, &key.LastUsedAt,
 			&key.RevokedAt, &key.CreatedAt, &rowRole); err != nil {
 			return nil, "", err
 		}
@@ -88,7 +89,13 @@ func (repository *ProjectKeyRepository) Create(ctx context.Context, actorID, pro
 	if err != nil {
 		return ProjectKeyCredential{}, err
 	}
-	credential, err := createProjectKeyRecord(ctx, transaction, projectID, name)
+	var hasDefault bool
+	if err := transaction.QueryRowContext(ctx,
+		"SELECT EXISTS(SELECT 1 FROM project_keys WHERE project_id=$1 AND is_default)", projectID,
+	).Scan(&hasDefault); err != nil {
+		return ProjectKeyCredential{}, err
+	}
+	credential, err := createProjectKeyRecord(ctx, transaction, projectID, name, !hasDefault)
 	if err != nil {
 		return ProjectKeyCredential{}, err
 	}
@@ -112,10 +119,11 @@ func (repository *ProjectKeyRepository) Rotate(ctx context.Context, actorID, pro
 		return ProjectKeyCredential{}, err
 	}
 	var currentName string
+	var isDefault bool
 	var revokedAt *time.Time
 	err = transaction.QueryRowContext(ctx,
-		"SELECT name, revoked_at FROM project_keys WHERE id=$1 AND project_id=$2 FOR UPDATE", keyID, projectID,
-	).Scan(&currentName, &revokedAt)
+		"SELECT name, revoked_at, is_default FROM project_keys WHERE id=$1 AND project_id=$2 FOR UPDATE", keyID, projectID,
+	).Scan(&currentName, &revokedAt, &isDefault)
 	if errors.Is(err, sql.ErrNoRows) {
 		return ProjectKeyCredential{}, ErrNotFound
 	}
@@ -128,7 +136,12 @@ func (repository *ProjectKeyRepository) Rotate(ctx context.Context, actorID, pro
 	if name == "" {
 		name = currentName
 	}
-	credential, err := createProjectKeyRecord(ctx, transaction, projectID, name)
+	if isDefault {
+		if _, err := transaction.ExecContext(ctx, "UPDATE project_keys SET is_default=false WHERE id=$1", keyID); err != nil {
+			return ProjectKeyCredential{}, err
+		}
+	}
+	credential, err := createProjectKeyRecord(ctx, transaction, projectID, name, isDefault)
 	if err != nil {
 		return ProjectKeyCredential{}, err
 	}
@@ -155,9 +168,10 @@ func (repository *ProjectKeyRepository) Revoke(ctx context.Context, actorID, pro
 		return err
 	}
 	var revokedAt *time.Time
+	var isDefault bool
 	err = transaction.QueryRowContext(ctx,
-		"SELECT revoked_at FROM project_keys WHERE id=$1 AND project_id=$2 FOR UPDATE", keyID, projectID,
-	).Scan(&revokedAt)
+		"SELECT revoked_at, is_default FROM project_keys WHERE id=$1 AND project_id=$2 FOR UPDATE", keyID, projectID,
+	).Scan(&revokedAt, &isDefault)
 	if errors.Is(err, sql.ErrNoRows) {
 		return ErrNotFound
 	}
@@ -166,6 +180,9 @@ func (repository *ProjectKeyRepository) Revoke(ctx context.Context, actorID, pro
 	}
 	if revokedAt != nil {
 		return transaction.Commit()
+	}
+	if isDefault {
+		return ErrDefaultProjectKey
 	}
 	if _, err := transaction.ExecContext(ctx,
 		"UPDATE project_keys SET revoked_at=COALESCE(revoked_at, now()) WHERE id=$1", keyID); err != nil {
@@ -184,17 +201,18 @@ func (repository *ProjectKeyRepository) Validate(ctx context.Context, raw string
 	digest := sha256.Sum256([]byte(raw))
 	var access ProjectKeyAccess
 	var allowedOriginsJSON []byte
+	var environmentsJSON []byte
 	err := repository.database.QueryRowContext(ctx,
-		`SELECT project_keys.id, project_keys.project_id, project_keys.key_prefix, project_keys.name,
+		`SELECT project_keys.id, project_keys.project_id, project_keys.key_prefix, COALESCE(project_keys.public_key, ''), project_keys.is_default, project_keys.name,
 		        project_keys.last_used_at, project_keys.revoked_at, project_keys.created_at,
 		        projects.id, projects.organization_id, projects.name, projects.slug, to_json(projects.allowed_origins),
-		        projects.environment, projects.retention_days, projects.event_sample_rate, projects.api_sample_rate,
+		        projects.environment, `+projectEnvironmentsSQL+`, projects.retention_days, projects.event_sample_rate, projects.api_sample_rate,
 		        projects.error_sample_rate, projects.status, projects.created_at, projects.updated_at
 		 FROM project_keys JOIN projects ON projects.id=project_keys.project_id
 		 WHERE project_keys.key_hash=$1 AND project_keys.revoked_at IS NULL AND projects.status='active'`, digest[:],
-	).Scan(&access.Key.ID, &access.Key.ProjectID, &access.Key.KeyPrefix, &access.Key.Name, &access.Key.LastUsedAt,
+	).Scan(&access.Key.ID, &access.Key.ProjectID, &access.Key.KeyPrefix, &access.Key.PublicKey, &access.Key.IsDefault, &access.Key.Name, &access.Key.LastUsedAt,
 		&access.Key.RevokedAt, &access.Key.CreatedAt, &access.Project.ID, &access.Project.OrganizationID,
-		&access.Project.Name, &access.Project.Slug, &allowedOriginsJSON, &access.Project.Environment,
+		&access.Project.Name, &access.Project.Slug, &allowedOriginsJSON, &access.Project.Environment, &environmentsJSON,
 		&access.Project.RetentionDays, &access.Project.EventSampleRate, &access.Project.APISampleRate,
 		&access.Project.ErrorSampleRate, &access.Project.Status, &access.Project.CreatedAt, &access.Project.UpdatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -206,6 +224,9 @@ func (repository *ProjectKeyRepository) Validate(ctx context.Context, raw string
 	if err := json.Unmarshal(allowedOriginsJSON, &access.Project.AllowedOrigins); err != nil {
 		return ProjectKeyAccess{}, fmt.Errorf("decode allowed origins: %w", err)
 	}
+	if err := json.Unmarshal(environmentsJSON, &access.Project.Environments); err != nil {
+		return ProjectKeyAccess{}, fmt.Errorf("decode project environments: %w", err)
+	}
 	if _, err := repository.database.ExecContext(ctx,
 		"UPDATE project_keys SET last_used_at=now() WHERE id=$1 AND (last_used_at IS NULL OR last_used_at < now() - interval '1 minute')",
 		access.Key.ID); err != nil {
@@ -214,7 +235,7 @@ func (repository *ProjectKeyRepository) Validate(ctx context.Context, raw string
 	return access, nil
 }
 
-func createProjectKeyRecord(ctx context.Context, transaction *sql.Tx, projectID uuid.UUID, name string) (ProjectKeyCredential, error) {
+func createProjectKeyRecord(ctx context.Context, transaction *sql.Tx, projectID uuid.UUID, name string, isDefault bool) (ProjectKeyCredential, error) {
 	randomBytes := make([]byte, 32)
 	if _, err := rand.Read(randomBytes); err != nil {
 		return ProjectKeyCredential{}, fmt.Errorf("generate project key: %w", err)
@@ -223,11 +244,11 @@ func createProjectKeyRecord(ctx context.Context, transaction *sql.Tx, projectID 
 	digest := sha256.Sum256([]byte(raw))
 	credential := ProjectKeyCredential{
 		Raw: raw,
-		Key: ProjectKey{ID: uuid.New(), ProjectID: projectID, KeyPrefix: raw[:16], Name: name},
+		Key: ProjectKey{ID: uuid.New(), ProjectID: projectID, KeyPrefix: raw[:16], PublicKey: raw, IsDefault: isDefault, Name: name},
 	}
 	err := transaction.QueryRowContext(ctx,
-		`INSERT INTO project_keys (id, project_id, key_prefix, key_hash, name) VALUES ($1,$2,$3,$4,$5)
-		 RETURNING created_at`, credential.Key.ID, projectID, credential.Key.KeyPrefix, digest[:], name,
+		`INSERT INTO project_keys (id, project_id, key_prefix, key_hash, public_key, is_default, name) VALUES ($1,$2,$3,$4,$5,$6,$7)
+		 RETURNING created_at`, credential.Key.ID, projectID, credential.Key.KeyPrefix, digest[:], raw, isDefault, name,
 	).Scan(&credential.Key.CreatedAt)
 	if err != nil {
 		return ProjectKeyCredential{}, translateConstraintError(err)

@@ -14,8 +14,9 @@ import (
 )
 
 type ProjectKeyHandler struct {
-	keys   *metadata.ProjectKeyRepository
-	logger zerolog.Logger
+	keys           *metadata.ProjectKeyRepository
+	ingestEndpoint string
+	logger         zerolog.Logger
 }
 
 type projectKeyRequest struct {
@@ -30,11 +31,12 @@ type projectKeyResponse struct {
 	LastUsedAt *string `json:"lastUsedAt"`
 	RevokedAt  *string `json:"revokedAt"`
 	CreatedAt  string  `json:"createdAt"`
-	WriteKey   string  `json:"writeKey,omitempty"`
+	DSN        string  `json:"dsn,omitempty"`
+	IsDefault  bool    `json:"isDefault"`
 }
 
-func NewProjectKeyHandler(keys *metadata.ProjectKeyRepository, logger zerolog.Logger) *ProjectKeyHandler {
-	return &ProjectKeyHandler{keys: keys, logger: logger}
+func NewProjectKeyHandler(keys *metadata.ProjectKeyRepository, ingestEndpoint string, logger zerolog.Logger) *ProjectKeyHandler {
+	return &ProjectKeyHandler{keys: keys, ingestEndpoint: ingestEndpoint, logger: logger}
 }
 
 func (handler *ProjectKeyHandler) List(writer http.ResponseWriter, request *http.Request) {
@@ -58,7 +60,7 @@ func (handler *ProjectKeyHandler) List(writer http.ResponseWriter, request *http
 	}
 	response := make([]projectKeyResponse, 0, len(keys))
 	for _, key := range keys {
-		response = append(response, projectKeyDTO(key, ""))
+		response = append(response, projectKeyDTO(key, key.PublicKey, handler.ingestEndpoint))
 	}
 	writeJSON(writer, http.StatusOK, map[string]any{"keys": response})
 }
@@ -82,7 +84,7 @@ func (handler *ProjectKeyHandler) Create(writer http.ResponseWriter, request *ht
 		writeControlPlaneError(writer, request, handler.logger, err)
 		return
 	}
-	writeJSON(writer, http.StatusCreated, projectKeyDTO(credential.Key, credential.Raw))
+	writeJSON(writer, http.StatusCreated, projectKeyDTO(credential.Key, credential.Raw, handler.ingestEndpoint))
 }
 
 func (handler *ProjectKeyHandler) Rotate(writer http.ResponseWriter, request *http.Request) {
@@ -112,7 +114,7 @@ func (handler *ProjectKeyHandler) Rotate(writer http.ResponseWriter, request *ht
 		writeControlPlaneError(writer, request, handler.logger, err)
 		return
 	}
-	writeJSON(writer, http.StatusCreated, projectKeyDTO(credential.Key, credential.Raw))
+	writeJSON(writer, http.StatusCreated, projectKeyDTO(credential.Key, credential.Raw, handler.ingestEndpoint))
 }
 
 func (handler *ProjectKeyHandler) Revoke(writer http.ResponseWriter, request *http.Request) {
@@ -125,6 +127,10 @@ func (handler *ProjectKeyHandler) Revoke(writer http.ResponseWriter, request *ht
 		return
 	}
 	if err := handler.keys.Revoke(request.Context(), principal.UserID, projectID, keyID); err != nil {
+		if errors.Is(err, metadata.ErrDefaultProjectKey) {
+			httpx.WriteError(writer, request, http.StatusConflict, "DEFAULT_DSN_REQUIRED", "The default DSN can be rotated but not revoked.")
+			return
+		}
 		writeControlPlaneError(writer, request, handler.logger, err)
 		return
 	}
@@ -141,10 +147,13 @@ func principalAndProject(writer http.ResponseWriter, request *http.Request) (aut
 	return principal, projectID, ok
 }
 
-func projectKeyDTO(key metadata.ProjectKey, raw string) projectKeyResponse {
+func projectKeyDTO(key metadata.ProjectKey, raw, ingestEndpoint string) projectKeyResponse {
+	if raw == "" {
+		raw = key.PublicKey
+	}
 	response := projectKeyResponse{
 		ID: key.ID.String(), ProjectID: key.ProjectID.String(), Name: key.Name, Prefix: key.KeyPrefix,
-		CreatedAt: key.CreatedAt.UTC().Format(timeFormat), WriteKey: raw,
+		CreatedAt: key.CreatedAt.UTC().Format(timeFormat), DSN: clientDSN(ingestEndpoint, raw), IsDefault: key.IsDefault,
 	}
 	if key.LastUsedAt != nil {
 		value := key.LastUsedAt.UTC().Format(timeFormat)

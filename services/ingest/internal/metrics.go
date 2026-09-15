@@ -95,7 +95,7 @@ func (metrics *Metrics) observeEnvelopeRejected(reason string) {
 
 func boundedEventType(value event.EventType) string {
 	switch value {
-	case event.EventTypePageView, event.EventTypeError, event.EventTypeWebVital, event.EventTypeAPI, event.EventTypeCustom:
+	case event.EventTypePageView, event.EventTypeError, event.EventTypeWebVital, event.EventTypeAPI, event.EventTypeCustom, event.EventTypeLog:
 		return string(value)
 	default:
 		return "unknown"

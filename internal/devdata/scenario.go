@@ -11,9 +11,12 @@ package devdata
 import (
 	"errors"
 	"fmt"
+	"math"
 	"net/url"
+	"openrum/internal/event"
 	"strings"
 	"time"
+	"unicode/utf8"
 )
 
 // Scenario is the declarative description of a dataset. Every field that
@@ -72,6 +75,15 @@ type Page struct {
 	APIs   []API   `json:"apis"`
 	Errors []Error `json:"errors"`
 	Custom []Event `json:"custom"`
+	Logs   []Log   `json:"logs,omitempty"`
+}
+
+type Log struct {
+	Level      string            `json:"level"`
+	Message    string            `json:"message"`
+	Logger     string            `json:"logger,omitempty"`
+	Attributes map[string]string `json:"attributes,omitempty"`
+	Odds       float64           `json:"odds"`
 }
 
 // Vital is a Web Vital sample. The rating is derived from the value using the
@@ -196,6 +208,19 @@ func (journey *Journey) validate(index int) []error {
 		for vitalIndex, vital := range page.Vitals {
 			if !supportedVitals[vital.Name] {
 				problems = append(problems, fmt.Errorf("%s.vitals[%d].name %q is not in the protocol", label, vitalIndex, vital.Name))
+			}
+		}
+		if len(page.Logs) > 100 {
+			problems = append(problems, fmt.Errorf("%s.logs allows at most 100 templates", label))
+		}
+		for _, log := range page.Logs {
+			if !event.ValidLogLevel(log.Level) || strings.TrimSpace(log.Message) == "" || utf8.RuneCountInString(log.Message) > 4096 || utf8.RuneCountInString(log.Logger) > 80 || math.IsNaN(log.Odds) || log.Odds < 0 || log.Odds > 1 || len(log.Attributes) > 20 {
+				problems = append(problems, fmt.Errorf("%s.logs has an invalid level, message, attributes or probability", label))
+			}
+			for key, value := range log.Attributes {
+				if len(key) == 0 || utf8.RuneCountInString(key) > 64 || utf8.RuneCountInString(value) > 512 {
+					problems = append(problems, fmt.Errorf("%s.logs has an oversized attribute", label))
+				}
 			}
 		}
 	}

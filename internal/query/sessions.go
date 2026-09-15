@@ -35,6 +35,7 @@ type SessionFilters struct {
 type SessionSummary struct {
 	SessionID       uuid.UUID `json:"sessionId"`
 	VisitorID       string    `json:"visitorId,omitempty"`
+	UserID          string    `json:"userId,omitempty"`
 	StartedAt       time.Time `json:"startedAt"`
 	EndedAt         time.Time `json:"endedAt"`
 	DurationSeconds uint64    `json:"durationSeconds"`
@@ -84,8 +85,8 @@ func NewSessionRepository(database *sql.DB) *SessionRepository {
 	return &SessionRepository{database: database}
 }
 
-func (repository *SessionRepository) ListSession(ctx context.Context, projectID, sessionID uuid.UUID, from, to time.Time) (SessionTimeline, error) {
-	return NewEventRepository(repository.database).ListSession(ctx, projectID, sessionID, from, to)
+func (repository *SessionRepository) ListSession(ctx context.Context, filters SessionTimelineFilters) (SessionTimeline, error) {
+	return NewEventRepository(repository.database).ListSession(ctx, filters)
 }
 
 func NormalizeSessionFilters(filters SessionFilters) (SessionFilters, error) {
@@ -143,7 +144,7 @@ func (repository *SessionRepository) List(ctx context.Context, requested Session
 		"errors":   "error_count DESC, ended_at DESC",
 	}[filters.Sort]
 	query := `SELECT session_id,
-		argMin(anonymous_user_id,timestamp),min(timestamp) AS started_at,max(timestamp) AS ended_at,
+		argMin(anonymous_user_id,timestamp),argMaxIf(user_id,timestamp,user_id!=''),min(timestamp) AS started_at,max(timestamp) AS ended_at,
 		toUInt64(greatest(0,dateDiff('second',started_at,ended_at))) AS duration_seconds,
 		uniqCombined64(event_id) AS event_count,
 		countIf(event_type='page_view') AS page_view_count,
@@ -202,10 +203,10 @@ func sessionHaving(filters SessionFilters) (string, []any) {
 	}
 	if filters.Search != "" {
 		clauses = append(clauses, `(positionCaseInsensitiveUTF8(toString(session_id),?)>0 OR
-			countIf(positionCaseInsensitiveUTF8(anonymous_user_id,?)>0 OR positionCaseInsensitiveUTF8(route,?)>0 OR
+			countIf(positionCaseInsensitiveUTF8(anonymous_user_id,?)>0 OR positionCaseInsensitiveUTF8(user_id,?)>0 OR positionCaseInsensitiveUTF8(route,?)>0 OR
 			positionCaseInsensitiveUTF8(page_url_normalized,?)>0 OR positionCaseInsensitiveUTF8(custom_name,?)>0 OR
 			positionCaseInsensitiveUTF8(error_message,?)>0)>0)`)
-		for range 6 {
+		for range 7 {
 			arguments = append(arguments, filters.Search)
 		}
 	}
@@ -238,7 +239,7 @@ func scanSessions(rows *sql.Rows) ([]SessionSummary, error) {
 	result := make([]SessionSummary, 0)
 	for rows.Next() {
 		var session SessionSummary
-		if err := rows.Scan(&session.SessionID, &session.VisitorID, &session.StartedAt, &session.EndedAt,
+		if err := rows.Scan(&session.SessionID, &session.VisitorID, &session.UserID, &session.StartedAt, &session.EndedAt,
 			&session.DurationSeconds, &session.Events, &session.PageViews, &session.Errors, &session.APIFailures,
 			&session.CustomEvents, &session.Environment, &session.Release, &session.Browser, &session.OS,
 			&session.DeviceType, &session.Country, &session.EntryRoute, &session.ExitRoute, &session.SlowestAPI,

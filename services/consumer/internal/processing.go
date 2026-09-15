@@ -155,6 +155,8 @@ func applyScrubRules(candidate *event.CanonicalEvent, rules *processing.Compiled
 		scrub(&candidate.ErrorStack)
 		scrub(&candidate.ErrorMechanism)
 		scrub(&candidate.CustomName)
+		scrub(&candidate.LogMessage)
+		scrub(&candidate.LogLogger)
 		// URLs keep their query string stripped at normalization, so what is
 		// left is a path. A token embedded in a path is exactly the case a
 		// project-level pattern is written for.

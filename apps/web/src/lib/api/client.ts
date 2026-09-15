@@ -119,8 +119,11 @@ const projectKeySchema = z.object({
   lastUsedAt: isoTimeSchema.nullable(),
   revokedAt: isoTimeSchema.nullable(),
   createdAt: isoTimeSchema,
-  writeKey: z.string().optional(),
+  dsn: z.string().optional(),
+  isDefault: z.boolean(),
 });
+
+const projectKeyListSchema = z.object({ keys: z.array(projectKeySchema) });
 
 type RequestOptions = RequestInit & { redirectOnUnauthorized?: boolean };
 
@@ -196,4 +199,24 @@ export function createOnboardingKey(projectId: string) {
     headers: { "Content-Type": "application/json", ...csrfHeaders() },
     body: JSON.stringify({ name: "Onboarding browser key" }),
   });
+}
+
+export function listProjectKeys(projectId: string, signal?: AbortSignal) {
+  return requestJSON(
+    projectKeyListSchema,
+    `/api/v1/projects/${encodeURIComponent(projectId)}/keys`,
+    { signal },
+  );
+}
+
+export function rotateProjectKey(projectId: string, keyId: string) {
+  return requestJSON(
+    projectKeySchema,
+    `/api/v1/projects/${encodeURIComponent(projectId)}/keys/${encodeURIComponent(keyId)}/rotate`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...csrfHeaders() },
+      body: JSON.stringify({}),
+    },
+  );
 }

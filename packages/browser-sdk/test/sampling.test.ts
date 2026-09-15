@@ -42,8 +42,7 @@ void test("errors sample independently from APIs and captured events carry rate 
   const sink: EventSink = { add: (event) => captured.push(event) };
   const client = new OpenRUMClient(
     {
-      writeKey: "test",
-      endpoint: "/ingest",
+      dsn: "https://test@rum.example.test/ingest",
       eventSampleRate: 0,
       apiSampleRate: 0,
       errorSampleRate: 1,

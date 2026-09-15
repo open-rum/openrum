@@ -3,21 +3,20 @@ import { CheckIcon, CopyIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 type InstallSnippetProps = {
-  writeKey: string | null;
+  dsn: string | null;
   environment: string;
 };
 
-export function InstallSnippet({ writeKey, environment }: InstallSnippetProps) {
+export function InstallSnippet({ dsn, environment }: InstallSnippetProps) {
   const [copied, setCopied] = useState(false);
   const snippet = useMemo(
-    () => `import { init } from "@openrum/browser-sdk";
+    () => `import { init } from "@openrum/browser";
 
 init({
-  writeKey: "${writeKey ?? "<YOUR_WRITE_KEY>"}",
-  endpoint: "${window.location.origin}/ingest/v1/envelope",
+  dsn: "${dsn ?? "<YOUR_DSN>"}",
   environment: "${environment}",
 });`,
-    [environment, writeKey],
+    [dsn, environment],
   );
 
   async function copy() {
@@ -32,7 +31,7 @@ init({
         <div>
           <h3 className="text-sm font-medium">安装并初始化 Browser SDK</h3>
           <p className="mt-1 text-sm text-muted-foreground">
-            在应用入口执行一次；endpoint 必须指向公开的 Ingest 地址。
+            在应用入口执行一次；DSN 已包含公开 Ingest 地址和只写凭证。
           </p>
         </div>
         <Button type="button" variant="outline" onClick={() => void copy()}>
@@ -43,9 +42,9 @@ init({
       <pre className="overflow-x-auto rounded-lg bg-muted p-4 text-sm leading-6" tabIndex={0}>
         <code>{snippet}</code>
       </pre>
-      {!writeKey ? (
+      {!dsn ? (
         <p className="text-sm text-muted-foreground">
-          完整 Write Key 只显示一次。若未保存，请在上方创建新的接入 Key。
+          创建客户端 DSN 后会自动生成可复制的初始化代码。
         </p>
       ) : null}
     </div>

@@ -15,6 +15,7 @@ import {
 import LightRays from "./LightRays.astro";
 import BrandMark from "../BrandMark.astro";
 import TechStack from "./TechStack.astro";
+import Reliability from "./Reliability.astro";
 import PublicLayout from "../../layouts/PublicLayout.astro";
 import "../../styles/landing.css";
 const { lang = "en" } = Astro.props;
@@ -386,6 +387,8 @@ const pageTitle = zh
         </div>
       </div>
     </section>
+
+    <Reliability lang={lang} />
 
     <section class="lp-section lp-rule">
       <div class="site-container">

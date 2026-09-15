@@ -45,7 +45,6 @@ export function ProjectScrubbingRoute() {
     <ProjectSettingsLayout
       projectId={projectId}
       titleId="project-scrubbing-title"
-      breadcrumb={`项目 / ${project.data?.name ?? "…"} / 脱敏`}
       title="脱敏"
       description="在内置脱敏之上追加你自己的规则。内置的邮箱、Bearer、JWT、信用卡和一份敏感 key 名单始终生效，这里只能加，不能关。"
     >

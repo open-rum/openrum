@@ -56,13 +56,63 @@ void test("session and anonymous identifiers persist safely and renew after inac
   assert.notEqual(manager.startPage(), first.pageId);
 });
 
+void test("active sessions rotate at the absolute duration limit", () => {
+  const sessionStorage = new MemoryStorage();
+  const diagnostics = {
+    internalErrors: 0,
+    droppedEvents: 0,
+    droppedAttributes: 0,
+    droppedBreadcrumbs: 0,
+    filteredEvents: 0,
+  };
+  let now = 1_000;
+  const manager = new SessionManager(diagnostics, {
+    sessionStorage,
+    localStorage: new MemoryStorage(),
+    randomUUID: deterministicUUIDs(),
+    now: () => now,
+    sessionTimeoutMs: 100,
+    sessionMaxDurationMs: 250,
+  });
+  const first = manager.snapshot();
+  now = 1_090;
+  assert.equal(manager.snapshot().sessionId, first.sessionId);
+  now = 1_180;
+  assert.equal(manager.snapshot().sessionId, first.sessionId);
+  now = 1_250;
+  assert.notEqual(manager.snapshot().sessionId, first.sessionId);
+});
+
+void test("legacy session storage without startedAt is upgraded without rotation", () => {
+  const sessionStorage = new MemoryStorage();
+  sessionStorage.setItem(
+    "openrum.session.v1",
+    JSON.stringify({ id: "00000000-0000-4000-8000-000000000099", lastActivityAt: 990 }),
+  );
+  const diagnostics = {
+    internalErrors: 0,
+    droppedEvents: 0,
+    droppedAttributes: 0,
+    droppedBreadcrumbs: 0,
+    filteredEvents: 0,
+  };
+  const manager = new SessionManager(diagnostics, {
+    sessionStorage,
+    localStorage: new MemoryStorage(),
+    randomUUID: deterministicUUIDs(),
+    now: () => 1_000,
+  });
+  assert.equal(manager.snapshot().sessionId, "00000000-0000-4000-8000-000000000099");
+  const upgraded = JSON.parse(sessionStorage.getItem("openrum.session.v1") ?? "{}");
+  assert.equal(upgraded.startedAt, 1_000);
+});
+
 void test("context strips URL details and capture supplies immutable event identity", () => {
   const captured: CapturedEvent[] = [];
   const sink: EventSink = { add: (value) => captured.push(value) };
   const client = new OpenRUMClient(
     {
-      writeKey: "orr_pk_test",
-      endpoint: "https://rum.example.test/ingest/v1/envelope",
+      dsn: "https://orr_pk_test@rum.example.test/ingest/v1/envelope",
       environment: "production",
       release: "2026.09.02",
     },
@@ -112,8 +162,11 @@ void test("init is idempotent, close tears down once, and a later init creates a
       };
     },
   };
-  const first = init({ writeKey: "one", endpoint: "/ingest", integrations: [integration] });
-  const duplicate = init({ writeKey: "two", endpoint: "/other", integrations: [integration] });
+  const first = init({ dsn: "https://one@rum.example.test/ingest", integrations: [integration] });
+  const duplicate = init({
+    dsn: "https://two@rum.example.test/other",
+    integrations: [integration],
+  });
   assert.equal(duplicate, first);
   assert.equal(getClient(), first);
   assert.equal(setups, 1);
@@ -123,7 +176,10 @@ void test("init is idempotent, close tears down once, and a later init creates a
   assert.equal(teardowns, 1);
   assert.equal(getClient(), undefined);
 
-  const next = init({ writeKey: "three", endpoint: "/ingest", integrations: [integration] });
+  const next = init({
+    dsn: "https://three@rum.example.test/ingest",
+    integrations: [integration],
+  });
   assert.notEqual(next, first);
   assert.equal(setups, 2);
   await close();
@@ -140,8 +196,7 @@ void test("storage, integrations, sinks, and teardown failures never escape to t
   };
   const client = new OpenRUMClient(
     {
-      writeKey: "key",
-      endpoint: "/ingest",
+      dsn: "https://key@rum.example.test/ingest",
       integrations: [
         {
           name: "broken setup",

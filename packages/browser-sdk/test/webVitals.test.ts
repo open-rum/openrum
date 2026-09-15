@@ -7,10 +7,12 @@ import { webVitalsIntegration, type WebVitalsRuntime } from "../src/integrations
 type Report = Parameters<WebVitalsRuntime["onCLS"]>[0];
 
 class ControlledWebVitals implements WebVitalsRuntime {
-  readonly callbacks: Record<"CLS" | "INP" | "LCP", Report[]> = {
+  readonly callbacks: Record<"CLS" | "INP" | "LCP" | "FCP" | "TTFB", Report[]> = {
     CLS: [],
     INP: [],
     LCP: [],
+    FCP: [],
+    TTFB: [],
   };
   readonly options: unknown[] = [];
 
@@ -28,9 +30,17 @@ class ControlledWebVitals implements WebVitalsRuntime {
     this.callbacks.LCP.push(callback);
     this.options.push(options);
   };
+  readonly onFCP: NonNullable<WebVitalsRuntime["onFCP"]> = (callback, options) => {
+    this.callbacks.FCP.push(callback);
+    this.options.push(options);
+  };
+  readonly onTTFB: NonNullable<WebVitalsRuntime["onTTFB"]> = (callback, options) => {
+    this.callbacks.TTFB.push(callback);
+    this.options.push(options);
+  };
 
   emit(
-    name: "CLS" | "INP" | "LCP",
+    name: "CLS" | "INP" | "LCP" | "FCP" | "TTFB",
     value: number,
     navigationType:
       | "navigate"
@@ -51,7 +61,10 @@ function createClient(runtime: ControlledWebVitals, captured: CapturedEvent[]): 
   let nextID = 1;
   const sink: EventSink = { add: (event) => captured.push(event) };
   return new OpenRUMClient(
-    { writeKey: "test", endpoint: "/ingest", integrations: [webVitalsIntegration(runtime)] },
+    {
+      dsn: "https://test@rum.example.test/ingest",
+      integrations: [webVitalsIntegration(runtime)],
+    },
     {
       sink,
       randomUUID: () => `00000000-0000-4000-8000-${String(nextID++).padStart(12, "0")}`,
@@ -60,15 +73,17 @@ function createClient(runtime: ControlledWebVitals, captured: CapturedEvent[]): 
   );
 }
 
-void test("captures LCP, INP, and CLS with rating, delta, and navigation type", async () => {
+void test("captures all five Web Vitals with rating, delta, and navigation type", async () => {
   const runtime = new ControlledWebVitals();
   const captured: CapturedEvent[] = [];
   const client = createClient(runtime, captured);
   runtime.emit("LCP", 2_134.2, "reload");
   runtime.emit("INP", 180, "soft-navigation");
   runtime.emit("CLS", 0.08, "back-forward-cache");
+  runtime.emit("FCP", 1200);
+  runtime.emit("TTFB", 400);
 
-  assert.equal(captured.length, 3);
+  assert.equal(captured.length, 5);
   const metrics = captured.map((item) =>
     item.event.type === "web_vital" ? item.event.metric : null,
   );
@@ -76,8 +91,12 @@ void test("captures LCP, INP, and CLS with rating, delta, and navigation type", 
     { name: "LCP", value: 2_134.2, delta: 2_134.2, rating: "good", navigation_type: "reload" },
     { name: "INP", value: 180, delta: 180, rating: "good", navigation_type: "route_change" },
     { name: "CLS", value: 0.08, delta: 0.08, rating: "good", navigation_type: "back_forward" },
+    { name: "FCP", value: 1200, delta: 1200, rating: "good", navigation_type: "navigate" },
+    { name: "TTFB", value: 400, delta: 400, rating: "good", navigation_type: "navigate" },
   ]);
   assert.deepEqual(runtime.options, [
+    { reportAllChanges: false, reportSoftNavs: true },
+    { reportAllChanges: false, reportSoftNavs: true },
     { reportAllChanges: false, reportSoftNavs: true },
     { reportAllChanges: false, reportSoftNavs: true },
     { reportAllChanges: false, reportSoftNavs: true },
@@ -94,8 +113,12 @@ void test("registers observers once, ignores invalid values, and stops reporting
   assert.equal(runtime.callbacks.CLS.length, 1);
   assert.equal(runtime.callbacks.INP.length, 1);
   assert.equal(runtime.callbacks.LCP.length, 1);
+  assert.equal(runtime.callbacks.FCP.length, 1);
+  assert.equal(runtime.callbacks.TTFB.length, 1);
 
   runtime.emit("CLS", Number.NaN);
+  runtime.emit("FCP", Number.POSITIVE_INFINITY);
+  runtime.emit("TTFB", -1);
   assert.equal(firstEvents.length, 0);
   assert.equal(secondEvents.length, 0);
   runtime.emit("CLS", 0.04);
@@ -107,4 +130,8 @@ void test("registers observers once, ignores invalid values, and stops reporting
   assert.equal(firstEvents.length, 1);
   assert.equal(secondEvents.length, 2);
   await second.close();
+  runtime.emit("FCP", 1000);
+  runtime.emit("TTFB", 200);
+  assert.equal(firstEvents.length, 1);
+  assert.equal(secondEvents.length, 2);
 });

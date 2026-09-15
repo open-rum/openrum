@@ -11,18 +11,20 @@ Generated from `packages/browser-sdk/src/client.ts`; do not edit by hand. Pass t
 
 | Option | Type | Default | Notes |
 | --- | --- | --- | --- |
-| `writeKey` | `string` | required | Project write key, sent as the `x-openrum-key` header. Safe to expose. |
-| `endpoint` | `string` | required | Full Envelope URL, ending in `/ingest/v1/envelope`. |
+| `dsn` | `string` | required | Public Project connection string containing the Ingest URL and write-only client key. |
 | `environment` | `string` | `"production"` | Separates Events from staging and production. |
 | `release` | `string` | unset | Required for mapped stack frames. Must match the uploaded Release. |
 | `dist` | `string` | unset | Distinguishes builds that share one Release. |
-| `eventSampleRate` | `number` | `1` | Page Views, interactions and Custom Events. |
+| `eventSampleRate` | `number` | `1` | Page Views, interactions, Custom Events and opted-in Logs. |
 | `apiSampleRate` | `number` | `0.2` | fetch and XHR timing. |
 | `errorSampleRate` | `number` | `1` | Errors and unhandled rejections. |
 | `captureClicks` | `boolean` | `true` | Privacy-safe descriptions of interactive elements. |
+| `enableLogs` | `boolean` | ignored | Compatibility-only; logger calls and captureConsole are independently explicit. |
+| `captureConsole` | `ConsoleLogLevel[]` | unset | Opt-in console methods: debug, log, info, warn, error. |
+| `beforeSendLog` | `(log: LogInput) => LogInput \| null` | unset | Transforms a log or returns null to drop it; final privacy scrubbing still applies. |
 | `flushIntervalMs` | `number` | `5000` | Also flushed on `pagehide` and on reconnect. |
-| `beaconEndpoint` | `string` | unset | Pre-authenticated `sendBeacon` URL. Never gets the write key. |
-| `configEndpoint` | `string \| false` | endpoint origin | Remote sampling from `/api/v1/sdk/config`. `false` disables it. |
+| `beaconEndpoint` | `string` | unset | Pre-authenticated `sendBeacon` URL. Never gets the DSN credential. |
+| `configEndpoint` | `string \| false` | DSN origin | Remote sampling from `/api/v1/sdk/config`. `false` disables it. |
 | `integrations` | `Integration[]` | all of the above | Replaces the default set rather than adding to it. |
 
 Sample rates outside 0 to 1 are ignored and the built-in default applies instead, so a typo

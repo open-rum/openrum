@@ -128,5 +128,6 @@ func parseBehaviorFilters(request *http.Request, projectID uuid.UUID) (query.Beh
 	return query.NormalizeBehaviorFilters(query.BehaviorFilters{
 		ProjectID: projectID, From: from, To: to, Environment: values.Get("environment"),
 		EventKind: values.Get("eventKind"), EventName: values.Get("eventName"), Dimension: values.Get("dimension"),
+		Measurement: values.Get("measurement"),
 	})
 }

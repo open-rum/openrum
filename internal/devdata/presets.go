@@ -24,6 +24,7 @@ func Presets() []Preset {
 			Description: "Page views and vitals only, spread across good, needs-improvement and poor ratings."},
 		{ID: "error-burst", Name: "Error burst",
 			Description: "A narrow window dominated by a handful of recurring exceptions, for testing issue grouping."},
+		{ID: "logs", Name: "结构化应用日志", Description: "六种日志级别、支付排查属性，以及会话、Trace、设备与国家上下文。"},
 	}
 }
 
@@ -37,6 +38,17 @@ func PresetScenario(id string, from, to time.Time) Scenario {
 		Clients:  defaultClients(),
 	}
 	switch id {
+	case "logs":
+		scenario.Journeys = []Journey{{Name: "log-investigation", Weight: 1, Pages: []Page{
+			{Route: "/checkout", Path: "/checkout", Title: "Checkout", Logs: []Log{
+				{Level: "trace", Message: "checkout render started", Logger: "checkout", Odds: 0.7},
+				{Level: "debug", Message: "cart cache hit", Logger: "cart", Odds: 0.8, Attributes: map[string]string{"cache.hit": "true", "cart.items": "3"}},
+				{Level: "info", Message: "checkout started", Logger: "checkout", Odds: 1, Attributes: map[string]string{"order.id": "order-demo-123", "payment.provider": "demo", "currency": "CNY"}},
+				{Level: "warn", Message: "payment retry scheduled", Logger: "payment", Odds: 0.35, Attributes: map[string]string{"retry.attempt": "2", "payment.provider": "demo"}},
+				{Level: "error", Message: "payment failed: upstream timeout", Logger: "payment", Odds: 0.2, Attributes: map[string]string{"order.id": "order-demo-123", "error.code": "UPSTREAM_TIMEOUT"}},
+				{Level: "fatal", Message: "checkout initialization failed", Logger: "checkout", Odds: 0.04, Attributes: map[string]string{"error.code": "CONFIG_UNAVAILABLE"}},
+			}},
+		}}}
 	case "api-surface":
 		scenario.Journeys = []Journey{{Name: "api-surface", Weight: 1, Pages: apiSurfacePages()}}
 	case "failing-release":

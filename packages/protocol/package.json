@@ -5,11 +5,12 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
+    "./dsn": "./src/dsn.ts",
     "./schema": "./schema/envelope-v1.json"
   },
   "scripts": {
     "generate": "node scripts/generate-go-schema.mjs && gofmt -w ../../internal/event/schema_gen.go",
-    "test": "node --test tests/fixtures.test.mjs",
+    "test": "node --test tests/*.test.mjs",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

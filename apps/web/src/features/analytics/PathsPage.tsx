@@ -2,6 +2,12 @@ import { useQuery } from "@tanstack/react-query";
 import { useParams } from "@tanstack/react-router";
 import { ArrowRightIcon, GitBranchIcon, RefreshCwIcon } from "lucide-react";
 import { useMemo, useState } from "react";
+import {
+  ConsoleFilterBar,
+  ConsolePage,
+  ConsolePageHeader,
+  ConsolePageTabs,
+} from "@/components/layout/ConsolePage";
 import { AsyncError } from "@/components/ui/AsyncState";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -65,67 +71,70 @@ function ProjectPaths({ project }: { project: Project }) {
     queryFn: ({ signal }) => getPaths(input, signal),
   });
   return (
-    <div className="behavior-page path-page">
-      <header className="behavior-header">
-        <div>
-          <div className="breadcrumb">
-            项目 <span>/</span> {project.name} <span>/</span> 分析 <span>/</span> 路径
+    <ConsolePage width="fluid">
+      <ConsolePageHeader
+        title="用户路径"
+        description="查看会话中最常见的有限事件序列，快速发现用户实际如何到达关键动作。"
+        actions={
+          <Button
+            size="icon"
+            variant="outline"
+            aria-label="刷新用户路径"
+            onClick={() => void query.refetch()}
+            disabled={query.isFetching}
+          >
+            <RefreshCwIcon />
+          </Button>
+        }
+      />
+      <ConsolePageTabs>
+        <AnalysisTabs projectId={project.id} active="paths" />
+      </ConsolePageTabs>
+      <ConsoleFilterBar
+        primary={
+          <div className="behavior-toolbar" aria-label="路径查询配置">
+            <Select
+              value={String(controls.depth)}
+              onValueChange={(value) =>
+                setControls((current) => ({ ...current, depth: Number(value) as 2 | 3 | 4 | 5 }))
+              }
+            >
+              <SelectTrigger aria-label="路径最大深度">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  {[2, 3, 4, 5].map((depth) => (
+                    <SelectItem key={depth} value={String(depth)}>
+                      最多 {depth} 步
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+            <Select
+              value={String(controls.topN)}
+              onValueChange={(value) =>
+                setControls((current) => ({ ...current, topN: Number(value) as 5 | 10 | 20 }))
+              }
+            >
+              <SelectTrigger aria-label="路径返回数量">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  {[5, 10, 20].map((topN) => (
+                    <SelectItem key={topN} value={String(topN)}>
+                      Top {topN}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+            <span className="behavior-toolbar__note">固定深度 · session_id · 不进行跨设备合并</span>
           </div>
-          <h1>用户路径</h1>
-          <p>查看会话中最常见的有限事件序列，快速发现用户实际如何到达关键动作。</p>
-        </div>
-        <Button
-          size="icon"
-          variant="outline"
-          aria-label="刷新用户路径"
-          onClick={() => void query.refetch()}
-          disabled={query.isFetching}
-        >
-          <RefreshCwIcon />
-        </Button>
-      </header>
-      <AnalysisTabs projectId={project.id} active="paths" />
-      <div className="behavior-toolbar" aria-label="路径查询配置">
-        <Select
-          value={String(controls.depth)}
-          onValueChange={(value) =>
-            setControls((current) => ({ ...current, depth: Number(value) as 2 | 3 | 4 | 5 }))
-          }
-        >
-          <SelectTrigger aria-label="路径最大深度">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectGroup>
-              {[2, 3, 4, 5].map((depth) => (
-                <SelectItem key={depth} value={String(depth)}>
-                  最多 {depth} 步
-                </SelectItem>
-              ))}
-            </SelectGroup>
-          </SelectContent>
-        </Select>
-        <Select
-          value={String(controls.topN)}
-          onValueChange={(value) =>
-            setControls((current) => ({ ...current, topN: Number(value) as 5 | 10 | 20 }))
-          }
-        >
-          <SelectTrigger aria-label="路径返回数量">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectGroup>
-              {[5, 10, 20].map((topN) => (
-                <SelectItem key={topN} value={String(topN)}>
-                  Top {topN}
-                </SelectItem>
-              ))}
-            </SelectGroup>
-          </SelectContent>
-        </Select>
-        <span className="behavior-toolbar__note">固定深度 · session_id · 不进行跨设备合并</span>
-      </div>
+        }
+      />
       {query.isLoading ? <PathsSkeleton compact /> : null}
       {query.error ? (
         <AsyncError
@@ -136,7 +145,7 @@ function ProjectPaths({ project }: { project: Project }) {
         />
       ) : null}
       {query.data ? <PathResults data={query.data} /> : null}
-    </div>
+    </ConsolePage>
   );
 }
 

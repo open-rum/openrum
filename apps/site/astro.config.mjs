@@ -210,7 +210,23 @@ export default defineConfig({
           translations: { zh: "产品", "zh-CN": "产品" },
           items: [
             { slug: "docs/product/investigation" },
-            { slug: "docs/product/analytics" },
+            { slug: "docs/product/logs" },
+            // Analytics is the one capability with a model to learn before you can
+            // use it, so it is a group rather than a page. Collapsed by default: a
+            // reader who came for Alerts should not have to scroll past five
+            // analytics pages to find it.
+            {
+              label: "Analytics",
+              translations: { zh: "行为分析", "zh-CN": "行为分析" },
+              collapsed: true,
+              items: [
+                { slug: "docs/product/analytics" },
+                { slug: "docs/product/analytics/custom-events" },
+                { slug: "docs/product/analytics/instrumentation" },
+                { slug: "docs/product/analytics/explorations" },
+                { slug: "docs/product/analytics/ga4" },
+              ],
+            },
             { slug: "docs/product/performance" },
             { slug: "docs/product/api-monitoring" },
             { slug: "docs/product/alerts" },
@@ -237,6 +253,7 @@ export default defineConfig({
             {
               label: "Operate",
               translations: { zh: "日常运维", "zh-CN": "日常运维" },
+              collapsed: true,
               items: [
                 { slug: "docs/self-hosting/upgrades" },
                 { slug: "docs/self-hosting/backup-restore" },
@@ -249,6 +266,7 @@ export default defineConfig({
             {
               label: "Dependency runbooks",
               translations: { zh: "依赖 runbook", "zh-CN": "依赖 runbook" },
+              collapsed: true,
               items: [
                 { slug: "docs/self-hosting/postgres" },
                 { slug: "docs/self-hosting/clickhouse" },
@@ -260,6 +278,7 @@ export default defineConfig({
             {
               label: "Security",
               translations: { zh: "安全", "zh-CN": "安全" },
+              collapsed: true,
               items: [
                 { slug: "docs/self-hosting/security/privacy" },
                 { slug: "docs/self-hosting/security/threat-model" },

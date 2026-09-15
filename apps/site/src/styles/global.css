@@ -12,10 +12,8 @@
   background: var(--ds-canvas);
   --sl-color-accent-low: var(--ds-brand-soft);
   --sl-color-accent: var(--ds-brand);
-  /* Starlight reads accent-high as link text on dark surfaces and accent as link text on
-     light ones. Pointing accent-high at the plain text token made dark-mode links exactly
-     the colour of body text. `--ds-brand` already flips to the bright lemon green in dark
-     mode, so both ends of the ramp can come from it. */
+  /* Both link roles follow neutral text in their mode. Prose links are
+     distinguished with underlines in docs.css. */
   --sl-color-accent-high: var(--ds-brand);
   --sl-color-white: var(--ds-text);
   /* Starlight's ramp keeps gray-1 through gray-3 as text colours and only turns into
@@ -107,10 +105,7 @@ a:not(.ui-button) {
 .brand-mark {
   display: grid;
   place-items: center;
-  /* The mark carries the brand colour itself rather than sitting on a filled
-     tile. `--ds-brand` is the theme-aware pair — the flat `--ds-primary` fill is
-     the same pale lime in both themes and disappears on a light page. */
-  color: var(--ds-brand);
+  color: var(--ds-logo);
 }
 .brand-word {
   letter-spacing: -0.035em;

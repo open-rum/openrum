@@ -1384,6 +1384,522 @@
   justify-content: center;
 }
 
+/* ---------- Architecture & reliability ----------
+
+   The floor a developer reads to decide whether the thing is real. Three layers,
+   each quieter than the last: the pipeline diagram carries the argument, three
+   short principles say why it holds, and two cards underneath give the numbers —
+   what it costs to run, and what has been measured. Density drops as the eye
+   descends on purpose; the diagram is allowed to be the only loud thing. */
+
+.lp-reliability .lp-head {
+  max-width: 820px;
+}
+.lp-pipeline {
+  margin: 0;
+  padding: 30px 26px 18px;
+  border: 1px solid var(--lp-hairline);
+  border-radius: 20px;
+  background: color-mix(in oklch, var(--ds-surface), var(--ds-canvas) 40%);
+  overflow: hidden;
+}
+.lp-pipeline-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  font-family: var(--font-product-sans);
+}
+/* Nodes are a step lighter than the panel so they read as objects sitting on it;
+   Kafka is the one node on the brand colour, because it is the one place an
+   Envelope becomes durable and the whole section is an argument about that. */
+.lp-node rect {
+  fill: color-mix(in oklch, var(--ds-surface), var(--ds-text) 3%);
+  stroke: var(--ds-border);
+  stroke-width: 1.25;
+}
+.lp-node-kafka rect {
+  fill: var(--ds-brand-soft);
+  stroke: var(--ds-brand);
+  stroke-width: 1.5;
+}
+.lp-node-side rect {
+  stroke-dasharray: 0;
+  fill: color-mix(in oklch, var(--ds-surface), var(--ds-canvas) 30%);
+}
+.lp-node-title {
+  fill: var(--ds-text);
+  font-size: 13.5px;
+  font-weight: 620;
+  letter-spacing: -0.01em;
+  text-anchor: middle;
+}
+.lp-node-kafka .lp-node-title {
+  fill: var(--ds-brand);
+}
+.lp-node-side .lp-node-title {
+  font-size: 12.5px;
+  font-weight: 560;
+  fill: var(--ds-text-secondary);
+}
+.lp-node-sub {
+  fill: var(--ds-text-muted);
+  font-size: 10.5px;
+  text-anchor: middle;
+}
+.lp-edge {
+  stroke: color-mix(in oklch, var(--ds-text), transparent 62%);
+  stroke-width: 1.5;
+  fill: none;
+}
+.lp-edge-head {
+  fill: color-mix(in oklch, var(--ds-text), transparent 55%);
+}
+.lp-edge-quota {
+  stroke-dasharray: 4 5;
+}
+/* Drawn over the plain edge rather than replacing it, so the arrowhead stays in
+   the neutral colour and only the run of the line carries the brand. */
+.lp-edge-ack {
+  stroke: var(--ds-brand);
+  stroke-width: 2;
+  stroke-dasharray: 7 7;
+}
+.lp-edge-label {
+  fill: var(--ds-text-muted);
+  font: 500 10.5px/1 var(--font-mono);
+}
+.lp-node-pulse {
+  fill: none;
+  stroke: var(--ds-brand);
+  stroke-width: 1.5;
+  opacity: 0;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.lp-ack rect {
+  fill: var(--ds-brand-soft);
+  stroke: color-mix(in oklch, var(--ds-brand), transparent 45%);
+}
+.lp-ack text {
+  fill: var(--ds-brand);
+  font: 650 11px/1 var(--font-mono);
+  text-anchor: middle;
+}
+/* Packets ride the spine on an offset-path. Invisible unless the browser can run
+   the animation — a stationary dot on the line would read as a node. */
+.lp-packet {
+  fill: var(--ds-primary);
+  stroke: color-mix(in oklch, var(--ds-primary), transparent 65%);
+  stroke-width: 6;
+  opacity: 0;
+  offset-path: var(--lp-packet-path);
+  offset-rotate: 0deg;
+}
+@supports (offset-path: path("M0 0 L1 1")) {
+  @media (prefers-reduced-motion: no-preference) {
+    .lp-packet {
+      animation: lp-travel 6s linear infinite;
+      animation-delay: var(--lp-packet-delay, 0s);
+    }
+    /* A 2s loop with a 1.7s lead lands the ring on each packet's arrival at the
+       Kafka node: the node sits 30% along a 6s path with packets 2s apart. */
+    .lp-node-pulse {
+      animation: lp-node-pulse 2s cubic-bezier(0.2, 0, 0, 1) 1.7s infinite;
+    }
+    .lp-edge-ack {
+      animation: lp-dash-flow 1.4s linear infinite;
+    }
+  }
+}
+@keyframes lp-travel {
+  0% {
+    offset-distance: 0%;
+    opacity: 0;
+  }
+  4% {
+    opacity: 1;
+  }
+  95% {
+    opacity: 1;
+  }
+  100% {
+    offset-distance: 100%;
+    opacity: 0;
+  }
+}
+@keyframes lp-node-pulse {
+  0% {
+    opacity: 0.7;
+    transform: scale(0.97);
+  }
+  70%,
+  100% {
+    opacity: 0;
+    transform: scale(1.08);
+  }
+}
+@keyframes lp-dash-flow {
+  to {
+    stroke-dashoffset: -14;
+  }
+}
+/* The same six steps as a list. Screen readers get it always; sighted readers get
+   it under 800px, where the diagram's labels would fall below legible size. */
+.lp-pipeline-list {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.lp-pipeline-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 22px;
+  margin: 16px 0 0;
+  color: var(--ds-text-muted);
+  font-size: 0.74rem;
+}
+.lp-pipeline-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.lp-legend-line {
+  display: inline-block;
+  width: 22px;
+  height: 0;
+  border-top: 1.5px solid color-mix(in oklch, var(--ds-text), transparent 55%);
+}
+.lp-legend-dashed {
+  border-top-style: dashed;
+}
+.lp-legend-ack {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--ds-primary);
+  box-shadow: 0 0 0 3px color-mix(in oklch, var(--ds-primary), transparent 70%);
+}
+
+.lp-principles {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 22px 32px;
+  margin: 44px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.lp-principle {
+  padding-top: 18px;
+  border-top: 1px solid var(--lp-hairline);
+}
+.lp-principle-index {
+  display: block;
+  margin-bottom: 14px;
+  color: var(--ds-brand);
+  font: 650 0.74rem/1 var(--font-mono);
+  letter-spacing: 0.06em;
+}
+.lp-principle h3 {
+  margin: 0 0 9px;
+  font-size: 1.06rem;
+  font-weight: 620;
+  letter-spacing: -0.025em;
+}
+.lp-principle p {
+  margin: 0;
+  color: var(--ds-text-muted);
+  font-size: 0.88rem;
+  line-height: 1.7;
+}
+
+.lp-reliability-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+  gap: 24px;
+  margin-top: 56px;
+}
+.lp-block-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 16px;
+  color: var(--ds-text-muted);
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.lp-tiers {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+.lp-tier {
+  display: flex;
+  flex-direction: column;
+  padding: 22px;
+  border: 1px solid var(--lp-hairline);
+  border-radius: 16px;
+  background: var(--ds-surface);
+  transition: border-color var(--motion-normal) var(--ease-standard);
+}
+.lp-tier:hover {
+  border-color: color-mix(in oklch, var(--ds-brand), transparent 55%);
+}
+.lp-tier-production {
+  border-color: color-mix(in oklch, var(--ds-brand), transparent 70%);
+}
+.lp-tier header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.lp-tier-icon {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border-radius: 9px;
+  background: var(--ds-brand-soft);
+  color: var(--ds-brand);
+}
+.lp-tier-name {
+  font-size: 1rem;
+  font-weight: 620;
+  letter-spacing: -0.02em;
+}
+.lp-tier-stack {
+  margin-left: auto;
+  color: var(--ds-text-muted);
+  font: 500 0.7rem/1 var(--font-mono);
+  white-space: nowrap;
+}
+.lp-tier > p {
+  margin: 0;
+  color: var(--ds-text-muted);
+  font-size: 0.86rem;
+  line-height: 1.66;
+}
+.lp-tier-figures {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 26px;
+  margin: 18px 0 0;
+}
+.lp-tier-figures dd {
+  margin: 0;
+  font-size: 1.85rem;
+  font-weight: 640;
+  line-height: 1;
+  letter-spacing: -0.045em;
+}
+.lp-tier-figures dt {
+  margin-top: 5px;
+  color: var(--ds-text-muted);
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.lp-tier-note {
+  margin: 12px 0 0;
+  color: var(--ds-text-muted);
+  font-size: 0.76rem;
+  line-height: 1.55;
+}
+.lp-tier-note + .lp-tier-note {
+  margin-top: 4px;
+}
+.lp-tier .lp-tile-link {
+  margin-top: auto;
+  padding-top: 16px;
+}
+
+/* The evidence card is on the dark hero surface in both themes, like the terminal
+   in the next section: one dark object per screen is what gives the page its
+   rhythm, and the numbers in here are the ones worth setting apart. */
+.lp-evidence {
+  display: flex;
+  flex-direction: column;
+  padding: 24px;
+  border: 1px solid color-mix(in oklch, var(--ds-border), transparent 10%);
+  border-radius: 16px;
+  background: var(--ds-hero-surface);
+  color: var(--ds-hero-foreground);
+  box-shadow: var(--shadow-elevated);
+}
+.lp-evidence .lp-block-title {
+  color: color-mix(in oklch, var(--ds-hero-foreground), transparent 40%);
+}
+.lp-evidence .lp-block-title svg {
+  color: var(--ds-primary);
+}
+.lp-evidence-lead {
+  margin: 0;
+  color: color-mix(in oklch, var(--ds-hero-foreground), transparent 30%);
+  font-size: 0.86rem;
+  line-height: 1.68;
+}
+.lp-evidence-stats {
+  display: grid;
+  gap: 18px;
+  margin: 24px 0 0;
+}
+.lp-evidence-stat {
+  padding-top: 16px;
+  border-top: 1px solid color-mix(in oklch, var(--ds-hero-foreground), transparent 86%);
+}
+.lp-evidence-stat dd {
+  margin: 0;
+  color: var(--ds-primary);
+  font: 640 1.7rem/1.05 var(--font-product-sans);
+  letter-spacing: -0.04em;
+  font-variant-numeric: tabular-nums;
+}
+.lp-evidence-stat dt {
+  margin-top: 7px;
+  color: color-mix(in oklch, var(--ds-hero-foreground), transparent 34%);
+  font-size: 0.82rem;
+  line-height: 1.55;
+}
+.lp-evidence-footnote {
+  margin: 22px 0 0;
+  color: color-mix(in oklch, var(--ds-hero-foreground), transparent 40%);
+  font-size: 0.74rem;
+  line-height: 1.6;
+}
+/* Says "failed" in the record's own words. A page that reports a failed gate next
+   to the numbers it kept is more credible than one that only reports the numbers. */
+.lp-evidence-status {
+  display: inline-block;
+  margin: 0 8px 0 0;
+  padding: 2px 8px;
+  border: 1px solid color-mix(in oklch, var(--ds-warning), transparent 40%);
+  border-radius: 999px;
+  color: var(--ds-hero-foreground);
+  font: 600 0.66rem/1.5 var(--font-mono);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  vertical-align: 1px;
+}
+.lp-evidence .lp-tile-link {
+  margin-top: auto;
+  padding-top: 18px;
+  color: var(--ds-primary);
+}
+
+/* Staggered entrance: the reveal timeline is shared, so the offset is expressed
+   as a shift of the range rather than a delay, which scroll-linked animations
+   do not have. */
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .lp-principle.lp-reveal {
+      animation-range: entry calc(8% + var(--lp-order, 0) * 7%) cover
+        calc(26% + var(--lp-order, 0) * 7%);
+    }
+    .lp-evidence-stat {
+      animation: lp-rise linear both;
+      animation-timeline: view();
+      animation-range: entry calc(6% + var(--lp-order, 0) * 8%) cover
+        calc(24% + var(--lp-order, 0) * 8%);
+    }
+  }
+}
+
+@media (max-width: 1000px) {
+  .lp-reliability-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (max-width: 800px) {
+  .lp-pipeline {
+    padding: 20px 18px 16px;
+  }
+  .lp-pipeline-svg,
+  .lp-legend-ack,
+  .lp-pipeline-legend span:last-child {
+    display: none;
+  }
+  .lp-pipeline-list {
+    position: static;
+    width: auto;
+    height: auto;
+    margin: 0;
+    clip-path: none;
+    white-space: normal;
+    display: grid;
+    gap: 0;
+    list-style: none;
+    counter-reset: lp-step;
+  }
+  .lp-pipeline-list li {
+    position: relative;
+    display: grid;
+    grid-template-columns: 14px minmax(0, 1fr);
+    gap: 4px 14px;
+    padding: 10px 0 10px;
+  }
+  .lp-pipeline-list li::before {
+    grid-row: 1 / span 2;
+    width: 10px;
+    height: 10px;
+    margin-top: 5px;
+    border: 2px solid var(--ds-brand);
+    border-radius: 999px;
+    content: "";
+    background: var(--ds-surface);
+  }
+  .lp-pipeline-list li:nth-child(3)::before {
+    background: var(--ds-primary);
+  }
+  .lp-pipeline-list li:not(:last-child)::after {
+    position: absolute;
+    top: 26px;
+    bottom: -8px;
+    left: 6px;
+    width: 1.5px;
+    content: "";
+    background: color-mix(in oklch, var(--ds-text), transparent 75%);
+  }
+  .lp-pipeline-list strong {
+    font-size: 0.95rem;
+    letter-spacing: -0.02em;
+  }
+  .lp-pipeline-list span {
+    grid-column: 2;
+    color: var(--ds-text-muted);
+    font-size: 0.8rem;
+  }
+  .lp-principles {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 18px;
+  }
+}
+@media (max-width: 640px) {
+  .lp-tiers {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .lp-tier-stack {
+    display: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lp-packet,
+  .lp-node-pulse {
+    animation: none;
+    opacity: 0;
+  }
+  .lp-edge-ack {
+    animation: none;
+  }
+}
+
 /* ---------- Scroll-linked reveal ---------- */
 
 /* Guarded by @supports and expressed only through opacity and transform: browsers

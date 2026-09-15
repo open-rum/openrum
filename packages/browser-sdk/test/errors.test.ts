@@ -27,7 +27,7 @@ function testClient(runtime: ErrorRuntime, captured: CapturedEvent[]): OpenRUMCl
   let nextID = 1;
   const sink: EventSink = { add: (value) => captured.push(value) };
   return new OpenRUMClient(
-    { writeKey: "test", endpoint: "/ingest", integrations: [errorIntegration(runtime)] },
+    { dsn: "https://test@rum.example.test/ingest", integrations: [errorIntegration(runtime)] },
     {
       sink,
       randomUUID: () => `00000000-0000-4000-8000-${String(nextID++).padStart(12, "0")}`,

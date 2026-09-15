@@ -42,7 +42,7 @@ void test("captures initial and client-side page views and restores history", as
   const sink: EventSink = { add: (value) => captured.push(value) };
   let nextID = 1;
   const client = new OpenRUMClient(
-    { writeKey: "test", endpoint: "/ingest", integrations: [pageIntegration(runtime)] },
+    { dsn: "https://test@rum.example.test/ingest", integrations: [pageIntegration(runtime)] },
     {
       sink,
       randomUUID: () => `00000000-0000-4000-8000-${String(nextID++).padStart(12, "0")}`,

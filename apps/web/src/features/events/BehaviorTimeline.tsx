@@ -143,6 +143,7 @@ function iconForSession(kind: SessionTimeline["events"][number]["kind"]) {
   if (kind === "page_view") return FileTextIcon;
   if (kind === "api") return ServerIcon;
   if (kind === "error") return AlertCircleIcon;
+  if (kind === "log") return FileTextIcon;
   return BracesIcon;
 }
 
@@ -152,6 +153,7 @@ function sessionTitle(kind: string, title: string) {
   if (kind === "click") return "元素点击";
   if (kind === "api") return "API 请求";
   if (kind === "error") return `错误 · ${title}`;
+  if (kind === "log") return `日志 · ${title}`;
   return title || "自定义事件";
 }
 

@@ -10,6 +10,12 @@ test("issue investigation reaches mapped source and event context", async ({ pag
   ).toBeVisible();
   await expect(page.getByText("src/checkout/submit.ts:4:11")).toBeVisible();
   await expect(page.getByText("return api.post('/orders', { amount });")).toBeVisible();
+  const trend = page.getByLabel("错误事件与影响用户趋势");
+  await trend.hover({ position: { x: 160, y: 100 } });
+  await expect(page.getByText("Invalid time value", { exact: true })).toHaveCount(0);
+  await expect(page.locator(".recharts-tooltip-wrapper")).toBeVisible();
+  await expect(page.locator(".recharts-tooltip-wrapper")).toContainText(/09\/03/);
+  await page.getByRole("heading", { name: "发生趋势" }).hover();
   await page.getByRole("tab", { name: /行为时间线/ }).click();
   await expect(page.getByText("点击提交订单")).toBeVisible();
   await page.getByRole("tab", { name: /相关 API/ }).click();

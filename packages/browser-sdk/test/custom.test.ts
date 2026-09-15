@@ -8,7 +8,7 @@ function harness() {
   const sink: EventSink = { add: (event) => captured.push(event) };
   let nextID = 1;
   const client = new OpenRUMClient(
-    { writeKey: "test", endpoint: "/ingest" },
+    { dsn: "https://test@rum.example.test/ingest" },
     {
       sink,
       randomUUID: () => `00000000-0000-4000-8000-${String(nextID++).padStart(12, "0")}`,

@@ -33,13 +33,16 @@ func TestPerformanceHandlerValidatesAndReturnsBoundedResult(t *testing.T) {
 	authenticated := httpx.RequireSession(connectionFixtureAuthenticator{principal: auth.Principal{UserID: userID}})
 	router.Handle("GET /api/v1/projects/{projectId}/performance", authenticated(http.HandlerFunc(handler.Get)))
 	from := time.Date(2026, 9, 3, 0, 0, 0, 0, time.UTC)
-	url := "/api/v1/projects/" + projectID.String() + "/performance?from=" + from.Format(time.RFC3339Nano) + "&to=" + from.Add(time.Hour).Format(time.RFC3339Nano) + "&metric=inp&route=%2Fcheckout"
+	url := "/api/v1/projects/" + projectID.String() + "/performance?from=" + from.Format(time.RFC3339Nano) + "&to=" + from.Add(time.Hour).Format(time.RFC3339Nano) + "&metric=inp&route=%2Fcheckout&percentile=p99&country=cn&deviceType=mobile&browser=Safari"
 	request := httptest.NewRequest(http.MethodGet, url, nil)
 	request.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "valid"})
 	response := httptest.NewRecorder()
 	router.ServeHTTP(response, request)
 	if response.Code != http.StatusOK || queries.filters.Metric != "INP" || queries.filters.Route != "/checkout" {
 		t.Fatalf("status=%d filters=%+v body=%s", response.Code, queries.filters, response.Body.String())
+	}
+	if queries.filters.Country != "CN" || queries.filters.DeviceType != "mobile" || queries.filters.Browser != "Safari" || queries.filters.Percentile != "p99" {
+		t.Fatalf("dimensions not forwarded: %+v", queries.filters)
 	}
 
 	request = httptest.NewRequest(http.MethodGet, "/api/v1/projects/"+projectID.String()+"/performance?from=bad&to=bad", nil)

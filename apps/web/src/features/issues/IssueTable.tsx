@@ -27,11 +27,13 @@ export function IssueTable({
   issues: IssuesResponse["issues"];
   filters: IssueFilters;
 }) {
+  const maximumEvents = Math.max(1, ...issues.map((issue) => issue.events));
   function handleRowKey(
     event: React.KeyboardEvent<HTMLTableRowElement>,
     index: number,
     href: string,
   ) {
+    if (event.target !== event.currentTarget) return;
     if (event.key === "Enter") window.location.assign(href);
     if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
     event.preventDefault();
@@ -64,31 +66,55 @@ export function IssueTable({
               tabIndex={index === 0 ? 0 : -1}
               aria-label={`${statusLabel[issue.status]}：${issue.title}`}
               className="cursor-pointer focus-visible:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
-              onClick={() => window.location.assign(href)}
+              onClick={(event) => {
+                if (
+                  (event.target as HTMLElement).closest("a, button") ||
+                  window.getSelection()?.toString()
+                )
+                  return;
+                if (event.metaKey || event.ctrlKey) window.open(href, "_blank", "noopener");
+                else window.location.assign(href);
+              }}
               onKeyDown={(event) => handleRowKey(event, index, href)}
             >
               <TableCell>
                 <StatusBadge status={issue.status} />
               </TableCell>
-              <TableCell className="max-w-96">
-                <a
-                  className="block truncate font-medium text-foreground hover:text-primary"
-                  href={href}
-                  tabIndex={-1}
-                >
+              <TableCell>
+                <a className="issue-list-title" href={href} title={issue.title}>
                   {issue.title}
                 </a>
-                <code className="mt-1 block truncate text-xs text-muted-foreground">
+                <code
+                  className="mt-1 block truncate text-xs text-muted-foreground"
+                  title={issue.fingerprint}
+                >
                   {issue.errorType} · {issue.fingerprint}
                 </code>
               </TableCell>
               <TableCell className="font-medium tabular-nums">
                 {issue.events.toLocaleString()}
+                <div className="issue-event-meter" aria-hidden="true">
+                  <i style={{ width: `${(issue.events / maximumEvents) * 100}%` }} />
+                </div>
               </TableCell>
               <TableCell className="tabular-nums">{issue.users.toLocaleString()}</TableCell>
               <TableCell className="tabular-nums">{issue.sessions.toLocaleString()}</TableCell>
-              <TableCell>{formatTime(issue.firstSeenAt)}</TableCell>
-              <TableCell>{formatTime(issue.lastSeenAt)}</TableCell>
+              <TableCell>
+                <time
+                  dateTime={issue.firstSeenAt}
+                  title={new Date(issue.firstSeenAt).toLocaleString("zh-CN")}
+                >
+                  {formatTime(issue.firstSeenAt)}
+                </time>
+              </TableCell>
+              <TableCell>
+                <time
+                  dateTime={issue.lastSeenAt}
+                  title={new Date(issue.lastSeenAt).toLocaleString("zh-CN")}
+                >
+                  {formatTime(issue.lastSeenAt)}
+                </time>
+              </TableCell>
             </TableRow>
           );
         })}

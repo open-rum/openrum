@@ -4,6 +4,7 @@ import { runSafely } from "./safety.ts";
 const SESSION_KEY = "openrum.session.v1";
 const ANONYMOUS_USER_KEY = "openrum.anonymous-user.v1";
 const DEFAULT_SESSION_TIMEOUT_MS = 30 * 60 * 1000;
+const DEFAULT_SESSION_MAX_DURATION_MS = 24 * 60 * 60 * 1000;
 
 export interface StorageLike {
   getItem(key: string): string | null;
@@ -22,10 +23,12 @@ export interface SessionDependencies {
   sessionStorage?: StorageLike;
   localStorage?: StorageLike;
   sessionTimeoutMs?: number;
+  sessionMaxDurationMs?: number;
 }
 
 interface StoredSession {
   id: string;
+  startedAt: number;
   lastActivityAt: number;
 }
 
@@ -36,6 +39,7 @@ export class SessionManager {
   readonly #sessionStorage?: StorageLike;
   readonly #localStorage?: StorageLike;
   readonly #sessionTimeoutMs: number;
+  readonly #sessionMaxDurationMs: number;
   readonly #anonymousUserId: string;
   #session: StoredSession;
   #pageId: string;
@@ -47,6 +51,8 @@ export class SessionManager {
     this.#sessionStorage = dependencies.sessionStorage ?? browserStorage("sessionStorage");
     this.#localStorage = dependencies.localStorage ?? browserStorage("localStorage");
     this.#sessionTimeoutMs = dependencies.sessionTimeoutMs ?? DEFAULT_SESSION_TIMEOUT_MS;
+    this.#sessionMaxDurationMs =
+      dependencies.sessionMaxDurationMs ?? DEFAULT_SESSION_MAX_DURATION_MS;
     this.#anonymousUserId = this.#loadAnonymousUser();
     this.#session = this.#loadSession();
     this.#pageId = this.#randomUUID();
@@ -54,8 +60,11 @@ export class SessionManager {
 
   snapshot(): SessionSnapshot {
     const now = this.#now();
-    if (now - this.#session.lastActivityAt >= this.#sessionTimeoutMs) {
-      this.#session = { id: this.#randomUUID(), lastActivityAt: now };
+    if (
+      now - this.#session.lastActivityAt >= this.#sessionTimeoutMs ||
+      now - this.#session.startedAt >= this.#sessionMaxDurationMs
+    ) {
+      this.#session = { id: this.#randomUUID(), startedAt: now, lastActivityAt: now };
     } else {
       this.#session.lastActivityAt = now;
     }
@@ -85,10 +94,15 @@ export class SessionManager {
         Number.isFinite(parsed.lastActivityAt) &&
         now - parsed.lastActivityAt < this.#sessionTimeoutMs
       ) {
-        return { id: parsed.id, lastActivityAt: now };
+        const startedAt = Number.isFinite(parsed.startedAt) ? parsed.startedAt : now;
+        if (now - startedAt < this.#sessionMaxDurationMs) {
+          const session = { id: parsed.id, startedAt, lastActivityAt: now };
+          this.#write(this.#sessionStorage, SESSION_KEY, JSON.stringify(session));
+          return session;
+        }
       }
     }
-    const session = { id: this.#randomUUID(), lastActivityAt: now };
+    const session = { id: this.#randomUUID(), startedAt: now, lastActivityAt: now };
     this.#write(this.#sessionStorage, SESSION_KEY, JSON.stringify(session));
     return session;
   }

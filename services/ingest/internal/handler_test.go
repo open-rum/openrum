@@ -293,6 +293,23 @@ func TestHandlerRejectsAuthOriginRateAndSchemaFailures(t *testing.T) {
 	}
 }
 
+func TestHandlerAcceptsAnyRegisteredProjectEnvironment(t *testing.T) {
+	authenticator, acceptor, _ := testHandler(t, nil)
+	authenticator.access.Project.Environments = []string{"production", "staging"}
+	handler := NewHandler(authenticator, fakeLimiter{allowIP: true, allowProject: true}, acceptor, zerolog.Nop())
+	body := bytes.ReplaceAll(validEnvelope(t), []byte(`"environment": "production"`), []byte(`"environment": "staging"`))
+	response := httptest.NewRecorder()
+
+	testRouter(handler).ServeHTTP(response, ingestRequest(body))
+
+	if response.Code != http.StatusAccepted {
+		t.Fatalf("status = %d, want %d: %s", response.Code, http.StatusAccepted, response.Body.String())
+	}
+	if acceptor.accepted == nil || acceptor.accepted.Envelope.Context.Environment != "staging" {
+		t.Fatalf("accepted environment = %+v, want staging", acceptor.accepted)
+	}
+}
+
 func TestHandlerBoundsBodiesAndCompression(t *testing.T) {
 	tests := []struct {
 		name       string

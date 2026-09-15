@@ -1,4 +1,5 @@
 import type { EventContext, EventV1 } from "@openrum/protocol";
+import { parseOpenRUMDSN } from "@openrum/protocol/dsn";
 import { ContextManager, type PageReader, type PageSnapshot } from "./context.ts";
 import {
   captureCustomEvent,
@@ -8,6 +9,8 @@ import {
   type CustomEventInput,
 } from "./custom.ts";
 import { sanitizeAttribute, sanitizeUserID } from "./privacy/scrub.ts";
+import { createLogger, sanitizeLog, type LogInput } from "./logs.ts";
+import { consoleLoggingIntegration, type ConsoleLogLevel } from "./integrations/console.ts";
 import {
   eventPriority,
   normalizeSamplingOptions,
@@ -21,8 +24,8 @@ import { runSafely, runSafelyAsync, type Diagnostics } from "./safety.ts";
 import { createUUID, SessionManager, type SessionDependencies } from "./session.ts";
 
 export interface ClientOptions {
-  writeKey: string;
-  endpoint: string;
+  /** Public connection string copied from the Project's onboarding page. */
+  dsn: string;
   environment?: string;
   release?: string;
   dist?: string;
@@ -31,12 +34,27 @@ export interface ClientOptions {
   errorSampleRate?: number;
   /** Automatically capture privacy-safe interactive element clicks. Defaults to true. */
   captureClicks?: boolean;
+  /** @deprecated Compatibility-only; logger calls and captureConsole are independently explicit. */
+  enableLogs?: boolean;
+  /** Independently opts into selected console methods. Objects are intentionally not serialized. */
+  captureConsole?: ConsoleLogLevel[];
+  /** Return null to drop a log. Called before the final privacy scrub. */
+  beforeSendLog?: (log: LogInput) => LogInput | null;
   flushIntervalMs?: number;
-  /** Optional pre-authenticated endpoint for sendBeacon; never receives the project key. */
+  /** Optional pre-authenticated endpoint for sendBeacon; never receives the DSN credential. */
   beaconEndpoint?: string;
   /** Defaults to `/api/v1/sdk/config` on the ingest endpoint origin. Set false to disable. */
   configEndpoint?: string | false;
   integrations?: Integration[];
+}
+
+export type ResolvedClientOptions = ClientOptions & {
+  writeKey: string;
+  endpoint: string;
+};
+
+export function resolveClientOptions(options: ClientOptions): ResolvedClientOptions {
+  return { ...options, ...parseOpenRUMDSN(options.dsn) };
 }
 
 export interface CapturedEvent {
@@ -72,7 +90,9 @@ export type EventInput = EventV1 extends infer Event
   : never;
 
 export class OpenRUMClient {
-  readonly options: Readonly<Required<Pick<ClientOptions, "environment">> & ClientOptions>;
+  readonly options: Readonly<
+    Required<Pick<ResolvedClientOptions, "environment">> & ResolvedClientOptions
+  >;
   readonly #diagnostics: Diagnostics = {
     internalErrors: 0,
     droppedEvents: 0,
@@ -90,26 +110,35 @@ export class OpenRUMClient {
   readonly #teardowns: Array<() => void> = [];
   readonly #breadcrumbs: Breadcrumb[] = [];
   #state: "running" | "closed" = "running";
+  #capturingLog = false;
+  readonly logger = createLogger((log) => this.capture({ type: "log", ...log }));
 
   constructor(options: ClientOptions, dependencies: ClientDependencies = {}) {
-    this.options = Object.freeze({ ...options, environment: options.environment || "production" });
+    this.options = Object.freeze({
+      ...resolveClientOptions(options),
+      environment: options.environment || "production",
+    });
     this.#sink = dependencies.sink;
     this.#nowISO = dependencies.nowISO ?? (() => new Date().toISOString());
     this.#randomUUID = dependencies.randomUUID ?? createUUID;
     this.#onClose = dependencies.onClose;
-    this.#sampling = normalizeSamplingOptions(options);
+    this.#sampling = normalizeSamplingOptions(this.options);
     const session = new SessionManager(this.#diagnostics, dependencies);
     this.#context = new ContextManager(
       this.#diagnostics,
       session,
       {
         environment: this.options.environment,
-        release: options.release,
-        dist: options.dist,
+        release: this.options.release,
+        dist: this.options.dist,
       },
       dependencies.pageReader,
     );
-    for (const integration of options.integrations ?? []) {
+    const integrations = [...(this.options.integrations ?? [])];
+    if (this.options.captureConsole?.length) {
+      integrations.push(consoleLoggingIntegration({ levels: this.options.captureConsole }));
+    }
+    for (const integration of integrations) {
       const teardown = runSafely<ReturnType<Integration["setup"]>>(
         this.#diagnostics,
         undefined,
@@ -171,33 +200,51 @@ export class OpenRUMClient {
   }
 
   capture(event: EventInput): void {
-    runSafely(this.#diagnostics, undefined, () => {
-      if (this.#state !== "running" || !this.#sink) {
-        this.#diagnostics.droppedEvents += 1;
-        return;
-      }
-      const context = this.#context.snapshot();
-      if (!shouldSample(context.session_id, event.type, this.#sampling)) {
-        this.#diagnostics.droppedEvents += 1;
-        return;
-      }
-      // Skipping an upload the consumer would discard anyway. The consumer
-      // still applies the full rule set, so this only saves bandwidth.
-      if (this.#filters?.shouldDrop(event as EventV1, context)) {
-        this.#diagnostics.filteredEvents += 1;
-        return;
-      }
-      const complete = {
-        ...event,
-        ...(event.type === "error" && !("breadcrumbs" in event) && this.#breadcrumbs.length
-          ? { breadcrumbs: this.#breadcrumbs.map((breadcrumb) => ({ ...breadcrumb })) }
-          : {}),
-        event_id: event.event_id ?? this.#randomUUID(),
-        timestamp: event.timestamp ?? this.#nowISO(),
-        sample_rate: sampleRateFor(event.type, this.#sampling),
-      } as EventV1;
-      this.#sink.add({ context, event: complete, priority: eventPriority(event.type) });
-    });
+    const isLog = event.type === "log";
+    if (isLog && this.#capturingLog) return;
+    if (isLog) this.#capturingLog = true;
+    try {
+      runSafely(this.#diagnostics, undefined, () => {
+        if (event.type === "log") {
+          let log = sanitizeLog(event, this.#diagnostics);
+          if (!log) return;
+          if (this.options.beforeSendLog) {
+            const filtered = this.options.beforeSendLog(log);
+            if (!filtered) return;
+            log = sanitizeLog(filtered, this.#diagnostics);
+            if (!log) return;
+          }
+          event = { type: "log", event_id: event.event_id, timestamp: event.timestamp, ...log };
+        }
+        if (this.#state !== "running" || !this.#sink) {
+          this.#diagnostics.droppedEvents += 1;
+          return;
+        }
+        const context = this.#context.snapshot();
+        if (!shouldSample(context.session_id, event.type, this.#sampling)) {
+          this.#diagnostics.droppedEvents += 1;
+          return;
+        }
+        // Skipping an upload the consumer would discard anyway. The consumer
+        // still applies the full rule set, so this only saves bandwidth.
+        if (this.#filters?.shouldDrop(event as EventV1, context)) {
+          this.#diagnostics.filteredEvents += 1;
+          return;
+        }
+        const complete = {
+          ...event,
+          ...(event.type === "error" && !("breadcrumbs" in event) && this.#breadcrumbs.length
+            ? { breadcrumbs: this.#breadcrumbs.map((breadcrumb) => ({ ...breadcrumb })) }
+            : {}),
+          event_id: event.event_id ?? this.#randomUUID(),
+          timestamp: event.timestamp ?? this.#nowISO(),
+          sample_rate: sampleRateFor(event.type, this.#sampling),
+        } as EventV1;
+        this.#sink.add({ context, event: complete, priority: eventPriority(event.type) });
+      });
+    } finally {
+      if (isLog) this.#capturingLog = false;
+    }
   }
 
   diagnostics(): Readonly<Diagnostics> {

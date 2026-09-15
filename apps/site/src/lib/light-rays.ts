@@ -181,7 +181,7 @@ export function mountLightRays(canvas: HTMLCanvasElement): () => void {
   sizeObserver.observe(host);
   themeObserver.observe(document.documentElement, {
     attributes: true,
-    attributeFilter: ["class", "data-palette"],
+    attributeFilter: ["class"],
   });
   window.addEventListener("pointermove", pointer, { passive: true });
   document.addEventListener("visibilitychange", sync);

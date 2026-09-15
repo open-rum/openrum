@@ -30,6 +30,7 @@ func TestPerformanceRepositoryFiltersRoutesFacetsDistributionAndSamples(t *testi
 		row := metricRow(t, fixtureRow(t, fixture, fixture.Events[2], from.Add(time.Duration(index)*time.Minute)), "LCP", 1000+float64(index*10), uuid.NewString())
 		row["browser"] = map[bool]string{true: "Chrome", false: "Safari"}[index%2 == 0]
 		row["device_type"] = map[bool]string{true: "desktop", false: "mobile"}[index%2 == 0]
+		row["country"] = map[bool]string{true: "CN", false: "US"}[index%4 < 2]
 		rows = append(rows, row)
 	}
 	for range 2 {
@@ -37,6 +38,20 @@ func TestPerformanceRepositoryFiltersRoutesFacetsDistributionAndSamples(t *testi
 		page["event_id"] = uuid.NewString()
 		rows = append(rows, page)
 	}
+	for index := range 80 {
+		for _, name := range []string{"FCP", "TTFB"} {
+			value := 600 + float64(index*10)
+			if name == "TTFB" {
+				value = 200 + float64(index*5)
+			}
+			row := metricRow(t, fixtureRow(t, fixture, fixture.Events[2], from.Add(time.Duration(index)*time.Minute)), name, value, uuid.NewString())
+			row["country"], row["device_type"], row["browser"] = "CN", "desktop", "Chrome"
+			rows = append(rows, row)
+		}
+	}
+	auxiliaryOnly := metricRow(t, fixtureRow(t, fixture, fixture.Events[2], from.Add(10*time.Minute)), "TTFB", 2100, uuid.NewString())
+	auxiliaryOnly["route"] = "/auxiliary-only"
+	rows = append(rows, auxiliaryOnly)
 	synthetic := metricRow(t, fixtureRow(t, fixture, fixture.Events[2], from.Add(20*time.Minute)), "LCP", 9999, uuid.NewString())
 	synthetic["ingest_flags"] = []string{"synthetic"}
 	rows = append(rows, synthetic)
@@ -52,7 +67,7 @@ func TestPerformanceRepositoryFiltersRoutesFacetsDistributionAndSamples(t *testi
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(result.Routes) != 2 || result.Routes[0].Route != "/other" && result.Routes[1].Route != "/other" {
+	if len(result.Routes) != 1 || result.Routes[0].Route != "/checkout" {
 		t.Fatalf("routes=%+v", result.Routes)
 	}
 	var checkout RoutePerformance
@@ -80,5 +95,69 @@ func TestPerformanceRepositoryFiltersRoutesFacetsDistributionAndSamples(t *testi
 	}
 	if len(overview.Trend) == 0 || overview.Trend[0].LCP.P75 == nil || overview.Trend[0].LCP.Samples == 0 {
 		t.Fatalf("overview trend=%+v", overview.Trend)
+	}
+	if overview.Summary.LCP.Samples != 81 || overview.Summary.LCP.P50 == nil || overview.Summary.LCP.P99 == nil || *overview.Summary.LCP.P50 >= *overview.Summary.LCP.P99 {
+		t.Fatalf("overall quantiles=%+v", overview.Summary.LCP)
+	}
+	if *overview.Summary.LCP.P75 >= 1800 || overview.Summary.INP.P95 != nil {
+		t.Fatalf("must merge all samples, not average route quantiles: %+v", overview.Summary)
+	}
+	if overview.Summary.FCP.Samples != 80 || overview.Summary.TTFB.Samples != 81 || overview.Trend[0].FCP.P95 == nil || overview.Trend[0].TTFB.P50 == nil {
+		t.Fatalf("auxiliary overall/trend=%+v %+v", overview.Summary, overview.Trend[0])
+	}
+	for _, name := range []string{"FCP", "TTFB"} {
+		aux, err := NewPerformanceRepository(database).Get(ctx, PerformanceFilters{ProjectID: projectID, From: from, To: from.Add(2 * time.Hour), Route: "/checkout", Metric: name, Percentile: "p95", Country: "CN", DeviceType: "desktop"})
+		if err != nil || aux.Detail == nil || aux.Detail.Metric != name || len(aux.Detail.Samples) != 25 || len(aux.Detail.Trend) == 0 || aux.Detail.Trend[0].Metric.P95 == nil {
+			t.Fatalf("%s detail=%+v err=%v", name, aux.Detail, err)
+		}
+		var count uint64
+		for _, bucket := range aux.Detail.Distribution {
+			count += bucket.Samples
+		}
+		if count != 80 {
+			t.Fatalf("%s distribution samples=%d", name, count)
+		}
+	}
+	auxOnly, err := NewPerformanceRepository(database).Get(ctx, PerformanceFilters{ProjectID: projectID, From: from, To: from.Add(2 * time.Hour), Metric: "TTFB", Percentile: "p95"})
+	if err != nil || len(auxOnly.Routes) != 3 || auxOnly.Routes[0].Route != "/auxiliary-only" || auxOnly.Routes[0].TTFB.Samples != 1 {
+		t.Fatalf("auxiliary-only route and sorting=%+v err=%v", auxOnly.Routes, err)
+	}
+	filtered, err := NewPerformanceRepository(database).Get(ctx, PerformanceFilters{
+		ProjectID: projectID, From: from, To: from.Add(2 * time.Hour), Environment: "production", Release: "2.18.0", Route: "/checkout", Metric: "LCP", Percentile: "p95", Country: "cn", DeviceType: "desktop", Browser: "Chrome",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if filtered.Summary.LCP.Samples != 20 || filtered.Detail == nil || len(filtered.Detail.Samples) != 20 || len(filtered.Facets["countries"]) != 2 {
+		t.Fatalf("combined filters/facet self-exclusion: %+v", filtered)
+	}
+	var histogramCount, trendCount uint64
+	for _, bucket := range filtered.Detail.Distribution {
+		histogramCount += bucket.Samples
+	}
+	for _, point := range filtered.Detail.Trend {
+		trendCount += point.Metric.Samples
+		if point.Metric.Samples > 0 && point.Metric.P95 == nil {
+			t.Fatal("missing P95 trend")
+		}
+		if point.Metric.Samples == 0 && point.Metric.P95 != nil {
+			t.Fatal("a bucket with only auxiliary metrics must stay a gap for LCP")
+		}
+	}
+	if histogramCount != 20 || trendCount != 20 {
+		t.Fatalf("histogram=%d trend=%d", histogramCount, trendCount)
+	}
+	for _, sample := range filtered.Detail.Samples {
+		if sample.Country != "CN" || sample.DeviceType != "desktop" || sample.Browser != "Chrome" {
+			t.Fatalf("unfiltered raw sample: %+v", sample)
+		}
+	}
+	empty, err := NewPerformanceRepository(database).Get(ctx, PerformanceFilters{ProjectID: projectID, From: from, To: from.Add(2 * time.Hour), Country: "JP", Metric: "LCP"})
+	if err != nil || len(empty.Routes) != 0 || empty.Summary.LCP.P95 != nil || empty.Summary.LCP.Samples != 0 {
+		t.Fatalf("empty=%+v err=%v", empty, err)
+	}
+	overflow, err := NewPerformanceRepository(database).Get(ctx, PerformanceFilters{ProjectID: projectID, From: from, To: from.Add(2 * time.Hour), Route: "/other", Metric: "LCP"})
+	if err != nil || overflow.Detail == nil || len(overflow.Detail.Distribution) != 1 || !overflow.Detail.Distribution[0].Overflow {
+		t.Fatalf("overflow=%+v err=%v", overflow, err)
 	}
 }

@@ -188,7 +188,11 @@ func (handler *AuthHandler) internalError(writer http.ResponseWriter, request *h
 }
 
 func decodeJSONBody(writer http.ResponseWriter, request *http.Request, destination any) bool {
-	request.Body = http.MaxBytesReader(writer, request.Body, bootstrapBodyLimit)
+	return decodeJSONBodyWithLimit(writer, request, destination, bootstrapBodyLimit)
+}
+
+func decodeJSONBodyWithLimit(writer http.ResponseWriter, request *http.Request, destination any, limit int64) bool {
+	request.Body = http.MaxBytesReader(writer, request.Body, limit)
 	decoder := json.NewDecoder(request.Body)
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(destination); err != nil {

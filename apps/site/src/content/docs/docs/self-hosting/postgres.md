@@ -37,3 +37,4 @@ SELECT application_name, state, sync_state, write_lag, flush_lag, replay_lag FRO
 ```
 
 Use the migration binary's `status` command before and after recovery. A successful TCP connection alone is not recovery: require a read/write canary, valid login, tenant isolation and audit-log verification.
+

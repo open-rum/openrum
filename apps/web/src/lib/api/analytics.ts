@@ -27,6 +27,30 @@ export const behaviorAnalyticsSchema = z.object({
       cardinality: z.number().int().nonnegative(),
     }),
   ),
+  measurements: z.array(
+    z.object({
+      name: z.string(),
+      samples: z.number().int().nonnegative(),
+      total: z.number(),
+      estimated: z.number(),
+      average: z.number(),
+      minimum: z.number(),
+      maximum: z.number(),
+      p50: z.number(),
+      p90: z.number(),
+    }),
+  ),
+  measurementBreakdown: z
+    .array(
+      z.object({
+        value: z.string(),
+        samples: z.number().int().nonnegative(),
+        total: z.number(),
+        estimated: z.number(),
+        average: z.number(),
+      }),
+    )
+    .optional(),
   freshness: z.object({
     latestReceivedAt: isoTimeSchema.nullable(),
     ageSeconds: z.number().nonnegative().nullable(),
@@ -152,6 +176,8 @@ export type BehaviorFilters = {
   eventKind?: BehaviorKind;
   eventName?: string;
   dimension: BehaviorDimension;
+  /** Names a Custom Event measurement to break down by `dimension`. */
+  measurement?: string;
 };
 
 export function defaultBehaviorFilters(
@@ -165,10 +191,11 @@ export function defaultBehaviorFilters(
   const kind = parseKind(search.get("eventKind"));
   const eventName = clean(search.get("eventName"), 80);
   const environment = clean(search.get("environment"), 64);
+  const measurement = clean(search.get("measurement"), 64);
   if (from >= to || to.getTime() - from.getTime() > 30 * 24 * 60 * 60 * 1000) {
     return { projectId, from: new Date(to.getTime() - 24 * 60 * 60 * 1000), to, dimension };
   }
-  return { projectId, from, to, dimension, eventKind: kind, eventName, environment };
+  return { projectId, from, to, dimension, eventKind: kind, eventName, environment, measurement };
 }
 
 export function serializeBehaviorFilters(filters: BehaviorFilters) {
@@ -180,6 +207,10 @@ export function serializeBehaviorFilters(filters: BehaviorFilters) {
   if (filters.environment) parameters.set("environment", filters.environment);
   if (filters.eventKind) parameters.set("eventKind", filters.eventKind);
   if (filters.eventName) parameters.set("eventName", filters.eventName);
+  // `BehaviorDimension` is always a real dimension, so a named measurement can always
+  // be split on it; the server rejects the pair only for the `all` pseudo-dimension,
+  // which this type cannot express.
+  if (filters.measurement) parameters.set("measurement", filters.measurement);
   return parameters;
 }
 

@@ -18,28 +18,74 @@ import (
 var ErrEventNotFound = errors.New("event not found")
 
 var ErrInvalidSessionTimeline = errors.New("invalid session timeline query")
+var ErrSessionNotFound = errors.New("session not found")
+
+type SessionTimelineFilters struct {
+	ProjectID uuid.UUID
+	SessionID uuid.UUID
+	From      time.Time
+	To        time.Time
+	Cursor    string
+	Kinds     []string
+	Limit     int
+}
 
 type SessionTimelineEvent struct {
-	EventID      uuid.UUID         `json:"eventId"`
-	Timestamp    time.Time         `json:"timestamp"`
-	Kind         string            `json:"kind"`
-	Title        string            `json:"title"`
-	Route        string            `json:"route,omitempty"`
-	Fingerprint  string            `json:"fingerprint,omitempty"`
-	ErrorMessage string            `json:"errorMessage,omitempty"`
-	APIMethod    string            `json:"apiMethod,omitempty"`
-	APIURL       string            `json:"apiUrl,omitempty"`
-	APIStatus    uint16            `json:"apiStatus,omitempty"`
-	Attributes   map[string]string `json:"attributes"`
+	EventID        uuid.UUID          `json:"eventId"`
+	Timestamp      time.Time          `json:"timestamp"`
+	ReceivedAt     time.Time          `json:"receivedAt"`
+	Kind           string             `json:"kind"`
+	Title          string             `json:"title"`
+	Route          string             `json:"route,omitempty"`
+	PageID         uuid.UUID          `json:"pageId,omitempty"`
+	PageURL        string             `json:"pageUrl,omitempty"`
+	PageTitle      string             `json:"pageTitle,omitempty"`
+	NavigationType string             `json:"navigationType,omitempty"`
+	Environment    string             `json:"environment,omitempty"`
+	Release        string             `json:"release,omitempty"`
+	ErrorType      string             `json:"errorType,omitempty"`
+	ErrorMessage   string             `json:"errorMessage,omitempty"`
+	ErrorMechanism string             `json:"errorMechanism,omitempty"`
+	Fingerprint    string             `json:"fingerprint,omitempty"`
+	Handled        bool               `json:"handled,omitempty"`
+	APIMethod      string             `json:"apiMethod,omitempty"`
+	APIURL         string             `json:"apiUrl,omitempty"`
+	APIStatus      uint16             `json:"apiStatus,omitempty"`
+	APIFailure     string             `json:"apiFailure,omitempty"`
+	DurationMS     float64            `json:"durationMs,omitempty"`
+	TransferSize   uint64             `json:"transferSize,omitempty"`
+	LogLevel       string             `json:"logLevel,omitempty"`
+	LogMessage     string             `json:"logMessage,omitempty"`
+	Logger         string             `json:"logger,omitempty"`
+	MetricName     string             `json:"metricName,omitempty"`
+	MetricValue    float64            `json:"metricValue,omitempty"`
+	MetricDelta    float64            `json:"metricDelta,omitempty"`
+	MetricRating   string             `json:"metricRating,omitempty"`
+	TraceID        string             `json:"traceId,omitempty"`
+	SpanID         string             `json:"spanId,omitempty"`
+	SampleRate     float64            `json:"sampleRate,omitempty"`
+	Attributes     map[string]string  `json:"attributes"`
+	Measurements   map[string]float64 `json:"measurements"`
+	IngestFlags    []string           `json:"ingestFlags"`
+}
+
+type SessionTimelineAvailability struct {
+	Sampled       bool `json:"sampled"`
+	ExpiredLogs   bool `json:"expiredLogs"`
+	TimelineExact bool `json:"timelineExact"`
+	Replay        bool `json:"replay"`
 }
 
 type SessionTimeline struct {
-	ProjectID uuid.UUID              `json:"projectId"`
-	SessionID uuid.UUID              `json:"sessionId"`
-	From      time.Time              `json:"from"`
-	To        time.Time              `json:"to"`
-	Events    []SessionTimelineEvent `json:"events"`
-	Truncated bool                   `json:"truncated"`
+	ProjectID    uuid.UUID                   `json:"projectId"`
+	SessionID    uuid.UUID                   `json:"sessionId"`
+	From         time.Time                   `json:"from"`
+	To           time.Time                   `json:"to"`
+	Session      SessionSummary              `json:"session"`
+	Events       []SessionTimelineEvent      `json:"events"`
+	NextCursor   string                      `json:"nextCursor,omitempty"`
+	Truncated    bool                        `json:"truncated"`
+	Availability SessionTimelineAvailability `json:"availability"`
 }
 
 type EventContextAvailability struct {
@@ -104,35 +150,71 @@ func NewEventRepository(database *sql.DB) *EventRepository {
 	return &EventRepository{database: database}
 }
 
-func (repository *EventRepository) ListSession(ctx context.Context, projectID, sessionID uuid.UUID, from, to time.Time) (SessionTimeline, error) {
-	if projectID == uuid.Nil || sessionID == uuid.Nil || from.IsZero() || !from.Before(to) || to.Sub(from) > 24*time.Hour {
+func (repository *EventRepository) ListSession(ctx context.Context, requested SessionTimelineFilters) (SessionTimeline, error) {
+	filters, cursor, err := normalizeSessionTimelineFilters(requested)
+	if err != nil {
 		return SessionTimeline{}, ErrInvalidSessionTimeline
 	}
-	rows, err := repository.database.QueryContext(ctx, `SELECT event_id,timestamp,event_type,navigation_type,custom_name,
-		route,page_url_normalized,error_type,error_message,fingerprint,api_method,api_url_normalized,api_status,attributes
-		FROM rum_events WHERE project_id=? AND session_id=? AND timestamp>=? AND timestamp<?
-			AND event_type IN ('page_view','custom','error','api') AND NOT has(ingest_flags,'synthetic')
-		ORDER BY timestamp,event_id LIMIT 101`, projectID, sessionID, from.UTC(), to.UTC())
+	summary, availability, err := repository.sessionSummary(ctx, filters)
+	if err != nil {
+		return SessionTimeline{}, err
+	}
+	where := `project_id=? AND session_id=? AND timestamp>=? AND timestamp<=?
+		AND event_type IN ('page_view','custom','error','api','log','web_vital') AND NOT has(ingest_flags,'synthetic')
+		AND (event_type!='log' OR raw_expires_at>now64(3))`
+	arguments := []any{filters.ProjectID, filters.SessionID, filters.From, filters.To}
+	if len(filters.Kinds) > 0 {
+		predicates := make([]string, 0, len(filters.Kinds))
+		for _, kind := range filters.Kinds {
+			switch kind {
+			case "page_view":
+				predicates = append(predicates, "(event_type='page_view' AND navigation_type!='route_change')")
+			case "navigation":
+				predicates = append(predicates, "(event_type='page_view' AND navigation_type='route_change')")
+			case "click":
+				predicates = append(predicates, "(event_type='custom' AND custom_name='ui.click')")
+			case "custom":
+				predicates = append(predicates, "(event_type='custom' AND custom_name!='ui.click')")
+			default:
+				predicates = append(predicates, "event_type='"+kind+"'")
+			}
+		}
+		where += " AND (" + strings.Join(predicates, " OR ") + ")"
+	}
+	if cursor != nil {
+		where += " AND (timestamp>? OR (timestamp=? AND event_id>?))"
+		arguments = append(arguments, cursor.Timestamp, cursor.Timestamp, cursor.EventID)
+	}
+	arguments = append(arguments, filters.Limit+1)
+	rows, err := repository.database.QueryContext(ctx, `SELECT event_id,timestamp,received_at,event_type,navigation_type,custom_name,
+		route,page_url_normalized,title,page_id,environment,release,error_type,error_message,error_mechanism,fingerprint,handled,
+		api_method,api_url_normalized,api_status,api_failure,duration_ms,transfer_size,attributes,measurements,
+		log_level,log_message,log_logger,metric_name,metric_value,metric_delta,metric_rating,trace_id,span_id,sample_rate,ingest_flags
+		FROM rum_events FINAL WHERE `+where+` ORDER BY timestamp,event_id LIMIT ?`, arguments...)
 	if err != nil {
 		return SessionTimeline{}, fmt.Errorf("query session timeline: %w", err)
 	}
 	defer func() { _ = rows.Close() }()
-	events := make([]SessionTimelineEvent, 0, 101)
+	events := make([]SessionTimelineEvent, 0, filters.Limit+1)
 	for rows.Next() {
 		var current SessionTimelineEvent
-		var eventType, navigationType, customName, pageURL, errorType string
-		if err := rows.Scan(&current.EventID, &current.Timestamp, &eventType, &navigationType, &customName,
-			&current.Route, &pageURL, &errorType, &current.ErrorMessage, &current.Fingerprint,
-			&current.APIMethod, &current.APIURL, &current.APIStatus, &current.Attributes); err != nil {
+		var eventType, customName string
+		if err := rows.Scan(&current.EventID, &current.Timestamp, &current.ReceivedAt, &eventType, &current.NavigationType, &customName,
+			&current.Route, &current.PageURL, &current.PageTitle, &current.PageID, &current.Environment, &current.Release,
+			&current.ErrorType, &current.ErrorMessage, &current.ErrorMechanism, &current.Fingerprint, &current.Handled,
+			&current.APIMethod, &current.APIURL, &current.APIStatus, &current.APIFailure, &current.DurationMS, &current.TransferSize,
+			&current.Attributes, &current.Measurements, &current.LogLevel, &current.LogMessage, &current.Logger,
+			&current.MetricName, &current.MetricValue, &current.MetricDelta, &current.MetricRating,
+			&current.TraceID, &current.SpanID, &current.SampleRate, &current.IngestFlags); err != nil {
 			return SessionTimeline{}, fmt.Errorf("scan session timeline: %w", err)
 		}
-		current.Timestamp = current.Timestamp.UTC()
+		current.Timestamp, current.ReceivedAt = current.Timestamp.UTC(), current.ReceivedAt.UTC()
 		switch eventType {
 		case "page_view":
-			if navigationType == "route_change" {
-				current.Kind, current.Title = "navigation", firstNonEmpty(current.Route, pageURL, "页面导航")
+			if current.NavigationType == "route_change" {
+				current.Kind, current.Title = "navigation", firstNonEmpty(current.Route, current.PageURL, "页面导航")
 			} else {
-				current.Kind, current.Title = "page_view", firstNonEmpty(current.Route, pageURL, "页面访问")
+				current.Kind, current.Title = "page_view", firstNonEmpty(current.Route, current.PageURL, "页面访问")
 			}
 		case "custom":
 			if customName == "ui.click" {
@@ -141,23 +223,113 @@ func (repository *EventRepository) ListSession(ctx context.Context, projectID, s
 				current.Kind, current.Title = "custom", customName
 			}
 		case "error":
-			current.Kind, current.Title = "error", firstNonEmpty(errorType, "前端错误")
+			current.Kind, current.Title = "error", firstNonEmpty(current.ErrorType, "前端错误")
 		case "api":
 			current.Kind, current.Title = "api", strings.TrimSpace(current.APIMethod+" "+current.APIURL)
+		case "log":
+			current.Kind, current.Title = "log", strings.ToUpper(current.LogLevel)+" · "+current.LogMessage
+		case "web_vital":
+			current.Kind, current.Title = "web_vital", firstNonEmpty(current.MetricName, "性能指标")
 		}
 		if current.Attributes == nil {
 			current.Attributes = map[string]string{}
+		}
+		if current.Measurements == nil {
+			current.Measurements = map[string]float64{}
+		}
+		if current.IngestFlags == nil {
+			current.IngestFlags = []string{}
 		}
 		events = append(events, current)
 	}
 	if err := rows.Err(); err != nil {
 		return SessionTimeline{}, err
 	}
-	truncated := len(events) > 100
+	truncated := len(events) > filters.Limit
+	nextCursor := ""
 	if truncated {
-		events = events[:100]
+		events = events[:filters.Limit]
+		last := events[len(events)-1]
+		nextCursor = encodeEventCursor(last.Timestamp, last.EventID)
 	}
-	return SessionTimeline{ProjectID: projectID, SessionID: sessionID, From: from.UTC(), To: to.UTC(), Events: events, Truncated: truncated}, nil
+	return SessionTimeline{ProjectID: filters.ProjectID, SessionID: filters.SessionID, From: filters.From, To: filters.To,
+		Session: summary, Events: events, NextCursor: nextCursor, Truncated: truncated, Availability: availability}, nil
+}
+
+func normalizeSessionTimelineFilters(filters SessionTimelineFilters) (SessionTimelineFilters, *eventCursor, error) {
+	filters.From, filters.To = filters.From.UTC(), filters.To.UTC()
+	if filters.Limit == 0 {
+		filters.Limit = 100
+	}
+	if filters.ProjectID == uuid.Nil || filters.SessionID == uuid.Nil || filters.From.IsZero() ||
+		!filters.From.Before(filters.To) || filters.To.Sub(filters.From) > 24*time.Hour || filters.Limit < 1 || filters.Limit > 100 {
+		return SessionTimelineFilters{}, nil, ErrInvalidSessionTimeline
+	}
+	allowed := map[string]bool{"page_view": true, "navigation": true, "click": true, "custom": true, "error": true, "api": true, "log": true, "web_vital": true}
+	seen := map[string]bool{}
+	for _, kind := range filters.Kinds {
+		kind = strings.TrimSpace(kind)
+		if !allowed[kind] || seen[kind] {
+			return SessionTimelineFilters{}, nil, ErrInvalidSessionTimeline
+		}
+		seen[kind] = true
+	}
+	cursor, err := decodeTimelineCursor(filters.Cursor)
+	if err != nil {
+		return SessionTimelineFilters{}, nil, err
+	}
+	return filters, cursor, nil
+}
+
+func decodeTimelineCursor(value string) (*eventCursor, error) {
+	if value == "" {
+		return nil, nil
+	}
+	decoded, err := base64.RawURLEncoding.DecodeString(value)
+	if err != nil {
+		return nil, ErrInvalidSessionTimeline
+	}
+	var cursor eventCursor
+	if json.Unmarshal(decoded, &cursor) != nil || cursor.Timestamp.IsZero() || cursor.EventID == uuid.Nil {
+		return nil, ErrInvalidSessionTimeline
+	}
+	cursor.Timestamp = cursor.Timestamp.UTC()
+	return &cursor, nil
+}
+
+func (repository *EventRepository) sessionSummary(ctx context.Context, filters SessionTimelineFilters) (SessionSummary, SessionTimelineAvailability, error) {
+	var summary SessionSummary
+	var sampled, expiredLogs uint64
+	err := repository.database.QueryRowContext(ctx, `SELECT session_id,argMin(anonymous_user_id,timestamp),
+		argMaxIf(user_id,timestamp,user_id!=''),min(timestamp),max(timestamp),
+		toUInt64(greatest(0,dateDiff('second',min(timestamp),max(timestamp)))),count(),
+		countIf(event_type='page_view'),countIf(event_type='error'),
+		countIf(event_type='api' AND (api_failure!='' OR api_status=0 OR api_status>=400)),countIf(event_type='custom'),
+		argMax(environment,timestamp),argMax(release,timestamp),argMax(browser,timestamp),argMax(os,timestamp),
+		argMax(device_type,timestamp),argMax(toString(country),timestamp),
+		argMinIf(if(route!='',route,page_url_normalized),timestamp,route!='' OR page_url_normalized!=''),
+		argMaxIf(if(route!='',route,page_url_normalized),timestamp,route!='' OR page_url_normalized!=''),
+		maxIf(duration_ms,event_type='api'),maxIf(metric_value,metric_name='LCP'),maxIf(metric_value,metric_name='INP'),
+		maxIf(metric_value,metric_name='CLS'),countIf(sample_rate>0 AND sample_rate<1),
+		countIf(event_type='log' AND raw_expires_at<=now64(3))
+		FROM rum_events FINAL WHERE project_id=? AND session_id=? AND timestamp>=? AND timestamp<=?
+		AND NOT has(ingest_flags,'synthetic') GROUP BY session_id`, filters.ProjectID, filters.SessionID, filters.From, filters.To).Scan(
+		&summary.SessionID, &summary.VisitorID, &summary.UserID, &summary.StartedAt, &summary.EndedAt,
+		&summary.DurationSeconds, &summary.Events, &summary.PageViews, &summary.Errors, &summary.APIFailures,
+		&summary.CustomEvents, &summary.Environment, &summary.Release, &summary.Browser, &summary.OS,
+		&summary.DeviceType, &summary.Country, &summary.EntryRoute, &summary.ExitRoute, &summary.SlowestAPI,
+		&summary.LCP, &summary.INP, &summary.CLS, &sampled, &expiredLogs)
+	if errors.Is(err, sql.ErrNoRows) {
+		return SessionSummary{}, SessionTimelineAvailability{}, ErrSessionNotFound
+	}
+	if err != nil {
+		return SessionSummary{}, SessionTimelineAvailability{}, fmt.Errorf("query session summary: %w", err)
+	}
+	summary.StartedAt, summary.EndedAt = summary.StartedAt.UTC(), summary.EndedAt.UTC()
+	summary.Country = strings.TrimSpace(summary.Country)
+	availability := SessionTimelineAvailability{Sampled: sampled > 0, ExpiredLogs: expiredLogs > 0,
+		TimelineExact: sampled == 0 && expiredLogs == 0, Replay: false}
+	return summary, availability, nil
 }
 
 func firstNonEmpty(values ...string) string {

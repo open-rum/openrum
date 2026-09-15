@@ -1,0 +1,417 @@
+---
+import "@fontsource-variable/inter/wght.css";
+import "@fontsource-variable/ibm-plex-sans/wght.css";
+import "@fontsource-variable/manrope/wght.css";
+
+const fonts = [
+  {
+    id: "geist",
+    name: "Geist",
+    family: "Geist Variable",
+    tag: "当前字体",
+    note: "简洁、紧凑，延续现有界面。",
+    url: "https://vercel.com/font",
+  },
+  {
+    id: "inter",
+    name: "Inter",
+    family: "Inter Variable",
+    tag: "优先推荐",
+    note: "中性、清晰，适合表格和数据密集的控制台。",
+    url: "https://rsms.me/inter/",
+  },
+  {
+    id: "plex",
+    name: "IBM Plex Sans",
+    family: "IBM Plex Sans Variable",
+    tag: "工程气质",
+    note: "字形更有辨识度，适合监控与开发工具。",
+    url: "https://www.ibm.com/plex/",
+  },
+  {
+    id: "manrope",
+    name: "Manrope",
+    family: "Manrope Variable",
+    tag: "柔和几何",
+    note: "更圆润、舒展，适合标题和简洁的数据卡片。",
+    url: "https://fontsource.org/fonts/manrope",
+  },
+];
+---
+
+<div class="ds-font-lab" data-font-lab>
+  <div class="ds-font-toolbar">
+    <label
+      >英文与数字
+      <select data-font-select aria-label="预览英文字体">
+        {
+          fonts.map((font) => (
+            <option value={font.id} data-family={font.family}>
+              {font.name}
+              {font.id === "geist" ? "（当前）" : ""}
+            </option>
+          ))
+        }
+      </select>
+    </label>
+    <label
+      >中文
+      <select data-cjk-select aria-label="预览中文字体">
+        <option value="system">系统黑体（苹方 / 微软雅黑）</option>
+        <option value="noto">Noto Sans SC</option>
+      </select>
+    </label>
+    <button class="ui-button ui-button-neutral" type="button" data-font-reset>恢复当前字体</button>
+  </div>
+  <p class="ds-font-note">
+    切换会预览本页文字和图表。中文单独选择；Logo 字标为 SVG。当前产品字体仍是 Geist。
+  </p>
+  <div class="ds-font-options" role="group" aria-label="推荐字体对比">
+    {
+      fonts.map((font) => (
+        <article class="ds-font-option" style={`--font-option-family:'${font.family}'`}>
+          <div class="ds-font-option-heading">
+            <>
+              <h3>{font.name}</h3>
+              <span>{font.tag}</span>
+            </>
+          </div>
+          <p class="ds-font-option-sample">
+            OpenRUM
+            <br />
+            看清用户体验
+            <>
+              <br />
+              <strong>12,480.96</strong>
+            </>
+          </p>
+          <p class="ds-font-option-note">{font.note}</p>
+          <div class="ds-font-option-actions">
+            <button
+              type="button"
+              data-font-choice={font.id}
+              aria-pressed={font.id === "geist"}
+              aria-label={`预览 ${font.name}`}
+            >
+              预览此字体
+            </button>
+            <a href={font.url} target="_blank" rel="noreferrer">
+              字体介绍 ↗
+            </a>
+          </div>
+        </article>
+      ))
+    }
+  </div>
+  <div class="ds-font-test-controls">
+    <label for="font-sample">试试你的文字</label>
+    <textarea id="font-sample" data-font-sample maxlength="240" rows="2" spellcheck="false"
+      >看清每一次用户体验。Real user monitoring · 0123456789</textarea
+    >
+    <div>
+      <label
+        >字号 <output data-font-size-value>24px</output><input
+          data-font-size
+          aria-label="预览字号"
+          type="range"
+          min="14"
+          max="40"
+          value="24"
+        /></label
+      >
+      <label
+        >字重 <select data-font-weight aria-label="预览字重"
+          ><option value="400">400 · Regular</option><option value="500">500 · Medium</option
+          ><option value="600">600 · Semibold</option><option value="700">700 · Bold</option
+          ></select
+        ></label
+      >
+    </div>
+  </div>
+  <div class="ds-font-specimen">
+    <div class="ds-font-specimen-heading">
+      <span data-font-current>Geist + 系统黑体</span><span>界面示例 · 非线上数据</span>
+    </div>
+    <p data-font-custom>看清每一次用户体验。Real user monitoring · 0123456789</p>
+    <div class="ds-font-metrics">
+      <div><span>页面浏览 PV</span><strong>128,460</strong><small>上周期 119,024</small></div>
+      <div><span>LCP P75</span><strong>2.48 <em>s</em></strong><small>1,280 个有效样本</small></div>
+      <div><span>错误率</span><strong>0.08<em>%</em></strong><small>较上一周期 −0.02pp</small></div>
+    </div>
+    <div class="ds-font-table-wrap">
+      <table class="ds-font-table">
+        <caption>14px 表格正文 · 12px 表头 · 等宽数字</caption>
+        <thead><tr><th>页面 Route</th><th>浏览量</th><th>P75</th><th>状态</th></tr></thead>
+        <tbody
+          ><tr><td>商品详情 /products</td><td>12,480</td><td>1,248 ms</td><td>良好</td></tr><tr
+            ><td>结算页面 /checkout</td><td>1,024</td><td>2,480 ms</td><td>待优化</td></tr
+          ></tbody
+        >
+      </table>
+    </div>
+    <p class="ds-font-glyphs">易混字形：I l 1 · O 0 · S 5 · B 8　数值：0.01 / 99.99 / −12.5%</p>
+  </div>
+  <p class="ds-font-status" data-font-status role="status" aria-live="polite">预览就绪</p>
+</div>
+
+<script>
+  import "../../lib/font-preview";
+</script>
+
+<style>
+  .ds-font-lab {
+    --font-preview-cjk: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  }
+  .ds-font-toolbar,
+  .ds-font-test-controls > div {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: end;
+    gap: 16px;
+  }
+  .ds-font-toolbar label,
+  .ds-font-test-controls label {
+    display: grid;
+    gap: 8px;
+    color: var(--ds-text-secondary);
+    font-size: 14px;
+  }
+  select,
+  textarea {
+    border: 1px solid var(--ds-input);
+    border-radius: var(--radius-md);
+    background: var(--ds-surface);
+    color: var(--ds-text);
+    font: inherit;
+    padding: 9px 12px;
+    max-width: 100%;
+  }
+  select {
+    min-height: 40px;
+  }
+  button,
+  select,
+  textarea,
+  input {
+    outline-offset: 3px;
+  }
+  :is(button, select, textarea, input):focus-visible {
+    outline: 2px solid var(--ds-ring);
+  }
+  .ds-font-note,
+  .ds-font-status {
+    color: var(--ds-text-muted);
+    font-size: 12px;
+    line-height: 1.7;
+  }
+  .ds-font-options {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+    margin-block: 24px;
+  }
+  .ds-font-option {
+    padding: 20px;
+    border: 1px solid var(--ds-border);
+    border-radius: var(--radius-lg);
+    background: var(--ds-surface);
+    min-width: 0;
+  }
+  .ds-font-option:has([aria-pressed="true"]) {
+    border-color: var(--ds-text);
+  }
+  .ds-font-option-heading {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .ds-font-option-heading h3 {
+    margin: 0;
+    font-size: 14px;
+  }
+  .ds-font-option-heading > span {
+    font-size: 11px;
+    color: var(--ds-text-muted);
+  }
+  .ds-font-option-sample {
+    font-family: var(--font-option-family), var(--font-preview-cjk);
+    font-size: 22px;
+    line-height: 1.6;
+    margin-block: 20px;
+  }
+  .ds-font-option-sample strong {
+    font-size: 26px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+  .ds-font-option-note {
+    color: var(--ds-text-secondary);
+    font-size: 12px;
+    line-height: 1.7;
+    min-height: 42px;
+  }
+  .ds-font-option-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-top: 16px;
+  }
+  .ds-font-option-actions button {
+    padding: 7px 10px;
+    border: 1px solid var(--ds-border);
+    border-radius: var(--radius-md);
+    background: var(--ds-surface);
+    color: var(--ds-text);
+    font: inherit;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .ds-font-option-actions button[aria-pressed="true"] {
+    background: var(--ds-action-contrast);
+    color: var(--ds-action-contrast-foreground);
+  }
+  .ds-font-option-actions a {
+    font-size: 12px;
+    text-underline-offset: 3px;
+  }
+  .ds-font-test-controls {
+    display: grid;
+    gap: 12px;
+  }
+  .ds-font-test-controls textarea {
+    width: 100%;
+    resize: vertical;
+    font-size: 14px;
+    line-height: 1.6;
+  }
+  .ds-font-test-controls > div {
+    align-items: center;
+    justify-content: space-between;
+  }
+  .ds-font-test-controls > div label {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .ds-font-test-controls input {
+    accent-color: var(--ds-text);
+  }
+  .ds-font-test-controls output {
+    font-variant-numeric: tabular-nums;
+    min-width: 35px;
+  }
+  .ds-font-specimen {
+    margin-top: 20px;
+    padding: 24px;
+    background: var(--ds-surface);
+    border: 1px solid var(--ds-border);
+    border-radius: var(--radius-lg);
+  }
+  .ds-font-specimen-heading {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 8px;
+    color: var(--ds-text-muted);
+    font-size: 12px;
+  }
+  [data-font-custom] {
+    font-size: var(--font-preview-size, 24px);
+    font-weight: var(--font-preview-weight, 400);
+    line-height: 1.6;
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+    margin-block: 24px;
+  }
+  .ds-font-metrics {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 20px;
+    padding-block: 20px;
+    border-block: 1px solid var(--ds-border);
+  }
+  .ds-font-metrics > div {
+    display: grid;
+    gap: 8px;
+  }
+  .ds-font-metrics span {
+    font-size: 14px;
+    color: var(--ds-text-secondary);
+  }
+  .ds-font-metrics strong {
+    font-size: 30px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+  .ds-font-metrics em {
+    font-size: 16px;
+    font-style: normal;
+    font-weight: 400;
+  }
+  .ds-font-metrics small {
+    font-size: 12px;
+    color: var(--ds-text-muted);
+  }
+  .ds-font-table-wrap {
+    overflow-x: auto;
+  }
+  .ds-font-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+    margin-top: 20px;
+    font-variant-numeric: tabular-nums;
+  }
+  .ds-font-table caption {
+    text-align: left;
+    padding-bottom: 12px;
+    font-size: 12px;
+    color: var(--ds-text-muted);
+  }
+  .ds-font-table th,
+  .ds-font-table td {
+    text-align: left;
+    padding: 12px 8px;
+    border-bottom: 1px solid var(--ds-border);
+    white-space: nowrap;
+  }
+  .ds-font-table th {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--ds-text-muted);
+  }
+  .ds-font-table :is(th, td):nth-child(2),
+  .ds-font-table :is(th, td):nth-child(3) {
+    text-align: right;
+  }
+  .ds-font-glyphs {
+    margin: 20px 0 0;
+    font-size: 14px;
+    line-height: 1.8;
+    color: var(--ds-text-secondary);
+  }
+  @media (max-width: 1100px) {
+    .ds-font-options {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+  @media (max-width: 600px) {
+    .ds-font-toolbar {
+      align-items: stretch;
+      flex-direction: column;
+    }
+    .ds-font-options {
+      grid-template-columns: 1fr;
+    }
+    .ds-font-specimen {
+      padding: 16px;
+    }
+    .ds-font-metrics {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

@@ -46,7 +46,7 @@ yarn add @openrum/browser
 
 <Steps>
 
-1. Create a Project and copy its write key. See
+1. Create a Project and copy its client DSN. See
    [Create your first project](/docs/getting-started/create-first-project/).
 
 2. Add the application's origin to the Project's allowed origins. The SDK posts with
@@ -65,8 +65,7 @@ yarn add @openrum/browser
 import { init } from "@openrum/browser";
 
 init({
-  endpoint: import.meta.env.VITE_OPENRUM_ENDPOINT,
-  writeKey: import.meta.env.VITE_OPENRUM_WRITE_KEY,
+  dsn: import.meta.env.VITE_OPENRUM_DSN,
   environment: import.meta.env.MODE,
   release: import.meta.env.VITE_APP_RELEASE,
 });
@@ -97,8 +96,7 @@ pnpm --filter @openrum/example-react-vite dev
 import { init } from "@openrum/browser";
 
 init({
-  endpoint: import.meta.env.VITE_OPENRUM_ENDPOINT,
-  writeKey: import.meta.env.VITE_OPENRUM_WRITE_KEY,
+  dsn: import.meta.env.VITE_OPENRUM_DSN,
   environment: import.meta.env.MODE,
   release: import.meta.env.VITE_APP_RELEASE,
 });
@@ -122,8 +120,7 @@ captured without a router hook. Hash mode is not captured; see
 import { init } from "@openrum/browser";
 
 init({
-  endpoint: import.meta.env.VITE_OPENRUM_ENDPOINT,
-  writeKey: import.meta.env.VITE_OPENRUM_WRITE_KEY,
+  dsn: import.meta.env.VITE_OPENRUM_DSN,
   environment: import.meta.env.MODE,
   release: import.meta.env.VITE_APP_RELEASE,
 });
@@ -170,6 +167,63 @@ than once.
 Query strings, URL fragments, request and response bodies, headers and raw input values
 are stripped in the browser before an Event is queued.
 
+## Structured logs
+
+Logs are explicit: `init()` alone does not collect application logs. Import the singleton
+`logger`, or use the client returned by `init()`, and call a level method where the event
+happens.
+
+```ts
+import { init, logger, setUser } from "@openrum/browser";
+
+init({ dsn: import.meta.env.VITE_OPENRUM_DSN });
+
+setUser("customer-123"); // Pseudonymous application ID, never an email.
+logger.info("checkout started", {
+  "order.id": "order-123",
+  items: 3,
+});
+logger.error("payment failed", {
+  "error.code": "UPSTREAM_TIMEOUT",
+});
+
+// Clear the identity when the application user signs out.
+setUser(undefined);
+```
+
+Available levels are `trace`, `debug`, `info`, `warn`, `error`, and `fatal`. Attributes
+may contain up to 20 primitive string, number, or boolean values. Error and fatal logs are
+diagnostic Logs; they do not create an Issue.
+
+### Forward selected console methods
+
+`captureConsole` is a separate opt-in. Only the listed methods are forwarded, and their
+normal browser output is preserved.
+
+```ts
+init({
+  dsn: import.meta.env.VITE_OPENRUM_DSN,
+  captureConsole: ["warn", "error"],
+  beforeSendLog: (log) =>
+    log.message.includes("ResizeObserver loop") ? null : log,
+});
+```
+
+Omit `captureConsole` to keep every console message local. Object arguments are represented
+as `[Object]`, not serialized. The former `enableLogs` option is deprecated and ignored;
+existing configurations may leave it in place until a future breaking upgrade.
+
+<Aside type="caution" title="Treat log text as potentially sensitive">
+  Do not log credentials, personal data, request bodies, or access tokens. OpenRUM applies
+  bounded client and server scrubbing, but pattern matching cannot guarantee anonymization.
+</Aside>
+
+To verify the integration, send a temporary `logger.info("openrum setup check")`, open
+**Logs** in the Console, and search for `message:"openrum setup check"` in the same Project,
+Environment, and time range. For user investigation, search `user.id:"customer-123"`.
+See [Logs](/docs/product/logs/) for all search fields, limits, Session/Trace links, and
+privacy boundaries.
+
 ## Support matrix
 
 Stated against `@openrum/browser 0.1.0`. "Planned" means the work is scheduled and not yet
@@ -205,10 +259,10 @@ automatic Page View for that navigation has already been sent with the resolved 
 `page_id` values. Recording route patterns correctly needs an SDK change, tracked as Phase
 10 in `docs/product-roadmap.md`.
 
-### A rejected write key disables the page
+### A rejected DSN disables the page
 
 A `401` or `403` from ingest is treated as permanent: the SDK clears its queue and stops
-sending for the rest of the page, without logging. Check the write key and the Project's
+sending for the rest of the page, without logging. Check the DSN and the Project's
 allowed origins in the Console when Events do not arrive.
 
 ## Custom Events

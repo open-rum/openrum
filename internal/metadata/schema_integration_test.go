@@ -68,6 +68,9 @@ func TestControlPlaneConstraints(t *testing.T) {
 		"INSERT INTO project_keys (project_id, key_prefix, key_hash, name) VALUES ($1, $2, $3, $4)",
 		projectID, "orr_bad12", []byte("too-short"), "Invalid key")
 	expectConstraint(t, ctx, transaction,
+		"INSERT INTO project_keys (project_id, key_prefix, key_hash, public_key, name) VALUES ($1, $2, $3, $4, $5)",
+		projectID, "orr_bad34", make([]byte, 32), "not-an-openrum-key", "Invalid public key")
+	expectConstraint(t, ctx, transaction,
 		"INSERT INTO sessions (user_id, token_hash, expires_at, idle_expires_at) VALUES ($1, $2, now(), now() + interval '1 hour')",
 		userID, make([]byte, 32))
 	expectConstraint(t, ctx, transaction,

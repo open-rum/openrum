@@ -37,7 +37,7 @@ func TestNormalizeSessionFiltersRejectsUnboundedValues(t *testing.T) {
 
 func TestSessionHavingKeepsSummaryRowsIntact(t *testing.T) {
 	having, arguments := sessionHaving(SessionFilters{Route: "/checkout", Search: "alice", Signal: "error", MinimumEvents: 3, MinimumDuration: 60})
-	if having == "" || len(arguments) != 10 {
+	if having == "" || len(arguments) != 11 {
 		t.Fatalf("having=%q arguments=%v", having, arguments)
 	}
 }

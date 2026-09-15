@@ -90,9 +90,7 @@ export function MetricCards(props: MetricCardsProps) {
               {metric.value}
             </strong>
             <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-              <Badge variant={metric.low ? "outline" : "secondary"}>
-                {metric.low ? "样本不足" : metric.delta}
-              </Badge>
+              <Badge variant="outline">{metric.low ? "样本不足" : metric.delta}</Badge>
               {/* The delta alone cannot be sanity-checked: a +300% jump reads
                   very differently from 1 to 4 than from 1k to 4k. */}
               <span className="text-xs text-muted-foreground">上一周期 {metric.was}</span>

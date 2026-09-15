@@ -129,7 +129,7 @@ func (metrics *Metrics) ObserveClickHouseBatch(rows int, duration time.Duration,
 
 func boundedCanonicalEventType(value event.EventType) string {
 	switch value {
-	case event.EventTypePageView, event.EventTypeError, event.EventTypeWebVital, event.EventTypeAPI, event.EventTypeCustom:
+	case event.EventTypePageView, event.EventTypeError, event.EventTypeWebVital, event.EventTypeAPI, event.EventTypeCustom, event.EventTypeLog:
 		return string(value)
 	default:
 		return "unknown"

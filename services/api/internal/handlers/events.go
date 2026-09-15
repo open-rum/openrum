@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -21,7 +22,7 @@ type eventQueries interface {
 
 type sessionQueries interface {
 	List(context.Context, query.SessionFilters) (query.SessionPage, error)
-	ListSession(context.Context, uuid.UUID, uuid.UUID, time.Time, time.Time) (query.SessionTimeline, error)
+	ListSession(context.Context, query.SessionTimelineFilters) (query.SessionTimeline, error)
 }
 
 type SessionHandler struct {
@@ -96,12 +97,35 @@ func (handler *SessionHandler) Get(writer http.ResponseWriter, request *http.Req
 		httpx.WriteError(writer, request, http.StatusBadRequest, "VALIDATION_ERROR", "A valid session timeline range is required.")
 		return
 	}
-	ctx, cancel := context.WithTimeout(request.Context(), 5*time.Second)
+	limit := 100
+	if value := request.URL.Query().Get("limit"); value != "" {
+		limit, err = strconv.Atoi(value)
+		if err != nil {
+			httpx.WriteError(writer, request, http.StatusBadRequest, "VALIDATION_ERROR", "The session timeline limit is invalid.")
+			return
+		}
+	}
+	kinds := make([]string, 0)
+	for _, value := range request.URL.Query()["type"] {
+		for _, kind := range strings.Split(value, ",") {
+			if kind = strings.TrimSpace(kind); kind != "" {
+				kinds = append(kinds, kind)
+			}
+		}
+	}
+	ctx, cancel := context.WithTimeout(request.Context(), 10*time.Second)
 	defer cancel()
-	result, err := handler.events.ListSession(ctx, projectID, sessionID, from, to)
+	result, err := handler.events.ListSession(ctx, query.SessionTimelineFilters{
+		ProjectID: projectID, SessionID: sessionID, From: from, To: to,
+		Cursor: request.URL.Query().Get("cursor"), Kinds: kinds, Limit: limit,
+	})
 	if err != nil {
 		if errors.Is(err, query.ErrInvalidSessionTimeline) {
 			httpx.WriteError(writer, request, http.StatusBadRequest, "VALIDATION_ERROR", "The session timeline range is invalid.")
+			return
+		}
+		if errors.Is(err, query.ErrSessionNotFound) {
+			httpx.WriteError(writer, request, http.StatusNotFound, "SESSION_NOT_FOUND", "Session was not found or its data has expired.")
 			return
 		}
 		handler.logger.Error().Err(err).Str("project_id", projectID.String()).Str("session_id", sessionID.String()).Msg("session timeline query failed")

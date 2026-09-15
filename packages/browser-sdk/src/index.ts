@@ -1,4 +1,11 @@
-export type { EventContext, EventV1 } from "@openrum/protocol";
+export type { EventContext, EventV1, LogEvent, LogLevel } from "@openrum/protocol";
+export type { Logger, LogInput, LogAttributes } from "./logs.ts";
+export { consoleLoggingIntegration } from "./integrations/console.ts";
+export {
+  createOpenRUMDSN,
+  createOpenRUMDSNForInstance,
+  parseOpenRUMDSN,
+} from "@openrum/protocol/dsn";
 export {
   OpenRUMClient,
   type CapturedEvent,
@@ -17,7 +24,7 @@ export type {
 export type { RemoteSDKConfig } from "./config.ts";
 export type { EventPriority, SamplingOptions } from "./sampling.ts";
 
-import { OpenRUMClient, type ClientOptions } from "./client.ts";
+import { OpenRUMClient, resolveClientOptions, type ClientOptions } from "./client.ts";
 import { resolveConfigEndpoint, startRemoteConfig } from "./config.ts";
 import type { BreadcrumbInput, CustomEventInput } from "./custom.ts";
 import { behaviorIntegration } from "./integrations/behavior.ts";
@@ -27,27 +34,30 @@ import { pageIntegration } from "./integrations/page.ts";
 import { webVitalsIntegration } from "./integrations/webVitals.ts";
 import { xhrIntegration } from "./integrations/xhr.ts";
 import { createBrowserSender } from "./transport/sender.ts";
+import { createLogger } from "./logs.ts";
 
 let activeClient: OpenRUMClient | undefined;
+export const logger = createLogger((log) => activeClient?.capture({ type: "log", ...log }));
 
 export function init(options: ClientOptions): OpenRUMClient {
   if (activeClient?.state === "running") return activeClient;
-  const sender = createBrowserSender(options);
+  const resolved = resolveClientOptions(options);
+  const sender = createBrowserSender(resolved);
   const configEndpoint = resolveConfigEndpoint(
-    options.endpoint,
-    options.configEndpoint,
+    resolved.endpoint,
+    resolved.configEndpoint,
     typeof location === "undefined" ? undefined : location.href,
   );
   const client = new OpenRUMClient(
     {
-      ...options,
-      integrations: options.integrations ?? [
+      ...resolved,
+      integrations: resolved.integrations ?? [
         pageIntegration(),
-        ...(options.captureClicks === false ? [] : [behaviorIntegration()]),
+        ...(resolved.captureClicks === false ? [] : [behaviorIntegration()]),
         errorIntegration(),
         webVitalsIntegration(),
-        fetchIntegration([options.endpoint, ...(configEndpoint ? [configEndpoint] : [])]),
-        xhrIntegration([options.endpoint, ...(configEndpoint ? [configEndpoint] : [])]),
+        fetchIntegration([resolved.endpoint, ...(configEndpoint ? [configEndpoint] : [])]),
+        xhrIntegration([resolved.endpoint, ...(configEndpoint ? [configEndpoint] : [])]),
       ],
     },
     {
@@ -57,7 +67,7 @@ export function init(options: ClientOptions): OpenRUMClient {
       },
     },
   );
-  client.registerTeardown(startRemoteConfig(client, options));
+  client.registerTeardown(startRemoteConfig(client, resolved));
   activeClient = client;
   return client;
 }
