@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 
-FROM node:24-alpine AS console-build
+FROM --platform=$BUILDPLATFORM node:24-alpine AS console-build
 WORKDIR /src
 RUN corepack enable && corepack prepare pnpm@11.11.0 --activate
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
@@ -17,8 +17,10 @@ COPY apps/web apps/web
 COPY packages packages
 RUN pnpm --filter @openrum/browser build && pnpm --filter @openrum/web build
 
-FROM golang:1.26.6-alpine AS go-build
+FROM --platform=$BUILDPLATFORM golang:1.26.6-alpine AS go-build
 WORKDIR /src
+ARG TARGETOS
+ARG TARGETARCH
 RUN apk add --no-cache ca-certificates
 COPY go.mod go.sum go.work go.work.sum ./
 RUN --mount=type=cache,target=/go/pkg/mod go mod download
@@ -26,12 +28,13 @@ COPY . .
 ARG VERSION=dev
 ARG COMMIT=unknown
 RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
-    CGO_ENABLED=0 go build -trimpath -ldflags="-s -w -X main.version=${VERSION} -X main.commit=${COMMIT}" -o /out/api ./services/api/cmd/api && \
-    CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/ingest ./services/ingest/cmd/ingest && \
-    CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/consumer ./services/consumer/cmd/consumer && \
-    CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/worker ./services/worker/cmd/worker && \
-    CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/migrate ./services/api/cmd/migrate && \
-    CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/demo ./services/api/cmd/demo
+    export CGO_ENABLED=0 GOOS="$TARGETOS" GOARCH="$TARGETARCH" && \
+    go build -trimpath -ldflags="-s -w -X main.version=${VERSION} -X main.commit=${COMMIT}" -o /out/api ./services/api/cmd/api && \
+    go build -trimpath -ldflags="-s -w" -o /out/ingest ./services/ingest/cmd/ingest && \
+    go build -trimpath -ldflags="-s -w" -o /out/consumer ./services/consumer/cmd/consumer && \
+    go build -trimpath -ldflags="-s -w" -o /out/worker ./services/worker/cmd/worker && \
+    go build -trimpath -ldflags="-s -w" -o /out/migrate ./services/api/cmd/migrate && \
+    go build -trimpath -ldflags="-s -w" -o /out/demo ./services/api/cmd/demo
 
 FROM alpine:3.24
 LABEL org.opencontainers.image.title="OpenRUM" \

@@ -9,7 +9,6 @@ on:
       - "docs/**"
       - "scripts/docs/**"
       - "scripts/site/**"
-      - "deploy/site/**"
       - ".github/workflows/site.yml"
   push:
     branches: [main]
@@ -20,13 +19,11 @@ on:
       - "docs/**"
       - "scripts/docs/**"
       - "scripts/site/**"
-      - "deploy/site/**"
       - ".github/workflows/site.yml"
   workflow_dispatch:
 
 permissions:
   contents: read
-  packages: write
 
 concurrency:
   group: public-site-${{ github.ref }}
@@ -59,30 +56,3 @@ jobs:
           path: apps/site/dist
           if-no-files-found: error
           retention-days: 14
-
-  production-image:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && github.repository == 'openrum/openrum'
-    needs: preview
-    runs-on: ubuntu-latest
-    environment: public-site
-    steps:
-      - uses: actions/checkout@v7
-      - uses: pnpm/setup@v2
-        with:
-          runtime: node@24
-          cache: true
-          require-lockfile: true
-      - run: pnpm run site:build
-      - uses: docker/login-action@v4
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      - uses: docker/build-push-action@v7
-        with:
-          context: .
-          file: deploy/site/Dockerfile
-          push: true
-          tags: |
-            ghcr.io/${{ github.repository_owner }}/openrum-site:${{ github.sha }}
-            ghcr.io/${{ github.repository_owner }}/openrum-site:main
