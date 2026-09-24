@@ -55,7 +55,6 @@ jobs:
       - uses: azure/setup-helm@v4.3.1
         with:
           version: v3.21.4
-      - uses: docker/setup-qemu-action@v3
       - uses: docker/setup-buildx-action@v3
       - uses: docker/login-action@v4
         with:
@@ -74,24 +73,17 @@ jobs:
           helm lint private-test-chart/openrum
           helm template openrum private-test-chart/openrum > /dev/null
           helm package private-test-chart/openrum --destination private-test-chart
-      - name: Build private documentation image content
-        env:
-          PUBLIC_SITE_URL: https://openrum.dev
-          PUBLIC_REPOSITORY_URL: https://github.com/eijil/openrum
-          PUBLIC_OPENRUM_RELEASE: v${{ env.TEST_VERSION }}
-          PUBLIC_COMMIT_SHA: ${{ github.sha }}
-        run: |
-          pnpm run site:build
-          node scripts/site/check-built-links.mjs
       - name: Publish application image
         uses: docker/build-push-action@v7
         with:
           context: .
           file: Dockerfile
           push: true
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/amd64
           tags: ghcr.io/${{ env.PACKAGE_NAMESPACE }}/openrum:${{ env.TEST_VERSION }}
           labels: org.opencontainers.image.source=https://github.com/${{ github.repository }}
+          cache-from: type=gha,scope=openrum-app
+          cache-to: type=gha,scope=openrum-app,mode=max,timeout=5m,ignore-error=true
           build-args: |
             VERSION=${{ env.TEST_VERSION }}
             COMMIT=${{ github.sha }}
@@ -112,29 +104,12 @@ jobs:
             grep -F "repository: ghcr.io/$PACKAGE_NAMESPACE/openrum"
           helm show values "oci://ghcr.io/$PACKAGE_NAMESPACE/charts/openrum" --version "$TEST_VERSION" | \
             grep -F "tag: \"$TEST_VERSION\""
-      - name: Publish documentation image
-        uses: docker/build-push-action@v7
-        with:
-          context: .
-          file: deploy/site/Dockerfile
-          push: true
-          platforms: linux/amd64,linux/arm64
-          tags: ghcr.io/${{ env.PACKAGE_NAMESPACE }}/openrum-site:${{ env.TEST_VERSION }}
-          labels: org.opencontainers.image.source=https://github.com/${{ github.repository }}
-          provenance: true
-          sbom: true
-      - name: Verify the documentation image
-        run: |
-          docker pull "ghcr.io/$PACKAGE_NAMESPACE/openrum-site:$TEST_VERSION"
-          docker run --rm --entrypoint /bin/sh "ghcr.io/$PACKAGE_NAMESPACE/openrum-site:$TEST_VERSION" -ec \
-            'test -f /usr/share/nginx/html/index.html'
       - name: Summarize private test artifacts
         run: |
           {
             echo '### Private package test'
             echo
-            echo "- Application: \`ghcr.io/$PACKAGE_NAMESPACE/openrum:$TEST_VERSION\`"
-            echo "- Site: \`ghcr.io/$PACKAGE_NAMESPACE/openrum-site:$TEST_VERSION\`"
+            echo "- Application (linux/amd64): \`ghcr.io/$PACKAGE_NAMESPACE/openrum:$TEST_VERSION\`"
             echo "- Chart: \`oci://ghcr.io/$PACKAGE_NAMESPACE/charts/openrum --version $TEST_VERSION\`"
             echo '- No public release or deployment was performed.'
           } >> "$GITHUB_STEP_SUMMARY"
