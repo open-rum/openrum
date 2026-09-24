@@ -49,6 +49,9 @@ jobs:
         with:
           version: v2.12.2
 
+      - name: Build all packages and services
+        run: pnpm run build
+
       - name: Type-check workspaces
         run: pnpm run typecheck
 
@@ -65,9 +68,6 @@ jobs:
 
       - name: Test release metadata validation
         run: node --test scripts/release/check-version.test.mjs
-
-      - name: Build all packages and services
-        run: pnpm run build
 
       - name: Verify generated documentation and public-site content
         run: |
