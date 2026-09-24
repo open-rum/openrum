@@ -1983,7 +1983,7 @@ body {
   .app-status-bar {
     top: 52px;
     min-height: 52px;
-    padding: 7px 10px;
+    padding: 5px 10px;
     align-items: stretch;
     gap: 6px;
   }

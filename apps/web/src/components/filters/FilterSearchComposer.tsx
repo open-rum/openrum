@@ -149,7 +149,6 @@ export function FilterSearchComposer({
               ref={inputRef}
               className="min-w-44 flex-[1_1_12rem]"
               aria-label={ariaLabel}
-              aria-expanded={open}
               placeholder={active ? `输入${active.label}的值…` : placeholder}
               value={draft}
               onFocus={() => setOpen(true)}

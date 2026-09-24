@@ -71,10 +71,10 @@ test("every trend panel renders, including the previously unplotted series", asy
   await mockOpenRUM(page, { projectExists: true });
   await page.goto(`/projects/${projectId}/overview`);
 
-  await expect(page.getByRole("img", { name: "PV 与 UV 时间趋势" })).toBeVisible();
-  await expect(page.getByRole("img", { name: "错误率与 API 失败率时间趋势" })).toBeVisible();
-  for (const metric of ["LCP", "INP", "CLS"]) {
-    await expect(page.getByRole("img", { name: `${metric} P75 日期趋势` })).toBeVisible();
+  for (const title of ["访问量", "稳定性", "LCP P75 趋势", "INP P75 趋势", "CLS P75 趋势"]) {
+    const card = page.locator(`[data-module-title="${title}"]`);
+    await expect(card).toBeVisible();
+    await expect(card.locator(".recharts-surface")).toBeVisible();
   }
 });
 
