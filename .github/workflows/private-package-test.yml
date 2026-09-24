@@ -32,9 +32,9 @@ jobs:
         run: |
           pnpm run format:check
           pnpm run lint
+          pnpm run build
           pnpm run typecheck
           pnpm run test
-          pnpm run build
           pnpm run site:check
           pnpm run site:test:e2e
 
