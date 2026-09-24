@@ -1,7 +1,6 @@
-// Renders the Mermaid sources in docs/diagrams/ to SVG before site previews and releases.
-// Mermaid needs a DOM to measure text, so routine site builds consume the generated SVG
-// without launching a headless browser. Rendering is validated by the site workflows;
-// generated SVG bytes are not compared across operating systems.
+// Renders Mermaid sources in docs/diagrams/ to committed SVG assets when a maintainer
+// explicitly updates a diagram. Site previews and releases use those assets without
+// launching a headless browser or comparing SVG bytes across operating systems.
 import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";

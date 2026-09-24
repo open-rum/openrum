@@ -49,8 +49,6 @@ jobs:
           runtime: node@24
           cache: true
           require-lockfile: true
-      - run: pnpm exec playwright install --with-deps chromium
-      - run: pnpm run docs:generate
       - run: pnpm run site:build
       - run: node scripts/site/check-built-links.mjs
       - run: node scripts/site/check-performance-budget.mjs
@@ -74,8 +72,7 @@ jobs:
           runtime: node@24
           cache: true
           require-lockfile: true
-      - run: pnpm exec playwright install --with-deps chromium
-      - run: pnpm run docs:generate && pnpm run site:build
+      - run: pnpm run site:build
       - uses: docker/login-action@v4
         with:
           registry: ghcr.io
