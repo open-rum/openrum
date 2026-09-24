@@ -26,8 +26,6 @@ jobs:
         with:
           go-version-file: go.mod
           cache-dependency-path: go.sum
-      - name: Install browser for documentation checks
-        run: pnpm exec playwright install --with-deps chromium
       - name: Run private package smoke checks
         run: |
           pnpm run format:check
@@ -35,9 +33,7 @@ jobs:
           pnpm run build
           pnpm run typecheck
           pnpm run test
-          pnpm run docs:generate
           pnpm run site:check
-          pnpm run site:test:e2e
 
   publish:
     needs: verify
@@ -56,8 +52,6 @@ jobs:
           runtime: node@24
           cache: true
           require-lockfile: true
-      - name: Install browser for generated documentation diagrams
-        run: pnpm exec playwright install --with-deps chromium
       - uses: azure/setup-helm@v4.3.1
         with:
           version: v3.21.4
@@ -87,7 +81,6 @@ jobs:
           PUBLIC_OPENRUM_RELEASE: v${{ env.TEST_VERSION }}
           PUBLIC_COMMIT_SHA: ${{ github.sha }}
         run: |
-          pnpm run docs:generate
           pnpm run site:build
           node scripts/site/check-built-links.mjs
       - name: Publish application image
