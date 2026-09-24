@@ -62,7 +62,7 @@ jobs:
           retention-days: 14
 
   production-image:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && github.repository == 'openrum/openrum'
     needs: preview
     runs-on: ubuntu-latest
     environment: public-site
