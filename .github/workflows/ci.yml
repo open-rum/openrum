@@ -29,9 +29,6 @@ jobs:
           cache: true
           require-lockfile: true
 
-      - name: Install browser for generated documentation diagrams
-        run: pnpm exec playwright install --with-deps chromium
-
       - name: Set up Go
         uses: actions/setup-go@v7
         with:

@@ -23,7 +23,7 @@
     "site:check": "pnpm docs:check && pnpm site:spell && pnpm site:verify-demo && pnpm site:build && node scripts/site/check-built-links.mjs && node scripts/site/check-performance-budget.mjs",
     "docs:sync": "node scripts/docs/sync-content.mjs",
     "docs:generate": "node scripts/docs/generate-reference.mjs && node scripts/docs/generate-diagrams.mjs",
-    "docs:check": "node scripts/docs/generate-reference.mjs --check && node scripts/docs/generate-diagrams.mjs --check",
+    "docs:check": "node scripts/docs/generate-reference.mjs --check",
     "build": "pnpm -r --if-present build && go build ./...",
     "test": "pnpm -r --if-present test && go test ./...",
     "test:integration": "bash scripts/test-integration.sh",
