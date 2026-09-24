@@ -35,6 +35,7 @@ jobs:
           pnpm run build
           pnpm run typecheck
           pnpm run test
+          pnpm run docs:generate
           pnpm run site:check
           pnpm run site:test:e2e
 
