@@ -13,16 +13,17 @@ test("issues filters, rows and themes remain usable", async ({ page }) => {
   await rows.first().press("ArrowDown");
   await expect(rows.nth(1)).toBeFocused();
 
-  await page
-    .getByRole("radiogroup", { name: "处理状态" })
-    .getByRole("radio", { name: "待处理", exact: true })
-    .click();
+  await page.getByRole("combobox", { name: "问题状态" }).click();
+  await page.getByRole("option", { name: "待处理" }).click();
   await expect(page).toHaveURL(/status=unresolved/);
-  await page.getByRole("searchbox", { name: "搜索本页问题" }).fill("checkout");
+  const search = page.getByRole("textbox", { name: "搜索错误或添加筛选条件" });
+  await search.fill("checkout");
+  await search.press("Enter");
   await expect(rows).toHaveCount(1);
-  await page.getByRole("searchbox").fill("no-match");
-  await expect(page.getByText("本页没有匹配的搜索结果")).toBeVisible();
-  await page.getByRole("button", { name: "清除搜索" }).click();
+  await search.fill("no-match");
+  await search.press("Enter");
+  await expect(page.getByText("当前范围没有匹配的问题")).toBeVisible();
+  await page.getByRole("button", { name: "清除筛选" }).click();
   await expect(rows).toHaveCount(3);
 
   if (process.env.OPENRUM_ISSUES_LIGHT)
@@ -39,12 +40,12 @@ test("issues filters, rows and themes remain usable", async ({ page }) => {
   const darkForeground = await page
     .locator("body")
     .evaluate((element) => getComputedStyle(element).color);
-  await expect(page.getByLabel("处理状态")).toHaveCSS("color", darkForeground);
+  await expect(page.getByRole("combobox", { name: "问题状态" })).toHaveCSS("color", darkForeground);
   if (process.env.OPENRUM_ISSUES_DARK)
     await page.screenshot({ path: process.env.OPENRUM_ISSUES_DARK, fullPage: true });
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(page.getByRole("heading", { name: "错误问题" })).toBeVisible();
-  await expect(page.getByLabel("处理状态")).toBeVisible();
+  await expect(page.getByRole("combobox", { name: "问题状态" })).toBeVisible();
   if (process.env.OPENRUM_ISSUES_MOBILE)
     await page.screenshot({ path: process.env.OPENRUM_ISSUES_MOBILE, fullPage: true });
 });

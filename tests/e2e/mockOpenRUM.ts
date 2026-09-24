@@ -347,7 +347,20 @@ export async function mockOpenRUM(
       }
       return json(route, { channels });
     }
-    if (path === `/api/v1/projects/${projectId}/issues`) return json(route, issues());
+    if (path === `/api/v1/projects/${projectId}/issues`) {
+      const response = issues();
+      const status = url.searchParams.get("status");
+      const title = url.searchParams.get("title")?.toLocaleLowerCase();
+      return json(route, {
+        ...response,
+        issues: response.issues.filter(
+          (issue) =>
+            (!status || issue.status === status) &&
+            (!title || issue.title.toLocaleLowerCase().includes(title)),
+        ),
+        nextCursor: status || title ? undefined : response.nextCursor,
+      });
+    }
     if (path === `/api/v1/organizations/${organizationId}/members`)
       return json(route, {
         members: [

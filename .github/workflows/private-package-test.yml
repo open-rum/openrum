@@ -13,9 +13,30 @@ concurrency:
 jobs:
   verify:
     if: github.repository == 'eijil/openrum'
-    uses: ./.github/workflows/ci.yml
-    permissions:
-      contents: read
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/setup@v2
+        with:
+          runtime: node@24
+          cache: true
+          require-lockfile: true
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+      - name: Install browser for documentation checks
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Run private package smoke checks
+        run: |
+          pnpm run format:check
+          pnpm run lint
+          pnpm run typecheck
+          pnpm run test
+          pnpm run build
+          pnpm run site:check
+          pnpm run site:test:e2e
 
   publish:
     needs: verify
@@ -34,6 +55,8 @@ jobs:
           runtime: node@24
           cache: true
           require-lockfile: true
+      - name: Install browser for generated documentation diagrams
+        run: pnpm exec playwright install --with-deps chromium
       - uses: azure/setup-helm@v4.3.1
         with:
           version: v3.21.4
@@ -93,6 +116,8 @@ jobs:
           helm push "private-test-chart/openrum-$TEST_VERSION.tgz" "oci://ghcr.io/$PACKAGE_NAMESPACE/charts"
           helm show values "oci://ghcr.io/$PACKAGE_NAMESPACE/charts/openrum" --version "$TEST_VERSION" | \
             grep -F "repository: ghcr.io/$PACKAGE_NAMESPACE/openrum"
+          helm show values "oci://ghcr.io/$PACKAGE_NAMESPACE/charts/openrum" --version "$TEST_VERSION" | \
+            grep -F "tag: \"$TEST_VERSION\""
       - name: Publish documentation image
         uses: docker/build-push-action@v7
         with:
@@ -104,3 +129,18 @@ jobs:
           labels: org.opencontainers.image.source=https://github.com/${{ github.repository }}
           provenance: true
           sbom: true
+      - name: Verify the documentation image
+        run: |
+          docker pull "ghcr.io/$PACKAGE_NAMESPACE/openrum-site:$TEST_VERSION"
+          docker run --rm --entrypoint /bin/sh "ghcr.io/$PACKAGE_NAMESPACE/openrum-site:$TEST_VERSION" -ec \
+            'test -f /usr/share/nginx/html/index.html'
+      - name: Summarize private test artifacts
+        run: |
+          {
+            echo '### Private package test'
+            echo
+            echo "- Application: \`ghcr.io/$PACKAGE_NAMESPACE/openrum:$TEST_VERSION\`"
+            echo "- Site: \`ghcr.io/$PACKAGE_NAMESPACE/openrum-site:$TEST_VERSION\`"
+            echo "- Chart: \`oci://ghcr.io/$PACKAGE_NAMESPACE/charts/openrum --version $TEST_VERSION\`"
+            echo '- No public release or deployment was performed.'
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -48,6 +48,8 @@ jobs:
           runtime: node@24
           cache: true
           require-lockfile: true
+      - name: Install browser for generated documentation diagrams
+        run: pnpm exec playwright install --with-deps chromium
       - uses: azure/setup-helm@v4.3.1
         with:
           version: v3.21.4
