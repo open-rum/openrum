@@ -86,7 +86,6 @@ export function LoginPage({ returnTo, expired }: LoginPageProps) {
 
           <Button
             type="submit"
-            variant="contrast"
             size="lg"
             className="mt-1 h-11 w-full"
             disabled={authenticate.isPending}

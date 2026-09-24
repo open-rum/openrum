@@ -1,7 +1,7 @@
 ---
 title: 漏斗、路径与留存
 description: 三种探索查询各自统计的身份是什么，以及决定你能问什么的那些限制。
-appliesTo: Alpha / main
+appliesTo: Alpha
 ---
 
 三种查询，三种不同的身份。搞清楚某个数字统计的是哪一种，是这三者不互相打架的前提。

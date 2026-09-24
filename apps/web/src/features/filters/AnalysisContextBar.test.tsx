@@ -66,9 +66,7 @@ describe("analysis time filter", () => {
   });
 });
 
-function renderFilter(
-  update: (patch: { from?: Date; to?: Date; environment?: string }) => void,
-) {
+function renderFilter(update: (patch: { from?: Date; to?: Date; environment?: string }) => void) {
   return render(
     <AnalysisContextControls
       context={{

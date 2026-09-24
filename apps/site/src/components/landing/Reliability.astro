@@ -1,442 +1,685 @@
 ---
-import { Container, Layers, ShieldCheck } from "lucide-astro";
-import evidence from "../../content/evidence/local-overload-2026-09-03.json";
+// cspell:ignore nums
+import {
+  ArrowRight,
+  Braces,
+  Monitor,
+  Server,
+  Database,
+  Layers,
+  Cpu,
+  Network,
+  Gauge,
+  ExternalLink,
+} from "lucide-astro";
+import evidence from "../../content/evidence/local-capacity-2026-09-18.json";
 
-// The reliability floor: how an Event travels, what it takes to run, and what
-// has actually been measured.
-//
-// Every number here is either a design fact (the ack semantics), a declared
-// default (the Helm resource requests) or a figure from the one benchmark the
-// repository has published — which failed its release gate. That failure is
-// stated on the page rather than hidden, because `capacity.md` records that no
-// throughput figure has been published and this page must not be the first
-// place one appears. The argument for reliability is made from behaviour under
-// failure, which is the part a developer can verify by reading the code.
 const { lang = "en" } = Astro.props;
 const zh = lang === "zh";
 const docs = zh ? "/zh/docs" : "/docs";
 const prefix = zh ? "/zh" : "";
-
-// Mirrors deploy/helm/openrum/values.yaml `services.*.resources.requests` and
-// `services.*.replicas`. Summed here so the headline figure follows the table if
-// a row is edited; the table itself has to be kept in step with the chart.
-const workloads = [
-  { name: "api", replicas: 2, cpu: 200, memory: 256 },
-  { name: "ingest", replicas: 3, cpu: 500, memory: 512 },
-  { name: "consumer", replicas: 2, cpu: 500, memory: 512 },
-  { name: "worker", replicas: 1, cpu: 200, memory: 256 },
-  { name: "web", replicas: 2, cpu: 100, memory: 128 },
+// Both public surfaces share measured evidence. Local, short-run results are
+// not production capacity; keep hardware, workload and gate status visible.
+const layers = [
+  {
+    name: zh ? "采集与交互" : "Capture & explore",
+    icon: Monitor,
+    nodes: [
+      ["Browser SDK", zh ? "行为 · 错误 · 性能" : "Behavior · errors · vitals"],
+      ["Console", zh ? "分析 · 调查 · 配置" : "Analyze · investigate · configure"],
+    ],
+  },
+  {
+    name: zh ? "服务接入" : "Service layer",
+    icon: Server,
+    nodes: [
+      ["Ingest", zh ? "鉴权与校验 · 接收上报" : "Authenticate · validate · receive"],
+      ["API", zh ? "查询接口 · 项目管理" : "Query API · project management"],
+    ],
+  },
+  {
+    name: zh ? "消息缓冲" : "Message buffer",
+    icon: Layers,
+    nodes: [
+      ["Kafka", zh ? "分区队列 · 解耦接收与消费" : "Partitioned queue · decoupled ingestion"],
+    ],
+  },
+  {
+    name: zh ? "异步处理" : "Async processing",
+    icon: Cpu,
+    nodes: [
+      ["Consumer", zh ? "消费事件 · 写入分析存储" : "Consume events · write analytics"],
+      ["Worker", zh ? "后台任务 · 告警与堆栈处理" : "Background jobs · alerts · stack processing"],
+    ],
+  },
+  {
+    name: zh ? "数据存储" : "Data stores",
+    icon: Database,
+    nodes: [
+      ["ClickHouse", zh ? "事件与聚合分析" : "Events & analytics"],
+      ["PostgreSQL", zh ? "项目与配置" : "Projects & configuration"],
+      ["Redis", zh ? "限流与缓存" : "Limits & cache"],
+      [zh ? "对象存储（可选）" : "Object storage (optional)", "Source Maps"],
+    ],
+  },
 ];
-const totalCPU = workloads.reduce((sum, w) => sum + w.replicas * w.cpu, 0) / 1000;
-const totalMemory = workloads.reduce((sum, w) => sum + w.replicas * w.memory, 0) / 1024;
-const integer = new Intl.NumberFormat(zh ? "zh-CN" : "en-US");
-
-const copy = zh
-  ? {
-      eyebrow: "架构与可靠性",
-      title: "为出问题的那一天而设计。",
-      lead: "Ingest 只在 Kafka 落盘后才返回 202，之后的每一步都是异步的。流量尖峰或 ClickHouse 重启只会让数据晚一点出现，不会让它消失。",
-      diagramLabel: "事件从浏览器到控制台的路径",
-      ack: "202 · acks=all",
-      legendEvents: "事件流",
-      legendQuota: "配额检查",
-      legendAck: "在这里确认",
-      nodes: [
-        ["Browser SDK", "采集 · 脱敏"],
-        ["Ingest", "校验 · 鉴权"],
-        ["Kafka", "持久缓冲"],
-        ["Consumer", "写入事件"],
-        ["ClickHouse", "事件 · 聚合"],
-        ["API · Console", "查询 · 调查"],
-      ],
-      side: [
-        ["Redis", "配额"],
-        ["Object storage", "Source Map"],
-        ["Worker", "映射堆栈帧"],
-        ["PostgreSQL", "控制面"],
-      ],
-      principles: [
-        [
-          "先落盘，再确认",
-          "Kafka 全部副本确认之后，浏览器才收到应答。202 的含义是「已持久接收」，不是「已可查询」。",
-        ],
-        [
-          "只有一个会丢数据的依赖",
-          "ClickHouse、PostgreSQL、Redis、对象存储任何一个不可用都不丢事件，只有 Kafka 会。所以容量规划从 Kafka 的保留余量开始，而不是从 ClickHouse 的磁盘。",
-        ],
-        [
-          "按事件 ID 幂等",
-          "重试的 Envelope 只会存一份。超时后服务端仍完成的请求被单独记为「结果不明」，不混进成功数里。",
-        ],
-      ],
-      runTitle: "两种运行方式",
-      evaluate: "评估",
-      evaluateBody:
-        "Docker 是唯一前置条件。一条命令拉起全部服务，首次启动自动迁移并载入确定性 Demo 数据。",
-      evaluateStat: ["1", "条命令"],
-      evaluateHost: ["1", "台主机"],
-      evaluateDemo: [integer.format(30000), "Demo 会话"],
-      production: "生产",
-      productionBody:
-        "Helm 部署五个工作负载，带滚动更新、健康探针、自动扩缩容和迁移钩子。PostgreSQL、ClickHouse、Kafka、Redis 由你单独提供。",
-      productionNote: "五个 OpenRUM 工作负载的默认资源请求，不含依赖。",
-      autoscale: "api 2–8 · ingest 3–20 · web 2–6 副本，按 CPU 自动扩缩",
-      evidenceTitle: "证据，不是容量承诺",
-      evidenceLead:
-        "这是仓库里唯一一次公开的压测——单机 Compose、刻意打到 3 倍假设负载。它没有通过发布门禁。通过的部分才写在这里。",
-      stats: [
-        [
-          `${integer.format(evidence.storedEvents)} = ${integer.format(evidence.uniqueEventIds)}`,
-          "过载下，存储行数等于唯一事件数。零重复。",
-        ],
-        [`${evidence.kafkaPartitions} / ${evidence.kafkaPartitions}`, "个分区的消费 lag 回到零。"],
-        [`≤ ${evidence.lagRecoveryUpperBoundMinutes} 分钟`, "从停止施压到 lag 归零。"],
-      ],
-      footnote: `${evidence.date} 演练，运行 ID ${evidence.id}。方法、拓扑与原始输出已公开。`,
-      link: "阅读完整基准记录",
-    }
-  : {
-      eyebrow: "Architecture & reliability",
-      title: "Built for the day something breaks.",
-      lead: "Ingest returns 202 only after Kafka has the Envelope, and every step after that is asynchronous. A traffic spike or a ClickHouse restart delays visibility instead of dropping Events.",
-      diagramLabel: "The path an Event takes from the browser to the Console",
-      ack: "202 · acks=all",
-      legendEvents: "Event flow",
-      legendQuota: "Quota check",
-      legendAck: "Acknowledged here",
-      nodes: [
-        ["Browser SDK", "capture · scrub"],
-        ["Ingest", "validate · auth"],
-        ["Kafka", "durable buffer"],
-        ["Consumer", "write Events"],
-        ["ClickHouse", "Events · aggregates"],
-        ["API · Console", "query · investigate"],
-      ],
-      side: [
-        ["Redis", "quotas"],
-        ["Object storage", "Source Maps"],
-        ["Worker", "mapped frames"],
-        ["PostgreSQL", "control plane"],
-      ],
-      principles: [
-        [
-          "Durable before acknowledged",
-          "Every Kafka replica confirms before the browser hears back. A 202 means durably received, not yet queryable — and that distinction is what lets the Instance absorb a spike.",
-        ],
-        [
-          "One lossy dependency, by design",
-          "ClickHouse, PostgreSQL, Redis and object storage can each be unavailable without dropping an Event. Only Kafka can. Capacity planning therefore starts with Kafka retention headroom, not ClickHouse disk.",
-        ],
-        [
-          "Idempotent by Event ID",
-          "A retried Envelope is stored once. Requests that completed server-side after the client timed out are reported as ambiguous, never counted as successes.",
-        ],
-      ],
-      runTitle: "Run it two ways",
-      evaluate: "Evaluate",
-      evaluateBody:
-        "Docker is the only prerequisite. One command brings up every service, migrates both databases and loads a deterministic Demo on first start.",
-      evaluateStat: ["1", "command"],
-      evaluateHost: ["1", "host"],
-      evaluateDemo: [integer.format(30000), "Demo sessions"],
-      production: "Production",
-      productionBody:
-        "Helm deploys five workloads with rolling updates, health probes, autoscaling and a migration hook. PostgreSQL, ClickHouse, Kafka and Redis are yours to provision.",
-      productionNote:
-        "Default resource requests for the five OpenRUM workloads. Dependencies not included.",
-      autoscale: "api 2–8 · ingest 3–20 · web 2–6 replicas, autoscaled on CPU",
-      evidenceTitle: "Evidence, not a capacity claim",
-      evidenceLead:
-        "The one benchmark this repository has published: a single-machine Compose topology, pushed to a deliberate 3× of the assumed load. It failed its release gate. What held is what appears here.",
-      stats: [
-        [
-          `${integer.format(evidence.storedEvents)} = ${integer.format(evidence.uniqueEventIds)}`,
-          "Events stored equals unique Event IDs, under overload. Zero duplicates.",
-        ],
-        [
-          `${evidence.kafkaPartitions} / ${evidence.kafkaPartitions}`,
-          "partitions back to zero consumer lag.",
-        ],
-        [`≤ ${evidence.lagRecoveryUpperBoundMinutes} min`, "from load stopping to lag draining."],
-      ],
-      footnote: `From the ${evidence.date} rehearsal, run ${evidence.id}. Method, topology and raw output are published.`,
-      link: "Read the full benchmark record",
-    };
-
-// Diagram geometry, in viewBox units. Six spine nodes and four side nodes laid out
-// once here so the edges, the packet path and the labels cannot disagree about
-// where a node is. Widths are chosen so the two labelled spine edges have room
-// for their labels at the size the container renders the SVG.
-const W = 140;
-const H = 54;
-const spineY = 92;
-const spineX = [57, 254, 451, 648, 845, 1042];
-const sideY = 262;
-const sideH = 48;
-// Redis under Ingest, Object storage left of Worker, Worker under ClickHouse,
-// PostgreSQL under API · Console.
-const sideX = [254, 648, 845, 1042];
-const mid = (x: number) => x + W / 2;
-const spineTop = spineY - H / 2;
-const spineBottom = spineY + H / 2;
-const sideTop = sideY - sideH / 2;
-const packetPath = `M${spineX[0] + W} ${spineY} H${spineX[5]}`;
+const benefits = [
+  {
+    icon: Braces,
+    title: zh ? "Go 服务，独立扩容" : "Go services. Independent scaling.",
+    body: zh
+      ? "接收、消费、查询各司其职，按实际负载调整服务副本。"
+      : "Scale ingestion, consumption and queries independently to match your workload.",
+  },
+  {
+    icon: Network,
+    title: zh ? "异步管道，缓冲峰值" : "An async pipeline for traffic spikes.",
+    body: zh
+      ? "Kafka 缓冲已接收的事件，让写入与分析查询解耦。"
+      : "Kafka buffers accepted events, decoupling ingestion from analytics queries.",
+  },
+  {
+    icon: Gauge,
+    title: zh ? "列式存储，面向分析" : "Columnar storage for analytics.",
+    body: zh
+      ? "ClickHouse 承载事件与聚合查询，PostgreSQL 管理项目和配置。"
+      : "ClickHouse serves event analytics while PostgreSQL manages projects and configuration.",
+  },
+];
+const metrics = [
+  {
+    value: "≈ " + evidence.acknowledgedEventsPerSecond.toLocaleString(zh ? "zh-CN" : "en-US"),
+    unit: "events/s",
+    title: zh ? "实测确认接收吞吐" : "Measured acknowledged throughput",
+    detail: zh
+      ? `${evidence.durationSeconds / 60} 分钟混合事件持续测试`
+      : `${evidence.durationSeconds / 60}-minute mixed-event run`,
+  },
+  {
+    value: String(evidence.ingestP95Milliseconds),
+    unit: "ms",
+    title: zh ? "接收延迟 P95" : "Ingest latency P95",
+    detail: zh ? "等待 Kafka 确认后响应" : "Response after Kafka acknowledgment",
+  },
+  {
+    value: String(evidence.queryP95Milliseconds),
+    unit: "ms",
+    title: zh ? "查询延迟 P95" : "Query latency P95",
+    detail: zh
+      ? `同时施加 ${evidence.targetQueriesPerSecond} 次/秒查询`
+      : `${evidence.targetQueriesPerSecond} query req/s alongside ingest`,
+  },
+  {
+    value: String(evidence.ingestFailurePercent),
+    unit: "%",
+    title: zh ? "上报失败 / 超时比例" : "Ingest failure / timeout rate",
+    detail: zh
+      ? `查询失败率 ${evidence.queryFailurePercent}% · 已核对入库`
+      : `Query failures: ${evidence.queryFailurePercent}% · storage reconciled`,
+  },
+];
 ---
 
-<section class="lp-section lp-rule lp-reliability" aria-labelledby="lp-reliability-title">
+<section
+  class="architecture-section lp-rule"
+  id="architecture"
+  aria-labelledby="architecture-title"
+>
   <div class="site-container">
-    <div class="lp-head lp-reveal">
-      <p class="lp-eyebrow">{copy.eyebrow}</p>
-      <h2 id="lp-reliability-title">{copy.title}</h2>
-      <p>{copy.lead}</p>
-    </div>
-
-    <figure class="lp-pipeline lp-reveal">
-      <svg
-        class="lp-pipeline-svg"
-        viewBox="0 0 1240 330"
-        aria-hidden="true"
-        focusable="false"
-        style={`--lp-packet-path: path("${packetPath}")`}
-      >
-        <defs>
-          <marker
-            id="lp-arrow"
-            viewBox="0 0 10 10"
-            refX="9"
-            refY="5"
-            markerWidth="7"
-            markerHeight="7"
-            orient="auto-start-reverse"
-          >
-            <path class="lp-edge-head" d="M1 1 L9 5 L1 9 Z"></path>
-          </marker>
-        </defs>
-
-        <!-- Spine edges -->
-        {
-          spineX
-            .slice(0, -1)
-            .map((x, index) => (
-              <line
-                class="lp-edge"
-                x1={x + W}
-                y1={spineY}
-                x2={spineX[index + 1] - 1}
-                y2={spineY}
-                marker-end="url(#lp-arrow)"
-              />
-            ))
-        }
-        <!-- The one edge where acceptance becomes durable -->
-        <line
-          class="lp-edge lp-edge-ack"
-          x1={spineX[1] + W}
-          y1={spineY}
-          x2={spineX[2] - 1}
-          y2={spineY}></line>
-
-        <!-- Side edges -->
-        <line
-          class="lp-edge lp-edge-quota"
-          x1={mid(sideX[0])}
-          y1={spineBottom}
-          x2={mid(sideX[0])}
-          y2={sideTop - 1}
-          marker-end="url(#lp-arrow)"></line>
-        <line
-          class="lp-edge"
-          x1={sideX[1] + W}
-          y1={sideY}
-          x2={sideX[2] - 1}
-          y2={sideY}
-          marker-end="url(#lp-arrow)"></line>
-        <line
-          class="lp-edge"
-          x1={mid(sideX[2])}
-          y1={sideTop}
-          x2={mid(sideX[2])}
-          y2={spineBottom + 1}
-          marker-end="url(#lp-arrow)"></line>
-        <line
-          class="lp-edge"
-          x1={mid(sideX[3])}
-          y1={sideTop}
-          x2={mid(sideX[3])}
-          y2={spineBottom + 1}
-          marker-end="url(#lp-arrow)"></line>
-
-        <!-- Edge labels -->
-        <text class="lp-edge-label" x={mid(sideX[0]) + 10} y={(spineBottom + sideTop) / 2}
-          >{copy.side[0][1]}</text
-        >
-        <text class="lp-edge-label" x={mid(sideX[2]) + 10} y={(spineBottom + sideTop) / 2}
-          >{copy.side[2][1]}</text
-        >
-        <text class="lp-edge-label" x={mid(sideX[3]) + 10} y={(spineBottom + sideTop) / 2}
-          >{copy.side[3][1]}</text
-        >
-
-        <!-- Kafka gets a pulse ring: it is where an Envelope becomes durable -->
-        <rect
-          class="lp-node-pulse"
-          x={spineX[2] - 6}
-          y={spineTop - 6}
-          width={W + 12}
-          height={H + 12}
-          rx="16"></rect>
-
-        <!-- Spine nodes -->
-        {
-          spineX.map((x, index) => (
-            <g class={`lp-node ${index === 2 ? "lp-node-kafka" : ""}`}>
-              <rect x={x} y={spineTop} width={W} height={H} rx="12" />
-              <text class="lp-node-title" x={mid(x)} y={spineY - 4}>
-                {copy.nodes[index][0]}
-              </text>
-              <text class="lp-node-sub" x={mid(x)} y={spineY + 15}>
-                {copy.nodes[index][1]}
-              </text>
-            </g>
-          ))
-        }
-
-        <!-- Side nodes -->
-        {
-          sideX.map((x, index) => (
-            <g class="lp-node lp-node-side">
-              <rect x={x} y={sideTop} width={W} height={sideH} rx="11" />
-              <text class="lp-node-title" x={mid(x)} y={sideY + 5}>
-                {copy.side[index][0]}
-              </text>
-            </g>
-          ))
-        }
-
-        <!-- Acknowledgement badge above the Ingest → Kafka edge -->
-        <g class="lp-ack">
-          <rect
-            x={(spineX[1] + W + spineX[2]) / 2 - 52}
-            y={spineY - 46}
-            width="104"
-            height="22"
-            rx="11"></rect>
-          <text x={(spineX[1] + W + spineX[2]) / 2} y={spineY - 31}>{copy.ack}</text>
-        </g>
-
-        <!-- Packets travelling the spine. Three on one loop, offset a third apart. -->
-        {
-          [0, 1, 2].map((n) => (
-            <circle class="lp-packet" r="4.5" style={`--lp-packet-delay:${n * 2}s`} />
-          ))
-        }
-      </svg>
-
-      <ol class="lp-pipeline-list">
-        {
-          copy.nodes.map(([title, sub]) => (
-            <li>
-              <strong>{title}</strong>
-              <span>{sub}</span>
-            </li>
-          ))
-        }
-      </ol>
-
-      <figcaption class="lp-pipeline-legend">
-        <span><i class="lp-legend-line"></i>{copy.legendEvents}</span>
-        <span><i class="lp-legend-line lp-legend-dashed"></i>{copy.legendQuota}</span>
-        <span><i class="lp-legend-ack"></i>{copy.legendAck}</span>
-      </figcaption>
-    </figure>
-
-    <ol class="lp-principles">
-      {
-        copy.principles.map(([title, body], index) => (
-          <li class="lp-principle lp-reveal" style={`--lp-order:${index}`}>
-            <span class="lp-principle-index">{String(index + 1).padStart(2, "0")}</span>
-            <h3>{title}</h3>
-            <p>{body}</p>
-          </li>
-        ))
-      }
-    </ol>
-
-    <div class="lp-reliability-grid">
-      <div class="lp-run lp-reveal">
-        <h3 class="lp-block-title">{copy.runTitle}</h3>
-        <div class="lp-tiers">
-          <article class="lp-tier">
-            <header>
-              <span class="lp-tier-icon"><Container size={18} /></span>
-              <span class="lp-tier-name">{copy.evaluate}</span>
-              <span class="lp-tier-stack">Docker Compose</span>
-            </header>
-            <p>{copy.evaluateBody}</p>
-            <dl class="lp-tier-figures">
-              <div>
-                <dd>{copy.evaluateStat[0]}</dd>
-                <dt>{copy.evaluateStat[1]}</dt>
-              </div>
-              <div>
-                <dd>{copy.evaluateHost[0]}</dd>
-                <dt>{copy.evaluateHost[1]}</dt>
-              </div>
-              <div>
-                <dd>{copy.evaluateDemo[0]}</dd>
-                <dt>{copy.evaluateDemo[1]}</dt>
-              </div>
-            </dl>
-            <a class="lp-tile-link" href={`${docs}/self-hosting/compose/`}>Docker Compose →</a>
-          </article>
-          <article class="lp-tier lp-tier-production">
-            <header>
-              <span class="lp-tier-icon"><Layers size={18} /></span>
-              <span class="lp-tier-name">{copy.production}</span>
-              <span class="lp-tier-stack">Kubernetes · Helm</span>
-            </header>
-            <p>{copy.productionBody}</p>
-            <dl class="lp-tier-figures">
-              <div>
-                <dd>{totalCPU.toFixed(1)}</dd>
-                <dt>vCPU</dt>
-              </div>
-              <div>
-                <dd>{totalMemory.toFixed(1)}</dd>
-                <dt>GiB</dt>
-              </div>
-              <div>
-                <dd>{workloads.length}</dd>
-                <dt>{zh ? "工作负载" : "workloads"}</dt>
-              </div>
-            </dl>
-            <p class="lp-tier-note">{copy.productionNote}</p>
-            <p class="lp-tier-note">{copy.autoscale}</p>
-            <a class="lp-tile-link" href={`${docs}/self-hosting/kubernetes/`}>Kubernetes · Helm →</a
-            >
-          </article>
-        </div>
+    <header class="architecture-heading">
+      <div>
+        <p class="lp-eyebrow">{zh ? "高性能架构" : "Architecture for scale"}</p>
+        <h2 id="architecture-title">
+          {zh ? "分层解耦，" : "Decoupled by design."}<br />{
+            zh ? "为高吞吐而构建。" : "Built for growing workloads."
+          }
+        </h2>
       </div>
-
-      <div class="lp-evidence lp-reveal">
-        <h3 class="lp-block-title"><ShieldCheck size={17} />{copy.evidenceTitle}</h3>
-        <p class="lp-evidence-lead">{copy.evidenceLead}</p>
-        <dl class="lp-evidence-stats">
+      <div class="architecture-intro">
+        <p>
           {
-            copy.stats.map(([figure, label], index) => (
-              <div class="lp-evidence-stat" style={`--lp-order:${index}`}>
-                <dd>{figure}</dd>
-                <dt>{label}</dt>
-              </div>
+            zh
+              ? "从浏览器采集，到异步处理与分析查询。让每一层专注自己的工作，随业务规模独立扩展。"
+              : "From browser capture to asynchronous processing and analytics. Each layer has a clear role and room to scale."
+          }
+        </p>
+        <a href={`${docs}/self-hosting/architecture/`}
+          >{zh ? "了解完整架构" : "Explore the architecture"}<ArrowRight size={16} /></a
+        >
+      </div>
+    </header>
+
+    <div class="architecture-layout">
+      <figure class="architecture-diagram">
+        <figcaption>
+          <span><Layers size={17} />{zh ? "分层服务架构" : "Layered service architecture"}</span
+          ><span class="architecture-diagram-tag">OpenRUM</span>
+        </figcaption>
+        <ol class="architecture-layers">
+          {
+            layers.map(({ name, icon: Icon, nodes }, index) => (
+              <li class={`architecture-layer ${index === 2 ? "architecture-layer-buffer" : ""}`}>
+                <div class="architecture-layer-label">
+                  <>
+                    <span>{String(index + 1).padStart(2, "0")}</span>
+                    <Icon size={16} />
+                    <strong>{name}</strong>
+                  </>
+                </div>
+                <div class="architecture-nodes">
+                  {nodes.map(([title, detail]) => (
+                    <div class="architecture-node">
+                      <strong>{title}</strong>
+                      <span>{detail}</span>
+                    </div>
+                  ))}
+                </div>
+              </li>
             ))
           }
-        </dl>
-        <p class="lp-evidence-footnote">
-          <span class="lp-evidence-status">{zh ? "门禁未通过" : "gate failed"}</span>
-          {copy.footnote}
+        </ol>
+        <div class="architecture-flows">
+          <p>
+            <span>{zh ? "写入路径" : "Write path"}</span>SDK → Ingest → Kafka → Consumer →
+            ClickHouse
+          </p>
+          <p><span>{zh ? "查询路径" : "Read path"}</span>Console → API → ClickHouse / PostgreSQL</p>
+        </div>
+      </figure>
+      <aside
+        class="architecture-benefits"
+        aria-label={zh ? "架构设计要点" : "Architecture highlights"}
+      >
+        {
+          benefits.map(({ icon: Icon, title, body }) => (
+            <article>
+              <>
+                <span class="architecture-benefit-icon">
+                  <Icon size={21} />
+                </span>
+                <h3>{title}</h3>
+                <p>{body}</p>
+              </>
+            </article>
+          ))
+        }
+        <a class="architecture-deploy-link" href={`${docs}/self-hosting/kubernetes/`}
+          >Kubernetes / Helm<ArrowRight size={16} /></a
+        >
+      </aside>
+    </div>
+
+    <div class="architecture-benchmark">
+      <header class="architecture-benchmark-header">
+        <div>
+          <p class="lp-eyebrow">{zh ? "性能验证" : "Performance evidence"}</p><h3>
+            {zh ? "公开实测，清楚标注边界。" : "Measured results. Clear boundaries."}
+          </h3>
+        </div>
+        <span class="architecture-status" data-passed={String(evidence.passed)}
+          >{
+            evidence.passed
+              ? zh
+                ? "本地单机 · 短时测试通过"
+                : "Local single machine · short run passed"
+              : zh
+                ? "本地单机 · 部分门槛未通过"
+                : "Local single machine · some gates failed"
+          }</span
+        >
+      </header>
+      <p class="architecture-benchmark-context">
+        {
+          zh
+            ? "单机 Docker Compose · 服务单副本 · 1 个 Kafka Broker · 1 个 ClickHouse 节点"
+            : "Single-machine Docker Compose · single-replica services · 1 Kafka broker · 1 ClickHouse node"
+        }
+      </p>
+      <p class="architecture-hardware">
+        <Cpu size={17} /><strong
+          >{evidence.hardware.cpu} · {evidence.hardware.cpuCores}
+          {zh ? "核" : "cores"} · {evidence.hardware.memoryGiB} GiB RAM</strong
+        >
+        <span
+          >Docker VM · {evidence.hardware.dockerCPUs} vCPU / {evidence.hardware.dockerMemoryGiB} GiB</span
+        >
+      </p>
+      <dl class="architecture-metrics">
+        {
+          metrics.map(({ value, unit, title, detail }) => (
+            <div>
+              <>
+                <dt>{title}</dt>
+                <dd>
+                  {value}
+                  <small>{unit}</small>
+                  <p>{detail}</p>
+                </dd>
+              </>
+            </div>
+          ))
+        }
+      </dl>
+      <div class="architecture-benchmark-footer">
+        <p>
+          <strong
+            >{zh ? "生产并发能力：待验证。" : "Production concurrency: not yet validated."}</strong
+          >{" "}{
+            zh
+              ? `本轮持续 ${evidence.durationSeconds / 60} 分钟，目标 ${evidence.targetEventsPerSecond.toLocaleString()} events/s + ${evidence.targetQueriesPerSecond} 次/秒查询。已核对 ${evidence.acceptedEvents.toLocaleString()} 条事件全部入库且无重复。本轮及保守档位仍有查询失败，完整记录已保留。吞吐量不等于并发用户数。`
+              : `This ${evidence.durationSeconds / 60}-minute run targeted ${evidence.targetEventsPerSecond.toLocaleString()} events/s + ${evidence.targetQueriesPerSecond} query req/s. All ${evidence.acceptedEvents.toLocaleString()} acknowledged events were stored without duplicates. Queries still failed at this and a lower load; the full record is retained. Throughput is not concurrent users.`
+          }
         </p>
-        <a class="lp-tile-link" href={`${prefix}/benchmarks`}>{copy.link} →</a>
+        <a href={`${prefix}/benchmarks`}
+          >{zh ? "查看完整压测记录" : "View benchmark results"}<ExternalLink size={15} /></a
+        >
       </div>
+      <p class="architecture-benchmark-note">
+        {evidence.date} · {evidence.id} · {
+          zh
+            ? "生产环境容量需在目标部署规格下完成压测后发布。"
+            : "Production capacity requires a passing benchmark on the intended deployment topology."
+        }
+      </p>
     </div>
   </div>
 </section>
+
+<style>
+  .architecture-section {
+    padding-block: 88px;
+    scroll-margin-top: var(--site-nav-height);
+  }
+  .architecture-heading {
+    display: flex;
+    justify-content: space-between;
+    align-items: end;
+    gap: 48px;
+    margin-bottom: 36px;
+  }
+  .architecture-heading h2 {
+    margin: 16px 0 0;
+    font-size: clamp(30px, 3vw, 40px);
+    font-weight: 550;
+    letter-spacing: -0.04em;
+    line-height: 1.2;
+  }
+  .architecture-intro {
+    max-width: 430px;
+  }
+  .architecture-intro p {
+    margin: 0 0 18px;
+    color: var(--ds-text-muted);
+    font-size: 16px;
+    line-height: 1.75;
+  }
+  a {
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    color: var(--ds-text);
+    font-size: 14px;
+    text-decoration: none;
+    min-height: 44px;
+  }
+  a:hover {
+    text-decoration: underline;
+    text-underline-offset: 4px;
+  }
+  a:focus-visible {
+    outline: 2px solid var(--ds-ring);
+    outline-offset: 4px;
+    border-radius: var(--radius-sm);
+  }
+  .architecture-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 2.1fr) minmax(0, 1fr);
+    gap: 28px;
+  }
+  .architecture-diagram {
+    min-width: 0;
+    margin: 0;
+    padding: 24px;
+    border: 1px solid var(--ds-border);
+    border-radius: var(--radius-lg);
+    background: var(--ds-surface);
+  }
+  figcaption {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 24px;
+    font-size: 14px;
+    font-weight: 550;
+  }
+  figcaption > span:first-child {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .architecture-diagram-tag {
+    font-size: 12px;
+    color: var(--ds-text-muted);
+    font-weight: 400;
+  }
+  .architecture-layers {
+    display: grid;
+    gap: 10px;
+    padding: 0;
+    margin: 0;
+    list-style: none;
+  }
+  .architecture-layer {
+    display: grid;
+    grid-template-columns: 142px minmax(0, 1fr);
+    gap: 12px;
+    align-items: center;
+    padding: 12px;
+    border: 1px solid var(--ds-border);
+    border-radius: var(--radius-md);
+    background: var(--ds-canvas);
+  }
+  .architecture-layer-label {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 12px;
+  }
+  .architecture-layer-label > span {
+    font: 10px var(--font-mono);
+    color: var(--ds-text-muted);
+    margin-right: 3px;
+  }
+  .architecture-layer-label strong {
+    font-weight: 500;
+  }
+  .architecture-layer-label :global(svg) {
+    flex-shrink: 0;
+  }
+  .architecture-nodes {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .architecture-node {
+    display: grid;
+    gap: 4px;
+    min-width: 0;
+    padding: 10px 12px;
+    background: var(--ds-surface);
+    border: 1px solid var(--ds-border);
+    border-radius: var(--radius-sm);
+  }
+  .architecture-node strong {
+    font-size: 13px;
+    font-weight: 550;
+  }
+  .architecture-node span {
+    font-size: 11px;
+    color: var(--ds-text-muted);
+    line-height: 1.5;
+  }
+  .architecture-layer-buffer {
+    border-color: color-mix(in oklch, var(--ds-primary) 60%, var(--ds-border));
+  }
+  .architecture-layer-buffer .architecture-nodes {
+    grid-template-columns: 1fr;
+  }
+  .architecture-layer-buffer .architecture-node {
+    border-left: 3px solid var(--ds-primary);
+  }
+  .architecture-flows {
+    margin-top: 20px;
+    padding-top: 14px;
+    border-top: 1px solid var(--ds-border);
+  }
+  .architecture-flows p {
+    margin: 6px 0;
+    font-size: 11px;
+    line-height: 1.8;
+    color: var(--ds-text-muted);
+    overflow-wrap: anywhere;
+  }
+  .architecture-flows span {
+    display: inline-block;
+    margin-right: 10px;
+    color: var(--ds-text);
+    font-weight: 550;
+  }
+  .architecture-benefits {
+    display: flex;
+    flex-direction: column;
+    gap: 26px;
+    padding: 12px 0;
+  }
+  .architecture-benefits article {
+    padding-bottom: 24px;
+    border-bottom: 1px solid var(--ds-border);
+  }
+  .architecture-benefit-icon {
+    display: inline-grid;
+    place-items: center;
+    width: 38px;
+    height: 38px;
+    border-radius: var(--radius-md);
+    background: var(--ds-selection);
+    color: var(--ds-selection-foreground);
+  }
+  .architecture-benefits h3 {
+    margin: 13px 0 8px;
+    font-size: 18px;
+    font-weight: 550;
+    line-height: 1.5;
+  }
+  .architecture-benefits p {
+    margin: 0;
+    color: var(--ds-text-muted);
+    font-size: 14px;
+    line-height: 1.75;
+  }
+  .architecture-deploy-link {
+    margin-top: auto;
+  }
+  .architecture-benchmark {
+    margin-top: 32px;
+    padding: 28px;
+    border: 1px solid var(--ds-border);
+    border-radius: var(--radius-lg);
+    background: var(--ds-surface);
+  }
+  .architecture-benchmark-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+  }
+  .architecture-benchmark-header h3 {
+    margin: 12px 0 0;
+    font-size: 24px;
+    font-weight: 550;
+    letter-spacing: -0.025em;
+  }
+  .architecture-status {
+    padding: 6px 10px;
+    border-radius: var(--radius-sm);
+    background: var(--ds-warning-soft);
+    color: var(--ds-text);
+    font-size: 12px;
+    border: 1px solid var(--ds-border);
+  }
+  .architecture-status[data-passed="true"] {
+    background: var(--ds-success-soft);
+  }
+  .architecture-hardware {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 12px;
+    margin: 0 0 20px;
+    color: var(--ds-text);
+    font-size: 13px;
+    line-height: 1.7;
+  }
+  .architecture-hardware strong {
+    font-weight: 550;
+  }
+  .architecture-hardware span {
+    color: var(--ds-text-muted);
+  }
+  .architecture-benchmark-context {
+    margin: 16px 0 24px;
+    color: var(--ds-text-muted);
+    font-size: 12px;
+    line-height: 1.75;
+  }
+  .architecture-metrics {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    margin: 0;
+    padding-block: 24px;
+    border-block: 1px solid var(--ds-border);
+  }
+  .architecture-metrics > div {
+    min-width: 0;
+    padding-inline: 22px;
+    border-right: 1px solid var(--ds-border);
+  }
+  .architecture-metrics > div:first-child {
+    padding-left: 0;
+  }
+  .architecture-metrics > div:last-child {
+    padding-right: 0;
+    border-right: 0;
+  }
+  .architecture-metrics dt {
+    font-size: 13px;
+    color: var(--ds-text-secondary);
+  }
+  .architecture-metrics dd {
+    margin: 14px 0 0;
+    font-size: clamp(25px, 2.6vw, 34px);
+    line-height: 1.2;
+    font-weight: 550;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.03em;
+  }
+  .architecture-metrics small {
+    margin-left: 6px;
+    font-size: 12px;
+    font-weight: 400;
+    color: var(--ds-text-muted);
+    letter-spacing: 0;
+  }
+  .architecture-metrics p {
+    margin: 10px 0 0;
+    font-size: 12px;
+    font-weight: 400;
+    line-height: 1.6;
+    color: var(--ds-text-muted);
+  }
+  .architecture-benchmark-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 28px;
+    margin-top: 20px;
+  }
+  .architecture-benchmark-footer p {
+    max-width: 740px;
+    margin: 0;
+    font-size: 12px;
+    line-height: 1.8;
+    color: var(--ds-text-muted);
+  }
+  .architecture-benchmark-footer strong {
+    color: var(--ds-text);
+    font-weight: 550;
+  }
+  .architecture-benchmark-footer a {
+    flex-shrink: 0;
+  }
+  .architecture-benchmark-note {
+    margin: 16px 0 0;
+    font-size: 11px;
+    line-height: 1.7;
+    color: var(--ds-text-muted);
+  }
+  @media (max-width: 1050px) {
+    .architecture-layout {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .architecture-benefits {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 20px;
+    }
+    .architecture-deploy-link {
+      grid-column: 1 / -1;
+    }
+    .architecture-metrics {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 24px 0;
+    }
+    .architecture-metrics > div:nth-child(2) {
+      border-right: 0;
+    }
+    .architecture-metrics > div:nth-child(3) {
+      padding-left: 0;
+    }
+  }
+  @media (max-width: 650px) {
+    .architecture-section {
+      padding-block: 56px;
+    }
+    .architecture-heading {
+      display: block;
+    }
+    .architecture-intro {
+      margin-top: 24px;
+      max-width: none;
+    }
+    .architecture-diagram {
+      padding: 16px;
+    }
+    .architecture-layer {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .architecture-layer-label {
+      padding-bottom: 3px;
+    }
+    .architecture-node {
+      padding: 9px;
+    }
+    .architecture-benefits {
+      grid-template-columns: 1fr;
+    }
+    .architecture-benchmark {
+      padding: 20px;
+    }
+    .architecture-benchmark-header,
+    .architecture-benchmark-footer {
+      display: block;
+    }
+    .architecture-status {
+      display: inline-block;
+      margin-top: 16px;
+    }
+    .architecture-benchmark-header h3 {
+      font-size: 21px;
+    }
+    .architecture-metrics > div {
+      padding-inline: 12px;
+    }
+    .architecture-metrics dd {
+      font-size: 25px;
+    }
+    .architecture-metrics small {
+      display: block;
+      margin: 5px 0 0;
+    }
+    .architecture-benchmark-footer a {
+      margin-top: 12px;
+    }
+  }
+</style>

@@ -1,0 +1,103 @@
+{
+  "runID": "local-final-2k-20260918",
+  "project": "dc83948f-0b40-4ddd-9d97-461009404554",
+  "hardware": {
+    "cpu": "Apple M4 Pro",
+    "logicalCores": 12,
+    "memoryBytes": 25769803776,
+    "platform": "darwin",
+    "kernel": "27.0.0",
+    "docker": {
+      "cpus": 12,
+      "memoryBytes": 8321429504,
+      "version": "29.4.0"
+    }
+  },
+  "startedAt": "2026-09-18T10:24:41.822Z",
+  "loadEndedAt": "2026-09-18T10:29:43.582Z",
+  "finishedAt": "2026-09-18T10:29:43.901Z",
+  "startingProjectRows": 3864400,
+  "endingProjectRows": 4464500,
+  "eps": 2000,
+  "qps": 10,
+  "duration": "300s",
+  "workload": "mixed",
+  "passed": false,
+  "statuses": [
+    {
+      "kind": "ingest",
+      "code": 0
+    },
+    {
+      "kind": "query",
+      "code": 99
+    }
+  ],
+  "accepted": 600100,
+  "reconciliation": {
+    "stored": 600100,
+    "unique": 600100,
+    "latest": "2026-09-18 10:29:42.543"
+  },
+  "checkpoints": [
+    {
+      "at": "2026-09-18T10:29:43.901Z",
+      "stored": 600100,
+      "unique": 600100,
+      "latest": "2026-09-18 10:29:42.543"
+    }
+  ],
+  "resourceSampleCount": 29,
+  "pipelineSampleCount": 30,
+  "resourceMaxima": {
+    "fervent_hermann": {
+      "cpuPercent": 5.84,
+      "memoryMiB": 36.12
+    },
+    "competent_wilson": {
+      "cpuPercent": 47.73,
+      "memoryMiB": 38.86
+    },
+    "openrum-benchmark-api": {
+      "cpuPercent": 12.82,
+      "memoryMiB": 30.3
+    },
+    "openrum-benchmark-ingest": {
+      "cpuPercent": 58.46,
+      "memoryMiB": 29.78
+    },
+    "openrum-benchmark-consumer": {
+      "cpuPercent": 80.4,
+      "memoryMiB": 48.65
+    },
+    "openrum-worker-1": {
+      "cpuPercent": 1.22,
+      "memoryMiB": 21.31
+    },
+    "openrum-ingest-1": {
+      "cpuPercent": 3.88,
+      "memoryMiB": 25.67
+    },
+    "openrum-kafka-1": {
+      "cpuPercent": 243.41,
+      "memoryMiB": 767
+    },
+    "openrum-postgres-1": {
+      "cpuPercent": 9.15,
+      "memoryMiB": 40.75
+    },
+    "openrum-redis-1": {
+      "cpuPercent": 4.97,
+      "memoryMiB": 11.36
+    },
+    "openrum-clickhouse-1": {
+      "cpuPercent": 684.24,
+      "memoryMiB": 4256.768
+    },
+    "openrum-verify-control-plane": {
+      "cpuPercent": 52.95,
+      "memoryMiB": 975.9
+    }
+  },
+  "sampledMaxLagSeconds": 1.140187005
+}

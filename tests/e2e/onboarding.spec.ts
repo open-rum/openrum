@@ -39,3 +39,19 @@ test("project creation reaches the queryable overview magic moment in under five
   expect(Date.now() - startedAt).toBeLessThan(5 * 60_000);
   expect(ingestRequests).toEqual([]);
 });
+
+test("onboarding offers a bundler-free Instance CDN snippet", async ({ page }) => {
+  await mockOpenRUM(page, { projectExists: true });
+  await page.goto(`/projects/${projectId}/onboarding`);
+
+  await expect(page.getByRole("heading", { name: "连接第一个真实页面" })).toBeVisible();
+  await page.getByRole("tab", { name: "CDN 脚本" }).click();
+  const cdnPanel = page.getByRole("tabpanel", { name: "CDN 脚本" });
+  await expect(cdnPanel).toContainText("OpenRUM.init");
+  await expect(cdnPanel).toContainText("/sdk/browser/0.1.0/openrum.min.js");
+  await expect(cdnPanel).toContainText("script.onload");
+  await page.getByRole("tab", { name: "同步加载" }).click();
+  await expect(cdnPanel).not.toContainText("script.onload");
+  await cdnPanel.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: "/tmp/openrum-onboarding-cdn.png", fullPage: false });
+});

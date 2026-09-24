@@ -1,7 +1,7 @@
 ---
 title: 埋点场景
 description: 注册转化、下单、功能采用率、站内搜索、内容互动分别该上报什么，以及各自能查出什么。
-appliesTo: Alpha / main
+appliesTo: Alpha
 ---
 
 每个场景都是「回答一个问题所需的最小事件集」，加上它能支撑的查询。

@@ -18,8 +18,8 @@ import (
 const (
 	SessionCookieName  = "openrum_session"
 	CSRFCookieName     = "openrum_csrf"
-	SessionIdleTTL     = 30 * time.Minute
-	SessionAbsoluteTTL = 12 * time.Hour
+	SessionIdleTTL     = 30 * 24 * time.Hour
+	SessionAbsoluteTTL = 30 * 24 * time.Hour
 )
 
 var ErrUnauthenticated = errors.New("session is not authenticated")

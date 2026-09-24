@@ -104,6 +104,7 @@ func ensureDemoControlPlane(ctx context.Context, database *sql.DB) (uuid.UUID, s
 		OrganizationID:  organizationID,
 		Name:            "商城 H5（演示）",
 		Slug:            "demo-storefront",
+		SDKPlatform:     metadata.SDKPlatformVue,
 		AllowedOrigins:  []string{"http://localhost:4173", "http://127.0.0.1:4173"},
 		Environment:     "production",
 		Environments:    []string{"production", "canary", "test", "development"},

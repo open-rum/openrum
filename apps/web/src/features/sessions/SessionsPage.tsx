@@ -499,14 +499,14 @@ function readSessionListSearch() {
 function hasSessionFilters(filters: SessionFilters) {
   return Boolean(
     filters.release ||
-      filters.browser ||
-      filters.deviceType ||
-      filters.country ||
-      filters.route ||
-      filters.search ||
-      filters.signal !== "all" ||
-      filters.minimumEvents ||
-      filters.minimumDuration,
+    filters.browser ||
+    filters.deviceType ||
+    filters.country ||
+    filters.route ||
+    filters.search ||
+    filters.signal !== "all" ||
+    filters.minimumEvents ||
+    filters.minimumDuration,
   );
 }
 

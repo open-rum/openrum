@@ -7,6 +7,8 @@ export const toggleVariants = cva(
       variant: {
         default: "bg-transparent",
         outline: "border border-input bg-transparent hover:bg-muted",
+        selection:
+          "border border-input bg-transparent hover:bg-muted data-[state=on]:border-[var(--ds-selection-border)] data-[state=on]:bg-[var(--ds-selection)] data-[state=on]:text-[var(--ds-selection-foreground)] aria-pressed:border-[var(--ds-selection-border)] aria-pressed:bg-[var(--ds-selection)] aria-pressed:text-[var(--ds-selection-foreground)]",
         legend:
           "bg-transparent font-normal text-muted-foreground aria-pressed:bg-transparent data-[state=on]:bg-transparent data-[state=off]:line-through data-[state=off]:opacity-50",
       },

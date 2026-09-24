@@ -1,0 +1,82 @@
+---
+title: 生产 Docker 运维
+description: 备份、恢复、监控和升级单机 OpenRUM 部署。
+appliesTo: Alpha
+---
+
+import { Aside, Steps } from "@astrojs/starlight/components";
+
+本页只适用于独立的[生产 Docker 配置](/zh/docs/self-hosting/docker-production/)，不操作本地演示 Compose 项目。除非另有说明，命令都在 Linux 服务器的仓库根目录执行。
+
+## 日常检查
+
+```sh
+docker compose --env-file deploy/compose/.env.production \
+  -f deploy/compose/production.compose.yml ps
+docker compose --env-file deploy/compose/.env.production \
+  -f deploy/compose/production.compose.yml logs --tail=100 api ingest consumer worker edge
+```
+
+监控 ClickHouse 剩余磁盘空间及[存储压力状态](/zh/docs/self-hosting/storage-pressure/)、Kafka 消费积压、容器故障、TLS 续期、备份时间，以及宿主机 CPU、内存和磁盘。Compose 只应开放 TCP `80`/`443` 与 UDP `443`。告警应发往本机之外，避免整机故障时连告警一起消失。
+
+## 一致性备份
+
+仓库中的备份脚本会**停止整套服务**，归档 PostgreSQL、ClickHouse、Kafka、Redis 与 Caddy 的卷，然后重新启动。请安排停机窗口。这是离线备份，不是连续时间点恢复；可能丢失的数据量取决于距上次有效备份的时间。使用空间充足的独立磁盘或已挂载的备份位置：
+
+```sh
+backup_dir="/mnt/openrum-backups/openrum-$(date -u +%Y%m%dT%H%M%SZ)"
+bash deploy/compose/backup-production.sh "$backup_dir"
+```
+
+脚本会拒绝复用已有目录并生成 `SHA256SUMS`。它**不包含** `.env.production`；数据库密码和 Bootstrap Token 是恢复实例所必需的，须单独加密备份。外部对象存储 Bucket 也不在此备份范围内，需另行设置服务商的版本控制和备份策略。Caddy 卷中含 TLS 私钥，因此所有归档和私有配置都要加密并复制到服务器之外。接入生产流量前，请在替换服务器上演练恢复，并定期重做。数据量较大时，可在服务停止期间使用云服务商的一致性磁盘快照，避免长时间 `tar` 停机。
+
+<Aside type="danger" title="正常运维不要删除数据卷">
+  `docker compose down` 会保留卷；`down --volumes` 会删除数据库、Kafka 积压、Redis
+  状态和证书存储。不要把后者当作常规停止或升级命令。
+</Aside>
+
+## 在替换服务器上恢复
+
+<Steps>
+
+1. ## 准备空服务器
+
+   安装 Docker 与 Compose，切换到与原服务器**相同的 OpenRUM 版本**，恢复加密保存的 `.env.production` 并设为 `600` 权限，构建或加载原来的 `OPENRUM_IMAGE`。验证完成前不要切换域名，也不要执行 `compose up`。
+
+1. ## 校验并恢复归档
+
+   将解密后的备份目录复制到服务器，然后运行：
+
+   ```sh
+   bash deploy/compose/restore-production.sh /mnt/openrum-backups/openrum-YYYYMMDDTHHMMSSZ
+   ```
+
+   脚本会校验 `SHA256SUMS`，只接受没有任何 `openrum-production` 容器和卷的新环境，不会覆盖已有数据。如果上次恢复中途失败，请先调查，并在新服务器或明确清理的测试环境重试；脚本不会替你删除残留数据。
+
+1. ## 启动、验证，再切换流量
+
+   ```sh
+   docker compose --env-file deploy/compose/.env.production \
+     -f deploy/compose/production.compose.yml up -d --wait
+   ```
+
+   检查 HTTPS 与 `/health/ready`，再验证管理员登录、项目设置、一条历史事件和一条新上报事件，并确认 Kafka 积压逐步清空。记录恢复点和丢失事件后，再切换真实流量。
+
+</Steps>
+
+## 升级
+
+先备份并校验，再固定新代码版本，为 `OPENRUM_IMAGE` 使用**新的标签**。构建后安排维护窗口：停止入口和应用服务，执行迁移，启动并验证。修改 `.env.production` 中的标签后，示例命令为：
+
+```sh
+docker compose --env-file deploy/compose/.env.production \
+  -f deploy/compose/production.compose.yml build migrate
+docker compose --env-file deploy/compose/.env.production \
+  -f deploy/compose/production.compose.yml stop edge web api ingest consumer worker
+docker compose --env-file deploy/compose/.env.production \
+  -f deploy/compose/production.compose.yml run --rm migrate
+docker compose --env-file deploy/compose/.env.production \
+  -f deploy/compose/production.compose.yml up -d --wait
+```
+
+迁移在实践中只能向前。回退镜像**不会**回退 PostgreSQL 或 ClickHouse Schema；若新版本不兼容，应在另一台服务器上用升级前的备份恢复。详见[通用升级约定](/zh/docs/self-hosting/upgrades/)。单机 Compose 升级需要计划停机，不提供滚动发布。

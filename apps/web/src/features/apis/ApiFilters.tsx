@@ -1,20 +1,13 @@
-import { useState } from "react";
-import { SearchIcon } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { ArrowDownWideNarrowIcon, CodeXmlIcon, PackageIcon, RouteIcon } from "lucide-react";
 import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  FilterSearchComposer,
+  type FilterSearchField,
+  type FilterSearchToken,
+} from "@/components/filters/FilterSearchComposer";
 import {
   apiMethods,
   apiSortLabels,
   apiSorts,
-  minimumAPISamples,
   type APIFilters,
   type APIsResponse,
 } from "@/lib/api/apis";
@@ -30,160 +23,105 @@ export function ApiFilterBar({
   facets?: Facets;
   onChange: (patch: Partial<APIFilters>) => void;
 }) {
-  // The draft follows the applied search whenever it changes elsewhere, such as
-  // browser navigation, without an effect that would cascade a second render.
-  const [searchDraft, setSearchDraft] = useState(filters.search ?? "");
-  const [appliedSearch, setAppliedSearch] = useState(filters.search);
-  if (filters.search !== appliedSearch) {
-    setAppliedSearch(filters.search);
-    setSearchDraft(filters.search ?? "");
-  }
-  const filtered =
-    Boolean(filters.search ?? filters.release ?? filters.route) || filters.methods.length > 0;
   return (
-    <form
-      className="apis-toolbar"
-      onSubmit={(event) => {
-        event.preventDefault();
-        onChange({ search: searchDraft.trim() || undefined });
+    <FilterSearchComposer
+      ariaLabel="搜索 API 或添加筛选条件"
+      placeholder="搜索 endpoint 或添加筛选条件…"
+      fields={apiFields(facets)}
+      tokens={apiTokens(filters)}
+      shortcuts={[
+        { label: "GET", onSelect: () => addMethod("GET", filters, onChange) },
+        { label: "POST", onSelect: () => addMethod("POST", filters, onChange) },
+        { label: "失败率排序", onSelect: () => onChange({ sort: "failureRate" }) },
+      ]}
+      onSearch={(search) => onChange({ search })}
+      onSelect={(key, value) => {
+        const selected = String(value);
+        if (key === "method") addMethod(selected, filters, onChange);
+        if (key === "release") onChange({ release: selected });
+        if (key === "route") onChange({ route: selected });
+        if (key === "sort") onChange({ sort: selected as APIFilters["sort"] });
       }}
-    >
-      <div className="apis-search">
-        <SearchIcon aria-hidden="true" />
-        <Input
-          aria-label="搜索 endpoint"
-          placeholder="搜索归一化 endpoint，例如 /orders"
-          value={searchDraft}
-          onChange={(event) => setSearchDraft(event.target.value)}
-        />
-      </div>
-      <MethodFilter
-        selected={filters.methods}
-        available={facets?.methods}
-        onChange={(methods) => onChange({ methods })}
-      />
-      <FacetSelect
-        label="全部版本"
-        value={filters.release}
-        options={facets?.releases}
-        onChange={(release) => onChange({ release })}
-      />
-      <FacetSelect
-        label="全部 Route"
-        value={filters.route}
-        options={facets?.routes}
-        onChange={(route) => onChange({ route })}
-      />
-      <Select
-        value={filters.sort}
-        onValueChange={(value) => onChange({ sort: value as APIFilters["sort"] })}
-      >
-        <SelectTrigger aria-label="API 排序">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectGroup>
-            {apiSorts.map((sort) => (
-              <SelectItem key={sort} value={sort}>
-                {apiSortLabels[sort]}
-              </SelectItem>
-            ))}
-          </SelectGroup>
-        </SelectContent>
-      </Select>
-      <Button type="submit">查询</Button>
-      {filtered ? (
-        <Button
-          type="button"
-          variant="ghost"
-          onClick={() => {
-            setSearchDraft("");
-            onChange({ search: undefined, release: undefined, route: undefined, methods: [] });
-          }}
-        >
-          清除筛选
-        </Button>
-      ) : null}
-      <span>
-        URL 已归一化
-        {filters.sort === "p95" || filters.sort === "failureRate"
-          ? ` · 不足 ${minimumAPISamples} 次请求的 endpoint 排在末尾`
-          : ""}
-      </span>
-    </form>
+      onRemove={(key) => {
+        if (key === "search") onChange({ search: undefined });
+        if (key === "release") onChange({ release: undefined });
+        if (key === "route") onChange({ route: undefined });
+        if (key === "sort") onChange({ sort: "requests" });
+        if (key.startsWith("method:"))
+          onChange({ methods: filters.methods.filter((method) => method !== key.slice(7)) });
+      }}
+    />
   );
 }
 
-function MethodFilter({
-  selected,
-  available,
-  onChange,
-}: {
-  selected: string[];
-  available?: Facets["methods"];
-  onChange: (methods: string[]) => void;
-}) {
-  const observed = new Set(available?.map((facet) => facet.value));
-  const options = apiMethods.filter(
-    (method) => !available || observed.has(method) || selected.includes(method),
-  );
-  if (!options.length) return null;
-  return (
-    <div className="apis-methods" role="group" aria-label="HTTP 方法筛选">
-      {options.map((method) => {
-        const active = selected.includes(method);
-        return (
-          <Button
-            key={method}
-            type="button"
-            size="sm"
-            variant={active ? "default" : "outline"}
-            aria-pressed={active}
-            onClick={() =>
-              onChange(
-                active ? selected.filter((value) => value !== method) : [...selected, method],
-              )
-            }
-          >
-            {method}
-          </Button>
-        );
-      })}
-    </div>
-  );
+function apiFields(facets?: Facets): FilterSearchField[] {
+  const facetOptions = (source?: { value: string; requests: number }[]) =>
+    (source ?? [])
+      .filter((option) => option.value)
+      .map((option) => ({
+        value: option.value,
+        label: option.value,
+        count: option.requests,
+        countLabel: "个请求",
+      }));
+  const observedMethods = new Set(facets?.methods.map((facet) => facet.value));
+  return [
+    {
+      key: "method",
+      label: "HTTP 方法",
+      hint: "GET、POST、PUT、PATCH、DELETE 等",
+      icon: CodeXmlIcon,
+      allowCustom: false,
+      options: apiMethods
+        .filter((method) => !facets || observedMethods.has(method))
+        .map((method) => ({
+          value: method,
+          label: method,
+          count: facets?.methods.find((facet) => facet.value === method)?.requests,
+          countLabel: "个请求",
+        })),
+    },
+    {
+      key: "release",
+      label: "版本",
+      hint: "按 Release 定位接口回归",
+      icon: PackageIcon,
+      options: facetOptions(facets?.releases),
+    },
+    {
+      key: "route",
+      label: "页面 Route",
+      hint: "查看特定页面发起的请求",
+      icon: RouteIcon,
+      options: facetOptions(facets?.routes),
+    },
+    {
+      key: "sort",
+      label: "排序",
+      hint: "按请求量、失败、延迟或影响排序",
+      icon: ArrowDownWideNarrowIcon,
+      allowCustom: false,
+      options: apiSorts.map((sort) => ({ value: sort, label: apiSortLabels[sort] })),
+    },
+  ];
 }
 
-function FacetSelect({
-  label,
-  value,
-  options = [],
-  onChange,
-}: {
-  label: string;
-  value?: string;
-  options?: { value: string; requests: number }[];
-  onChange: (value?: string) => void;
-}) {
-  return (
-    <Select
-      value={value ?? "all"}
-      onValueChange={(next) => onChange(next === "all" ? undefined : next)}
-    >
-      <SelectTrigger aria-label={label}>
-        <SelectValue />
-      </SelectTrigger>
-      <SelectContent>
-        <SelectGroup>
-          <SelectItem value="all">{label}</SelectItem>
-          {options
-            .filter((option) => option.value)
-            .map((option) => (
-              <SelectItem key={option.value} value={option.value}>
-                {option.value} · {option.requests.toLocaleString()}
-              </SelectItem>
-            ))}
-        </SelectGroup>
-      </SelectContent>
-    </Select>
-  );
+function apiTokens(filters: APIFilters): FilterSearchToken[] {
+  const tokens: FilterSearchToken[] = [];
+  if (filters.search) tokens.push({ key: "search", label: `Endpoint：${filters.search}` });
+  for (const method of filters.methods)
+    tokens.push({ key: `method:${method}`, label: `方法：${method}` });
+  if (filters.release) tokens.push({ key: "release", label: `版本：${filters.release}` });
+  if (filters.route) tokens.push({ key: "route", label: `Route：${filters.route}` });
+  if (filters.sort !== "requests")
+    tokens.push({ key: "sort", label: `排序：${apiSortLabels[filters.sort]}` });
+  return tokens;
+}
+
+function addMethod(
+  method: string,
+  filters: APIFilters,
+  onChange: (patch: Partial<APIFilters>) => void,
+) {
+  if (!filters.methods.includes(method)) onChange({ methods: [...filters.methods, method] });
 }

@@ -1,11 +1,25 @@
 package query
 
 import (
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
 )
+
+func TestPerformanceWherePrunesUnrelatedEventTypes(t *testing.T) {
+	from := time.Now().UTC()
+	where, args := performanceAggregateWhere(PerformanceFilters{ProjectID: uuid.New(), From: from, To: from.Add(time.Hour), Environment: "production", Route: "/checkout"}, false)
+	for _, predicate := range []string{"event_type IN ('page_view','web_vital')", "NOT has(ingest_flags,'synthetic')", "environment=?", "route=?"} {
+		if !strings.Contains(where, predicate) {
+			t.Fatalf("missing %s: %s", predicate, where)
+		}
+	}
+	if len(args) != 5 || args[3] != "production" || args[4] != "/checkout" {
+		t.Fatalf("arguments=%v", args)
+	}
+}
 
 func TestNormalizePerformanceFilters(t *testing.T) {
 	from := time.Date(2026, 9, 1, 0, 0, 0, 0, time.FixedZone("Asia/Shanghai", 8*60*60))

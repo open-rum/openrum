@@ -1,6 +1,6 @@
 import type { ReactElement } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { CheckIcon, FolderKanbanIcon, PlusIcon, Rows3Icon } from "lucide-react";
+import { CheckIcon, PlusIcon, Rows3Icon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import {
@@ -14,6 +14,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import type { Organization, Project } from "@/lib/api/projects";
 import { rememberProject } from "@/lib/projects/currentProject";
+import { ProjectPlatformIcon } from "./projectPlatforms";
 
 export function ProjectSwitcher({
   organization,
@@ -68,7 +69,7 @@ export function ProjectSwitcher({
                 });
               }}
             >
-              <FolderKanbanIcon data-icon="inline-start" />
+              <ProjectPlatformIcon platform={item.sdkPlatform} data-icon="inline-start" />
               <span>
                 <strong>{item.name}</strong>
                 <small>{item.slug}</small>

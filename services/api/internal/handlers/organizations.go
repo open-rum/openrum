@@ -118,6 +118,12 @@ func writeControlPlaneError(writer http.ResponseWriter, request *http.Request, l
 		httpx.WriteError(writer, request, http.StatusForbidden, "FORBIDDEN", "You do not have permission to perform this action.")
 	case errors.Is(err, metadata.ErrConflict):
 		httpx.WriteError(writer, request, http.StatusConflict, "CONFLICT", "A resource with these values already exists.")
+	case errors.Is(err, metadata.ErrProjectMustBeDisabled):
+		httpx.WriteError(writer, request, http.StatusConflict, "PROJECT_MUST_BE_DISABLED", "Disable the project before deleting its data.")
+	case errors.Is(err, metadata.ErrProjectDataPurgeInProgress):
+		httpx.WriteError(writer, request, http.StatusConflict, "PROJECT_DATA_PURGE_IN_PROGRESS", "Project data deletion is still in progress.")
+	case errors.Is(err, metadata.ErrInvalidDataPurgeConfirmation):
+		httpx.WriteError(writer, request, http.StatusBadRequest, "INVALID_CONFIRMATION", "The confirmation does not match the project name.")
 	case errors.Is(err, metadata.ErrLastOwner):
 		httpx.WriteError(writer, request, http.StatusConflict, "LAST_OWNER_REQUIRED", "The organization must retain at least one owner.")
 	case errors.Is(err, metadata.ErrLastInstanceOwner):

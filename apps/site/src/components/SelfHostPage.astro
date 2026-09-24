@@ -1,5 +1,5 @@
 ---
-import { Boxes, Cloud, Database, ShieldCheck } from "lucide-astro";
+import { Boxes, Cloud, Server, ShieldCheck } from "lucide-astro";
 import PublicLayout from "../layouts/PublicLayout.astro";
 const { lang = "en" } = Astro.props;
 const zh = lang === "zh";
@@ -12,16 +12,16 @@ const tiers = zh
         Boxes,
       ],
       [
-        "生产 Kubernetes",
-        "Helm + 外部依赖",
-        "API、Ingest、Consumer 与 Web 可独立扩缩；使用生产级 PostgreSQL、ClickHouse、Kafka 和 Redis。",
-        Cloud,
+        "单机生产部署",
+        "独立的 Docker Compose",
+        "一台 Linux 服务器运行完整服务，配置 HTTPS、私有凭据和异机备份；需要接受单点故障。",
+        Server,
       ],
       [
-        "对象存储",
-        "可选 OSS / S3",
-        "Source Map 使用 Alibaba OSS 或 S3-compatible。没有 Bucket 时核心监控能力保持可用。",
-        Database,
+        "Kubernetes / Helm",
+        "生产部署",
+        "应用服务可独立扩缩；需自行准备外部 PostgreSQL、ClickHouse、Kafka、Redis、密钥与备份。",
+        Cloud,
       ],
     ]
   : [
@@ -32,16 +32,16 @@ const tiers = zh
         Boxes,
       ],
       [
-        "Production Kubernetes",
-        "Helm + external dependencies",
-        "Scale API, Ingest, Consumer and Web independently with production PostgreSQL, ClickHouse, Kafka and Redis.",
-        Cloud,
+        "Single-host production",
+        "Separate Docker Compose stack",
+        "Run the complete stack on one Linux server with HTTPS, private credentials and off-host backups; accept the single point of failure.",
+        Server,
       ],
       [
-        "Object storage",
-        "Optional OSS / S3",
-        "Source Maps use Alibaba OSS or an S3-compatible provider. Core monitoring remains available without a Bucket.",
-        Database,
+        "Kubernetes / Helm",
+        "Production deployment",
+        "Scale application services independently; prepare external PostgreSQL, ClickHouse, Kafka, Redis, secrets and backups.",
+        Cloud,
       ],
     ];
 ---
@@ -61,8 +61,8 @@ const tiers = zh
       </h1><p>
         {
           zh
-            ? "先用 Compose 验证调查路径，再按容量与可用性要求迁移到 Kubernetes。OpenRUM 不要求连接托管控制面。"
-            : "Validate the investigation path with Compose, then move to Kubernetes for capacity and availability. OpenRUM does not require a hosted control plane."
+            ? "本地评估、单机生产和推荐的 Kubernetes 部署各有独立路径。OpenRUM 不要求连接托管控制面。"
+            : "Choose local evaluation, single-host production or the recommended Kubernetes path. OpenRUM does not require a hosted control plane."
         }
       </p><div class="cta-row">
         <a
@@ -80,9 +80,14 @@ const tiers = zh
     <div class="site-container">
       <div class="card-grid">
         {
-          tiers.map(([title, status, body, Icon]) => (
-            <article class="ui-card feature-card">
+          tiers.map(([title, status, body, Icon], index) => (
+            <article
+              class:list={["ui-card", "feature-card", { "self-host-recommended": index === 2 }]}
+            >
               <>
+                {index === 2 && (
+                  <span class="self-host-recommended-badge">{zh ? "推荐" : "Recommended"}</span>
+                )}
                 <span class="feature-icon">
                   <Icon size={19} />
                 </span>
@@ -91,7 +96,7 @@ const tiers = zh
                 <div class="status-line">
                   <>
                     <span>{status}</span>
-                    <span>{zh ? "已发布" : "Published"}</span>
+                    <span>Alpha</span>
                   </>
                 </div>
               </>
@@ -104,11 +109,31 @@ const tiers = zh
         </h3><p>
           {
             zh
-              ? "启用 TLS、外部 Secret、备份恢复、依赖监控、容量验证和升级演练。千万级日 PV 是设计目标，不是未经验证的默认承诺。"
-              : "Enable TLS, external secrets, backup/restore, dependency monitoring, capacity verification and upgrade drills. Ten-million daily PV is a design target—not an unverified default claim."
+              ? "接入真实流量前完成 TLS、私有密钥、异机备份与恢复演练、依赖监控、容量验证和升级演练。单机 Docker 不提供高可用；千万级日 PV 是设计目标，不是未经验证的默认承诺。"
+              : "Before real traffic, verify TLS, private secrets, off-host backup and restore, dependency monitoring, capacity and upgrades. Single-host Docker is not highly available; ten-million daily PV is a design target, not an unverified default claim."
           }
         </p>
       </div>
     </div>
   </section></PublicLayout
 >
+
+<style>
+  .self-host-recommended {
+    position: relative;
+    border-color: var(--ds-primary);
+  }
+
+  .self-host-recommended-badge {
+    position: absolute;
+    top: 1.5rem;
+    right: 1.5rem;
+    padding: 0.2rem 0.65rem;
+    border: 1px solid var(--ds-primary);
+    border-radius: 999px;
+    color: var(--ds-primary-foreground);
+    background: var(--ds-primary);
+    font-size: 0.75rem;
+    font-weight: 650;
+  }
+</style>

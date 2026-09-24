@@ -1,0 +1,44 @@
+---
+title: 首次使用与维护
+description: 初始化管理员，验证真实事件，并配置可选功能和日常维护。
+appliesTo: Alpha
+---
+
+import { Steps, Aside, LinkCard } from "@astrojs/starlight/components";
+
+先完成[安装服务](/zh/docs/getting-started/production-deployment/install/)，确认服务就绪并准备好 Bootstrap Token。
+
+<Steps>
+
+1. ## 创建第一个管理员
+
+   打开 `https://rum.example.com/setup`，依次填写：
+
+   1. 组织名称。
+   2. 你的名称和工作邮箱。
+   3. 至少 12 个字符的密码与确认密码。
+   4. 凭据配置步骤保存的 Bootstrap Token。
+   5. 点击“创建实例并进入控制台”。
+
+   生产 Helm 部署不导入本地演示账号。首次初始化完成后，该入口关闭；以后使用创建的账号登录。如果提示已初始化，使用现有管理员账号，不要重复初始化。
+
+   **完成标志：** 已进入控制台，并能访问自己的组织。
+
+1. ## 接入第一个真实项目
+
+   按[创建第一个项目](/zh/docs/getting-started/create-first-project/)选择开发平台、配置应用 Origin 与 `production` 环境，从“接入”页复制 DSN 并初始化 SDK。
+
+   发布应用后访问一个页面、触发一个测试事件。在控制台选择同一项目、`production` 和“最近 15 分钟”，确认事件与会话可见。
+
+   **完成标志：** 浏览器上报经过 Ingest、Kafka、Consumer 后，能在控制台查到。若有问题，先查 Origin、DSN、环境和时间范围，再查管道服务日志。
+
+</Steps>
+## 启用可选功能并安排维护
+
+- **Source Map：** 按[对象存储](/zh/docs/self-hosting/object-storage/)配置 OSS 或 S3 兼容存储，再按 [Source Map](/zh/docs/sdk/source-maps/)上传构建产物。
+- **告警与 IM 通知：** 配置通知渠道，再建立[告警规则](/zh/docs/product/alerts/)。在控制台保存托管凭据前，需要在运行时 Secret 加入 `OPENRUM_MASTER_KEY`，并设置 `config.managedSecrets.enabled: true`。主密钥用 `openssl rand -base64 32` 生成，妥善备份。
+- **数据保留与容量：** 设置保留期，关注[存储压力](/zh/docs/self-hosting/storage-pressure/)通知和 Kafka 积压，按[容量规划](/zh/docs/self-hosting/capacity/)验证实际负载。
+- **备份与恢复：** 配置自动备份并做一次[恢复演练](/zh/docs/self-hosting/backup-restore/)。
+- **升级与回滚：** 保留配置、镜像版本与备份，按[升级指南](/zh/docs/self-hosting/upgrades/)操作。
+
+Secret 变更不会自动使所有应用重启，轮换后需安排滚动更新。集群资源、扩缩容与网络细节见 [Kubernetes 与 Helm](/zh/docs/self-hosting/kubernetes/)。

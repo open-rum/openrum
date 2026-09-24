@@ -11,11 +11,11 @@ import {
   ConsolePageContent,
   ConsolePageHeader,
 } from "@/components/layout/ConsolePage";
-import { BehaviorControls } from "@/features/analytics/BehaviorControls";
 import { useBehaviorFilters } from "@/features/analytics/useBehaviorFilters";
 import { getBehaviorAnalytics } from "@/lib/api/analytics";
 import { listOrganizations, listProjects, type Project } from "@/lib/api/projects";
 import { EventExplorer } from "./EventExplorer";
+import { EventFilterComposer } from "./EventFilterComposer";
 
 export function EventsPage() {
   const { projectId } = useParams({ strict: false }) as { projectId?: string };
@@ -64,7 +64,7 @@ function ProjectEvents({ project }: { project: Project }) {
         }
       />
       <ConsoleFilterBar
-        primary={<BehaviorControls filters={filters} data={query.data} onChange={update} />}
+        primary={<EventFilterComposer filters={filters} data={query.data} onChange={update} />}
       />
       <ConsolePageContent className="grid gap-6">
         {query.isLoading ? <EventsSkeleton compact /> : null}

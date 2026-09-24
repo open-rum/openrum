@@ -9,7 +9,15 @@ data:
   PUBLIC_BASE_URL: {{ .Values.config.publicBaseURL | quote }}
   KAFKA_BROKERS: {{ .Values.config.kafkaBrokers | quote }}
   KAFKA_EVENT_TOPIC: {{ .Values.config.kafkaEventTopic | quote }}
+  OPENRUM_KAFKA_RETENTION_DURATION: {{ .Values.config.kafkaRetentionDuration | quote }}
   REDIS_ADDR: {{ .Values.config.redisAddress | quote }}
+  OPENRUM_STORAGE_PRESSURE_GUARD_ENABLED: {{ .Values.config.storagePressure.guardEnabled | quote }}
+  OPENRUM_STORAGE_WARNING_FREE_RATIO: {{ .Values.config.storagePressure.warningFreeRatio | quote }}
+  OPENRUM_STORAGE_CRITICAL_FREE_RATIO: {{ .Values.config.storagePressure.criticalFreeRatio | quote }}
+  OPENRUM_STORAGE_HARD_STOP_FREE_RATIO: {{ .Values.config.storagePressure.hardStopFreeRatio | quote }}
+  OPENRUM_STORAGE_RECOVERY_FREE_RATIO: {{ .Values.config.storagePressure.recoveryFreeRatio | quote }}
+  OPENRUM_STORAGE_EMERGENCY_SAMPLE_RATE: {{ .Values.config.storagePressure.emergencySampleRate | quote }}
+  OPENRUM_STORAGE_POLL_INTERVAL: {{ .Values.config.storagePressure.pollInterval | quote }}
   INGEST_TRUSTED_PROXIES: {{ .Values.config.ingestTrustedProxies | quote }}
   GEO_COUNTRY_HEADER: {{ .Values.config.geoCountryHeader | quote }}
   GEO_TRUSTED_PROXIES: {{ .Values.config.geoTrustedProxies | quote }}

@@ -10,9 +10,9 @@ export function ImpactPreview({ impact }: { impact: SamplingImpact }) {
       <p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
         保存前预览
       </p>
-      <h2 id="impact-title" className="mt-2 text-lg font-semibold">
+      <h3 id="impact-title" className="mt-2 text-lg font-semibold">
         预计每日接收 {formatCount(impact.projectedDaily)} 条
-      </h2>
+      </h3>
       <p
         className={`mt-2 text-sm font-medium ${saving ? "text-(--ds-success)" : "text-(--ds-warning)"}`}
       >
@@ -28,8 +28,8 @@ export function ImpactPreview({ impact }: { impact: SamplingImpact }) {
         />
       </div>
       <p className="mt-4 text-xs leading-5 text-muted-foreground">
-        基于所选时段的估算原始事件量 × 新采样率计算；错误事件保持
-        100%。流量变化和压缩率会让实际结果产生偏差。
+        按各类事件的估算原始量 × 对应的新采样率计算。
+        这不是接收上限；流量变化和压缩率会让实际结果产生偏差。
       </p>
     </section>
   );

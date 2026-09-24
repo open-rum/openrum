@@ -1,0 +1,136 @@
+---
+title: 安装服务
+description: 构建镜像、配置运行时凭据与 HTTPS，并通过 Helm 安装和验证。
+appliesTo: Alpha
+---
+
+import { Steps, Aside, LinkCard } from "@astrojs/starlight/components";
+
+先完成[部署准备](/zh/docs/getting-started/production-deployment/)，并获取准备部署的源码。以下命令在仓库根目录执行。
+
+<Steps>
+
+1. ## 构建与推送应用镜像
+
+   获取准备部署的源码版本，在仓库根目录执行。请为每次发布使用唯一镜像标签，并记录对应 Git commit：
+
+   ```sh
+   docker login registry.example.com
+   docker build --platform linux/amd64 \
+     -t registry.example.com/openrum:alpha-deploy-001 .
+   docker push registry.example.com/openrum:alpha-deploy-001
+   ```
+
+   示例按 AMD64 节点构建；ARM64 节点请改为 `linux/arm64`。同一镜像内包含五个服务、迁移工具、控制台和 Browser SDK，无需分别构建五份镜像。
+
+   Chart 默认的 `ghcr.io/example/openrum` 是占位地址。必须替换为刚推送的地址。私有仓库需通过集群的镜像拉取 Secret 配置 `imagePullSecrets`。
+
+   **完成标志：** 镜像已推送，目标集群具有拉取权限。构建不依赖你本机安装 Go 或 pnpm，它们由 Docker 构建阶段提供。
+
+1. ## 配置运行时凭据和 HTTPS
+
+   先生成首次初始化使用的 Token，并保存在团队的密码管理器中：
+
+   ```sh
+   openssl rand -hex 32
+   ```
+
+   在安全的本地目录创建 `runtime-secret.yaml`，替换下面三个值：
+
+   ```yaml title="runtime-secret.yaml"
+   apiVersion: v1
+   kind: Secret
+   metadata:
+     name: openrum-runtime
+     namespace: openrum
+   type: Opaque
+   stringData:
+     POSTGRES_DSN: "postgres://openrum:REPLACE_PASSWORD@postgres.example:5432/openrum?sslmode=require"
+     CLICKHOUSE_DSN: "clickhouse://openrum:REPLACE_PASSWORD@clickhouse.example:9000/openrum"
+     BOOTSTRAP_TOKEN: "REPLACE_WITH_GENERATED_TOKEN"
+   ```
+
+   数据库连接中的特殊字符需要 URL 编码；ClickHouse 的端口和 TLS 参数必须与数据库实际配置一致。该文件含真实凭据，不要提交到 Git。
+
+   ```sh
+   kubectl apply -f runtime-secret.yaml
+   kubectl -n openrum get secret openrum-runtime
+   ```
+
+   把域名证书导入同一个 Namespace；若由证书控制器管理，可使用它生成的 Secret：
+
+   ```sh
+   kubectl -n openrum create secret tls openrum-tls \
+     --cert=/path/to/certificate-chain.pem --key=/path/to/private-key.pem
+   ```
+
+   **完成标志：** `openrum-runtime`、`openrum-tls` 都存在。首次初始化 Token 已保存，后续会在创建管理员时使用。
+
+1. ## 填写部署配置
+
+   创建 `values.production.yaml`：
+
+   ```yaml title="values.production.yaml"
+   image:
+     repository: registry.example.com/openrum
+     tag: alpha-deploy-001
+
+   config:
+     appEnv: production
+     publicBaseURL: https://rum.example.com
+     existingSecret: openrum-runtime
+     kafkaBrokers: kafka-0:9092,kafka-1:9092,kafka-2:9092
+     kafkaEventTopic: rum-events-v1
+     kafkaRetentionDuration: 168h
+     redisAddress: redis.example:6379
+     # 替换为你实际管理的 Ingress 代理地址段。
+     ingestTrustedProxies: "10.42.0.0/16"
+
+   ingress:
+     enabled: true
+     className: nginx
+     host: rum.example.com
+     tls:
+       - hosts: [rum.example.com]
+         secretName: openrum-tls
+   ```
+
+   - `repository/tag`：镜像构建步骤的镜像。
+   - `publicBaseURL/host`：浏览器真正访问的域名；生产要求 HTTPS。
+   - Kafka 与 Redis 地址：Pod 实际可访问的端点，不是开发机的 `localhost`。
+   - `ingestTrustedProxies`：只填自己管理的代理地址段，让限流能识别真实客户端 IP。
+   - `className`：与你安装的 Ingress Controller 一致。
+
+   对象存储配置可先全部留空。更多选项见 [Helm values](/zh/docs/reference/helm-values/)。
+
+   **完成标志：** 示例地址均已替换，域名已解析到 Ingress，对应 Secret 名称与凭据配置步骤一致。
+
+1. ## 安装并验证服务
+
+   ```sh
+   helm lint deploy/helm/openrum -f values.production.yaml
+   helm upgrade --install openrum deploy/helm/openrum \
+     --namespace openrum --values values.production.yaml \
+     --wait --timeout 15m
+   helm test openrum --namespace openrum
+   kubectl -n openrum get pods,deploy,ingress
+   ```
+
+   安装先运行数据库迁移，再启动应用。部署或健康测试失败时查看：
+
+   ```sh
+   kubectl -n openrum get jobs
+   kubectl -n openrum logs -l app.kubernetes.io/component=migration --tail=100
+   kubectl -n openrum logs deploy/openrum-api --tail=100
+   kubectl -n openrum describe pods
+   ```
+
+   **完成标志：** Helm 安装及测试成功，五个 Deployment 可用，打开 `https://rum.example.com` 没有证书错误。服务健康还不能代替真实事件上报验证。
+
+</Steps>
+
+<LinkCard
+  title="下一步：首次使用与维护"
+  href="/zh/docs/getting-started/production-deployment/first-run/"
+  description="创建管理员、接入真实项目，并安排上线后的维护。"
+/>

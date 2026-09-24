@@ -1,6 +1,12 @@
 import { z } from "zod";
 
 export const MAX_WIDGETS = 24;
+export const statAppearanceLabels = {
+  plain: "简洁数值",
+  "line-right": "右侧折线",
+  "bar-right": "右侧柱状图",
+} as const;
+export type StatAppearance = keyof typeof statAppearanceLabels;
 export const sizeLabels = { compact: "紧凑", half: "半宽", full: "整宽" } as const;
 export const viewLabels = {
   number: "Stat",
@@ -9,6 +15,7 @@ export const viewLabels = {
   bar: "Bar",
   table: "Table",
   map: "世界地图",
+  donut: "圆环 + 列表",
 } as const;
 export type WidgetSize = keyof typeof sizeLabels;
 export type WidgetView = keyof typeof viewLabels;
@@ -83,11 +90,19 @@ export const widgetSchema = z
     version: z.literal(1),
     title: boundedText(80).min(1),
     size: z.enum(["compact", "half", "full"]),
-    view: z.enum(["number", "area", "line", "bar", "table", "map"]),
+    view: z.enum(["number", "area", "line", "bar", "table", "map", "donut"]),
+    statAppearance: z
+      .enum(["plain", "line-right", "bar-right", "line-bottom", "area-bottom"])
+      // Keep saved bottom variants readable without continuing to render them.
+      .transform((value): StatAppearance =>
+        value === "line-bottom" || value === "area-bottom" ? "line-right" : value,
+      )
+      .optional(),
     data: dataSchema,
   })
   .superRefine((w, ctx) => {
     const fail = (message: string) => ctx.addIssue({ code: "custom", message });
+    if (w.type !== "stat" && w.statAppearance !== undefined) fail("卡片外观仅适用于指标卡。");
     if (w.type === "stat") {
       if (w.size === "full" || w.view !== "number" || w.data.metrics.length !== 1)
         fail("指标卡使用紧凑或半宽布局，选择一个指标。");
@@ -98,9 +113,9 @@ export const widgetSchema = z
     }
     if (
       w.type === "breakdown" &&
-      (w.data.source !== "events" || !["bar", "table", "map"].includes(w.view))
+      (w.data.source !== "events" || !["bar", "table", "map", "donut"].includes(w.view))
     )
-      fail("分布图支持事件数据的 Bar、Table 或国家地图展示。");
+      fail("分布图支持事件数据的 Bar、Table、圆环列表或国家地图展示。");
     if (w.view === "map" && !supportsWorldMap(w)) fail("世界地图仅支持按国家分组的事件分布。");
     if (
       ["top-issues", "slow-apis"].includes(w.type) &&

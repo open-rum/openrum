@@ -24,10 +24,16 @@ import { Input } from "@/components/ui/input";
 import { Empty, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import type { OverviewFilters } from "@/lib/filters/schema";
-import { moduleRegistry } from "./registry";
+import { moduleRegistry, donutModules } from "./registry";
 import { ModuleContent } from "./ModuleContent";
 import { useModulePreview } from "./queries";
-import { widgetSchema, widgetDescription, type Widget, type WidgetType } from "./model";
+import {
+  widgetSchema,
+  widgetDescription,
+  type Widget,
+  type WidgetType,
+  type WidgetView,
+} from "./model";
 
 export default function ModuleEditor({
   initial,
@@ -50,7 +56,7 @@ export default function ModuleEditor({
   const parsed = widget ? widgetSchema.safeParse(widget) : undefined;
   const definition = widget ? moduleRegistry[widget.type] : undefined;
   const Editor = definition?.Editor;
-  const modules = Object.values(moduleRegistry).filter(
+  const modules = [...Object.values(moduleRegistry), ...donutModules].filter(
     (module) =>
       (group === "全部" || module.group === group) &&
       `${module.name}${module.description}`.toLowerCase().includes(search.toLowerCase()),
@@ -64,7 +70,7 @@ export default function ModuleEditor({
           if (!open) close();
         }}
       >
-        <SheetContent style={{ width: "min(100vw, 520px)", maxWidth: "none" }}>
+        <SheetContent style={{ width: "min(100vw, 1040px)", maxWidth: "none" }}>
           <SheetHeader className="shrink-0 pr-12">
             <SheetTitle>{widget ? (initial ? "配置模块" : "添加模块") : "模块库"}</SheetTitle>
             <SheetDescription>
@@ -99,7 +105,7 @@ export default function ModuleEditor({
                 <div className="grid gap-3 sm:grid-cols-2">
                   {modules.map((module) => (
                     <button
-                      key={module.type}
+                      key={`${module.type}-${module.name}`}
                       type="button"
                       onClick={() => setWidget(module.create())}
                       className="dashboard-catalog-item text-left"
@@ -116,7 +122,7 @@ export default function ModuleEditor({
                           <CardDescription>{module.description}</CardDescription>
                         </CardHeader>
                         <CardContent className="mt-auto">
-                          <ModuleMiniature type={module.type} />
+                          <ModuleMiniature type={module.type} view={module.previewView} />
                         </CardContent>
                       </Card>
                     </button>
@@ -218,8 +224,8 @@ function Preview({
   return (
     <section className="flex flex-col gap-3" aria-label="模块实时预览">
       <p className="text-xs text-muted-foreground">实时数据预览 · 跟随当前时间和环境</p>
-      <Card>
-        <CardHeader>
+      <Card className={debounced.type === "stat" ? "relative isolate" : undefined}>
+        <CardHeader className="relative z-10">
           <CardTitle>{debounced.title}</CardTitle>
           <CardDescription>{widgetDescription(debounced)}</CardDescription>
         </CardHeader>
@@ -231,10 +237,45 @@ function Preview({
   );
 }
 
-function ModuleMiniature({ type }: { type: WidgetType }) {
+function ModuleMiniature({ type, view }: { type: WidgetType; view?: WidgetView }) {
   return (
     <svg viewBox="0 0 180 64" className="h-16 w-full text-primary" aria-hidden="true">
-      {type === "stat" ? (
+      {view === "donut" ? (
+        <>
+          <circle
+            cx="34"
+            cy="32"
+            r="23"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="12"
+            opacity="0.16"
+          />
+          <circle
+            cx="34"
+            cy="32"
+            r="23"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="12"
+            strokeDasharray="92 145"
+            transform="rotate(-90 34 32)"
+          />
+          {[0, 1, 2].map((index) => (
+            <g key={index} opacity={0.7 - index * 0.2}>
+              <circle cx="86" cy={12 + index * 20} r="3" fill="currentColor" />
+              <rect
+                x="96"
+                y={9 + index * 20}
+                width={72 - index * 15}
+                height="6"
+                rx="3"
+                fill="currentColor"
+              />
+            </g>
+          ))}
+        </>
+      ) : type === "stat" ? (
         <>
           <rect x="0" y="8" width="84" height="24" rx="4" fill="currentColor" opacity="0.6" />
           <rect x="0" y="44" width="44" height="6" rx="3" fill="currentColor" opacity="0.2" />

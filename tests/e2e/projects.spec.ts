@@ -7,6 +7,24 @@ test("a user with no projects starts in project creation", async ({ page }) => {
 
   await expect(page).toHaveURL(/\/projects\/new$/);
   await expect(page.getByRole("heading", { name: "创建监控项目" })).toBeVisible();
+  await expect(page.getByRole("radio", { name: "React" })).toBeVisible();
+});
+
+test("project creation keeps the selected platform and opens its onboarding recipe", async ({
+  page,
+}) => {
+  await mockOpenRUM(page);
+  await page.goto("/projects/new");
+
+  await page.getByLabel("项目名称").fill("Vue Store");
+  await page.getByLabel("项目 Slug").fill("vue-store");
+  await page.getByRole("radio", { name: "Vue" }).click();
+  await page.getByLabel("允许的 Origin").fill("https://store.example.com");
+  await page.getByRole("button", { name: "创建项目" }).click();
+
+  await expect(page).toHaveURL(/\/projects\/[^/]+\/onboarding$/);
+  await expect(page.getByText("安装并初始化 Vue SDK")).toBeVisible();
+  await expect(page.getByText(/src\/main.ts/)).toBeVisible();
 });
 
 test("a user can list, switch and restore projects", async ({ page }) => {
@@ -28,6 +46,17 @@ test("a user can list, switch and restore projects", async ({ page }) => {
 
   await page.goto("/");
   await expect(page).toHaveURL(new RegExp(`/projects/${secondProjectId}/overview(?:\\?.*)?$`));
+});
+
+test("the organization usage logo returns to the project list", async ({ page }) => {
+  await mockOpenRUM(page, { projectExists: true, projectCount: 2 });
+  await page.goto("/usage");
+
+  const brand = page.getByRole("link", { name: "OpenRUM 项目列表" });
+  await expect(brand).toHaveAttribute("href", "/projects");
+  await brand.click();
+  await expect(page).toHaveURL(/\/projects$/);
+  await expect(page.getByRole("heading", { name: "项目", exact: true })).toBeVisible();
 });
 
 test("collapsed sidebar stacks its expand control below the brand", async ({ page }) => {

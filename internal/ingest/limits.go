@@ -26,7 +26,11 @@ const (
 	MaxRawBodyBytes        = 1024 * 1024
 	MaxDecompressionRatio  = 100
 
-	defaultIPRequestsPerSecond = 1_000
+	// DefaultIPRequestsPerSecond protects the public Ingest edge before a
+	// Project DSN has been authenticated. It is exported so the HTTP response
+	// can report which ceiling produced a 429 without copying the value into a
+	// second package.
+	DefaultIPRequestsPerSecond = 1_000
 
 	// DefaultProjectRequestsPerSecond applies to a project that has set no
 	// limit of its own. It is exported because the Console shows what the
@@ -117,8 +121,8 @@ return admitted
 func NewRedisRateLimiter(client *redis.Client) *RedisRateLimiter {
 	return &RedisRateLimiter{
 		client:  client,
-		local:   newLocalRateLimiter(defaultIPRequestsPerSecond / 2),
-		ipLimit: defaultIPRequestsPerSecond,
+		local:   newLocalRateLimiter(DefaultIPRequestsPerSecond / 2),
+		ipLimit: DefaultIPRequestsPerSecond,
 	}
 }
 

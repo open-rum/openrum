@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
@@ -59,6 +60,11 @@ type Handler struct {
 	logger        zerolog.Logger
 	now           func() time.Time
 	metrics       *Metrics
+	storage       StoragePressureGate
+}
+
+type StoragePressureGate interface {
+	HardStop() bool
 }
 
 type HandlerOption func(*Handler)
@@ -86,6 +92,10 @@ func WithConnectionStatus(connection ingest.ConnectionStatusRecorder) HandlerOpt
 	return func(handler *Handler) { handler.connection = connection }
 }
 
+func WithStoragePressureGate(storage StoragePressureGate) HandlerOption {
+	return func(handler *Handler) { handler.storage = storage }
+}
+
 func NewHandler(authenticator ingest.Authenticator, limiter ingest.RateLimiter, acceptor EnvelopeAcceptor, logger zerolog.Logger, options ...HandlerOption) *Handler {
 	handler := &Handler{
 		authenticator: authenticator,
@@ -105,9 +115,21 @@ func (handler *Handler) ServeHTTP(response http.ResponseWriter, request *http.Re
 		handler.preflight(response, request)
 		return
 	}
+	if handler.storage != nil && handler.storage.HardStop() {
+		// A successful empty acceptance deliberately drains Browser SDK queues.
+		// Returning 429/503 here would turn a full disk into a retry storm.
+		response.Header().Set("Access-Control-Allow-Origin", "*")
+		response.Header().Set("Access-Control-Expose-Headers", "X-OpenRUM-Storage-Pressure")
+		response.Header().Set("X-OpenRUM-Storage-Pressure", "hard-stop")
+		if handler.metrics != nil {
+			handler.metrics.observeStoragePressureDrop()
+		}
+		handler.writeAcceptance(response, http.StatusAccepted, Acceptance{Accepted: 0, Rejected: []Rejection{}})
+		return
+	}
 	clientIP := handler.resolveClientIP(request)
 	if !handler.limiter.AllowIP(request.Context(), clientIP) {
-		handler.writeRateLimit(response, request)
+		handler.writeRateLimit(response, request, "ip", ingest.DefaultIPRequestsPerSecond)
 		return
 	}
 	key := singleHeader(request.Header, "X-OpenRUM-Key")
@@ -137,7 +159,7 @@ func (handler *Handler) ServeHTTP(response http.ResponseWriter, request *http.Re
 	}
 	if !handler.limiter.AllowProject(request.Context(), access.Project.ID, quota, clientIP) {
 		handler.markRejected(request.Context(), access.Project.ID, ingest.RejectRateLimited)
-		handler.writeRateLimit(response, request)
+		handler.writeRateLimit(response, request, "project", quota.Limit())
 		return
 	}
 	body, err := ingest.ReadEnvelopeBody(request)
@@ -321,12 +343,14 @@ func boundedHeader(value string, maximum int) string {
 
 func setCORSHeaders(header http.Header, origin string) {
 	header.Set("Access-Control-Allow-Origin", origin)
-	header.Set("Access-Control-Expose-Headers", "X-Request-ID, Retry-After")
+	header.Set("Access-Control-Expose-Headers", "X-Request-ID, Retry-After, X-OpenRUM-RateLimit-Scope, X-OpenRUM-RateLimit-Limit")
 	header.Add("Vary", "Origin")
 }
 
-func (handler *Handler) writeRateLimit(response http.ResponseWriter, request *http.Request) {
+func (handler *Handler) writeRateLimit(response http.ResponseWriter, request *http.Request, scope string, limit int64) {
 	response.Header().Set("Retry-After", "1")
+	response.Header().Set("X-OpenRUM-RateLimit-Scope", scope)
+	response.Header().Set("X-OpenRUM-RateLimit-Limit", strconv.FormatInt(limit, 10))
 	handler.writeError(response, request, http.StatusTooManyRequests, "RATE_LIMITED", "The ingest rate limit was exceeded. Retry later.")
 }
 

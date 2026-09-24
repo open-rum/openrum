@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -23,6 +24,7 @@ import (
 	"openrum/internal/query"
 	"openrum/internal/service"
 	"openrum/internal/sourcemap"
+	"openrum/internal/storagepressure"
 	"openrum/services/api/internal/handlers"
 )
 
@@ -55,7 +57,15 @@ func deploymentMode() string {
 	return "standalone"
 }
 
-func registerRoutes(ctx context.Context, router *httpx.Router, configuration config.Config, logger zerolog.Logger, _ *observability.MetricsRegistry) (func() error, error) {
+func registerRoutes(ctx context.Context, router *httpx.Router, configuration config.Config, logger zerolog.Logger, metrics *observability.MetricsRegistry) (func() error, error) {
+	browserSDKBundle, err := loadBrowserSDKBundle()
+	if err != nil {
+		return nil, err
+	}
+	browserSDKHandler, err := handlers.NewBrowserSDKHandler(browserSDKBundle)
+	if err != nil {
+		return nil, err
+	}
 	connectCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 	database, err := metadata.OpenPostgres(connectCtx, configuration.PostgresDSN)
@@ -88,6 +98,16 @@ func registerRoutes(ctx context.Context, router *httpx.Router, configuration con
 	projectRepository := metadata.NewProjectRepository(database)
 	projectKeyRepository := metadata.NewProjectKeyRepository(database)
 	projectConfigRepository := metadata.NewProjectConfigRepository(database)
+	pressureMonitor := storagepressure.NewMonitor(
+		storagepressure.SQLCapacityReader{Database: clickHouse}, configuration.StoragePressure,
+	)
+	if err := storagepressure.RegisterMetrics(metrics, pressureMonitor); err != nil {
+		_ = database.Close()
+		_ = clickHouse.Close()
+		_ = redisClient.Close()
+		return nil, err
+	}
+	go pressureMonitor.Run(ctx)
 	connectionStatus := ingest.NewRedisConnectionStatus(redisClient)
 	eventProducer := ingest.NewKafkaProducer(configuration.KafkaBrokers, configuration.KafkaEventTopic)
 	organizationHandler := handlers.NewOrganizationHandler(organizationRepository, logger)
@@ -104,11 +124,19 @@ func registerRoutes(ctx context.Context, router *httpx.Router, configuration con
 		instanceMemberRepository, metadata.NewMaintenanceJobRepository(database), projectConfigRepository,
 		handlers.NewSQLRetentionPreviewSource(clickHouse), sessionManager, configuration.SystemSettings, logger,
 	)
+	adminEmergencyCleanupHandler := handlers.NewAdminEmergencyCleanupHandler(
+		instanceMemberRepository,
+		metadata.NewEmergencyCleanupRepository(database),
+		handlers.NewSQLEmergencyCleanupPlanner(database, clickHouse),
+		pressureMonitor,
+		sessionManager,
+		logger,
+	)
 	adminOverviewHandler := handlers.NewAdminOverviewHandler(
 		instanceMemberRepository,
 		handlers.NewSQLAdminOverviewSource(
 			database, clickHouse, redisClient, buildVersion(), configuration.AppEnv, deploymentMode(),
-			configuration.ObjectStorageProvider != config.ObjectStorageProviderNone, startedAt,
+			configuration.ObjectStorageProvider != config.ObjectStorageProviderNone, startedAt, pressureMonitor,
 		),
 		logger,
 	)
@@ -118,10 +146,11 @@ func registerRoutes(ctx context.Context, router *httpx.Router, configuration con
 		metadata.NewProjectFilterRepository(database), logger)
 	projectProcessingHandler := handlers.NewProjectProcessingHandler(projectRepository,
 		metadata.NewProjectProcessingRepository(database), logger)
-	sdkConfigHandler := handlers.NewSDKConfigHandler(projectKeyRepository, projectConfigRepository, logger)
+	sdkConfigHandler := handlers.NewSDKConfigHandler(projectKeyRepository, projectConfigRepository, logger, pressureMonitor)
+	storagePressureHandler := handlers.NewStoragePressureHandler(pressureMonitor)
 	connectionStatusHandler := handlers.NewConnectionStatusHandler(projectKeyRepository, connectionStatus, logger)
 	testEventHandler := handlers.NewTestEventHandler(projectRepository, eventProducer, connectionStatus, logger)
-	devDataHandler := handlers.NewDevDataHandler(configuration.AppEnv, projectRepository, configuration.IngestEnvelopeURL(), logger)
+	devDataHandler := handlers.NewDevDataHandler(configuration.AppEnv, projectRepository, configuration.IngestEnvelopeURL(), logger, projectKeyRepository)
 	overviewHandler := handlers.NewOverviewHandler(projectRepository, query.NewOverviewRepository(clickHouse), query.NewOverviewCache(redisClient), connectionStatus, logger)
 	dashboardHandler := handlers.NewDashboardHandler(projectRepository, metadata.NewDashboardRepository(database), logger)
 	analyticsHandler := handlers.NewAnalyticsHandler(projectRepository, query.NewBehaviorRepository(clickHouse), logger)
@@ -192,11 +221,14 @@ func registerRoutes(ctx context.Context, router *httpx.Router, configuration con
 	router.HandleFunc("GET /api/v1/setup/status", setupHandler.Status)
 	router.HandleFunc("POST /api/v1/setup/bootstrap", setupHandler.Bootstrap)
 	router.HandleFunc("POST /api/v1/auth/login", authHandler.Login)
+	router.Handle("GET "+handlers.BrowserSDKPublicPath, browserSDKHandler)
+	router.Handle("GET "+handlers.BrowserSDKLegacyPublicPath, browserSDKHandler)
 	router.HandleFunc("GET /api/v1/sdk/config", sdkConfigHandler.Get)
 	router.HandleFunc("OPTIONS /api/v1/sdk/config", sdkConfigHandler.Options)
 	requireSession := httpx.RequireSession(sessionManager)
 	requireCSRF := httpx.RequireCSRF(configuration.PublicBaseURL)
 	router.Handle("GET /api/v1/auth/me", requireSession(http.HandlerFunc(authHandler.Me)))
+	router.Handle("GET /api/v1/storage-pressure", requireSession(http.HandlerFunc(storagePressureHandler.Get)))
 	router.Handle("POST /api/v1/auth/logout", requireSession(requireCSRF(http.HandlerFunc(authHandler.Logout))))
 	router.Handle("POST /api/v1/auth/password", requireSession(requireCSRF(http.HandlerFunc(authHandler.ChangePassword))))
 	router.Handle("POST /api/v1/auth/reauthenticate", requireSession(requireCSRF(http.HandlerFunc(authHandler.Reauthenticate))))
@@ -215,6 +247,9 @@ func registerRoutes(ctx context.Context, router *httpx.Router, configuration con
 	router.Handle("POST /api/v1/admin/retention-policy/preview", requireSession(requireCSRF(http.HandlerFunc(adminRetentionHandler.Preview))))
 	router.Handle("POST /api/v1/admin/retention-jobs", requireSession(adminMutationAudit(requireCSRF(http.HandlerFunc(adminRetentionHandler.CreateJob)))))
 	router.Handle("GET /api/v1/admin/maintenance-jobs", requireSession(http.HandlerFunc(adminRetentionHandler.ListJobs)))
+	router.Handle("POST /api/v1/admin/emergency-cleanup/preview", requireSession(requireCSRF(http.HandlerFunc(adminEmergencyCleanupHandler.Preview))))
+	router.Handle("POST /api/v1/admin/emergency-cleanup/jobs", requireSession(adminMutationAudit(requireCSRF(http.HandlerFunc(adminEmergencyCleanupHandler.CreateJob)))))
+	router.Handle("GET /api/v1/admin/emergency-cleanup/jobs/latest", requireSession(http.HandlerFunc(adminEmergencyCleanupHandler.LatestJob)))
 	router.Handle("GET /api/v1/admin/overview", requireSession(http.HandlerFunc(adminOverviewHandler.Get)))
 	router.Handle("GET /api/v1/admin/audit-logs", requireSession(http.HandlerFunc(adminAuditHandler.List)))
 	router.Handle("GET /api/v1/admin/object-storage", requireSession(http.HandlerFunc(adminStorageHandler.Get)))
@@ -225,6 +260,8 @@ func registerRoutes(ctx context.Context, router *httpx.Router, configuration con
 	router.Handle("GET /api/v1/projects/{projectId}", requireSession(http.HandlerFunc(projectHandler.Get)))
 	router.Handle("PATCH /api/v1/projects/{projectId}", requireSession(requireCSRF(http.HandlerFunc(projectHandler.Update))))
 	router.Handle("DELETE /api/v1/projects/{projectId}", requireSession(requireCSRF(http.HandlerFunc(projectHandler.Delete))))
+	router.Handle("GET /api/v1/projects/{projectId}/data-purge", requireSession(http.HandlerFunc(projectHandler.GetDataPurge)))
+	router.Handle("POST /api/v1/projects/{projectId}/data-purge", requireSession(requireCSRF(http.HandlerFunc(projectHandler.CreateDataPurge))))
 	router.Handle("GET /api/v1/projects/{projectId}/filters", requireSession(http.HandlerFunc(projectFilterHandler.Get)))
 	router.Handle("PUT /api/v1/projects/{projectId}/filters", requireSession(requireCSRF(http.HandlerFunc(projectFilterHandler.Put))))
 	router.Handle("GET /api/v1/projects/{projectId}/url-rules", requireSession(http.HandlerFunc(projectProcessingHandler.GetURLRules)))
@@ -247,6 +284,7 @@ func registerRoutes(ctx context.Context, router *httpx.Router, configuration con
 	router.Handle("GET /api/v1/projects/{projectId}/usage", requireSession(http.HandlerFunc(usageHandler.Get)))
 	router.Handle("GET /api/v1/projects/{projectId}/usage.csv", requireSession(http.HandlerFunc(usageHandler.CSV)))
 	router.Handle("GET /api/v1/projects/{projectId}/issues", requireSession(http.HandlerFunc(issueHandler.List)))
+	router.Handle("GET /api/v1/projects/{projectId}/issues/overview", requireSession(http.HandlerFunc(issueHandler.Overview)))
 	router.Handle("GET /api/v1/projects/{projectId}/issues/{fingerprint}", requireSession(http.HandlerFunc(issueHandler.Get)))
 	router.Handle("PATCH /api/v1/projects/{projectId}/issues/{fingerprint}", requireSession(requireCSRF(http.HandlerFunc(issueHandler.Patch))))
 	router.Handle("GET /api/v1/projects/{projectId}/issues/{fingerprint}/events", requireSession(http.HandlerFunc(issueHandler.Events)))
@@ -277,4 +315,20 @@ func registerRoutes(ctx context.Context, router *httpx.Router, configuration con
 	return func() error {
 		return errors.Join(database.Close(), clickHouse.Close(), redisClient.Close(), eventProducer.Close())
 	}, nil
+}
+
+func loadBrowserSDKBundle() ([]byte, error) {
+	paths := []string{
+		"/app/sdk/index.iife.js",
+		"packages/browser-sdk/dist/index.iife.js",
+	}
+	var failures []error
+	for _, path := range paths {
+		bundle, err := os.ReadFile(path)
+		if err == nil {
+			return bundle, nil
+		}
+		failures = append(failures, fmt.Errorf("%s: %w", path, err))
+	}
+	return nil, fmt.Errorf("load Browser SDK bundle (run pnpm --filter @openrum/browser build): %w", errors.Join(failures...))
 }

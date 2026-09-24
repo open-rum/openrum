@@ -12,6 +12,7 @@ export type Organization = {
 };
 
 export type ProjectStatus = "active" | "disabled" | "deleting";
+export type SDKPlatform = "javascript" | "react" | "vue" | "nextjs" | "nuxt" | "angular" | "svelte";
 
 export type OverLimitBehavior = "reject" | "sample";
 
@@ -20,6 +21,7 @@ export type Project = {
   organizationId: string;
   name: string;
   slug: string;
+  sdkPlatform: SDKPlatform;
   allowedOrigins: string[];
   /** Default environment selected when the project opens. */
   environment: string;
@@ -39,6 +41,20 @@ export type Project = {
   createdAt: string;
   updatedAt: string;
   dsn?: string;
+};
+
+export type ProjectDataPurgeStatus =
+  "idle" | "queued" | "running" | "retry" | "verifying" | "completed" | "failed";
+
+export type ProjectDataPurge = {
+  projectId: string;
+  status: ProjectDataPurgeStatus;
+  attempts: number;
+  lastError: string;
+  deadlineAt?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  completedAt?: string;
 };
 
 export type OrganizationMember = {
@@ -89,6 +105,7 @@ export function createProject(
   input: {
     name: string;
     slug: string;
+    sdkPlatform: SDKPlatform;
     allowedOrigins: string[];
     environment: string;
     environments: string[];
@@ -114,6 +131,7 @@ export function createProject(
 export type ProjectUpdate = {
   name?: string;
   slug?: string;
+  sdkPlatform?: SDKPlatform;
   allowedOrigins?: string[];
   environment?: string;
   environments?: string[];
@@ -137,6 +155,26 @@ export function updateProject(projectId: string, input: ProjectUpdate) {
       method: "PATCH",
       headers: { "Content-Type": "application/json", ...csrfHeaders() },
       body: JSON.stringify(input),
+    },
+    protectedRequest,
+  );
+}
+
+export function getProjectDataPurge(projectId: string, signal?: AbortSignal) {
+  return apiFetch<ProjectDataPurge>(
+    `/api/v1/projects/${encodeURIComponent(projectId)}/data-purge`,
+    { signal },
+    protectedRequest,
+  );
+}
+
+export function createProjectDataPurge(projectId: string, confirmation: string) {
+  return apiFetch<ProjectDataPurge>(
+    `/api/v1/projects/${encodeURIComponent(projectId)}/data-purge`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...csrfHeaders() },
+      body: JSON.stringify({ confirmation }),
     },
     protectedRequest,
   );

@@ -20,6 +20,7 @@ const analytics: BehaviorAnalyticsResponse = {
   trend: [],
   catalog: [],
   properties: [],
+  measurements: [],
   breakdown: countries.map((value, i) => ({
     value,
     metric: metric(i === 0 ? 12400 : (countries.length - i) * 120),
@@ -79,7 +80,6 @@ async function setup(page: Page, map = false) {
 }
 
 async function configure(page: Page, title = "国家分布") {
-  await page.getByRole("button", { name: "编辑概览", exact: true }).click();
   await page.getByRole("button", { name: `${title} 操作`, exact: true }).click();
   await page.getByRole("menuitem", { name: "配置模块", exact: true }).click();
   return page.getByRole("dialog", { name: "配置模块", exact: true });
@@ -134,8 +134,10 @@ test("country map can be previewed, saved and reloaded; details keep all countri
   await page.screenshot({ path: "/tmp/openrum-dashboard-world-map-dark.png" });
   const queries = state.queries();
   await card.hover();
-  await card.getByRole("button", { name: "国家分布 详情", exact: true }).click();
+  await card.getByRole("button", { name: "国家分布 操作", exact: true }).click();
+  await page.getByRole("menuitem", { name: "详细", exact: true }).click();
   const details = page.getByRole("dialog", { name: "国家分布 详情", exact: true });
+  await details.getByRole("tab", { name: "数据表", exact: true }).click();
   await expect(details.getByRole("table").getByRole("row")).toHaveCount(countries.length + 1);
   await expect(details.getByRole("table")).toContainText("未知国家 (ZZ)");
   await expect(details.getByRole("table")).toContainText("12,400");
@@ -178,8 +180,10 @@ test("mobile map supports tapping small countries and a bounded details dialog",
   await expect(page.getByRole("tooltip")).toContainText("新加坡 (SG)");
   await expect(page.locator('[data-slot="tooltip-content"]').first()).toHaveCSS("opacity", "1");
   await page.screenshot({ path: "/tmp/openrum-dashboard-world-map-mobile.png" });
-  await card.getByRole("button", { name: "国家分布 详情", exact: true }).click();
+  await card.getByRole("button", { name: "国家分布 操作", exact: true }).click();
+  await page.getByRole("menuitem", { name: "详细", exact: true }).click();
   const details = page.getByRole("dialog", { name: "国家分布 详情", exact: true });
+  await details.getByRole("tab", { name: "数据表", exact: true }).click();
   await expect(details.getByRole("table").getByRole("row")).toHaveCount(14);
   const bounds = await details.boundingBox();
   expect(bounds!.x).toBeGreaterThanOrEqual(0);

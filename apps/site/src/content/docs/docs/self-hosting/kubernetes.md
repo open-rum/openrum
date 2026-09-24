@@ -1,7 +1,7 @@
 ---
 title: Kubernetes and Helm
 description: Deploy OpenRUM to production with the Helm chart, from prerequisites to first login.
-appliesTo: Alpha / main
+appliesTo: Alpha
 ---
 
 The chart under `deploy/helm/openrum` deploys the five OpenRUM workloads — `api`, `ingest`, `consumer`, `worker` and `web` — with rolling updates, health probes, autoscaling and a schema migration hook.
@@ -14,7 +14,7 @@ It does **not** provision PostgreSQL, ClickHouse, Kafka or Redis, create the Kaf
 
 **Create the Kafka topic yourself.** Both the producer and the consumer set `AllowAutoTopicCreation: false`, so a missing topic is a runtime failure rather than a self-healing condition. The default topic name is `rum-events-v1`, and ingest only reports durable acceptance after `acks=all`.
 
-**Publish the images somewhere your cluster can pull from.** `image.repository` defaults to the placeholder `ghcr.io/example/openrum`, so an install with stock values will never pull.
+**Use an image your cluster can pull.** Helm installs the chart; Kubernetes pulls the referenced container images. The chart defaults to `ghcr.io/openrum/openrum`. This address becomes usable only after the first official versioned release is published and the package is public. Before then, build and publish your own image and override `image.repository` in your own values file rather than editing the chart.
 
 **Decide on a hostname and a TLS certificate.** `config.appEnv: production` makes every service reject a non-HTTPS `PUBLIC_BASE_URL` at startup, and `ingress.tls` is empty by default — see [Routing and TLS](#routing-and-tls).
 
@@ -48,13 +48,9 @@ Key names are configurable under `config.secretKeys` if your secret manager impo
 
 ## 2. Write a values file
 
-Keep your environment in its own file rather than editing the chart. These are the values with no usable default:
+Keep your environment in its own file rather than editing the chart. These values are specific to your deployment:
 
 ```yaml
-image:
-  repository: registry.example.com/openrum
-  tag: "0.1.0"
-
 config:
   appEnv: production
   publicBaseURL: https://rum.example.com
@@ -71,6 +67,8 @@ ingress:
       secretName: openrum-tls
 ```
 
+To use an internal mirror, add `image.repository: registry.example.com/openrum` and `image.tag: "0.1.0"` to this file, using the exact image version paired with the Chart. For a private registry, create an image-pull Secret in the same namespace and add `imagePullSecrets: [{ name: your-registry-secret }]`. The chart passes it to the application Deployments, the pre-install migration Job, and the Helm test Pod. If the cluster cannot pull the default `busybox:1.37` test image, also override `smokeTest.image`.
+
 `publicBaseURL` must be an absolute `http(s)` URL, and under `appEnv: production` it must be HTTPS. It is the origin the Console and the SDK are told to use, so it has to be the address users actually reach — not an internal Service name.
 
 Object storage is optional, but it is all-or-nothing: if you set any of `endpoint`, `bucket` or `region` while leaving `provider` empty, every pod exits with `OBJECT_STORAGE_PROVIDER is required when object storage fields are configured`. Set `provider` to `oss` or `s3`, or leave the whole block empty. See [Object storage](/docs/self-hosting/object-storage/).
@@ -79,12 +77,17 @@ The full annotated list is the [Helm values reference](/docs/reference/helm-valu
 
 ## 3. Install
 
+Once the official `0.1.0` release is available, install its OCI chart and matching default image:
+
 ```sh
-helm upgrade --install openrum deploy/helm/openrum \
+helm upgrade --install openrum oci://ghcr.io/openrum/charts/openrum \
+  --version 0.1.0 \
   --namespace openrum --create-namespace \
   --values values.production.yaml \
   --wait --timeout 15m
 ```
+
+Before the first official release, use `deploy/helm/openrum` in place of the OCI chart and point `image.repository` at an image you published. Publishing a Chart does not install it into your cluster.
 
 The `pre-install,pre-upgrade` hook runs `/app/migrate up all` — PostgreSQL migrations, then ClickHouse — at hook weight `-5`, so the schema is in place before any workload starts. It retries twice (`migration.backoffLimit`) inside a 600-second Job deadline, but the binary imposes its own two-minute context timeout, so a genuinely long migration fails on that limit first.
 
@@ -109,7 +112,7 @@ Each service exposes `/health/ready` and `/health/live`; `web` also answers both
 
 ## 5. Create the first administrator
 
-Open `https://rum.example.com`, then follow [Quickstart](/docs/getting-started/quickstart/) and [Create your first project](/docs/getting-started/create-first-project/).
+Open `https://rum.example.com/setup`, then follow [First use and maintenance](/docs/getting-started/production-deployment/first-run/) and [Create your first project](/docs/getting-started/create-first-project/).
 
 ### Set BOOTSTRAP_TOKEN before the ingress is reachable
 
@@ -166,6 +169,8 @@ Every pod runs `runAsNonRoot` with a read-only root filesystem, all capabilities
 Because the root filesystem is read only, a custom image that expects to write outside `/tmp` will crash-loop. Review the [Threat model](/docs/self-hosting/security/threat-model/) and [Privacy](/docs/self-hosting/security/privacy/) before opening ingest to the internet.
 
 ### Declare your edge, or the per-IP limit becomes one shared limit
+
+This is the pre-authentication layer of the two-part protection described in [Rate limits](/docs/product/rate-limits/#two-protection-layers).
 
 Ingest rate limits on the socket peer by default, because a forwarding header is written by the caller: believing one unconditionally would let anybody mint unlimited identities and walk past the limiter entirely. Behind an Ingress that peer is the gateway, so all callers collapse onto a single 1000 req/s bucket. Legitimate aggregate traffic above that threshold is then rejected at random, and the symptom looks like intermittent reporting failures rather than a limit.
 

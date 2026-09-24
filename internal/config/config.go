@@ -30,6 +30,9 @@ type Config struct {
 	ClickHouseDSN               string
 	KafkaBrokers                []string
 	KafkaEventTopic             string
+	KafkaRetention              time.Duration
+	ConsumerWorkers             int
+	ConsumerFlushInterval       time.Duration
 	RedisAddress                string
 	GeoCountryHeader            string
 	GeoTrustedProxies           []string
@@ -48,6 +51,20 @@ type Config struct {
 	ManagedSecretsMasterKey     []byte
 	BootstrapToken              string
 	SystemSettings              []SystemSettingDefinition
+	StoragePressure             StoragePressureConfig
+}
+
+// StoragePressureConfig controls the optional ClickHouse capacity guard. The
+// guard is deliberately opt-in because external ClickHouse providers do not
+// all expose system.disks to application users.
+type StoragePressureConfig struct {
+	Enabled           bool
+	WarningFreeRatio  float64
+	CriticalFreeRatio float64
+	HardStopFreeRatio float64
+	RecoveryFreeRatio float64
+	EmergencyRate     float64
+	PollInterval      time.Duration
 }
 
 type ObjectStorageCredentialSource string
@@ -140,6 +157,13 @@ func load(service Service, lookup lookupEnv) (Config, error) {
 	if topic == "" {
 		topic = "rum-events-v1"
 	}
+	kafkaRetention := 7 * 24 * time.Hour
+	if raw := values("OPENRUM_KAFKA_RETENTION_DURATION"); raw != "" {
+		kafkaRetention, err = time.ParseDuration(raw)
+		if err != nil || kafkaRetention < time.Hour {
+			return Config{}, fmt.Errorf("OPENRUM_KAFKA_RETENTION_DURATION must be a duration of at least 1h")
+		}
+	}
 	systemSettings, err := loadSystemSettings(values)
 	if err != nil {
 		return Config{}, err
@@ -152,6 +176,25 @@ func load(service Service, lookup lookupEnv) (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	storagePressure, err := loadStoragePressure(values)
+	if err != nil {
+		return Config{}, err
+	}
+
+	consumerWorkers := 4
+	if raw := values("OPENRUM_CONSUMER_WORKERS"); raw != "" {
+		consumerWorkers, err = strconv.Atoi(raw)
+		if err != nil || consumerWorkers < 1 || consumerWorkers > 64 {
+			return Config{}, fmt.Errorf("OPENRUM_CONSUMER_WORKERS must be an integer between 1 and 64")
+		}
+	}
+	consumerFlushInterval := 10 * time.Millisecond
+	if raw := values("OPENRUM_CONSUMER_FLUSH_INTERVAL"); raw != "" {
+		consumerFlushInterval, err = time.ParseDuration(raw)
+		if err != nil || consumerFlushInterval < time.Millisecond || consumerFlushInterval > time.Second {
+			return Config{}, fmt.Errorf("OPENRUM_CONSUMER_FLUSH_INTERVAL must be between 1ms and 1s")
+		}
+	}
 
 	return Config{
 		Service:                     service,
@@ -163,6 +206,9 @@ func load(service Service, lookup lookupEnv) (Config, error) {
 		ClickHouseDSN:               values("CLICKHOUSE_DSN"),
 		KafkaBrokers:                splitCommaSeparated(values("KAFKA_BROKERS")),
 		KafkaEventTopic:             topic,
+		KafkaRetention:              kafkaRetention,
+		ConsumerWorkers:             consumerWorkers,
+		ConsumerFlushInterval:       consumerFlushInterval,
 		RedisAddress:                values("REDIS_ADDR"),
 		GeoCountryHeader:            strings.TrimSpace(values("GEO_COUNTRY_HEADER")),
 		GeoTrustedProxies:           splitCommaSeparated(values("GEO_TRUSTED_PROXIES")),
@@ -181,7 +227,56 @@ func load(service Service, lookup lookupEnv) (Config, error) {
 		ManagedSecretsMasterKey:     managedMasterKey,
 		BootstrapToken:              values("BOOTSTRAP_TOKEN"),
 		SystemSettings:              systemSettings,
+		StoragePressure:             storagePressure,
 	}, nil
+}
+
+func loadStoragePressure(values func(string) string) (StoragePressureConfig, error) {
+	result := StoragePressureConfig{
+		WarningFreeRatio: 0.15, CriticalFreeRatio: 0.10, HardStopFreeRatio: 0.05, RecoveryFreeRatio: 0.10,
+		EmergencyRate: 0.10, PollInterval: 30 * time.Second,
+	}
+	if raw := values("OPENRUM_STORAGE_PRESSURE_GUARD_ENABLED"); raw != "" {
+		enabled, err := strconv.ParseBool(raw)
+		if err != nil {
+			return StoragePressureConfig{}, fmt.Errorf("OPENRUM_STORAGE_PRESSURE_GUARD_ENABLED must be true or false")
+		}
+		result.Enabled = enabled
+	}
+	for key, destination := range map[string]*float64{
+		"OPENRUM_STORAGE_WARNING_FREE_RATIO":   &result.WarningFreeRatio,
+		"OPENRUM_STORAGE_CRITICAL_FREE_RATIO":  &result.CriticalFreeRatio,
+		"OPENRUM_STORAGE_HARD_STOP_FREE_RATIO": &result.HardStopFreeRatio,
+		"OPENRUM_STORAGE_RECOVERY_FREE_RATIO":  &result.RecoveryFreeRatio,
+	} {
+		if raw := values(key); raw != "" {
+			parsed, err := strconv.ParseFloat(raw, 64)
+			if err != nil || parsed <= 0 || parsed > 1 {
+				return StoragePressureConfig{}, fmt.Errorf("%s must be greater than 0 and at most 1", key)
+			}
+			*destination = parsed
+		}
+	}
+	if raw := values("OPENRUM_STORAGE_EMERGENCY_SAMPLE_RATE"); raw != "" {
+		parsed, err := strconv.ParseFloat(raw, 64)
+		if err != nil || parsed < 0 || parsed > 1 {
+			return StoragePressureConfig{}, fmt.Errorf("OPENRUM_STORAGE_EMERGENCY_SAMPLE_RATE must be between 0 and 1")
+		}
+		result.EmergencyRate = parsed
+	}
+	if raw := values("OPENRUM_STORAGE_POLL_INTERVAL"); raw != "" {
+		parsed, err := time.ParseDuration(raw)
+		if err != nil || parsed < 10*time.Second || parsed > 10*time.Minute {
+			return StoragePressureConfig{}, fmt.Errorf("OPENRUM_STORAGE_POLL_INTERVAL must be between 10s and 10m")
+		}
+		result.PollInterval = parsed
+	}
+	if !(result.HardStopFreeRatio < result.CriticalFreeRatio &&
+		result.CriticalFreeRatio <= result.RecoveryFreeRatio &&
+		result.RecoveryFreeRatio < result.WarningFreeRatio) {
+		return StoragePressureConfig{}, fmt.Errorf("storage pressure ratios must satisfy hard stop < critical <= recovery < warning")
+	}
+	return result, nil
 }
 
 // IngestEnvelopeURL is the endpoint the development data generator posts to.

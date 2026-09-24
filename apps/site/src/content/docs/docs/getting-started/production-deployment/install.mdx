@@ -1,0 +1,136 @@
+---
+title: Install services
+description: Build an image, configure credentials and HTTPS, and install and verify with Helm.
+appliesTo: Alpha
+---
+
+import { Steps, Aside, LinkCard } from "@astrojs/starlight/components";
+
+Complete [Deployment preparation](/docs/getting-started/production-deployment/) and obtain the source version you will deploy. Run commands from the repository root.
+
+<Steps>
+
+1. ## Build and push the application image
+
+   Check out the source revision you intend to deploy and run from the repository root. Use a unique image tag for every deployment and record its Git commit:
+
+   ```sh
+   docker login registry.example.com
+   docker build --platform linux/amd64 \
+     -t registry.example.com/openrum:alpha-deploy-001 .
+   docker push registry.example.com/openrum:alpha-deploy-001
+   ```
+
+   This targets AMD64 nodes; use `linux/arm64` for ARM64 nodes. One image contains all five services, the migration tool, Console and Browser SDK.
+
+   The Chart default `ghcr.io/example/openrum` is a placeholder. Replace it with your pushed image. For private registries configure the cluster pull Secret through `imagePullSecrets`.
+
+   **Success:** The image is pushed and the cluster can pull it. Go and pnpm run inside Docker build stages, so this build does not require host installations.
+
+1. ## Configure runtime credentials and HTTPS
+
+   Generate a token for first-time initialization and save it in your team's password manager:
+
+   ```sh
+   openssl rand -hex 32
+   ```
+
+   Create `runtime-secret.yaml` in a secure local directory and replace all three values:
+
+   ```yaml title="runtime-secret.yaml"
+   apiVersion: v1
+   kind: Secret
+   metadata:
+     name: openrum-runtime
+     namespace: openrum
+   type: Opaque
+   stringData:
+     POSTGRES_DSN: "postgres://openrum:REPLACE_PASSWORD@postgres.example:5432/openrum?sslmode=require"
+     CLICKHOUSE_DSN: "clickhouse://openrum:REPLACE_PASSWORD@clickhouse.example:9000/openrum"
+     BOOTSTRAP_TOKEN: "REPLACE_WITH_GENERATED_TOKEN"
+   ```
+
+   URL-encode special characters in connection credentials. Match ClickHouse port and TLS parameters to the database configuration. This file contains real credentials; do not commit it.
+
+   ```sh
+   kubectl apply -f runtime-secret.yaml
+   kubectl -n openrum get secret openrum-runtime
+   ```
+
+   Import the domain certificate into the same Namespace, or use the Secret produced by your certificate controller:
+
+   ```sh
+   kubectl -n openrum create secret tls openrum-tls \
+     --cert=/path/to/certificate-chain.pem --key=/path/to/private-key.pem
+   ```
+
+   **Success:** Both `openrum-runtime` and `openrum-tls` exist. Keep the bootstrap token available for the first administrator setup.
+
+1. ## Write deployment values
+
+   Create `values.production.yaml`:
+
+   ```yaml title="values.production.yaml"
+   image:
+     repository: registry.example.com/openrum
+     tag: alpha-deploy-001
+
+   config:
+     appEnv: production
+     publicBaseURL: https://rum.example.com
+     existingSecret: openrum-runtime
+     kafkaBrokers: kafka-0:9092,kafka-1:9092,kafka-2:9092
+     kafkaEventTopic: rum-events-v1
+     kafkaRetentionDuration: 168h
+     redisAddress: redis.example:6379
+     # Replace with the actual Ingress proxy range you operate.
+     ingestTrustedProxies: "10.42.0.0/16"
+
+   ingress:
+     enabled: true
+     className: nginx
+     host: rum.example.com
+     tls:
+       - hosts: [rum.example.com]
+         secretName: openrum-tls
+   ```
+
+   - `repository/tag`: the image from the image build step.
+   - `publicBaseURL/host`: the domain browsers actually visit; production requires HTTPS.
+   - Kafka and Redis addresses: endpoints reachable from Pods, not your development machine's `localhost`.
+   - `ingestTrustedProxies`: only proxy ranges you operate, allowing rate limits to identify the real caller IP.
+   - `className`: your installed Ingress Controller.
+
+   Leave object-storage fields empty initially. See [Helm values](/docs/reference/helm-values/) for more options.
+
+   **Success:** Every placeholder is replaced, DNS points to the Ingress, and Secret names match the credentials step.
+
+1. ## Install and verify services
+
+   ```sh
+   helm lint deploy/helm/openrum -f values.production.yaml
+   helm upgrade --install openrum deploy/helm/openrum \
+     --namespace openrum --values values.production.yaml \
+     --wait --timeout 15m
+   helm test openrum --namespace openrum
+   kubectl -n openrum get pods,deploy,ingress
+   ```
+
+   Installation runs database migrations before starting applications. For deployment or health-test failures:
+
+   ```sh
+   kubectl -n openrum get jobs
+   kubectl -n openrum logs -l app.kubernetes.io/component=migration --tail=100
+   kubectl -n openrum logs deploy/openrum-api --tail=100
+   kubectl -n openrum describe pods
+   ```
+
+   **Success:** Installation and Helm tests pass, all five Deployments are available, and `https://rum.example.com` opens without certificate errors. Service health still needs an end-to-end event check.
+
+</Steps>
+
+<LinkCard
+  title="Next: First use and maintenance"
+  href="/docs/getting-started/production-deployment/first-run/"
+  description="Create an administrator, connect a real Project and arrange ongoing maintenance."
+/>

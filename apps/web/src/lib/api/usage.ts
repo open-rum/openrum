@@ -34,14 +34,23 @@ export function usageRange(days = 7) {
   return { from, to };
 }
 
-export function usageURL(projectId: string, range: { from: Date; to: Date }, csv = false) {
+export function usageURL(
+  projectId: string,
+  range: { from: Date; to: Date; eventType?: string },
+  csv = false,
+) {
   const parameters = new URLSearchParams({
     from: range.from.toISOString(),
     to: range.to.toISOString(),
   });
+  if (range.eventType) parameters.set("eventType", range.eventType);
   return `/api/v1/projects/${encodeURIComponent(projectId)}/usage${csv ? ".csv" : ""}?${parameters}`;
 }
 
-export function getUsage(projectId: string, range: { from: Date; to: Date }, signal?: AbortSignal) {
+export function getUsage(
+  projectId: string,
+  range: { from: Date; to: Date; eventType?: string },
+  signal?: AbortSignal,
+) {
   return requestJSON(usageResponseSchema, usageURL(projectId, range), { signal });
 }

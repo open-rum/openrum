@@ -12,7 +12,7 @@ import (
 
 func TestConsumerMetricsUseBoundedLabelsAndExposeFreshness(t *testing.T) {
 	registry := prometheus.NewRegistry()
-	metrics, err := NewMetrics(collectorRegisterer{registry})
+	metrics, err := NewMetrics(collectorRegisterer{registry}, 7*24*time.Hour)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -37,7 +37,7 @@ func TestConsumerMetricsUseBoundedLabelsAndExposeFreshness(t *testing.T) {
 			}
 		}
 	}
-	if !names["openrum_consumer_kafka_lag_seconds"] || !names["openrum_consumer_data_freshness_seconds"] {
+	if !names["openrum_consumer_kafka_lag_seconds"] || !names["openrum_consumer_kafka_retention_headroom_seconds"] || !names["openrum_consumer_data_freshness_seconds"] {
 		t.Fatalf("metric names=%v", names)
 	}
 	if !labels["page_view"] || !labels["unknown"] || !labels["OTHER"] || labels["attacker-controlled"] {

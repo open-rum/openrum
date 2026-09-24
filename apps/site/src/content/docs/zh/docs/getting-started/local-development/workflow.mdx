@@ -1,0 +1,54 @@
+---
+title: 日常开发与排查
+description: 更新代码、查看日志、生成测试数据并排查常见问题。
+appliesTo: Alpha
+---
+
+import { Aside } from "@astrojs/starlight/components";
+
+本文供日常开发时查阅。首次运行请先完成[环境与启动](/zh/docs/getting-started/local-development/)和[接入与验证](/zh/docs/getting-started/local-development/connect-app/)。
+
+## 修改代码与日常操作
+
+| 修改内容                             | 如何更新                                                         |
+| ------------------------------------ | ---------------------------------------------------------------- |
+| 控制台 `apps/web`                    | 开发模式通常自动热更新                                           |
+| API 或它引用的 Go 代码               | `pnpm openrum restart api`，重新编译并启动                       |
+| Ingest、Consumer、Worker、数据库迁移 | 重新执行 `pnpm openrum dev`，触发镜像构建和启动流程              |
+| Browser SDK                          | `pnpm --filter @openrum/browser build`，再刷新或重启引用它的示例 |
+| 文档站                               | 另开终端运行 `pnpm site:dev`，与监控服务独立                     |
+
+容器的 `restart` 只重启现有镜像，不会重新编译代码。需要全镜像运行时使用 `pnpm openrum up`；它和 `dev` 共用端口及数据，由命令自动切换模式。
+
+```sh
+pnpm openrum logs api
+pnpm openrum logs ingest consumer worker
+pnpm openrum stop
+# 下次继续开发
+pnpm openrum dev
+```
+
+`stop` 保留容器和数据；`down` 移除容器但保留数据卷。宿主机日志也位于 `.openrum/log/`。
+
+## 生成和清理测试数据
+
+本地控制台右下角试管按钮可以打开“造数据”。选择项目、环境和时间范围后生成，按面板的查询验证结果查看数据。建议先生成少量数据验证，再增加数量。
+
+场景说明见[演示数据](/zh/docs/getting-started/demo-data/)。
+
+<Aside type="danger" title="重置会删除数据">
+  需要彻底重新开始时使用 `pnpm openrum reset`，它会要求确认并删除全部本地数据库；日常停止用 `stop`。
+</Aside>
+
+## 常见问题
+
+| 现象                 | 先检查什么                                      |
+| -------------------- | ----------------------------------------------- |
+| 镜像或依赖下载失败   | Docker 和包仓库的网络访问、代理配置             |
+| 端口被占用           | 命令输出的占用进程与本地端口配置                |
+| 登录失败或 CSRF 错误 | 是否使用命令打印的控制台地址                    |
+| SDK 上报失败         | DSN、允许的 Origin、Ingest 日志                 |
+| 上报成功但查不到     | 项目、环境、时间范围及 Consumer/ClickHouse 状态 |
+| 改代码后没变化       | 当前模式，以及是否按本页更新代码说明重启或构建  |
+
+继续开发可查看[贡献者指南](/zh/docs/contributing/local-development/)中的目录说明与验证命令。

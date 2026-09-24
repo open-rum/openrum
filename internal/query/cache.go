@@ -72,7 +72,7 @@ func overviewCacheKey(requested OverviewFilters, version time.Time) (string, err
 	}
 	canonical := filters.ProjectID.String() + "\n" + filters.From.Format(time.RFC3339Nano) + "\n" +
 		filters.To.Format(time.RFC3339Nano) + "\n" + filters.Environment + "\n" + filters.Release + "\n" +
-		filters.Route + "\n" + strconv.FormatInt(version.UTC().UnixMilli(), 10)
+		filters.Route + "\n" + strconv.Itoa(filters.MaxPoints) + "\n" + strconv.FormatInt(version.UTC().UnixMilli(), 10)
 	digest := sha256.Sum256([]byte(canonical))
 	return overviewCachePrefix + hex.EncodeToString(digest[:]), nil
 }

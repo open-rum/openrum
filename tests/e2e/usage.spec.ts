@@ -1,11 +1,10 @@
 import { expect, test } from "@playwright/test";
-import { mockOpenRUM } from "./mockOpenRUM";
+import { mockOpenRUM, projectId } from "./mockOpenRUM";
 
 test("admin previews and saves sampling changes", async ({ page }) => {
   await mockOpenRUM(page, { projectExists: true, role: "admin" });
-  await page.goto("/usage");
-  await expect(page.getByRole("heading", { name: "用量与采样" })).toBeVisible();
-  await expect(page.getByText("15,840")).toBeVisible();
+  await page.goto(`/settings/project/${projectId}/sampling`);
+  await expect(page.getByRole("heading", { name: "采样配置" })).toBeVisible();
   if (process.env.OPENRUM_USAGE_SCREENSHOT)
     await page.screenshot({ path: process.env.OPENRUM_USAGE_SCREENSHOT, fullPage: true });
   const eventRate = page.getByLabel("页面、性能与自定义事件采样率");
@@ -18,7 +17,7 @@ test("admin previews and saves sampling changes", async ({ page }) => {
 
 test("failed save rolls back and members remain read-only", async ({ page }) => {
   await mockOpenRUM(page, { projectExists: true, role: "owner", failProjectPatch: true });
-  await page.goto("/usage");
+  await page.goto(`/settings/project/${projectId}/sampling`);
   const eventRate = page.getByLabel("页面、性能与自定义事件采样率");
   await eventRate.fill("30");
   await page.getByRole("button", { name: "保存采样配置" }).click();

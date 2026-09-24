@@ -5,7 +5,7 @@ tests:
   - interval: 1m
     input_series:
       - series: 'openrum_consumer_clickhouse_batches_total{outcome="error"}'
-        values: '0 1 2 3 4 5 6 7 8 9 10'
+        values: "0 1 2 3 4 5 6 7 8 9 10"
     alert_rule_test:
       - eval_time: 10m
         alertname: OpenRUMClickHouseInsertErrors
@@ -14,3 +14,27 @@ tests:
             exp_annotations:
               summary: Consumer ClickHouse inserts are failing
               runbook_url: docs/operations/clickhouse.md
+  - interval: 1m
+    input_series:
+      - series: "openrum_consumer_kafka_retention_headroom_seconds"
+        values: "18000 18000 18000 18000 18000 18000 18000 18000 18000 18000 18000"
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: OpenRUMKafkaRetentionHeadroomLow
+        exp_alerts:
+          - exp_labels: { severity: critical, team: openrum }
+            exp_annotations:
+              summary: Kafka retention headroom is below six hours
+              runbook_url: docs/operations/storage-pressure.md
+  - interval: 1m
+    input_series:
+      - series: 'openrum_storage_ingest_hard_stop_active{backend="clickhouse"}'
+        values: "1 1 1"
+    alert_rule_test:
+      - eval_time: 2m
+        alertname: OpenRUMStorageIngestHardStopActive
+        exp_alerts:
+          - exp_labels: { severity: critical, team: openrum }
+            exp_annotations:
+              summary: Ingest acceptance is stopped because ClickHouse storage is at least 95% used
+              runbook_url: docs/operations/storage-pressure.md

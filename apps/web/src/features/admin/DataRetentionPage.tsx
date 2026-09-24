@@ -42,6 +42,7 @@ import {
 } from "@/lib/api/admin";
 import { listOrganizations, listProjects, type Project } from "@/lib/api/projects";
 import { AdminPageLayout } from "./AdminPageLayout";
+import { EmergencyStorageRecovery } from "./EmergencyStorageRecovery";
 import { ReauthenticationDialog } from "./ReauthenticationDialog";
 
 const definitions = {
@@ -165,6 +166,7 @@ export function DataRetentionPage() {
       title="数据生命周期"
       description="统一管理 Instance 默认保留期，并在确认影响后逐月处理历史数据。"
     >
+      <EmergencyStorageRecovery />
       {configuration.isLoading || projects.isLoading ? <AsyncLoading /> : null}
       {loadError ? (
         <AsyncError

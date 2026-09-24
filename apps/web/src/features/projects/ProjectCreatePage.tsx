@@ -10,8 +10,10 @@ import {
   createProject,
   listOrganizations,
   type Project,
+  type SDKPlatform,
 } from "@/lib/api/projects";
 import { recordProductEvent } from "@/lib/telemetry/productEvents";
+import { ProjectPlatformSelector } from "./ProjectPlatformSelector";
 
 export function ProjectCreatePage() {
   const queryClient = useQueryClient();
@@ -20,6 +22,7 @@ export function ProjectCreatePage() {
   const [showOrganizationForm, setShowOrganizationForm] = useState(false);
   const [createdProject, setCreatedProject] = useState<Project | null>(null);
   const [copied, setCopied] = useState(false);
+  const [sdkPlatform, setSDKPlatform] = useState<SDKPlatform>("javascript");
   const organizationsQuery = useQuery({
     queryKey: ["organizations"],
     queryFn: listOrganizations,
@@ -60,7 +63,7 @@ export function ProjectCreatePage() {
     <ConsolePage width="wide">
       <ConsolePageHeader
         title="创建监控项目"
-        description="配置允许上报的站点 Origin、环境、数据保留与采样率，然后复制客户端 DSN。"
+        description="选择开发平台并配置站点 Origin、环境、数据保留与采样率，创建后继续完成对应 SDK 接入。"
       />
 
       {createdProject?.dsn ? (
@@ -84,6 +87,7 @@ export function ProjectCreatePage() {
             projectMutation.mutate({
               name: String(form.get("name") ?? ""),
               slug: String(form.get("slug") ?? ""),
+              sdkPlatform,
               allowedOrigins: String(form.get("allowedOrigins") ?? "")
                 .split("\n")
                 .map((value) => value.trim())
@@ -110,6 +114,9 @@ export function ProjectCreatePage() {
                 placeholder="mall-h5"
               />
             </FormField>
+          </div>
+          <div className="mt-6">
+            <ProjectPlatformSelector value={sdkPlatform} onValueChange={setSDKPlatform} />
           </div>
           <div className="mt-5">
             <FormField label="允许的 Origin" hint="每行一个，不包含路径或结尾斜杠">

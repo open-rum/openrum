@@ -1,0 +1,180 @@
+name: Publish release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version tag to validate without publishing, for example v0.1.0"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    uses: ./.github/workflows/ci.yml
+    permissions:
+      contents: read
+
+  prepare:
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Confirm a release tag is on main
+        if: github.event_name == 'push'
+        run: |
+          git fetch origin main:refs/remotes/origin/main
+          git merge-base --is-ancestor HEAD origin/main
+      - name: Validate matching release versions and public image
+        id: version
+        env:
+          RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.version || github.ref_name }}
+        run: node scripts/release/check-version.mjs
+      - uses: pnpm/setup@v2
+        with:
+          runtime: node@24
+          cache: true
+          require-lockfile: true
+      - uses: azure/setup-helm@v4.3.1
+        with:
+          version: v3.21.4
+      - name: Validate and package Helm chart
+        run: |
+          helm lint deploy/helm/openrum
+          helm template openrum deploy/helm/openrum > /dev/null
+          mkdir -p release-artifacts
+          helm package deploy/helm/openrum --destination release-artifacts
+      - name: Build docs from the tagged source
+        env:
+          PUBLIC_SITE_URL: https://openrum.dev
+          PUBLIC_REPOSITORY_URL: https://github.com/openrum/openrum
+          PUBLIC_OPENRUM_RELEASE: v${{ steps.version.outputs.version }}
+          PUBLIC_COMMIT_SHA: ${{ github.sha }}
+        run: |
+          pnpm run docs:generate
+          pnpm run site:build
+          node scripts/site/check-built-links.mjs
+          node scripts/site/check-performance-budget.mjs
+          tar -C apps/site/dist -czf "release-artifacts/openrum-docs-${{ steps.version.outputs.version }}.tar.gz" .
+      - uses: actions/upload-artifact@v6
+        with:
+          name: openrum-release-${{ steps.version.outputs.version }}
+          path: release-artifacts/
+          if-no-files-found: error
+          retention-days: 30
+      - uses: actions/upload-artifact@v6
+        with:
+          name: openrum-site-${{ steps.version.outputs.version }}
+          path: apps/site/dist/
+          if-no-files-found: error
+          retention-days: 30
+
+  publish:
+    if: github.event_name == 'push' && github.repository == 'openrum/openrum'
+    needs: prepare
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    environment: public-release
+    permissions:
+      contents: write
+      packages: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/download-artifact@v6
+        with:
+          name: openrum-release-${{ needs.prepare.outputs.version }}
+          path: release-artifacts
+      - uses: actions/download-artifact@v6
+        with:
+          name: openrum-site-${{ needs.prepare.outputs.version }}
+          path: apps/site/dist
+      - name: Reject an existing GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            echo "Release $GITHUB_REF_NAME already exists; publish a new version instead of overwriting it." >&2
+            exit 1
+          fi
+      - name: Reject previously published image tags
+        run: |
+          for image in \
+            "ghcr.io/openrum/openrum:${{ needs.prepare.outputs.version }}" \
+            "ghcr.io/openrum/openrum-site:${{ needs.prepare.outputs.version }}"; do
+            if docker manifest inspect "$image" >/dev/null 2>&1; then
+              echo "$image already exists; publish a new version instead of overwriting it." >&2
+              exit 1
+            fi
+          done
+      - uses: azure/setup-helm@v4.3.1
+        with:
+          version: v3.21.4
+      - name: Reject a previously published Chart version
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          printf '%s' "$GHCR_TOKEN" | helm registry login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+          if helm show chart oci://ghcr.io/openrum/charts/openrum --version "${{ needs.prepare.outputs.version }}" >/dev/null 2>&1; then
+            echo "OCI Chart ${{ needs.prepare.outputs.version }} already exists; publish a new version instead of overwriting it." >&2
+            exit 1
+          fi
+      - name: Publish application image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: Dockerfile
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: ghcr.io/openrum/openrum:${{ needs.prepare.outputs.version }}
+          build-args: |
+            VERSION=${{ needs.prepare.outputs.version }}
+            COMMIT=${{ github.sha }}
+          provenance: true
+          sbom: true
+      - name: Verify the published application image
+        run: |
+          docker pull "ghcr.io/openrum/openrum:${{ needs.prepare.outputs.version }}"
+          docker run --rm --entrypoint /bin/sh "ghcr.io/openrum/openrum:${{ needs.prepare.outputs.version }}" -ec \
+            'test -x /app/api && test -x /app/ingest && test -x /app/consumer && test -x /app/worker && test -x /app/migrate && test -x /app/web'
+      - name: Publish and verify OCI Helm chart
+        run: |
+          helm push "release-artifacts/openrum-${{ needs.prepare.outputs.version }}.tgz" oci://ghcr.io/openrum/charts
+          helm show chart oci://ghcr.io/openrum/charts/openrum --version "${{ needs.prepare.outputs.version }}"
+      - name: Publish versioned documentation image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: deploy/site/Dockerfile
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: ghcr.io/openrum/openrum-site:${{ needs.prepare.outputs.version }}
+          provenance: true
+          sbom: true
+      - name: Announce the verified release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            "release-artifacts/openrum-${{ needs.prepare.outputs.version }}.tgz" \
+            "release-artifacts/openrum-docs-${{ needs.prepare.outputs.version }}.tar.gz" \
+            --verify-tag --title "$GITHUB_REF_NAME" --generate-notes --prerelease

@@ -8,6 +8,7 @@ import {
   type ChartConfig,
 } from "@/components/ui/chart";
 import { useChartMotion } from "@/lib/charts/useChartMotion";
+import { smoothCurve } from "@/lib/charts/smoothCurve";
 import { formatAPIDuration, type APITrendPoint } from "@/lib/api/apis";
 
 const trendTimeFormatter = new Intl.DateTimeFormat("zh-CN", {
@@ -128,7 +129,7 @@ export function ApiTrend({
           <Area
             key={band.key}
             dataKey={band.key}
-            type="natural"
+            {...smoothCurve}
             stackId="requests"
             stroke={`var(--color-${band.key})`}
             fill={`url(#apiTrend-${band.key})`}

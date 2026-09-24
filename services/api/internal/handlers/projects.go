@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/rs/zerolog"
@@ -19,6 +20,11 @@ import (
 
 var environmentPattern = regexp.MustCompile(`^[a-z][a-z0-9_-]{0,63}$`)
 
+var validSDKPlatforms = map[metadata.SDKPlatform]struct{}{
+	metadata.SDKPlatformJavaScript: {}, metadata.SDKPlatformReact: {}, metadata.SDKPlatformVue: {},
+	metadata.SDKPlatformNextJS: {}, metadata.SDKPlatformNuxt: {}, metadata.SDKPlatformAngular: {}, metadata.SDKPlatformSvelte: {},
+}
+
 type ProjectHandler struct {
 	organizations  *metadata.OrganizationRepository
 	projects       *metadata.ProjectRepository
@@ -27,27 +33,29 @@ type ProjectHandler struct {
 }
 
 type createProjectRequest struct {
-	Name            string   `json:"name"`
-	Slug            string   `json:"slug"`
-	AllowedOrigins  []string `json:"allowedOrigins"`
-	Environment     string   `json:"environment"`
-	Environments    []string `json:"environments"`
-	RetentionDays   *int16   `json:"retentionDays"`
-	EventSampleRate *float64 `json:"eventSampleRate"`
-	APISampleRate   *float64 `json:"apiSampleRate"`
-	ErrorSampleRate *float64 `json:"errorSampleRate"`
+	Name            string               `json:"name"`
+	Slug            string               `json:"slug"`
+	SDKPlatform     metadata.SDKPlatform `json:"sdkPlatform"`
+	AllowedOrigins  []string             `json:"allowedOrigins"`
+	Environment     string               `json:"environment"`
+	Environments    []string             `json:"environments"`
+	RetentionDays   *int16               `json:"retentionDays"`
+	EventSampleRate *float64             `json:"eventSampleRate"`
+	APISampleRate   *float64             `json:"apiSampleRate"`
+	ErrorSampleRate *float64             `json:"errorSampleRate"`
 }
 
 type updateProjectRequest struct {
-	Name            *string   `json:"name"`
-	Slug            *string   `json:"slug"`
-	AllowedOrigins  *[]string `json:"allowedOrigins"`
-	Environment     *string   `json:"environment"`
-	Environments    *[]string `json:"environments"`
-	RetentionDays   *int16    `json:"retentionDays"`
-	EventSampleRate *float64  `json:"eventSampleRate"`
-	APISampleRate   *float64  `json:"apiSampleRate"`
-	ErrorSampleRate *float64  `json:"errorSampleRate"`
+	Name            *string               `json:"name"`
+	Slug            *string               `json:"slug"`
+	SDKPlatform     *metadata.SDKPlatform `json:"sdkPlatform"`
+	AllowedOrigins  *[]string             `json:"allowedOrigins"`
+	Environment     *string               `json:"environment"`
+	Environments    *[]string             `json:"environments"`
+	RetentionDays   *int16                `json:"retentionDays"`
+	EventSampleRate *float64              `json:"eventSampleRate"`
+	APISampleRate   *float64              `json:"apiSampleRate"`
+	ErrorSampleRate *float64              `json:"errorSampleRate"`
 	// IngestRateLimit is decoded as a pointer to a pointer so that omitting the
 	// field and sending an explicit null stay distinguishable: omitted leaves
 	// the override as it is, null clears it back to the instance default.
@@ -56,18 +64,34 @@ type updateProjectRequest struct {
 	Status            *metadata.ProjectStatus     `json:"status"`
 }
 
+type projectDataPurgeRequest struct {
+	Confirmation string `json:"confirmation"`
+}
+
+type projectDataPurgeResponse struct {
+	ProjectID   string  `json:"projectId"`
+	Status      string  `json:"status"`
+	Attempts    int     `json:"attempts"`
+	LastError   string  `json:"lastError"`
+	DeadlineAt  string  `json:"deadlineAt,omitempty"`
+	CreatedAt   string  `json:"createdAt,omitempty"`
+	UpdatedAt   string  `json:"updatedAt,omitempty"`
+	CompletedAt *string `json:"completedAt,omitempty"`
+}
+
 type projectResponse struct {
-	ID              string   `json:"id"`
-	OrganizationID  string   `json:"organizationId"`
-	Name            string   `json:"name"`
-	Slug            string   `json:"slug"`
-	AllowedOrigins  []string `json:"allowedOrigins"`
-	Environment     string   `json:"environment"`
-	Environments    []string `json:"environments"`
-	RetentionDays   int16    `json:"retentionDays"`
-	EventSampleRate float64  `json:"eventSampleRate"`
-	APISampleRate   float64  `json:"apiSampleRate"`
-	ErrorSampleRate float64  `json:"errorSampleRate"`
+	ID              string               `json:"id"`
+	OrganizationID  string               `json:"organizationId"`
+	Name            string               `json:"name"`
+	Slug            string               `json:"slug"`
+	SDKPlatform     metadata.SDKPlatform `json:"sdkPlatform"`
+	AllowedOrigins  []string             `json:"allowedOrigins"`
+	Environment     string               `json:"environment"`
+	Environments    []string             `json:"environments"`
+	RetentionDays   int16                `json:"retentionDays"`
+	EventSampleRate float64              `json:"eventSampleRate"`
+	APISampleRate   float64              `json:"apiSampleRate"`
+	ErrorSampleRate float64              `json:"errorSampleRate"`
 	// Null means the project has no override and the instance default applies.
 	IngestRateLimit   *int32                     `json:"ingestRateLimit"`
 	OverLimitBehavior metadata.OverLimitBehavior `json:"overLimitBehavior"`
@@ -221,10 +245,82 @@ func (handler *ProjectHandler) Delete(writer http.ResponseWriter, request *http.
 	writeJSON(writer, http.StatusAccepted, map[string]any{"status": "deleting", "deadlineHours": 24})
 }
 
+func (handler *ProjectHandler) GetDataPurge(writer http.ResponseWriter, request *http.Request) {
+	principal, ok := httpx.PrincipalFromContext(request.Context())
+	if !ok {
+		httpx.WriteError(writer, request, http.StatusUnauthorized, "UNAUTHENTICATED", "Authentication is required.")
+		return
+	}
+	projectID, ok := parsePathUUID(writer, request, "projectId")
+	if !ok {
+		return
+	}
+	purge, err := handler.projects.GetDataPurge(request.Context(), principal.UserID, projectID)
+	if err != nil {
+		writeControlPlaneError(writer, request, handler.logger, err)
+		return
+	}
+	writeJSON(writer, http.StatusOK, projectDataPurgeDTO(purge))
+}
+
+func (handler *ProjectHandler) CreateDataPurge(writer http.ResponseWriter, request *http.Request) {
+	principal, ok := httpx.PrincipalFromContext(request.Context())
+	if !ok {
+		httpx.WriteError(writer, request, http.StatusUnauthorized, "UNAUTHENTICATED", "Authentication is required.")
+		return
+	}
+	projectID, ok := parsePathUUID(writer, request, "projectId")
+	if !ok {
+		return
+	}
+	var payload projectDataPurgeRequest
+	if !decodeJSONBody(writer, request, &payload) {
+		return
+	}
+	access, err := handler.projects.GetForUser(request.Context(), principal.UserID, projectID)
+	if err != nil {
+		writeControlPlaneError(writer, request, handler.logger, err)
+		return
+	}
+	if err := auth.Authorize(access.Role, auth.ActionDeleteProject); err != nil {
+		writeControlPlaneError(writer, request, handler.logger, errors.Join(metadata.ErrForbidden, err))
+		return
+	}
+	purge, err := handler.projects.RequestDataPurge(request.Context(), principal.UserID, projectID, payload.Confirmation)
+	if err != nil {
+		writeControlPlaneError(writer, request, handler.logger, err)
+		return
+	}
+	writeJSON(writer, http.StatusAccepted, projectDataPurgeDTO(purge))
+}
+
+func projectDataPurgeDTO(purge metadata.ProjectDataPurge) projectDataPurgeResponse {
+	response := projectDataPurgeResponse{
+		ProjectID: purge.ProjectID.String(), Status: purge.Status, Attempts: purge.Attempts, LastError: purge.LastError,
+	}
+	if !purge.DeadlineAt.IsZero() {
+		response.DeadlineAt = purge.DeadlineAt.Format(time.RFC3339Nano)
+	}
+	if !purge.CreatedAt.IsZero() {
+		response.CreatedAt = purge.CreatedAt.Format(time.RFC3339Nano)
+	}
+	if !purge.UpdatedAt.IsZero() {
+		response.UpdatedAt = purge.UpdatedAt.Format(time.RFC3339Nano)
+	}
+	if purge.CompletedAt != nil {
+		value := purge.CompletedAt.Format(time.RFC3339Nano)
+		response.CompletedAt = &value
+	}
+	return response
+}
+
 func validateCreateProject(payload createProjectRequest, organizationID uuid.UUID) (metadata.CreateProjectInput, bool) {
 	payload.Name = strings.TrimSpace(payload.Name)
 	payload.Slug = strings.TrimSpace(payload.Slug)
 	payload.Environment = strings.TrimSpace(payload.Environment)
+	if payload.SDKPlatform == "" {
+		payload.SDKPlatform = metadata.SDKPlatformJavaScript
+	}
 	if payload.Environment == "" {
 		payload.Environment = "production"
 	}
@@ -235,7 +331,7 @@ func validateCreateProject(payload createProjectRequest, organizationID uuid.UUI
 	environments, environmentsOK := normalizeEnvironments(environments)
 	environments = ensureEnvironment(environments, payload.Environment)
 	origins, ok := normalizeOrigins(payload.AllowedOrigins)
-	if !validName(payload.Name) || !validSlug(payload.Slug) || !environmentPattern.MatchString(payload.Environment) ||
+	if !validName(payload.Name) || !validSlug(payload.Slug) || !validSDKPlatform(payload.SDKPlatform) || !environmentPattern.MatchString(payload.Environment) ||
 		!environmentsOK || len(environments) > 16 || !ok {
 		return metadata.CreateProjectInput{}, false
 	}
@@ -257,14 +353,14 @@ func validateCreateProject(payload createProjectRequest, organizationID uuid.UUI
 		return metadata.CreateProjectInput{}, false
 	}
 	return metadata.CreateProjectInput{
-		OrganizationID: organizationID, Name: payload.Name, Slug: payload.Slug, AllowedOrigins: origins,
+		OrganizationID: organizationID, Name: payload.Name, Slug: payload.Slug, SDKPlatform: payload.SDKPlatform, AllowedOrigins: origins,
 		Environment: payload.Environment, Environments: environments, RetentionDays: retentionDays, EventSampleRate: eventSampleRate,
 		APISampleRate: apiSampleRate, ErrorSampleRate: errorSampleRate,
 	}, true
 }
 
 func validateUpdateProject(payload updateProjectRequest) (metadata.UpdateProjectInput, bool) {
-	if payload.Name == nil && payload.Slug == nil && payload.AllowedOrigins == nil && payload.Environment == nil && payload.Environments == nil &&
+	if payload.Name == nil && payload.Slug == nil && payload.SDKPlatform == nil && payload.AllowedOrigins == nil && payload.Environment == nil && payload.Environments == nil &&
 		payload.RetentionDays == nil && payload.EventSampleRate == nil && payload.APISampleRate == nil &&
 		payload.ErrorSampleRate == nil && payload.Status == nil {
 		return metadata.UpdateProjectInput{}, false
@@ -282,6 +378,9 @@ func validateUpdateProject(payload updateProjectRequest) (metadata.UpdateProject
 		if !validSlug(trimmed) {
 			return metadata.UpdateProjectInput{}, false
 		}
+	}
+	if payload.SDKPlatform != nil && !validSDKPlatform(*payload.SDKPlatform) {
+		return metadata.UpdateProjectInput{}, false
 	}
 	if payload.AllowedOrigins != nil {
 		origins, ok := normalizeOrigins(*payload.AllowedOrigins)
@@ -408,9 +507,14 @@ func validSampleRate(value float64) bool {
 	return value >= 0 && value <= 1 && !math.IsNaN(value) && !math.IsInf(value, 0)
 }
 
+func validSDKPlatform(value metadata.SDKPlatform) bool {
+	_, ok := validSDKPlatforms[value]
+	return ok
+}
+
 func projectDTO(project metadata.Project, role metadata.OrganizationRole) projectResponse {
 	return projectResponse{
-		ID: project.ID.String(), OrganizationID: project.OrganizationID.String(), Name: project.Name, Slug: project.Slug,
+		ID: project.ID.String(), OrganizationID: project.OrganizationID.String(), Name: project.Name, Slug: project.Slug, SDKPlatform: project.SDKPlatform,
 		AllowedOrigins: project.AllowedOrigins, Environment: project.Environment, Environments: project.Environments, RetentionDays: project.RetentionDays,
 		EventSampleRate: project.EventSampleRate, APISampleRate: project.APISampleRate,
 		ErrorSampleRate: project.ErrorSampleRate, IngestRateLimit: project.IngestRateLimit,

@@ -1,0 +1,17 @@
+{$OPENRUM_DOMAIN} {
+	encode zstd gzip
+
+	@api path /api/*
+	handle @api {
+		reverse_proxy api:8080
+	}
+
+	@ingest path /ingest/*
+	handle @ingest {
+		reverse_proxy ingest:8081
+	}
+
+	handle {
+		reverse_proxy web:8080
+	}
+}

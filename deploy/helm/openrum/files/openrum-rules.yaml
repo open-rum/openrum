@@ -22,6 +22,13 @@ groups:
         annotations:
           summary: Consumer Kafka lag exceeds 30 seconds
           runbook_url: docs/operations/kafka.md
+      - alert: OpenRUMKafkaRetentionHeadroomLow
+        expr: min(openrum_consumer_kafka_retention_headroom_seconds) >= 0 and min(openrum_consumer_kafka_retention_headroom_seconds) < 21600
+        for: 10m
+        labels: { severity: critical, team: openrum }
+        annotations:
+          summary: Kafka retention headroom is below six hours
+          runbook_url: docs/operations/storage-pressure.md
       - alert: OpenRUMClickHouseInsertErrors
         expr: sum(rate(openrum_consumer_clickhouse_batches_total{outcome="error"}[5m])) > 0
         for: 5m
@@ -36,6 +43,92 @@ groups:
         annotations:
           summary: Query data is more than two minutes stale
           runbook_url: docs/operations/clickhouse.md
+      - alert: OpenRUMStoragePressureGuardActive
+        expr: max(openrum_storage_pressure_guard_active{backend="clickhouse"}) == 1
+        for: 2m
+        labels: { severity: warning, team: openrum }
+        annotations:
+          summary: Emergency Browser SDK sampling is active because ClickHouse storage is low
+          runbook_url: docs/operations/storage-pressure.md
+      - alert: OpenRUMStorageIngestHardStopActive
+        expr: max(openrum_storage_ingest_hard_stop_active{backend="clickhouse"}) == 1
+        for: 1m
+        labels: { severity: critical, team: openrum }
+        annotations:
+          summary: Ingest acceptance is stopped because ClickHouse storage is at least 95% used
+          runbook_url: docs/operations/storage-pressure.md
+      - alert: OpenRUMStoragePressureDrops
+        expr: sum(rate(openrum_ingest_storage_pressure_dropped_envelopes_total[5m])) > 0
+        for: 1m
+        labels: { severity: critical, team: openrum }
+        annotations:
+          summary: Ingest is deliberately dropping envelopes during the storage hard stop
+          runbook_url: docs/operations/storage-pressure.md
+      - alert: OpenRUMStorageCapacityProbeFailed
+        expr: min by (backend) (openrum_storage_capacity_probe_success{backend="clickhouse"}) == 0
+        for: 10m
+        labels: { severity: warning, team: openrum }
+        annotations:
+          summary: OpenRUM cannot read ClickHouse storage capacity
+          runbook_url: docs/operations/storage-pressure.md
+      - alert: OpenRUMClickHouseFreeSpaceLow
+        expr: min(openrum_storage_free_ratio{backend="clickhouse"}) >= 0 and min(openrum_storage_free_ratio{backend="clickhouse"}) < 0.15
+        for: 10m
+        labels: { severity: warning, team: openrum }
+        annotations:
+          summary: ClickHouse has less than 15% free space
+          runbook_url: docs/operations/storage-pressure.md
+      - alert: OpenRUMClickHouseFreeSpaceCritical
+        expr: min(openrum_storage_free_ratio{backend="clickhouse"}) >= 0 and min(openrum_storage_free_ratio{backend="clickhouse"}) < 0.05
+        for: 5m
+        labels: { severity: critical, team: openrum }
+        annotations:
+          summary: ClickHouse has less than 5% free space
+          runbook_url: docs/operations/storage-pressure.md
+      - alert: OpenRUMStorageWriteUnavailable
+        expr: min by (backend) (openrum_storage_write_available) == 0
+        for: 2m
+        labels: { severity: critical, team: openrum }
+        annotations:
+          summary: OpenRUM observed a failed durable storage write
+          runbook_url: docs/operations/storage-pressure.md
+  - name: openrum.storage
+    rules:
+      - alert: OpenRUMPersistentVolumeSpaceLow
+        expr: kubelet_volume_stats_available_bytes{namespace="{{ .Release.Namespace }}"} / kubelet_volume_stats_capacity_bytes{namespace="{{ .Release.Namespace }}"} < 0.15
+        for: 15m
+        labels: { severity: warning, team: openrum }
+        annotations:
+          summary: A persistent volume in the OpenRUM namespace has less than 15% free space
+          runbook_url: docs/operations/storage-pressure.md
+      - alert: OpenRUMPersistentVolumeSpaceCritical
+        expr: kubelet_volume_stats_available_bytes{namespace="{{ .Release.Namespace }}"} / kubelet_volume_stats_capacity_bytes{namespace="{{ .Release.Namespace }}"} < 0.05
+        for: 5m
+        labels: { severity: critical, team: openrum }
+        annotations:
+          summary: A persistent volume in the OpenRUM namespace has less than 5% free space
+          runbook_url: docs/operations/storage-pressure.md
+      - alert: OpenRUMPersistentVolumeInodesLow
+        expr: kubelet_volume_stats_inodes_free{namespace="{{ .Release.Namespace }}"} / kubelet_volume_stats_inodes{namespace="{{ .Release.Namespace }}"} < 0.10
+        for: 10m
+        labels: { severity: critical, team: openrum }
+        annotations:
+          summary: A persistent volume in the OpenRUM namespace has less than 10% free inodes
+          runbook_url: docs/operations/storage-pressure.md
+      - alert: OpenRUMPersistentVolumeFillingSoon
+        expr: predict_linear(kubelet_volume_stats_available_bytes{namespace="{{ .Release.Namespace }}"}[6h], 4 * 3600) < 0 and kubelet_volume_stats_available_bytes{namespace="{{ .Release.Namespace }}"} / kubelet_volume_stats_capacity_bytes{namespace="{{ .Release.Namespace }}"} < 0.30
+        for: 30m
+        labels: { severity: warning, team: openrum }
+        annotations:
+          summary: A persistent volume in the OpenRUM namespace is predicted to fill within four hours
+          runbook_url: docs/operations/storage-pressure.md
+      - alert: OpenRUMNodeDiskPressure
+        expr: max by (node) (kube_node_status_condition{condition="DiskPressure",status="true"} == 1) and on (node) max by (node) (kube_pod_info{namespace="{{ .Release.Namespace }}"})
+        for: 5m
+        labels: { severity: critical, team: openrum }
+        annotations:
+          summary: A Kubernetes node running OpenRUM reports DiskPressure
+          runbook_url: docs/operations/storage-pressure.md
   - name: openrum.query
     rules:
       - alert: OpenRUMAPIErrorRateHigh

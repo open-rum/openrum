@@ -14,7 +14,13 @@ import (
 )
 
 func TestSessionCredentialsAreRandomAndBounded(t *testing.T) {
-	first, _, err := newSessionCredentials(time.Now())
+	const expectedConsoleSessionTTL = 30 * 24 * time.Hour
+	if SessionIdleTTL != expectedConsoleSessionTTL || SessionAbsoluteTTL != expectedConsoleSessionTTL {
+		t.Fatalf("session TTLs idle=%s absolute=%s, want %s", SessionIdleTTL, SessionAbsoluteTTL, expectedConsoleSessionTTL)
+	}
+
+	now := time.Now()
+	first, _, err := newSessionCredentials(now)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -25,8 +31,8 @@ func TestSessionCredentialsAreRandomAndBounded(t *testing.T) {
 	if first.Token == second.Token || first.CSRFToken == second.CSRFToken {
 		t.Fatal("session credentials were reused")
 	}
-	if first.ExpiresAt.Before(time.Now().Add(SessionAbsoluteTTL - time.Minute)) {
-		t.Fatal("absolute expiry is too short")
+	if !first.ExpiresAt.Equal(now.Add(expectedConsoleSessionTTL)) {
+		t.Fatalf("absolute expiry=%s, want %s", first.ExpiresAt, now.Add(expectedConsoleSessionTTL))
 	}
 }
 

@@ -7,5 +7,5 @@ metadata:
     {{- include "openrum.labels" . | nindent 4 }}
     {{- with .Values.prometheusRules.labels }}{{ toYaml . | nindent 4 }}{{- end }}
 spec:
-{{ .Files.Get "files/openrum-rules.yaml" | nindent 2 }}
+{{ tpl (.Files.Get "files/openrum-rules.yaml") . | nindent 2 }}
 {{- end }}

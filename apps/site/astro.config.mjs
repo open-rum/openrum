@@ -6,89 +6,6 @@ import tailwindcss from "@tailwindcss/vite";
 const site = process.env.PUBLIC_SITE_URL || "http://localhost:4321";
 const repository = process.env.PUBLIC_REPOSITORY_URL || "https://github.com/openrum/openrum";
 
-/* Code-block syntax palettes.
- *
- * Starlight ships GitHub-flavoured defaults, whose blues, purples and magentas
- * share no hue with anything else on the site — the code blocks read as a widget
- * pasted in from another product. These two themes take their hues straight from
- * the design tokens: lime 125.59 (brand), cyan 185.87 (`--ds-secondary`), amber 72
- * (`--ds-warning`) and red 25.33 (`--ds-danger`), converted to sRGB at lightnesses
- * that clear 4.5:1 on the surface each theme sits on.
- *
- * Literal colours are deliberate and have to live here: a TextMate theme is
- * resolved at build time and cannot read a CSS variable. `design:check` only
- * guards `apps/site/src`, so the boundary it protects is not crossed. Everything
- * that *can* be a token — the frame, border, tab bar, terminal chrome — is one,
- * through `styleOverrides` below, so the block's shell still follows the theme
- * toggle while only the syntax is fixed.
- *
- * Four hues rather than one: colouring every token lime would tie the block to the
- * brand and destroy the thing syntax highlighting is for.
- */
-const codeTheme = (type, c) => ({
-  name: `openrum-${type}`,
-  type,
-  colors: { "editor.background": c.bg, "editor.foreground": c.text },
-  tokenColors: [
-    { scope: ["comment", "punctuation.definition.comment"], settings: { foreground: c.muted } },
-    {
-      scope: ["keyword", "storage", "storage.type", "keyword.control", "keyword.operator.new"],
-      settings: { foreground: c.lime },
-    },
-    { scope: ["entity.name.tag", "support.type.property-name"], settings: { foreground: c.lime } },
-    {
-      scope: ["string", "string.quoted", "punctuation.definition.string", "meta.attribute"],
-      settings: { foreground: c.cyan },
-    },
-    {
-      scope: ["constant.numeric", "constant.language", "constant.character", "keyword.other.unit"],
-      settings: { foreground: c.amber },
-    },
-    {
-      scope: ["entity.name.type", "support.type", "support.class", "entity.name.class"],
-      settings: { foreground: c.amber },
-    },
-    {
-      scope: ["entity.name.function", "support.function", "meta.function-call.generic"],
-      settings: { foreground: c.text, fontStyle: "bold" },
-    },
-    { scope: ["entity.other.attribute-name"], settings: { foreground: c.dim } },
-    {
-      scope: ["variable", "variable.other", "meta.definition.variable", "meta.object-literal.key"],
-      settings: { foreground: c.text },
-    },
-    {
-      scope: ["punctuation", "meta.brace", "keyword.operator"],
-      settings: { foreground: c.muted },
-    },
-    { scope: ["invalid", "message.error", "markup.deleted"], settings: { foreground: c.red } },
-    { scope: ["markup.inserted"], settings: { foreground: c.lime } },
-  ],
-});
-
-const codeThemes = [
-  codeTheme("dark", {
-    bg: "#1a1a1a",
-    text: "#e5e5e5",
-    muted: "#929292",
-    lime: "#b8e954",
-    cyan: "#54cec2",
-    amber: "#fcb452",
-    red: "#f2716a",
-    dim: "#b3bba7",
-  }),
-  codeTheme("light", {
-    bg: "#f7f7f7",
-    text: "#262626",
-    muted: "#636363",
-    lime: "#496209",
-    cyan: "#006b62",
-    amber: "#9f6200",
-    red: "#be2229",
-    dim: "#465234",
-  }),
-];
-
 export default defineConfig({
   site,
   output: "static",
@@ -145,30 +62,6 @@ export default defineConfig({
         zh: { label: "简体中文", lang: "zh-CN" },
       },
       customCss: ["./src/styles/global.css", "./src/styles/docs.css"],
-      expressiveCode: {
-        themes: codeThemes,
-        // The shell of the block is tokens, so it tracks the theme toggle and sits
-        // in the same material as every other panel on the site. Only the syntax
-        // colours above are fixed values.
-        styleOverrides: {
-          borderColor: "var(--ds-border)",
-          borderRadius: "var(--radius-lg)",
-          codeBackground: "var(--ds-surface)",
-          codeFontFamily: "var(--font-mono)",
-          scrollbarThumbColor: "var(--ds-border)",
-          frames: {
-            editorTabBarBackground: "var(--ds-surface-subtle)",
-            editorTabBarBorderBottomColor: "var(--ds-border)",
-            editorActiveTabBackground: "var(--ds-surface)",
-            editorActiveTabBorderColor: "var(--ds-border)",
-            editorActiveTabIndicatorTopColor: "var(--ds-primary)",
-            editorBackground: "var(--ds-surface)",
-            terminalBackground: "var(--ds-surface)",
-            terminalTitlebarBackground: "var(--ds-surface-subtle)",
-            terminalTitlebarBorderBottomColor: "var(--ds-border)",
-          },
-        },
-      },
       components: {
         Head: "./src/components/DocsHead.astro",
         Footer: "./src/components/DocsFooter.astro",
@@ -186,13 +79,31 @@ export default defineConfig({
       // deployment guide and left readers with no way to tell what comes first.
       sidebar: [
         {
-          label: "Get started",
-          translations: { zh: "从这里开始", "zh-CN": "从这里开始" },
+          label: "Start",
+          translations: { zh: "开始", "zh-CN": "开始" },
           items: [
             { slug: "docs/getting-started/quickstart" },
+            {
+              label: "Local development",
+              translations: { zh: "本地开发", "zh-CN": "本地开发" },
+              collapsed: true,
+              items: [
+                { slug: "docs/getting-started/local-development" },
+                { slug: "docs/getting-started/local-development/connect-app" },
+                { slug: "docs/getting-started/local-development/workflow" },
+              ],
+            },
+            {
+              label: "Production deployment",
+              translations: { zh: "生产部署", "zh-CN": "生产部署" },
+              collapsed: true,
+              items: [
+                { slug: "docs/getting-started/production-deployment" },
+                { slug: "docs/getting-started/production-deployment/install" },
+                { slug: "docs/getting-started/production-deployment/first-run" },
+              ],
+            },
             { slug: "docs/getting-started/create-first-project" },
-            { slug: "docs/getting-started/demo-data" },
-            { slug: "docs/getting-started/domain-model" },
           ],
         },
         {
@@ -231,6 +142,7 @@ export default defineConfig({
             { slug: "docs/product/api-monitoring" },
             { slug: "docs/product/alerts" },
             { slug: "docs/product/project-settings" },
+            { slug: "docs/product/rate-limits" },
             { slug: "docs/product/inbound-filters" },
           ],
         },
@@ -238,14 +150,24 @@ export default defineConfig({
           label: "Self-hosting",
           translations: { zh: "自托管", "zh-CN": "自托管" },
           items: [
+            { slug: "docs/self-hosting/overview" },
+            { slug: "docs/self-hosting/kubernetes" },
             {
-              label: "Deploy",
-              translations: { zh: "部署", "zh-CN": "部署" },
+              label: "Docker",
+              translations: { zh: "Docker", "zh-CN": "Docker" },
+              collapsed: true,
               items: [
-                { slug: "docs/self-hosting/overview" },
-                { slug: "docs/self-hosting/architecture" },
+                { slug: "docs/self-hosting/docker-production" },
+                { slug: "docs/self-hosting/docker-operations" },
                 { slug: "docs/self-hosting/compose" },
-                { slug: "docs/self-hosting/kubernetes" },
+              ],
+            },
+            {
+              label: "Architecture and planning",
+              translations: { zh: "架构与规划", "zh-CN": "架构与规划" },
+              collapsed: true,
+              items: [
+                { slug: "docs/self-hosting/architecture" },
                 { slug: "docs/self-hosting/dependencies" },
                 { slug: "docs/self-hosting/capacity" },
               ],
@@ -259,6 +181,7 @@ export default defineConfig({
                 { slug: "docs/self-hosting/backup-restore" },
                 { slug: "docs/self-hosting/data-lifecycle" },
                 { slug: "docs/self-hosting/troubleshooting" },
+                { slug: "docs/self-hosting/storage-pressure" },
               ],
             },
             // Nobody reads these in order; they are opened when one component
@@ -291,6 +214,7 @@ export default defineConfig({
           label: "Reference",
           translations: { zh: "参考", "zh-CN": "参考" },
           items: [
+            { slug: "docs/getting-started/domain-model" },
             { slug: "docs/reference/configuration" },
             { slug: "docs/reference/sdk-options" },
             { slug: "docs/reference/event-schema" },
@@ -305,6 +229,7 @@ export default defineConfig({
           items: [
             { slug: "docs/contributing" },
             { slug: "docs/contributing/local-development" },
+            { slug: "docs/getting-started/demo-data" },
             { slug: "docs/contributing/roadmap" },
           ],
         },

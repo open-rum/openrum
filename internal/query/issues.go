@@ -26,6 +26,9 @@ type IssueFilters struct {
 	From        time.Time
 	To          time.Time
 	Environment string
+	Title       string
+	ErrorType   string
+	UserID      string
 	Release     string
 	Route       string
 	Browser     string
@@ -80,6 +83,30 @@ type IssueTrendPoint struct {
 	Sessions uint64    `json:"sessions"`
 }
 
+type IssueOverviewPoint struct {
+	Bucket          time.Time `json:"bucket"`
+	Events          uint64    `json:"events"`
+	AnonymousUsers  uint64    `json:"anonymousUsers"`
+	IdentifiedUsers uint64    `json:"identifiedUsers"`
+	Sessions        uint64    `json:"sessions"`
+	Pages           uint64    `json:"pages"`
+}
+
+type IssueDistributionItem struct {
+	Value  string `json:"value"`
+	Events uint64 `json:"events"`
+}
+
+type IssueOverview struct {
+	From            time.Time               `json:"from"`
+	To              time.Time               `json:"to"`
+	IntervalSeconds int64                   `json:"intervalSeconds"`
+	Trend           []IssueOverviewPoint    `json:"trend"`
+	ErrorTypes      []IssueDistributionItem `json:"errorTypes"`
+	Pages           []IssueDistributionItem `json:"pages"`
+	Countries       []IssueDistributionItem `json:"countries"`
+}
+
 type IssuesRepository struct {
 	database *sql.DB
 	states   IssueStateLookup
@@ -95,29 +122,50 @@ func (repository *IssuesRepository) List(ctx context.Context, requested IssueFil
 		return IssuePage{}, err
 	}
 	where, arguments := issueWhere(filters)
-	query := `SELECT fingerprint, max(fingerprint_version), argMaxMerge(error_type), argMaxMerge(error_message),
-  uniqCombined64Merge(events) AS event_count, uniqCombined64Merge(users), uniqCombined64Merge(sessions),
+	query := `SELECT fingerprint, max(fingerprint_version), argMaxMerge(error_type) AS error_type_value, argMaxMerge(error_message) AS issue_title,
+  uniqCombined64Merge(events) AS event_count, uniqCombined64Merge(users) AS user_count, uniqCombined64Merge(sessions) AS session_count,
   minMerge(first_seen) AS first_seen_at, maxMerge(last_seen) AS last_seen_at
 FROM issue_metrics_5m WHERE ` + where + `
 GROUP BY fingerprint`
+	usesRawEvents := filters.UserID != ""
+	if usesRawEvents {
+		where, arguments = issueEventWhere(filters)
+		query = `SELECT fingerprint, max(fingerprint_version), argMax(error_type, timestamp) AS error_type_value, argMax(error_message, timestamp) AS issue_title,
+  uniqCombined64(event_id) AS event_count, uniqCombined64If(anonymous_user_id, anonymous_user_id != '') AS user_count,
+  uniqCombined64(session_id) AS session_count, min(timestamp) AS first_seen_at, max(timestamp) AS last_seen_at
+FROM rum_events WHERE ` + where + `
+GROUP BY fingerprint`
+	}
+	having := make([]string, 0, 3)
+	if filters.ErrorType != "" && !usesRawEvents {
+		having = append(having, "error_type_value = ?")
+		arguments = append(arguments, filters.ErrorType)
+	}
+	if filters.Title != "" && !usesRawEvents {
+		having = append(having, "positionCaseInsensitiveUTF8(issue_title, ?) > 0")
+		arguments = append(arguments, filters.Title)
+	}
 	if cursor != nil {
 		primary, value := "event_count", any(cursor.Events)
 		if filters.Sort == "users" {
-			primary, value = "uniqCombined64Merge(users)", cursor.Users
+			primary, value = "user_count", cursor.Users
 		}
 		if filters.Sort == "last_seen" {
-			query += ` HAVING last_seen_at < ? OR (last_seen_at = ? AND fingerprint > ?)`
+			having = append(having, `(last_seen_at < ? OR (last_seen_at = ? AND fingerprint > ?))`)
 			arguments = append(arguments, cursor.LastSeenAt, cursor.LastSeenAt, cursor.Fingerprint)
 		} else {
-			query += fmt.Sprintf(` HAVING %s < ? OR (%s = ? AND last_seen_at < ?) OR
-  (%s = ? AND last_seen_at = ? AND fingerprint > ?)`, primary, primary, primary)
+			having = append(having, fmt.Sprintf(`(%s < ? OR (%s = ? AND last_seen_at < ?) OR
+  (%s = ? AND last_seen_at = ? AND fingerprint > ?))`, primary, primary, primary))
 			arguments = append(arguments, value, value, cursor.LastSeenAt, value, cursor.LastSeenAt, cursor.Fingerprint)
 		}
+	}
+	if len(having) > 0 {
+		query += ` HAVING ` + strings.Join(having, " AND ")
 	}
 	candidateLimit := min(max(filters.Limit*4, filters.Limit+1), 1000)
 	order := "event_count DESC, last_seen_at DESC, fingerprint ASC"
 	if filters.Sort == "users" {
-		order = "uniqCombined64Merge(users) DESC, last_seen_at DESC, fingerprint ASC"
+		order = "user_count DESC, last_seen_at DESC, fingerprint ASC"
 	} else if filters.Sort == "last_seen" {
 		order = "last_seen_at DESC, fingerprint ASC"
 	}
@@ -178,8 +226,8 @@ func (repository *IssuesRepository) Trend(ctx context.Context, requested IssueFi
 	}
 	where, arguments := issueWhere(filters)
 	arguments = append(arguments, fingerprint)
-	interval := overviewInterval(filters.To.Sub(filters.From))
-	minutes := max(5, int(interval/time.Minute))
+	interval := ConsoleSeriesInterval(filters.To.Sub(filters.From), 5*time.Minute)
+	minutes := int(interval / time.Minute)
 	rows, err := repository.database.QueryContext(ctx, fmt.Sprintf(`SELECT
   toStartOfInterval(bucket, INTERVAL %d MINUTE), uniqCombined64Merge(events),
   uniqCombined64Merge(users), uniqCombined64Merge(sessions)
@@ -199,6 +247,91 @@ GROUP BY 1 ORDER BY 1`, minutes, where), arguments...)
 		points = append(points, point)
 	}
 	return points, rows.Err()
+}
+
+// Overview reads raw error events so the Console can distinguish anonymous
+// visitors from explicitly identified business users and count affected page
+// instances. Those dimensions are intentionally not approximated from the
+// issue rollup because the rollup does not retain user_id or page_id.
+func (repository *IssuesRepository) Overview(ctx context.Context, requested IssueFilters) (IssueOverview, error) {
+	requested.Cursor = ""
+	filters, _, err := normalizeIssueFilters(requested)
+	if err != nil {
+		return IssueOverview{}, err
+	}
+	where, arguments := issueEventWhere(filters)
+	interval := ConsoleSeriesInterval(filters.To.Sub(filters.From), time.Minute)
+	minutes := int(interval / time.Minute)
+	rows, err := repository.database.QueryContext(ctx, fmt.Sprintf(`SELECT
+  toStartOfInterval(timestamp, INTERVAL %d MINUTE) AS bucket,
+  uniqCombined64(event_id),
+  uniqCombined64If(anonymous_user_id, anonymous_user_id != ''),
+  uniqCombined64If(user_id, user_id != ''),
+  uniqCombined64If(session_id, session_id != toUUID('00000000-0000-0000-0000-000000000000')),
+  uniqCombined64If(page_id, page_id != toUUID('00000000-0000-0000-0000-000000000000'))
+FROM rum_events WHERE %s
+GROUP BY bucket ORDER BY bucket`, minutes, where), arguments...)
+	if err != nil {
+		return IssueOverview{}, fmt.Errorf("query issue overview trend: %w", err)
+	}
+	trend := make([]IssueOverviewPoint, 0)
+	for rows.Next() {
+		var point IssueOverviewPoint
+		if err := rows.Scan(&point.Bucket, &point.Events, &point.AnonymousUsers, &point.IdentifiedUsers, &point.Sessions, &point.Pages); err != nil {
+			_ = rows.Close()
+			return IssueOverview{}, fmt.Errorf("scan issue overview trend: %w", err)
+		}
+		point.Bucket = point.Bucket.UTC()
+		trend = append(trend, point)
+	}
+	if err := rows.Err(); err != nil {
+		_ = rows.Close()
+		return IssueOverview{}, fmt.Errorf("scan issue overview trend: %w", err)
+	}
+	_ = rows.Close()
+
+	distributionQuery := `SELECT dimension, value, events FROM (
+  SELECT 'error_type' AS dimension, if(error_type = '', 'unknown', error_type) AS value, uniqCombined64(event_id) AS events
+  FROM rum_events WHERE ` + where + ` GROUP BY value
+  UNION ALL
+  SELECT 'page' AS dimension, if(route = '', if(page_url_normalized = '', 'unknown', page_url_normalized), route) AS value, uniqCombined64(event_id) AS events
+  FROM rum_events WHERE ` + where + ` GROUP BY value
+  UNION ALL
+  SELECT 'country' AS dimension, if(country = '', 'unknown', toString(country)) AS value, uniqCombined64(event_id) AS events
+  FROM rum_events WHERE ` + where + ` GROUP BY value
+) ORDER BY dimension, events DESC, value LIMIT 7 BY dimension`
+	distributionArguments := make([]any, 0, len(arguments)*3)
+	for range 3 {
+		distributionArguments = append(distributionArguments, arguments...)
+	}
+	distributionRows, err := repository.database.QueryContext(ctx, distributionQuery, distributionArguments...)
+	if err != nil {
+		return IssueOverview{}, fmt.Errorf("query issue overview distribution: %w", err)
+	}
+	defer func() { _ = distributionRows.Close() }()
+	overview := IssueOverview{
+		From: filters.From, To: filters.To, IntervalSeconds: int64(interval / time.Second),
+		Trend: trend, ErrorTypes: []IssueDistributionItem{}, Pages: []IssueDistributionItem{}, Countries: []IssueDistributionItem{},
+	}
+	for distributionRows.Next() {
+		var dimension string
+		var item IssueDistributionItem
+		if err := distributionRows.Scan(&dimension, &item.Value, &item.Events); err != nil {
+			return IssueOverview{}, fmt.Errorf("scan issue overview distribution: %w", err)
+		}
+		switch dimension {
+		case "error_type":
+			overview.ErrorTypes = append(overview.ErrorTypes, item)
+		case "page":
+			overview.Pages = append(overview.Pages, item)
+		case "country":
+			overview.Countries = append(overview.Countries, item)
+		}
+	}
+	if err := distributionRows.Err(); err != nil {
+		return IssueOverview{}, fmt.Errorf("scan issue overview distribution: %w", err)
+	}
+	return overview, nil
 }
 
 func (repository *IssuesRepository) readFacets(ctx context.Context, filters IssueFilters) (IssueFacets, error) {
@@ -268,6 +401,8 @@ func normalizeIssueFilters(filters IssueFilters) (IssueFilters, *issueCursor, er
 		!boundedQueryDimension(filters.Environment, 64) || !boundedQueryDimension(filters.Release, 128) ||
 		!boundedQueryDimension(filters.Route, 512) || !boundedQueryDimension(filters.Browser, 128) ||
 		!boundedQueryDimension(filters.DeviceType, 64) || !boundedQueryDimension(filters.Country, 2) ||
+		!boundedQueryDimension(filters.Title, 200) || !boundedQueryDimension(filters.ErrorType, 128) ||
+		!boundedQueryDimension(filters.UserID, 128) ||
 		!boundedQueryDimension(filters.Fingerprint, 128) {
 		return IssueFilters{}, nil, ErrInvalidIssueFilters
 	}
@@ -304,6 +439,28 @@ func issueWhere(filters IssueFilters) (string, []any) {
 			clauses = append(clauses, filter.column+" = ?")
 			arguments = append(arguments, filter.value)
 		}
+	}
+	return strings.Join(clauses, " AND "), arguments
+}
+
+func issueEventWhere(filters IssueFilters) (string, []any) {
+	clauses := []string{
+		"project_id = ?", "event_type = 'error'", "timestamp >= ?", "timestamp < ?", "NOT has(ingest_flags, 'synthetic')",
+	}
+	arguments := []any{filters.ProjectID, filters.From, filters.To}
+	for _, filter := range []struct{ column, value string }{
+		{"environment", filters.Environment}, {"release", filters.Release}, {"route", filters.Route},
+		{"browser", filters.Browser}, {"device_type", filters.DeviceType}, {"country", filters.Country},
+		{"error_type", filters.ErrorType}, {"fingerprint", filters.Fingerprint}, {"user_id", filters.UserID},
+	} {
+		if filter.value != "" {
+			clauses = append(clauses, filter.column+" = ?")
+			arguments = append(arguments, filter.value)
+		}
+	}
+	if filters.Title != "" {
+		clauses = append(clauses, "positionCaseInsensitiveUTF8(error_message, ?) > 0")
+		arguments = append(arguments, filters.Title)
 	}
 	return strings.Join(clauses, " AND "), arguments
 }

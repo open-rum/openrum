@@ -1,0 +1,74 @@
+---
+title: Single-host Docker production
+description: Run OpenRUM on one Linux server with a separate production Compose stack and HTTPS.
+appliesTo: Alpha
+---
+
+import { Aside, LinkCard, Steps } from "@astrojs/starlight/components";
+
+This path runs OpenRUM and its four data services on **one Linux host**. It uses a separate Compose file from the [local evaluation stack](/docs/self-hosting/compose/): no Demo seeding, `APP_ENV=production`, required private credentials, no published database ports, and Caddy for automatic HTTPS. Kubernetes/Helm remains the [recommended path](/docs/self-hosting/kubernetes/) when you need multiple application nodes or planned scaling.
+
+<Aside type="caution" title="A single failure domain, not high availability">
+  Docker will restart a failed container, but it cannot recover from a lost host or disk. Backups,
+  off-host copies, capacity alerts, upgrades and restore drills are your responsibility. Do not
+  accept real traffic before completing the [operations
+  checklist](/docs/self-hosting/docker-operations/). This Alpha path has no uptime or capacity
+  guarantee.
+</Aside>
+
+<Steps>
+
+1. ## Prepare the host and domain
+
+   Use a Linux server with Docker Engine, Compose v2 and enough CPU, RAM and SSD space for your measured event rate and retention. Use [capacity planning](/docs/self-hosting/capacity/) rather than treating one example machine size as a guarantee. Point a public DNS name at the server and allow inbound TCP `80`/`443` and UDP `443`. Caddy obtains and renews the certificate; no Traefik installation is involved. Keep SSH limited to administrators, and arrange an encrypted off-host backup destination.
+
+   **Check:** `docker info`, `docker compose version` and DNS resolution succeed. Ports `80` and `443` are not already occupied. Caddy needs public reachability for certificate issuance; see its [HTTPS requirements](https://caddyserver.com/docs/quick-starts/https).
+
+1. ## Get a pinned OpenRUM revision and configure secrets
+
+   Clone the repository and check out a reviewed release tag or commit. Do not deploy a moving branch tip. From the repository root:
+
+   ```sh
+   cp deploy/compose/.env.production.example deploy/compose/.env.production
+   chmod 600 deploy/compose/.env.production
+   openssl rand -hex 24
+   ```
+
+   Run the last command **three times** and put the independent results into `POSTGRES_PASSWORD`, `CLICKHOUSE_PASSWORD` and `BOOTSTRAP_TOKEN` in `.env.production`. Set `OPENRUM_DOMAIN` to the public DNS name. Set `OPENRUM_IMAGE` to a tag identifying the checked-out revision, for example `openrum-production:0.1.0`. The passwords use hex so they can be embedded safely in the internal database DSNs. Never commit or send this file; preserve an encrypted copy separately from the Docker volumes.
+
+   If `172.30.77.0/24` overlaps your host network, change `OPENRUM_EDGE_SUBNET` and the contained `OPENRUM_EDGE_IP` together. Ingest trusts only that Caddy address for client-IP rate limiting.
+
+1. ## Build and validate before opening the site
+
+   ```sh
+   docker compose --env-file deploy/compose/.env.production \
+     -f deploy/compose/production.compose.yml config --quiet
+   docker compose --env-file deploy/compose/.env.production \
+     -f deploy/compose/production.compose.yml build migrate
+   ```
+
+   The build tags one application image for API, Ingest, Consumer, Worker, Web and migrations. Other services never pull an unknown application image implicitly. Check available disk space before building; for a registry-based workflow, load or pull a reviewed image under the exact tag in `OPENRUM_IMAGE` first.
+
+1. ## Start and verify
+
+   ```sh
+   docker compose --env-file deploy/compose/.env.production \
+     -f deploy/compose/production.compose.yml up -d --wait
+   curl --fail https://rum.example.com/health/ready
+   ```
+
+   Replace the example domain with your own. The one-time `migrate` and `kafka-init` services should complete successfully; the application and four data services should be healthy. Only Caddy publishes host ports. If the TLS check fails, inspect `edge` logs and confirm DNS and ports `80`/`443` before using a browser warning bypass.
+
+1. ## Create the first administrator and send a test event
+
+   Open `https://<your-domain>/setup`. Enter your organization, administrator details and the `BOOTSTRAP_TOKEN` from the private env file. After the first user is created, setup closes. Create a project, allow your application's Origin, install the SDK using its DSN and verify one event in the Console. There is **no** Demo account or synthetic production data.
+
+   Before real traffic, run the [backup and restore procedure](/docs/self-hosting/docker-operations/) on a replacement host and set up monitoring for disk pressure and Kafka lag.
+
+</Steps>
+
+<LinkCard
+  title="Next: Operate a single-host Instance"
+  href="/docs/self-hosting/docker-operations/"
+  description="Back up, restore, monitor and upgrade this Compose deployment."
+/>

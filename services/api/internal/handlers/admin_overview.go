@@ -14,6 +14,7 @@ import (
 	"openrum/internal/auth"
 	"openrum/internal/httpx"
 	"openrum/internal/metadata"
+	"openrum/internal/storagepressure"
 )
 
 type adminOverviewRoles interface {
@@ -39,10 +40,18 @@ type adminDependencyResponse struct {
 }
 
 type adminCapacityResponse struct {
-	Status        string  `json:"status"`
-	UsedBytes     *uint64 `json:"usedBytes"`
-	CapacityBytes *uint64 `json:"capacityBytes"`
-	Detail        string  `json:"detail"`
+	Status                  string   `json:"status"`
+	Mode                    string   `json:"mode"`
+	Pressure                string   `json:"pressure"`
+	UsedBytes               *uint64  `json:"usedBytes"`
+	FreeBytes               *uint64  `json:"freeBytes"`
+	CapacityBytes           *uint64  `json:"capacityBytes"`
+	UsedPercent             *float64 `json:"usedPercent"`
+	AutomaticSamplingActive bool     `json:"automaticSamplingActive"`
+	AutomaticSamplingRate   *float64 `json:"automaticSamplingRate"`
+	IngestBlocked           bool     `json:"ingestBlocked"`
+	ObservedAt              *string  `json:"observedAt"`
+	Detail                  string   `json:"detail"`
 }
 
 type adminPipelineResponse struct {
@@ -82,6 +91,9 @@ type SQLAdminOverviewSource struct {
 	storageConfigured bool
 	startedAt         time.Time
 	now               func() time.Time
+	pressure          interface {
+		Snapshot() storagepressure.Snapshot
+	}
 }
 
 func NewAdminOverviewHandler(members adminOverviewRoles, source adminOverviewSource, logger zerolog.Logger) *AdminOverviewHandler {
@@ -94,12 +106,19 @@ func NewSQLAdminOverviewSource(
 	version, environment, deploymentMode string,
 	storageConfigured bool,
 	startedAt time.Time,
+	pressure ...interface {
+		Snapshot() storagepressure.Snapshot
+	},
 ) *SQLAdminOverviewSource {
-	return &SQLAdminOverviewSource{
+	source := &SQLAdminOverviewSource{
 		postgres: postgres, clickHouse: clickHouse, redis: redisClient,
 		version: version, environment: environment, deploymentMode: deploymentMode,
 		storageConfigured: storageConfigured, startedAt: startedAt.UTC(), now: time.Now,
 	}
+	if len(pressure) > 0 {
+		source.pressure = pressure[0]
+	}
+	return source
 }
 
 func (handler *AdminOverviewHandler) Get(writer http.ResponseWriter, request *http.Request) {
@@ -136,7 +155,7 @@ func (source *SQLAdminOverviewSource) Snapshot(ctx context.Context) adminOvervie
 			{ID: "worker", Label: "Worker", Status: "unknown", Detail: "Worker 心跳尚未接入"},
 		},
 		Pipeline: adminPipelineResponse{
-			Capacity: adminCapacityResponse{Status: "unknown", Detail: "容量暂时无法读取"},
+			Capacity: adminCapacityResponse{Status: "unknown", Mode: "unknown", Pressure: "unknown", Detail: "容量暂时无法读取"},
 		},
 	}
 	if source.storageConfigured {
@@ -184,12 +203,36 @@ func (source *SQLAdminOverviewSource) Snapshot(ctx context.Context) adminOvervie
 			formatted := latest.Time.UTC().Format(timeFormat)
 			response.Pipeline.LatestEventAt = &formatted
 		}
-		var total, free uint64
-		if err := source.clickHouse.QueryRowContext(ctx,
-			"SELECT sum(total_space), sum(free_space) FROM system.disks").Scan(&total, &free); err == nil && total >= free {
-			used := total - free
-			response.Pipeline.Capacity = adminCapacityResponse{
-				Status: "available", UsedBytes: &used, CapacityBytes: &total, Detail: "ClickHouse 节点磁盘容量",
+		if source.pressure != nil {
+			snapshot := source.pressure.Snapshot()
+			if snapshot.CapacityBytes > 0 {
+				used, free, total := snapshot.UsedBytes, snapshot.FreeBytes, snapshot.CapacityBytes
+				usedPercent := (1 - snapshot.FreeRatio) * 100
+				observedAt, rate := snapshot.ObservedAt.UTC().Format(timeFormat), snapshot.AutomaticSamplingRate
+				if snapshot.IngestBlocked {
+					rate = 0
+				}
+				status, detail := "available", "ClickHouse 节点磁盘容量"
+				if !snapshot.ProbeSuccessful {
+					status, detail = "unknown", "容量探测失败；展示最近一次成功结果"
+				}
+				response.Pipeline.Capacity = adminCapacityResponse{
+					Status: status, Mode: snapshot.Mode, Pressure: snapshot.Level,
+					UsedBytes: &used, FreeBytes: &free, CapacityBytes: &total, UsedPercent: &usedPercent,
+					AutomaticSamplingActive: snapshot.AutomaticSamplingActive, AutomaticSamplingRate: &rate,
+					IngestBlocked: snapshot.IngestBlocked,
+					ObservedAt:    &observedAt, Detail: detail,
+				}
+			}
+		} else {
+			var total, free uint64
+			if err := source.clickHouse.QueryRowContext(ctx,
+				"SELECT sum(total_space), sum(free_space) FROM system.disks").Scan(&total, &free); err == nil && total > 0 && total >= free {
+				used, usedPercent := total-free, float64(total-free)/float64(total)*100
+				response.Pipeline.Capacity = adminCapacityResponse{
+					Status: "available", Mode: "unknown", Pressure: "unknown", UsedBytes: &used, FreeBytes: &free,
+					CapacityBytes: &total, UsedPercent: &usedPercent, Detail: "ClickHouse 节点磁盘容量",
+				}
 			}
 		}
 	}()

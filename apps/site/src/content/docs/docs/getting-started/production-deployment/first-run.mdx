@@ -1,0 +1,44 @@
+---
+title: First use and maintenance
+description: Initialize the administrator, verify real events and arrange optional features and maintenance.
+appliesTo: Alpha
+---
+
+import { Steps, Aside, LinkCard } from "@astrojs/starlight/components";
+
+Complete [Install services](/docs/getting-started/production-deployment/install/), confirm service readiness and have the bootstrap token ready.
+
+<Steps>
+
+1. ## Create the first administrator
+
+   Open `https://rum.example.com/setup` and fill in:
+
+   1. Organization name.
+   2. Your display name and work email.
+   3. A password of at least 12 characters, and its confirmation.
+   4. The Bootstrap Token saved in the credentials step.
+   5. Submit the initialization form.
+
+   Helm production deployment does not seed local demo accounts. This entry closes after initialization; use the created account for subsequent logins. If the Instance is already initialized, sign in with an existing administrator account.
+
+   **Success:** You are signed into the Console and can access your Organization.
+
+1. ## Connect the first real Project
+
+   Follow [Create your first project](/docs/getting-started/create-first-project/): select the SDK platform, configure the application origin and `production` Environment, copy the onboarding DSN and initialize the SDK.
+
+   After deploying the application, visit a page and send a test Event. Select the same Project, `production` and the last 15 minutes in the Console, then find the Event and its Session.
+
+   **Success:** Telemetry has passed through Ingest, Kafka and Consumer and is queryable. If not, check origin, DSN, Environment and time range before pipeline logs.
+
+</Steps>
+## Enable optional features and arrange maintenance
+
+- **Source Maps:** Configure OSS or S3-compatible [object storage](/docs/self-hosting/object-storage/), then [upload build artifacts](/docs/sdk/source-maps/).
+- **Alerts and IM notifications:** Configure a notification channel and [alert rules](/docs/product/alerts/). To save managed credentials in the Console, add `OPENRUM_MASTER_KEY` to the runtime Secret and set `config.managedSecrets.enabled: true`. Generate the key with `openssl rand -base64 32` and back it up securely.
+- **Retention and capacity:** Set retention, watch [storage pressure](/docs/self-hosting/storage-pressure/) notifications and Kafka lag, and validate your actual load through [capacity planning](/docs/self-hosting/capacity/).
+- **Backup and restore:** Configure automated backups and complete a [restore drill](/docs/self-hosting/backup-restore/).
+- **Upgrades and rollback:** Retain configuration, image versions and backups; follow the [upgrade guide](/docs/self-hosting/upgrades/).
+
+Secret changes do not automatically restart every application; schedule a rollout after rotation. See [Kubernetes and Helm](/docs/self-hosting/kubernetes/) for resource, scaling and network details.

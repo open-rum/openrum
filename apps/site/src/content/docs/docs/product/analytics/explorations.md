@@ -1,7 +1,7 @@
 ---
 title: Funnels, paths and retention
 description: The three exploration queries, the identity each one counts, and the limits that decide what you can ask.
-appliesTo: Alpha / main
+appliesTo: Alpha
 ---
 
 Three queries, three different identities. Knowing which one a number counts is what keeps

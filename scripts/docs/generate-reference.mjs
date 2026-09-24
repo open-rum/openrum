@@ -30,6 +30,17 @@ const descriptions = {
   OBJECT_STORAGE_PROVIDER: "Optional oss or s3 provider.",
   OPENRUM_ALLOW_MANAGED_SECRETS: "Explicit opt-in for console-managed encrypted credentials.",
   OPENRUM_MASTER_KEY: "Base64 for exactly 32 external key bytes; never stored in PostgreSQL.",
+  OPENRUM_KAFKA_RETENTION_DURATION:
+    "Real Event-topic retention used to calculate remaining Consumer drain headroom.",
+  OPENRUM_STORAGE_PRESSURE_GUARD_ENABLED:
+    "Enables automatic Browser SDK sampling protection from low ClickHouse free space.",
+  OPENRUM_STORAGE_WARNING_FREE_RATIO: "Free-space ratio that reports storage pressure.",
+  OPENRUM_STORAGE_CRITICAL_FREE_RATIO: "Free-space ratio that activates emergency sampling.",
+  OPENRUM_STORAGE_HARD_STOP_FREE_RATIO: "Free-space ratio that stops Ingest acceptance.",
+  OPENRUM_STORAGE_RECOVERY_FREE_RATIO: "Free-space ratio required to release emergency sampling.",
+  OPENRUM_STORAGE_EMERGENCY_SAMPLE_RATE:
+    "Temporary Browser SDK sampling cap while the guard is active.",
+  OPENRUM_STORAGE_POLL_INTERVAL: "Interval between ClickHouse system.disks capacity checks.",
 };
 // Translated alongside the English text so that a Chinese reader looking up a variable is
 // not dropped into English. Anything missing here falls back to the generic sentence.
@@ -49,6 +60,14 @@ const chineseDescriptions = {
   OBJECT_STORAGE_PROVIDER: "可选的 oss 或 s3 provider。",
   OPENRUM_ALLOW_MANAGED_SECRETS: "显式开启由 Console 托管的加密凭据。",
   OPENRUM_MASTER_KEY: "恰好 32 字节外部密钥的 Base64 值；绝不存入 PostgreSQL。",
+  OPENRUM_KAFKA_RETENTION_DURATION: "真实 Event topic 保留期，用于计算 Consumer 剩余排空时间。",
+  OPENRUM_STORAGE_PRESSURE_GUARD_ENABLED: "启用 ClickHouse 低容量时的 Browser SDK 自动采样保护。",
+  OPENRUM_STORAGE_WARNING_FREE_RATIO: "进入存储压力提示的剩余空间比例。",
+  OPENRUM_STORAGE_CRITICAL_FREE_RATIO: "启动紧急采样的剩余空间比例。",
+  OPENRUM_STORAGE_HARD_STOP_FREE_RATIO: "停止 Ingest 接入的剩余空间比例。",
+  OPENRUM_STORAGE_RECOVERY_FREE_RATIO: "解除硬熔断和紧急采样所需的剩余空间比例。",
+  OPENRUM_STORAGE_EMERGENCY_SAMPLE_RATE: "保护生效期间的 Browser SDK 临时采样上限。",
+  OPENRUM_STORAGE_POLL_INTERVAL: "检查 ClickHouse system.disks 容量的间隔。",
 };
 
 function configurationPage({ title, description, generatedFrom, columns, fallback, notes }) {
@@ -58,7 +77,7 @@ function configurationPage({ title, description, generatedFrom, columns, fallbac
   return `---
 title: ${title}
 description: ${description}
-appliesTo: Alpha / main
+appliesTo: Alpha
 ---
 
 <!-- GENERATED: scripts/docs/generate-reference.mjs -->
@@ -123,7 +142,7 @@ const helmSource = await readFile(join(root, "deploy/helm/openrum/values.yaml"),
 const helmValues = `---
 title: Helm values reference
 description: Generated source-of-truth values for the OpenRUM Helm chart.
-appliesTo: Alpha / main
+appliesTo: Alpha
 ---
 
 <!-- GENERATED: scripts/docs/generate-reference.mjs -->

@@ -34,12 +34,51 @@ yarn add @openrum/browser
 ```
 
   </TabItem>
+  <TabItem label="CDN script">
+
+Asynchronous loading (recommended) does not block HTML parsing and initializes after the SDK loads:
+
+```html
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.src = "https://rum.example.com/sdk/browser/0.1.0/openrum.min.js";
+    script.async = true;
+    script.onload = function () {
+      OpenRUM.init({
+        dsn: "https://YOUR_PUBLIC_DSN@rum.example.com/ingest/v1/envelope",
+        environment: "production",
+      });
+    };
+    document.head.appendChild(script);
+  })();
+</script>
+```
+
+Synchronous loading starts collection earlier, but blocks HTML parsing while the bundle downloads:
+
+```html
+<script src="https://rum.example.com/sdk/browser/0.1.0/openrum.min.js"></script>
+<script>
+  OpenRUM.init({
+    dsn: "https://YOUR_PUBLIC_DSN@rum.example.com/ingest/v1/envelope",
+    environment: "production",
+  });
+</script>
+```
+
+  </TabItem>
 </Tabs>
 
-<Aside type="caution" title="No CDN build yet">
-  The package ships ES modules only, so there is no `<script src="...">` snippet to paste. A
-  bundler is required. An Instance-served bundle is planned; see [Support
-  matrix](#support-matrix).
+Do not add `async` to the external script and then call `OpenRUM.init()` immediately in the next
+script: those scripts have an execution race. Initialize from `onload` when loading asynchronously.
+Very early events may happen before an asynchronous bundle is ready; use synchronous loading when
+covering those events matters more than avoiding parser blocking.
+
+<Aside type="note" title="The Instance serves the script">
+  Replace `rum.example.com` with your OpenRUM Instance. The versioned URL is immutable and may be
+  cached for one year; change the version in the URL when you upgrade. This is an Instance-hosted
+  script, not a dependency on a third-party public CDN.
 </Aside>
 
 ## Initialize
@@ -204,8 +243,7 @@ normal browser output is preserved.
 init({
   dsn: import.meta.env.VITE_OPENRUM_DSN,
   captureConsole: ["warn", "error"],
-  beforeSendLog: (log) =>
-    log.message.includes("ResizeObserver loop") ? null : log,
+  beforeSendLog: (log) => (log.message.includes("ResizeObserver loop") ? null : log),
 });
 ```
 
@@ -214,8 +252,8 @@ as `[Object]`, not serialized. The former `enableLogs` option is deprecated and 
 existing configurations may leave it in place until a future breaking upgrade.
 
 <Aside type="caution" title="Treat log text as potentially sensitive">
-  Do not log credentials, personal data, request bodies, or access tokens. OpenRUM applies
-  bounded client and server scrubbing, but pattern matching cannot guarantee anonymization.
+  Do not log credentials, personal data, request bodies, or access tokens. OpenRUM applies bounded
+  client and server scrubbing, but pattern matching cannot guarantee anonymization.
 </Aside>
 
 To verify the integration, send a temporary `logger.info("openrum setup check")`, open
@@ -237,7 +275,7 @@ written; nothing in this table is inferred from the fact that a framework is pop
 | Astro                                                     | Works, with placement rules | Runs in a client island, not in a `.astro` frontmatter block. See [Astro](/docs/sdk/astro/). |
 | Hash-based routing                                        | Not captured                | The SDK does not listen for `hashchange`, so only the first Page View is recorded.           |
 | Route patterns instead of resolved paths                  | Not recorded                | See below.                                                                                   |
-| CDN `<script>` tag                                        | Planned                     | The package has no IIFE or UMD build, so there is nothing to serve yet.                      |
+| CDN `<script>` tag                                        | Works                       | The Instance serves the versioned IIFE bundle at `/sdk/browser/0.1.0/openrum.min.js`.        |
 | React Native and other non-browser runtimes               | Not supported               | The SDK reads `window` and keeps its queue in `localStorage`.                                |
 
 ### Server rendering drops Events silently

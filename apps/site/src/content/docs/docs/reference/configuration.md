@@ -1,7 +1,7 @@
 ---
 title: Configuration reference
 description: Generated environment-variable reference for OpenRUM services.
-appliesTo: Alpha / main
+appliesTo: Alpha
 ---
 
 <!-- GENERATED: scripts/docs/generate-reference.mjs -->
@@ -28,10 +28,16 @@ Generated from `internal/config/config.go`; do not edit by hand.
 | `OBJECT_STORAGE_PROVIDER` | Optional oss or s3 provider. |
 | `OBJECT_STORAGE_REGION` | Optional service or feature configuration; see source validation for constraints. |
 | `OPENRUM_ALLOW_MANAGED_SECRETS` | Explicit opt-in for console-managed encrypted credentials. |
+| `OPENRUM_CONSUMER_FLUSH_INTERVAL` | Optional service or feature configuration; see source validation for constraints. |
+| `OPENRUM_CONSUMER_WORKERS` | Optional service or feature configuration; see source validation for constraints. |
+| `OPENRUM_KAFKA_RETENTION_DURATION` | Real Event-topic retention used to calculate remaining Consumer drain headroom. |
 | `OPENRUM_MASTER_KEY` | Base64 for exactly 32 external key bytes; never stored in PostgreSQL. |
 | `OPENRUM_MASTER_KEY_ID` | Optional service or feature configuration; see source validation for constraints. |
 | `OPENRUM_OBJECT_STORAGE_ENDPOINT_ALLOWLIST` | Optional service or feature configuration; see source validation for constraints. |
 | `OPENRUM_OSS_ENDPOINT_ALLOWLIST` | Optional service or feature configuration; see source validation for constraints. |
+| `OPENRUM_STORAGE_EMERGENCY_SAMPLE_RATE` | Temporary Browser SDK sampling cap while the guard is active. |
+| `OPENRUM_STORAGE_POLL_INTERVAL` | Interval between ClickHouse system.disks capacity checks. |
+| `OPENRUM_STORAGE_PRESSURE_GUARD_ENABLED` | Enables automatic Browser SDK sampling protection from low ClickHouse free space. |
 | `OSS_ACCESS_KEY_ID` | Optional service or feature configuration; see source validation for constraints. |
 | `OSS_ACCESS_KEY_SECRET` | Optional service or feature configuration; see source validation for constraints. |
 | `OSS_BUCKET` | Optional service or feature configuration; see source validation for constraints. |

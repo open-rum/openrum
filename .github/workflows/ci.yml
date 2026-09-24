@@ -1,6 +1,7 @@
 name: CI
 
 on:
+  workflow_call:
   pull_request:
   push:
     branches: [main]
@@ -58,6 +59,9 @@ jobs:
         run: |
           pnpm run protocol:check
           git diff --exit-code -- internal/event/schema_gen.go
+
+      - name: Test release metadata validation
+        run: node --test scripts/release/check-version.test.mjs
 
       - name: Build all packages and services
         run: pnpm run build

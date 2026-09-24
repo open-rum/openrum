@@ -1,8 +1,33 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams } from "@tanstack/react-router";
+import { GaugeIcon, InfoIcon, ShieldCheckIcon, UsersIcon } from "lucide-react";
+
 import { AsyncError, AsyncLoading } from "@/components/ui/AsyncState";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+  FieldLegend,
+  FieldSet,
+} from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { getConnectionStatus, type ConnectionStatus } from "@/lib/api/client";
 import {
   canManageProjects,
   getProject,
@@ -10,58 +35,89 @@ import {
   type OverLimitBehavior,
   type Project,
 } from "@/lib/api/projects";
-import { ProjectSettingsLayout } from "./ProjectSettingsLayout";
+import { ProjectDataSettingsShell } from "./ProjectDataSettingsShell";
+
+const maximumRequestsPerSecond = 1_000_000;
+const maximumEventsPerRequest = 100;
 
 export function ProjectQuotaRoute() {
-  const { projectId } = useParams({ from: "/protected/projects/$projectId/settings/quota" });
+  const { projectId } = useParams({ from: "/protected/settings/project/$projectId/quota" });
   const project = useQuery({
     queryKey: ["project", projectId],
     queryFn: ({ signal }) => getProject(projectId, signal),
   });
+  const connectionStatus = useQuery({
+    queryKey: ["connection-status", projectId],
+    queryFn: ({ signal }) => getConnectionStatus(projectId, signal),
+  });
+
   return (
-    <ProjectSettingsLayout
-      projectId={projectId}
-      titleId="project-quota-title"
-      title="配额"
-      description="限制这个项目每秒能提交多少次上报。没有项目级配额时，一个项目的突发流量会挤占同一实例上其他项目的余量。"
-    >
+    <ProjectDataSettingsShell projectId={projectId} section="quota">
       {project.isLoading ? (
-        <AsyncLoading label="正在加载配额设置…" />
+        <AsyncLoading label="正在加载速率限制设置…" />
       ) : project.error ? (
         <AsyncError
           error={project.error}
-          title="无法加载配额设置"
+          title="无法加载速率限制设置"
           remediation="项目可能已被删除，或你已不在该组织中。"
           onRetry={() => void project.refetch()}
         />
       ) : project.data ? (
-        <QuotaForm projectId={projectId} project={project.data} />
+        <RateLimitForm
+          projectId={projectId}
+          project={project.data}
+          connectionStatus={connectionStatus.data}
+        />
       ) : null}
-    </ProjectSettingsLayout>
+    </ProjectDataSettingsShell>
   );
 }
 
-function QuotaForm({ projectId, project }: { projectId: string; project: Project }) {
+function RateLimitForm({
+  projectId,
+  project,
+  connectionStatus,
+}: {
+  projectId: string;
+  project: Project;
+  connectionStatus?: ConnectionStatus;
+}) {
   const queryClient = useQueryClient();
   const canManage = canManageProjects(project.role);
-  // An empty string is the "no override" state. It is kept as text rather than
-  // as a number so that clearing the field is distinguishable from typing 0,
-  // which the server refuses.
+  const [source, setSource] = useState<"default" | "custom">(
+    project.ingestRateLimit === null ? "default" : "custom",
+  );
   const [limit, setLimit] = useState(
-    project.ingestRateLimit === null ? "" : String(project.ingestRateLimit),
+    String(project.ingestRateLimit ?? project.defaultIngestRateLimit),
   );
   const [behavior, setBehavior] = useState<OverLimitBehavior>(project.overLimitBehavior);
   const [saved, setSaved] = useState(false);
 
+  const inheritsDefault = source === "default";
+  const parsedLimit = Number(limit);
+  const limitError =
+    source === "custom" &&
+    (limit.trim() === "" ||
+      !Number.isInteger(parsedLimit) ||
+      parsedLimit < 1 ||
+      parsedLimit > maximumRequestsPerSecond)
+      ? `请输入 1–${maximumRequestsPerSecond.toLocaleString("zh-CN")} 之间的整数。`
+      : "";
+  const effectiveLimit =
+    inheritsDefault || limitError ? project.defaultIngestRateLimit : parsedLimit;
+  const theoreticalEventLimit = effectiveLimit * maximumEventsPerRequest;
+  const environmentCount = Math.max(project.environments?.length ?? 1, 1);
+
   const mutation = useMutation({
     mutationFn: () =>
       updateProject(projectId, {
-        ingestRateLimit: limit.trim() === "" ? null : Number(limit),
+        ingestRateLimit: inheritsDefault ? null : parsedLimit,
         overLimitBehavior: behavior,
       }),
     onSuccess: (updated) => {
       queryClient.setQueryData(["project", projectId], updated);
-      setLimit(updated.ingestRateLimit === null ? "" : String(updated.ingestRateLimit));
+      setSource(updated.ingestRateLimit === null ? "default" : "custom");
+      setLimit(String(updated.ingestRateLimit ?? updated.defaultIngestRateLimit));
       setBehavior(updated.overLimitBehavior);
       setSaved(true);
     },
@@ -73,85 +129,195 @@ function QuotaForm({ projectId, project }: { projectId: string; project: Project
       className="flex flex-col gap-6"
       onSubmit={(event) => {
         event.preventDefault();
-        mutation.mutate();
+        if (!limitError) mutation.mutate();
       }}
     >
       {!canManage ? (
-        <p className="border border-border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
-          当前角色为 {project.role}，只有 Owner 或 Admin 可以修改配额。
-        </p>
+        <Alert>
+          <ShieldCheckIcon />
+          <AlertTitle>当前权限为只读</AlertTitle>
+          <AlertDescription>
+            当前角色为 {project.role}，只有 Owner 或 Admin 可以修改速率限制。
+          </AlertDescription>
+        </Alert>
       ) : null}
 
-      <section className="border border-border bg-card p-6">
-        <h2 className="text-lg font-semibold text-foreground">每秒请求上限</h2>
-        <p className="mt-2 text-sm leading-6 text-muted-foreground">
-          按<strong>请求</strong>计，不是按事件计——一次请求里可以带最多 100 个事件。
-          留空表示沿用实例默认值（当前为 {project.defaultIngestRateLimit.toLocaleString()} /
-          秒）。Redis 不可用时每个副本各自退化到一半额度，因为此时没有共享计数可依。
-        </p>
-        <label className="mt-5 flex max-w-xs flex-col gap-1.5 text-sm">
-          <span className="font-medium text-foreground">上限（次 / 秒）</span>
-          <input
-            type="number"
-            min={1}
-            max={1000000}
-            value={limit}
-            disabled={disabled}
-            placeholder={String(project.defaultIngestRateLimit)}
-            aria-label="每秒请求上限"
-            onChange={(event) => {
-              setSaved(false);
-              setLimit(event.target.value);
-            }}
-          />
-          <span className="text-xs text-muted-foreground">留空则沿用实例默认值。</span>
-        </label>
+      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="当前速率限制摘要">
+        <SummaryCard
+          icon={<GaugeIcon aria-hidden="true" />}
+          title="当前生效上限"
+          value={`${effectiveLimit.toLocaleString("zh-CN")} 请求/秒`}
+          detail={inheritsDefault ? "继承 Instance 默认值" : "Project 自定义值"}
+        />
+        <SummaryCard
+          icon={<InfoIcon aria-hidden="true" />}
+          title="理论事件上限"
+          value={`${theoreticalEventLimit.toLocaleString("zh-CN")} 事件/秒`}
+          detail={`按每个请求最多 ${maximumEventsPerRequest} 个事件估算，不代表处理容量`}
+        />
+        <SummaryCard
+          icon={<UsersIcon aria-hidden="true" />}
+          title="共享范围"
+          value={`${environmentCount} 个 Environment`}
+          detail="同一 Project 下的环境共用这个上限"
+        />
+        <SummaryCard
+          icon={<ShieldCheckIcon aria-hidden="true" />}
+          title="最近限流信号"
+          value={formatRateLimitSignal(connectionStatus)}
+          detail="只反映最近一次 Ingest 拒绝，不是累计次数"
+        />
       </section>
 
-      <section className="border border-border bg-card p-6">
-        <h2 className="text-lg font-semibold text-foreground">超限行为</h2>
-        <p className="mt-2 text-sm leading-6 text-muted-foreground">
-          两种都会返回 429，区别在于<strong>丢谁</strong>。
-        </p>
-        <ul className="mt-5 flex flex-col gap-4">
-          <BehaviorOption
-            value="reject"
-            current={behavior}
-            disabled={disabled}
-            title="拒绝"
-            description="上限是精确的。一秒内先到的请求通过，其余全部拒绝，所以一次突发会把会话拦腰截断——会话在突发前开始，在突发中断掉，它的指标是按半页算出来的。"
-            onChange={(next) => {
-              setSaved(false);
-              setBehavior(next);
-            }}
-          />
-          <BehaviorOption
-            value="sample"
-            current={behavior}
-            disabled={disabled}
-            title="降采样"
-            description="按调用方哈希丢弃，一个客户端在一个窗口内要么全过要么全不过，所以会话是完整的，速率和 Web Vitals 仍然可比。代价是上限变成近似值，单窗口最多放行到上限的两倍。"
-            onChange={(next) => {
-              setSaved(false);
-              setBehavior(next);
-            }}
-          />
-        </ul>
-      </section>
+      <Card>
+        <CardHeader>
+          <CardTitle>请求上限</CardTitle>
+          <CardDescription>
+            限制按请求计数，不按事件计数。所有 DSN 和 Environment 共享 Project 上限。
+          </CardDescription>
+          <CardAction>
+            <Badge>当前生效 {effectiveLimit.toLocaleString("zh-CN")}/秒</Badge>
+          </CardAction>
+        </CardHeader>
+        <CardContent>
+          <FieldGroup>
+            <FieldSet>
+              <FieldLegend variant="label">限制来源</FieldLegend>
+              <FieldDescription>
+                继承默认值便于统一运维；只在项目确实需要独立流量边界时设置覆盖值。
+              </FieldDescription>
+              <ToggleGroup
+                type="single"
+                variant="selection"
+                value={source}
+                disabled={disabled}
+                aria-label="限制来源"
+                className="grid w-full max-w-xl grid-cols-2"
+                onValueChange={(value) => {
+                  if (value !== "default" && value !== "custom") return;
+                  setSaved(false);
+                  setSource(value);
+                }}
+              >
+                <ToggleGroupItem value="default" className="min-h-10">
+                  继承 Instance 默认
+                </ToggleGroupItem>
+                <ToggleGroupItem value="custom" className="min-h-10">
+                  Project 自定义
+                </ToggleGroupItem>
+              </ToggleGroup>
+            </FieldSet>
+
+            {!inheritsDefault ? (
+              <Field data-invalid={Boolean(limitError)} className="max-w-sm">
+                <FieldLabel htmlFor="ingest-rate-limit">每秒请求上限</FieldLabel>
+                <Input
+                  id="ingest-rate-limit"
+                  type="number"
+                  min={1}
+                  max={maximumRequestsPerSecond}
+                  step={1}
+                  inputMode="numeric"
+                  value={limit}
+                  disabled={disabled}
+                  aria-invalid={Boolean(limitError)}
+                  onChange={(event) => {
+                    setSaved(false);
+                    setLimit(event.target.value);
+                  }}
+                />
+                <FieldDescription>
+                  可设置 1–{maximumRequestsPerSecond.toLocaleString("zh-CN")} 请求/秒。
+                </FieldDescription>
+                <FieldError>{limitError}</FieldError>
+              </Field>
+            ) : null}
+          </FieldGroup>
+        </CardContent>
+        <CardFooter className="justify-between gap-3">
+          <span className="text-sm text-muted-foreground">
+            Instance 默认值：{project.defaultIngestRateLimit.toLocaleString("zh-CN")} 请求/秒
+          </span>
+          <Badge variant="outline">固定 1 秒窗口</Badge>
+        </CardFooter>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>超过上限时</CardTitle>
+          <CardDescription>
+            两种策略都会返回 HTTP 429 和 Retry-After；区别在于优先保留吞吐边界还是完整会话。
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <FieldSet>
+            <FieldLegend variant="label">超限策略</FieldLegend>
+            <ToggleGroup
+              type="single"
+              variant="selection"
+              value={behavior}
+              disabled={disabled}
+              aria-label="超限策略"
+              className="grid w-full grid-cols-1 gap-3 lg:grid-cols-2"
+              onValueChange={(value) => {
+                if (value !== "reject" && value !== "sample") return;
+                setSaved(false);
+                setBehavior(value);
+              }}
+            >
+              <ToggleGroupItem
+                value="reject"
+                className="h-auto min-h-24 items-start justify-start px-4 py-3 text-left whitespace-normal"
+              >
+                <span className="flex flex-col gap-1">
+                  <strong>精确拒绝</strong>
+                  <span className="font-normal text-muted-foreground">
+                    严格守住上限；先到的请求通过，其余请求被拒绝，突发期间的会话可能不完整。
+                  </span>
+                </span>
+              </ToggleGroupItem>
+              <ToggleGroupItem
+                value="sample"
+                className="h-auto min-h-24 items-start justify-start px-4 py-3 text-left whitespace-normal"
+              >
+                <span className="flex flex-col gap-1">
+                  <strong>按调用方降采样</strong>
+                  <span className="font-normal text-muted-foreground">
+                    稳定保留完整调用方；单窗口放行量是近似值，最坏可达到设置上限的两倍。
+                  </span>
+                </span>
+              </ToggleGroupItem>
+            </ToggleGroup>
+          </FieldSet>
+        </CardContent>
+      </Card>
+
+      <Alert>
+        <InfoIcon />
+        <AlertTitle>部署与故障语义</AlertTitle>
+        <AlertDescription>
+          Redis 正常时由所有 Ingest 副本共享计数。Redis 不可用时，每个副本会以 Project
+          上限的一半独立保护自己，因此集群总量不再是精确上限。修改后最多约 30 秒进入 Ingest 缓存。
+        </AlertDescription>
+      </Alert>
 
       {mutation.error ? (
-        <p role="alert" className="text-sm text-destructive">
-          保存失败：{mutation.error instanceof Error ? mutation.error.message : "未知错误"}
-        </p>
+        <Alert variant="destructive">
+          <AlertTitle>保存失败</AlertTitle>
+          <AlertDescription>
+            {mutation.error instanceof Error ? mutation.error.message : "未知错误"}
+          </AlertDescription>
+        </Alert>
       ) : null}
 
-      <div className="flex items-center gap-3">
-        <Button type="submit" disabled={disabled}>
-          {mutation.isPending ? "保存中…" : "保存"}
+      <div className="flex flex-wrap items-center gap-3">
+        <Button type="submit" disabled={disabled || Boolean(limitError)}>
+          {mutation.isPending ? "保存中…" : "保存速率限制"}
         </Button>
         {saved ? (
-          <span role="status" className="text-sm text-muted-foreground">
-            已保存。Ingest 缓存写入 Key 约 30 秒，之后生效。
+          <span role="status" className="flex items-center gap-2">
+            <Badge>已保存</Badge>
+            <span className="text-sm text-muted-foreground">新的设置将在缓存刷新后生效。</span>
           </span>
         ) : null}
       </div>
@@ -159,38 +325,42 @@ function QuotaForm({ projectId, project }: { projectId: string; project: Project
   );
 }
 
-function BehaviorOption({
-  value,
-  current,
-  disabled,
+function SummaryCard({
+  icon,
   title,
-  description,
-  onChange,
+  value,
+  detail,
 }: {
-  value: OverLimitBehavior;
-  current: OverLimitBehavior;
-  disabled: boolean;
+  icon: ReactNode;
   title: string;
-  description: string;
-  onChange: (value: OverLimitBehavior) => void;
+  value: string;
+  detail: string;
 }) {
   return (
-    <li>
-      <label className="flex gap-3">
-        <input
-          type="radio"
-          name="over-limit-behavior"
-          className="mt-1"
-          value={value}
-          checked={current === value}
-          disabled={disabled}
-          onChange={() => onChange(value)}
-        />
-        <span className="min-w-0">
-          <span className="block text-sm font-medium text-foreground">{title}</span>
-          <span className="mt-1 block text-xs leading-5 text-muted-foreground">{description}</span>
-        </span>
-      </label>
-    </li>
+    <Card size="sm">
+      <CardHeader>
+        <CardTitle>{title}</CardTitle>
+        <CardAction>
+          <Badge aria-hidden="true">{icon}</Badge>
+        </CardAction>
+      </CardHeader>
+      <CardContent>
+        <p className="text-xl font-semibold text-foreground">{value}</p>
+        <p className="mt-1 text-xs leading-5 text-muted-foreground">{detail}</p>
+      </CardContent>
+    </Card>
   );
+}
+
+function formatRateLimitSignal(status?: ConnectionStatus) {
+  if (!status) return "正在确认";
+  if (status.lastRejectReason !== "RATE_LIMITED" || !status.lastRejectAt) {
+    return "最近未记录";
+  }
+  return new Date(status.lastRejectAt).toLocaleString("zh-CN", {
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }

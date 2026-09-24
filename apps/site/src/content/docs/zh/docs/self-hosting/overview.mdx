@@ -1,0 +1,51 @@
+---
+title: 自部署
+description: 生产环境可选择推荐的 Kubernetes/Helm，或单机 Docker；本地评估另有独立配置。
+appliesTo: Alpha
+---
+
+import { Aside, Badge, CardGrid, LinkCard } from "@astrojs/starlight/components";
+
+OpenRUM 运行在你自己管理的基础设施中。先选择部署路径；两条路径的准备工作与运维责任不同。两种生产部署均处于 Alpha 阶段，不提供可用性保证。
+
+## 选择部署方式
+
+<div class="docs-entry-grid">
+  <CardGrid>
+    <div class="docs-deployment-choice docs-deployment-choice--recommended">
+      <Badge text="推荐" class="docs-deployment-badge" />
+      <LinkCard
+        title="Kubernetes / Helm"
+        href="/zh/docs/self-hosting/kubernetes/"
+        description="将应用服务部署到集群，并自行准备外部 PostgreSQL、ClickHouse、Kafka、Redis、HTTPS、密钥和备份。"
+      />
+    </div>
+    <div class="docs-deployment-choice">
+      <LinkCard
+        title="Docker Compose · 单机生产部署"
+        href="/zh/docs/self-hosting/docker-production/"
+        description="在一台 Linux 主机上运行完整服务，配置私有凭据、自动 HTTPS 与备份，并接受单机故障边界。"
+      />
+    </div>
+  </CardGrid>
+</div>
+
+<Aside type="caution" title="当前支持边界">
+  [本地评估 Compose
+  配置](/zh/docs/self-hosting/compose/)仍带演示数据和示例凭据，不可接入真实流量。独立的生产 Docker
+  配置移除了这些默认值，但仍是单点故障。Helm 路径也要求事先准备外部数据服务、TLS
+  与镜像仓库，并非一条命令就能完成的集群安装。
+</Aside>
+
+如果你要修改 OpenRUM 源码，而不只是体验容器化实例，请阅读[本地开发](/zh/docs/getting-started/local-development/)。
+
+## 自部署意味着什么
+
+你的团队需要负责域名与 HTTPS、凭据、容量、服务健康、升级和故障恢复。先了解[架构](/zh/docs/self-hosting/architecture/)与[外部依赖](/zh/docs/self-hosting/dependencies/)，再安排：
+
+- 接入真实流量前的[容量与保留规划](/zh/docs/self-hosting/capacity/)。
+- 首次升级前的[备份与恢复演练](/zh/docs/self-hosting/backup-restore/)。
+- 日常[升级](/zh/docs/self-hosting/upgrades/)、[存储压力处理](/zh/docs/self-hosting/storage-pressure/)与[故障排查](/zh/docs/self-hosting/troubleshooting/)。
+- 将 Ingest 暴露到公网前阅读[威胁模型](/zh/docs/self-hosting/security/threat-model/)。
+
+对象存储是可选的：没有 Bucket 时核心监控仍能运行；Source Map Artifact 需要 Alibaba OSS 或 S3 兼容服务。

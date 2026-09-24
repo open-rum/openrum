@@ -93,6 +93,11 @@ func (stack stack) start(mode devstack.Mode) error {
 	if err := preflight(mode); err != nil {
 		return err
 	}
+	if mode == devstack.ModeDev {
+		if err := stack.buildBrowserSDK(); err != nil {
+			return err
+		}
+	}
 	if mode == devstack.ModeUp {
 		for _, service := range devstack.HostServicesFor(devstack.ModeDev) {
 			if _, running := stack.supervisor.Running(service); running {
@@ -125,6 +130,17 @@ func (stack stack) start(mode devstack.Mode) error {
 		}
 	}
 	return stack.status(mode)
+}
+
+func (stack stack) buildBrowserSDK() error {
+	command := exec.Command("pnpm", "--filter", "@openrum/browser", "build")
+	command.Dir = stack.root
+	command.Stdout = os.Stdout
+	command.Stderr = os.Stderr
+	if err := command.Run(); err != nil {
+		return fmt.Errorf("build Browser SDK: %w", err)
+	}
+	return nil
 }
 
 // releaseContainers stops the containers that belong to the other mode. They

@@ -1,7 +1,7 @@
 ---
 title: Helm values reference
 description: Generated source-of-truth values for the OpenRUM Helm chart.
-appliesTo: Alpha / main
+appliesTo: Alpha
 ---
 
 <!-- GENERATED: scripts/docs/generate-reference.mjs -->
@@ -16,23 +16,94 @@ nameOverride: ""
 fullnameOverride: ""
 
 image:
-  repository: ghcr.io/example/openrum
+  repository: ghcr.io/openrum/openrum
   tag: "0.1.0"
   pullPolicy: IfNotPresent
 
 services:
-  api: { replicas: 2, port: 8080, readyPath: /health/ready, livePath: /health/live, command: ["/app/api"], resources: { requests: { cpu: 200m, memory: 256Mi }, limits: { memory: 512Mi } } }
-  ingest: { replicas: 3, port: 8081, readyPath: /health/ready, livePath: /health/live, command: ["/app/ingest"], resources: { requests: { cpu: 500m, memory: 512Mi }, limits: { memory: 1Gi } } }
-  consumer: { replicas: 2, port: 8082, readyPath: /health/ready, livePath: /health/live, command: ["/app/consumer"], resources: { requests: { cpu: 500m, memory: 512Mi }, limits: { memory: 1Gi } } }
-  worker: { replicas: 1, port: 8083, readyPath: /health/ready, livePath: /health/live, command: ["/app/worker"], resources: { requests: { cpu: 200m, memory: 256Mi }, limits: { memory: 512Mi } } }
-  web: { replicas: 2, port: 8080, readyPath: /, livePath: /, command: ["/app/web"], resources: { requests: { cpu: 100m, memory: 128Mi }, limits: { memory: 256Mi } } }
+  api:
+    {
+      replicas: 2,
+      port: 8080,
+      readyPath: /health/ready,
+      livePath: /health/live,
+      command: ["/app/api"],
+      resources:
+        {
+          requests: { cpu: 200m, memory: 256Mi, ephemeral-storage: 64Mi },
+          limits: { memory: 512Mi, ephemeral-storage: 256Mi },
+        },
+    }
+  ingest:
+    {
+      replicas: 3,
+      port: 8081,
+      readyPath: /health/ready,
+      livePath: /health/live,
+      command: ["/app/ingest"],
+      resources:
+        {
+          requests: { cpu: 500m, memory: 512Mi, ephemeral-storage: 64Mi },
+          limits: { memory: 1Gi, ephemeral-storage: 256Mi },
+        },
+    }
+  consumer:
+    {
+      replicas: 2,
+      port: 8082,
+      readyPath: /health/ready,
+      livePath: /health/live,
+      command: ["/app/consumer"],
+      resources:
+        {
+          requests: { cpu: 500m, memory: 512Mi, ephemeral-storage: 64Mi },
+          limits: { memory: 1Gi, ephemeral-storage: 256Mi },
+        },
+    }
+  worker:
+    {
+      replicas: 1,
+      port: 8083,
+      readyPath: /health/ready,
+      livePath: /health/live,
+      command: ["/app/worker"],
+      resources:
+        {
+          requests: { cpu: 200m, memory: 256Mi, ephemeral-storage: 64Mi },
+          limits: { memory: 512Mi, ephemeral-storage: 256Mi },
+        },
+    }
+  web:
+    {
+      replicas: 2,
+      port: 8080,
+      readyPath: /,
+      livePath: /,
+      command: ["/app/web"],
+      resources:
+        {
+          requests: { cpu: 100m, memory: 128Mi, ephemeral-storage: 64Mi },
+          limits: { memory: 256Mi, ephemeral-storage: 256Mi },
+        },
+    }
 
 config:
   appEnv: production
   publicBaseURL: https://rum.example.com
   kafkaBrokers: kafka.example.svc:9092
   kafkaEventTopic: rum-events-v1
+  # Must match the broker topic retention used to calculate remaining drain time.
+  kafkaRetentionDuration: 168h
   redisAddress: redis.example.svc:6379
+  storagePressure:
+    # Disable only when a managed ClickHouse provider does not expose system.disks.
+    guardEnabled: true
+    warningFreeRatio: "0.15"
+    criticalFreeRatio: "0.10"
+    hardStopFreeRatio: "0.05"
+    recoveryFreeRatio: "0.10"
+    emergencySampleRate: "0.10"
+    pollInterval: 30s
   # Comma-separated CIDRs or addresses of the proxies that terminate inbound
   # traffic. Leaving this empty keeps the ingest rate limit keyed on the socket
   # peer, which behind an ingress means every caller shares one limit. Declaring

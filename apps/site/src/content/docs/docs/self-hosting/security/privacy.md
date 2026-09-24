@@ -3,7 +3,7 @@ title: Security and privacy defaults
 description: Collection boundaries, RBAC, CSRF and Secret handling.
 ---
 
-**Applies to:** Alpha / main.
+**Applies to:** Alpha.
 
 ## Collection boundaries
 

@@ -2,30 +2,31 @@
 title: OpenRUM 文档
 description: 部署一套 OpenRUM 实例，或者从应用里发出第一个 Event。
 template: splash
-appliesTo: Alpha / main
+appliesTo: Alpha
 ---
 
 import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
-OpenRUM 是开源、可自托管的前端监控平台。实例由你自己运行，所以这里其实是两件不同的事，
-而大多数读者手上只有其中一件。
+OpenRUM 是开源、可自托管的前端监控平台。选择本地开发或生产部署，按步骤启动实例、登录控制台，再接入自己的应用。
 
 ## 从哪里开始
 
 <div class="docs-entry-grid">
   <CardGrid>
     <LinkCard
-      title="部署一套实例"
-      description="用 Compose 或 Helm 把整套服务拉起来并保持健康。还没有任何环境时从这里开始。"
-      href="/zh/docs/getting-started/quickstart/"
+      title="本地开发"
+      description="在电脑上准备环境、启动服务、修改代码，并用示例应用和造数据工具验证。"
+      href="/zh/docs/getting-started/local-development/"
     />
     <LinkCard
-      title="给应用接入监控"
-      description="装上 Browser SDK，把 Event 发到别人已经运行的实例，并拿到可读的堆栈。"
-      href="/zh/docs/sdk/browser/"
+      title="生产部署"
+      description="准备数据服务、镜像和 HTTPS，通过 Helm 部署，创建管理员并接入真实项目。"
+      href="/zh/docs/getting-started/production-deployment/"
     />
   </CardGrid>
 </div>
+
+不确定选哪条路径？先看[开始使用](/zh/docs/getting-started/quickstart/)。已有运行中的实例，可直接[创建第一个项目](/zh/docs/getting-started/create-first-project/)。
 
 ## 按任务查
 
@@ -33,7 +34,7 @@ OpenRUM 是开源、可自托管的前端监控平台。实例由你自己运行
   <LinkCard
     title="部署到生产"
     description="拓扑、外部依赖，以及那些事后很难改回来的决定。"
-    href="/zh/docs/self-hosting/overview/"
+    href="/zh/docs/getting-started/production-deployment/"
   />
   <LinkCard
     title="接入服务端渲染应用"
@@ -75,7 +76,6 @@ OpenRUM 是开源、可自托管的前端监控平台。实例由你自己运行
 ## 对外暴露实例之前
 
 OpenRUM 处于 Alpha。先读[威胁模型](/zh/docs/self-hosting/security/threat-model/)和
-[实测容量上限](/zh/docs/self-hosting/capacity/)：已发布的基准是一次本地单机压测，
-OpenRUM 在目标速率上并没有通过，我们不会据此给出任何生产容量结论。
+[容量规划](/zh/docs/self-hosting/capacity/)，使用自己的实际负载验证容量。已发布的本地单机基准不代表生产容量保证。
 
-页头的语言切换是整站生效的。未翻译的进阶运维与 Reference 页面目前仅提供英文。
+文档同时提供中文和英文，页头可切换语言。

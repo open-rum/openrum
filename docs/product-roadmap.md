@@ -609,9 +609,15 @@
       Files: `packages/browser-sdk/src/integrations/page.ts`, `apps/site/src/content/docs/docs/sdk/browser.mdx`
       Notes: 目前只监听 history 事件，hash 模式的应用只会记录首个 Page View。Verify: hash 路由的每次跳转产生一个 Page View，且不会为 history 模式重复计数。
 
-- [ ] **TASK-110** — Publish a bundler-free build and serve it from the Instance
+- [x] **TASK-110** — Publish a bundler-free build and serve it from the Instance
       Files: `packages/browser-sdk/tsup.config.ts`, `packages/browser-sdk/package.json`, `services/api/internal/handlers/`, `apps/site/src/content/docs/docs/sdk/browser.mdx`
       Notes: 当前只有 ESM 产物，因此文档把 CDN `<script>` 标注为计划中；需要 IIFE/UMD 产物、体积预算和版本化的分发路径。Verify: 一个没有打包器的静态页面用 `<script>` 即可完成接入，且产物体积有门禁。
+
+## Single-host production Docker follow-up
+
+`deploy/compose/production.compose.yml` is a separate Alpha single-host production path; `deploy/compose/docker-compose.yml` remains the local Demo topology. The production path removes Demo seeding and example credentials, enables HTTPS and production mode, exposes only the edge ports, and includes offline backup and fresh-host restore procedures. Kubernetes/Helm remains the recommended production deployment.
+
+Before a stable support claim, complete clean-host installation, upgrade and restore drills with real TLS and representative traffic; automate encrypted off-host backup and alerting; publish pinned release images; document capacity and resource-limit baselines. A single-host deployment remains a single failure domain even after those checks.
 
 ## Agent Session Guide
 

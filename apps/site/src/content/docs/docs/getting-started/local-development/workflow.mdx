@@ -1,0 +1,55 @@
+---
+title: Development and troubleshooting
+description: Update code, inspect logs, generate test data and troubleshoot common problems.
+appliesTo: Alpha
+---
+
+import { Aside } from "@astrojs/starlight/components";
+
+Use this page as a daily reference. For a first run, complete [Environment and startup](/docs/getting-started/local-development/) and [Connect and verify](/docs/getting-started/local-development/connect-app/).
+
+## Update code and operate the stack
+
+| Change                                 | How to update                                                               |
+| -------------------------------------- | --------------------------------------------------------------------------- |
+| Console in `apps/web`                  | Development mode normally hot-reloads                                       |
+| API or Go code it imports              | `pnpm openrum restart api` recompiles and starts it                         |
+| Ingest, Consumer, Worker or migrations | Rerun `pnpm openrum dev` to build images and run startup                    |
+| Browser SDK                            | `pnpm --filter @openrum/browser build`, then refresh or restart the example |
+| Documentation site                     | Run `pnpm site:dev` separately                                              |
+
+Restarting a container does not rebuild its image. Use `pnpm openrum up` for an all-container stack; it shares ports and data with `dev`, and the command switches modes for you.
+
+```sh
+pnpm openrum logs api
+pnpm openrum logs ingest consumer worker
+pnpm openrum stop
+# Resume development later
+pnpm openrum dev
+```
+
+`stop` preserves containers and data; `down` removes containers but keeps volumes. Host logs are also available in `.openrum/log/`.
+
+## Generate and clean test data
+
+Use the floating flask button at the bottom-right of the local Console. Select Project, Environment and time range, generate a small batch, then inspect the query verification result before increasing volume.
+
+See [Demo data](/docs/getting-started/demo-data/) for scenarios.
+
+<Aside type="danger" title="Reset deletes data">
+  For a complete reset, `pnpm openrum reset` asks for confirmation and deletes all local databases.
+  Use `stop` for routine shutdown.
+</Aside>
+
+## Common problems
+
+| Symptom                         | Check first                                                     |
+| ------------------------------- | --------------------------------------------------------------- |
+| Image or package download fails | Registry connectivity and proxy settings                        |
+| Port occupied                   | Reported process and local port configuration                   |
+| Login or CSRF failure           | Use the Console URL printed by the command                      |
+| SDK delivery fails              | DSN, allowed origin and Ingest logs                             |
+| Accepted data is missing        | Project, Environment, time range and Consumer/ClickHouse health |
+| Code changes are invisible      | Current mode and the update procedure on this page              |
+
+See the [contributor guide](/docs/contributing/local-development/) for the repository map and validation commands.

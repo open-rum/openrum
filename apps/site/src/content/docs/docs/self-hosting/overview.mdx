@@ -1,0 +1,51 @@
+---
+title: Self-hosting
+description: Choose recommended Kubernetes/Helm or single-host Docker for production, with a separate local evaluation stack.
+appliesTo: Alpha
+---
+
+import { Aside, Badge, CardGrid, LinkCard } from "@astrojs/starlight/components";
+
+OpenRUM runs on infrastructure you control. Choose a deployment path first; the setup and operating responsibilities differ. Both production paths are available in Alpha, without an uptime guarantee.
+
+## Choose a deployment path
+
+<div class="docs-entry-grid">
+  <CardGrid>
+    <div class="docs-deployment-choice docs-deployment-choice--recommended">
+      <Badge text="Recommended" class="docs-deployment-badge" />
+      <LinkCard
+        title="Kubernetes / Helm"
+        href="/docs/self-hosting/kubernetes/"
+        description="Deploy application services to a cluster. Prepare external PostgreSQL, ClickHouse, Kafka, Redis, HTTPS, secrets and backups."
+      />
+    </div>
+    <div class="docs-deployment-choice">
+      <LinkCard
+        title="Docker Compose · Single-host production"
+        href="/docs/self-hosting/docker-production/"
+        description="Run the complete stack on one Linux host with private credentials, automatic HTTPS, backups and an explicit single-host failure boundary."
+      />
+    </div>
+  </CardGrid>
+</div>
+
+<Aside type="caution" title="Current support boundary">
+  The [local evaluation Compose stack](/docs/self-hosting/compose/) still includes Demo data and
+  example credentials; do not expose it to real traffic. The separate production Docker stack
+  removes those defaults but remains a single failure domain. The Helm path also needs external data
+  services, TLS and an image registry; it is not a one-command cluster installation.
+</Aside>
+
+If you want to change OpenRUM's source code rather than evaluate a containerized Instance, follow [Local development](/docs/getting-started/local-development/) instead.
+
+## What you operate
+
+Self-hosting means your team owns the domain and HTTPS, credentials, capacity, service health, upgrades, and recovery. Start with the [architecture](/docs/self-hosting/architecture/) and [external dependencies](/docs/self-hosting/dependencies/), then plan for:
+
+- [Capacity and retention](/docs/self-hosting/capacity/) before accepting real traffic.
+- [Backups and a tested restore](/docs/self-hosting/backup-restore/) before the first upgrade.
+- [Upgrades](/docs/self-hosting/upgrades/), [storage pressure](/docs/self-hosting/storage-pressure/) and [troubleshooting](/docs/self-hosting/troubleshooting/) during operation.
+- The [threat model](/docs/self-hosting/security/threat-model/) before exposing Ingest to the internet.
+
+Object storage is optional. Core monitoring runs without a Bucket; Source Map Artifacts require Alibaba OSS or an S3-compatible provider.

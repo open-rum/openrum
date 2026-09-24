@@ -132,6 +132,9 @@ func (repository *OverviewRepository) Get(ctx context.Context, requested Overvie
 		return Overview{}, err
 	}
 	interval := overviewInterval(filters.To.Sub(filters.From))
+	if filters.MaxPoints > 0 {
+		interval = adaptiveSeriesInterval(filters.To.Sub(filters.From), filters.MaxPoints)
+	}
 	series, err := repository.readSeries(ctx, filters, interval)
 	if err != nil {
 		return Overview{}, err

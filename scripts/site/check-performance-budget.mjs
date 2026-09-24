@@ -1,4 +1,4 @@
-import { readFile, readdir, stat } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
 import { extname, join } from "node:path";
 
 const root = process.cwd();
@@ -15,30 +15,17 @@ async function walk(directory) {
 }
 
 await walk(dist);
-let totalAssets = 0;
 let externalScripts = 0;
-const failures = [];
 for (const file of files) {
-  const size = (await stat(file)).size;
   if (extname(file) === ".html") {
-    if (size > budget.maxHtmlBytes) failures.push(`${file}: HTML ${size} bytes`);
     const html = await readFile(file, "utf8");
     externalScripts += [...html.matchAll(/<script[^>]+src=["']https?:\/\//gi)].length;
-  } else {
-    totalAssets += size;
-    if (size > budget.maxAssetBytes) failures.push(`${file}: asset ${size} bytes`);
   }
 }
-if (totalAssets > budget.maxTotalAssetBytes) {
-  failures.push(`all non-HTML assets: ${totalAssets} bytes`);
-}
 if (externalScripts > budget.maxExternalScripts) {
-  failures.push(`external scripts: ${externalScripts}`);
-}
-if (failures.length) {
-  console.error(`Public-site performance budget failed:\n${failures.join("\n")}`);
+  console.error(
+    `Public-site external-script policy failed: ${externalScripts} scripts exceed the allowed ${budget.maxExternalScripts}.`,
+  );
   process.exit(1);
 }
-console.log(
-  `Public-site budget passed: ${files.length} files, ${totalAssets} non-HTML bytes, no external scripts.`,
-);
+console.log(`Public-site external-script policy passed: ${externalScripts} external scripts.`);

@@ -23,12 +23,12 @@ Area / Bar / Line chart examples. It is a site route, not a package or a
 component-library application. The page reads actual CSS custom properties;
 it does not maintain a second table of color values.
 
-The typography section includes a font-selection preview: Geist (current),
-Inter, IBM Plex Sans and Manrope for Latin text, paired independently with
+The typography section includes a font-selection preview: IBM Plex Sans (current),
+Geist, Inter, Manrope and Exo 2 for Latin text, paired independently with
 system Chinese fonts or Noto Sans SC. Selections affect only the workbench and
 persist in its `font` / `cjk` URL parameters; they do not change product defaults.
 Compare editable text, KPI numbers, 14px tables, and chart labels. Reset restores
-Geist and system Chinese. Fonts are self-hosted via Fontsource; Noto Sans SC's
+IBM Plex Sans and system Chinese. Fonts are self-hosted via Fontsource; Noto Sans SC's
 stylesheet loads only when selected, with Unicode subsets fetched as needed.
 
 Shared foundations remain in `packages/design-tokens`:
@@ -49,6 +49,11 @@ provides lemon-green SVG downloads and light/dark surface previews. Every mark
 uses `--ds-logo` (`#b8e954`) in both modes; wordmarks use neutral text. The favicon is a static copy of
 that geometry; update both apps' favicons when changing the shared mark.
 
+Header brand lockups use one shared proportion: a 28px mark, an 18px wordmark,
+and a 9px gap. The mark and outlined wordmark use optically cropped view boxes so
+their visible shapes align instead of aligning their source-canvas whitespace.
+Favicons use a tighter crop because they do not include a neighboring wordmark.
+
 ## Visual language
 
 - Citrus is the only product theme. Do not add page-level palette switches or
@@ -67,13 +72,59 @@ that geometry; update both apps' favicons when changing the shared mark.
 - Error, warning, and success remain independently recognizable and pair
   color with labels, shapes, or icons.
 - Radius: 5 / 7 / 9px. Shadows are limited to controls and elevated surfaces.
-- Typography: Geist Variable with system Chinese fallback; the Space Grotesk
+- Typography: IBM Plex Sans Variable with system Chinese fallback; the Space Grotesk
   wordmark uses SVG outlines. Marketing display sizes are 56 / 38px and
   section headings 40 / 30px. Product UI uses a comfortable 12–14px scale.
 
+### Light-mode Citrus accent hierarchy
+
+Light mode keeps neutral canvas, cards, typography, borders, tables, and primary
+actions. A page's main submit or create action uses the black/white contrast
+tokens; lemon green is not the default button fill.
+
+Use lemon green in small, semantically meaningful regions:
+
+- selected choices and active form options use `--ds-selection`,
+  `--ds-selection-foreground`, and `--ds-selection-border`;
+- compact badges, icons, switches, progress, focus rings, and data-series marks
+  may use `--ds-primary` with `--ds-primary-foreground`;
+- use one or two green anchors per content group rather than tinting the whole
+  card or section;
+- hover without selection remains neutral, so green continues to mean selected,
+  enabled, or currently effective;
+- success, warning, danger, and information states retain their own semantic
+  tokens and must not be recolored as Citrus decoration.
+
+The Rate Limits settings page is the reference composition: neutral cards and
+black submit action, lime summary marks and effective-state badges, and a pale
+lime surface plus stronger lime border for selected source and strategy options.
+The same pattern should be reused by other Console settings forms.
+
 ## Landing concepts
 
-- `/` is the existing centered headline / Light Rays homepage.
+- `/` is the centered Stroke Text headline homepage, without the Light Rays background.
+- The second content floor after the feature Bento is `Reliability.astro`
+  (`#architecture`): five service layers, independent-scaling highlights and
+  sourced performance evidence. Layer grouping is not a sequential request
+  path; write and query paths are spelled out separately. Benchmark figures
+  come from `content/evidence/local-capacity-2026-09-18.json` and must retain
+  the local-machine label, CPU/core count, host RAM versus Docker VM RAM,
+  test duration/load, gate status and unvalidated production-concurrency status.
+  Both the homepage and Benchmarks page consume the same evidence. Retain the
+  historical failed runs; do not turn a short passing run into a sustained-load
+  or production-capacity claim. Public download is a static sanitized JSON file,
+  never the private benchmark credential directory.
+  Do not relabel target EPS/QPS as measured throughput or supported concurrency.
+- Its feature overview uses `FeatureBento.astro` after the technology strip:
+  analytics and errors are the two large cards (7/5 columns); sessions,
+  performance, API monitoring and alerts form four smaller cards. The alert
+  illustration connects a metric rule to a team IM notification through Webhook;
+  it does not imply native integrations with specific IM providers.
+  At 1100px the grid becomes two columns, and at 600px one column. Use shared
+  Citrus surfaces, typography and radii, with lime data accents. Illustrations
+  are static HTML/SVG, explicitly labelled as example data, and cards link to
+  the corresponding localized documentation. Maintain keyboard focus and
+  reduced-motion support; do not imply an interactive Console or Session Replay.
 - `/design/landing/01/` is the static document reference: split Hero, product
   mockups, trust strip, features, errors, analytics, performance, platforms,
   self-hosting, and open-source CTA. Mockups contain clearly labelled sample
@@ -149,20 +200,26 @@ Small chart text stays neutral; bright chart colors are not text colors.
 
 The visual workbench maps its Recharts series to shared roles:
 
-| Role           | Token                                         | Use                                      |
-| -------------- | --------------------------------------------- | ---------------------------------------- |
-| Primary series | `--ds-chart-1` → lemon green                  | Lines, bars, points and area outlines    |
-| Second metric  | `--ds-chart-2` → teal                         | Another metric on the same unit axis     |
-| Theme accents  | `--ds-chart-3`, `--ds-chart-4`                | Green and mint categorical accents       |
-| Theme repeat   | `--ds-chart-5` → lemon green                  | Same as chart 1; not a distinct category |
-| Prior period   | `--ds-chart-comparison` → pale yellow         | Same metric, dashed line                 |
-| Status         | `--ds-success`, `--ds-warning`, `--ds-danger` | Ratings and thresholds                   |
-| Area fill      | `--ds-chart-area` → primary                   | Translucent volume under a clear outline |
+| Role                | Token                                         | Use                                      |
+| ------------------- | --------------------------------------------- | ---------------------------------------- |
+| Primary series      | `--ds-chart-1` → lemon green                  | Lines, bars, points and area outlines    |
+| Categorical palette | `--ds-chart-1` … `--ds-chart-10`              | Up to ten discrete, unordered categories |
+| Prior period        | `--ds-chart-comparison` → pale yellow         | Same metric, dashed line                 |
+| Status              | `--ds-success`, `--ds-warning`, `--ds-danger` | Ratings and thresholds                   |
+| Area fill           | `--ds-chart-area` → primary                   | Translucent volume under a clear outline |
 
-Chart 1–5 reproduce the reference theme (`#b8e954`, `#45807a`, `#a2e400`,
-`#99e0d3`, `#b8e954`). The reference's comparison stroke is
-`oklch(0.9002 0.137175 94.1925)`. It does not indicate a warning. Avoid using
-repeated or similar greens as the only way to distinguish categories.
+The categorical order is lemon, blue, orange, violet, teal, coral, cyan,
+magenta, gold and slate. Keep this fixed order across the console. Do not derive
+colors from the array length or generate random hues during rendering: that
+makes a category change color when data refreshes. For more than ten categories,
+show the nine most important categories and combine the remainder into `Other`
+using chart 10. A stable hash may select from this palette when a domain needs
+the same named category to retain its color across separate charts, but the
+palette remains fixed and collisions still need labels or direct interaction.
+
+The comparison stroke is `oklch(0.9002 0.137175 94.1925)`. It does not indicate
+a warning. Never rely on color alone: categorical charts retain labels, legends
+and tooltips, and line charts distinguish overlapping series with dash patterns.
 
 Axes, annotations and tooltips use neutral text; grids and cursors use borders.
 Performance trends use chart 1; their success/error thresholds and rated Route
@@ -182,6 +239,41 @@ is re-exported at its existing console import path. The workbench uses that
 same primitive through an isolated `client:visible` React island. Example
 charts use fixed data and disable animation to keep comparisons stable.
 Live console charts retain `isAnimationActive={useChartMotion()}`.
+
+Console Line/Area trends share `apps/web/src/lib/charts/smoothCurve.ts`:
+monotone-X interpolation and rounded stroke caps/joins. Apply it to page charts,
+Stat mini charts, editor previews and enlarged details alike. Curves pass through
+the measured samples without creating new local extrema; never smooth the data
+by averaging or removing peaks. Preserve null gaps and show a resting dot only
+for an isolated Dashboard sample, not every sample merely because a gap exists.
+Bar and distribution views retain their configured visualization type.
+
+Console time-series charts and Stat mini charts share a target of at most
+approximately 30 backend-aggregated points at every viewport width. Short ranges
+may return fewer; calendar alignment can add one partial edge bucket. Keep gaps
+as null, not synthetic zeroes. Resizing/enlarging changes presentation only;
+time labels still adapt to available width.
+Read [the time-series implementation standard](agents/time-series.md) before
+adding or changing trends. It defines source-resolution floors, the interval
+table, API fields, shared code entry points and the remaining legacy consumers.
+
+Category Bar breakdowns are ranked lists, not small axis-heavy plots. Place
+the category name and existing metadata icon on the left, exact value and share
+on the right, and a thin lime bar below. Use a shared zero baseline and scale to
+the largest returned group; do not assign arbitrary rainbow colors to rankings.
+Shares describe the full returned group sum, not only visible Top 10 rows.
+Show all returned groups in enlarged details and disclose overlapping unique
+counts/query limits. Keep values visible without hover and long lists keyboard
+scrollable. This styling does not apply to time-series Bars.
+
+Dashboard donut distributions pair a left ring with a right ranked list. Use
+existing Chart/Table primitives, neutral typography, fixed chart tokens, and
+always-visible exact values and shares. These compact rings keep up to six
+slices; above six, show the five largest and combine the remainder using chart 10.
+The accessible details table keeps every returned group. Label percentages as
+shares of returned group counts; disclose query limits and user/session overlap,
+never imply a sum of group uniques is a globally distinct count. Stack ring/list
+on narrow cards and give keyboard focus the same highlight as pointer hover.
 
 ## One unit per axis
 
@@ -268,24 +360,19 @@ A product that sells Core Web Vitals cannot regress its own.
 The accepted centered homepage direction is `output/site-redesign/v2.html`,
 with the later requested 56px navigation (frosted from the initial view,
 no bottom border) and black/white
-CTA pair. The user explicitly approved the Light Rays background. Its shader is
-adapted from React Bits into a small native renderer; React and OGL are not loaded.
-The existing performance thresholds remain in force.
-
-`LightRays.astro` loads the renderer after the first paint during idle time. It
-caps pixel density and rendering at 30fps, suspends offscreen and in hidden tabs,
-with no visible playback controls. Reduced motion uses the static light field, which
-also remains available if WebGL fails. Colors are read from the shared tokens;
-shader/source attribution is in `public/licenses/`. The background is decorative,
-so headings, navigation and actions remain native HTML with no dependency on it.
-The rays cover the top of the page behind the frosted navigation, with their
-source 20% of the background height above the viewport, matching the original
-top-center placement. The unchanged React Bits shader overlays the Hero content
-at z-index 3 with pointer events disabled, so the light tints text and buttons
-without intercepting clicks. Only the bottom 15% is masked to join the next section.
-Dark mode uses the user's light-ray color token and parameters: speed 1, spread
-0.5, length 3, mouse influence 0.1, fade distance 1, saturation 1, no noise,
-distortion or pulsation. Light mode keeps the previous muted green treatment.
+CTA pair. The hero no longer mounts the Light Rays background or its WebGL renderer.
+The two-line heading uses the supplied React Bits StrokeText component with GSAP:
+SVG character outlines draw progressively with staggered stroke-dash offsets, then
+a horizontal wipe fills the text only after the last character finishes drawing.
+Do not replace the drawing phase with a static CSS outline. Hidden native text
+reserves the layout; await fonts and initialize the SVG dash/clip state before
+revealing it. The SVG uses those font metrics and baseline, without glyph-bounds
+padding or a visible solid-HTML-to-SVG swap. Resizing must not restart the animation.
+The first line uses the foreground token; the second draws in Citrus primary and
+fills with the accessible brand token. Keep the existing localized copy and typography.
+Without JavaScript, the reserved text is shown as a static outline.
+Reduced motion shows the completed heading without animation. All animation resources
+are bundled locally; the existing performance thresholds remain in force.
 
 Buttons use the shared `ui-button-contrast` and `ui-button-neutral` variants:
 white/black in dark mode and black/white in light mode. Hover applies a small
@@ -394,19 +481,35 @@ the desktop composition uses a compact variant.
 
 Overview cards keep the default view quiet: title and main value or chart.
 Stat cards place a left-aligned previous-period change badge with "较上一周期"
-below the number, then one muted line explaining the metric. Reserve the
-top-right for the details icon so it does not compete with the comparison.
+below the number; keep metric descriptions in configuration/details. Appearance
+choices are plain, right-side smooth line and right-side bar. Both mini charts
+reuse real buckets, preserve missing-data gaps and stay display-only. Retired
+bottom-line/area appearances fall back to the right-side line. Reserve the
+top-right for the settings menu icon so it does not compete with the comparison.
 Rising PV/UV uses the positive token;
 rising errors, API failures and Web Vital values use the negative token.
 No comparison, insufficient samples and rounded-zero changes stay neutral.
-Use an icon that appears on hover or keyboard focus to open a details Dialog;
-keep the entry visible on touch/narrow screens. Move repeated descriptions,
+Use an icon that appears on hover or keyboard focus to open the card settings menu,
+including enlarge/details; no prior page edit action is required. Keep the entry
+visible on touch/narrow screens. The page edit action is icon-only, without a
+refresh button. Card mutations start a Save/Cancel draft; menu/details opening
+does not. Move repeated descriptions,
 sampling notes, receive timestamps, previous values and chart data tables into
 the dialog. Keep a small delayed-data indicator visible beside the title.
 Explicitly configured table views remain tables. Reuse the loaded query result
 for details, without new requests or configuration writes. Dialog tables show
 unabbreviated counts and milliseconds; provide a scrollable body, a visible
 close action and focus return to the trigger.
+
+The dashboard menu calls this action **详细**. Its detail workspace is capped at
+1160px and the viewport height, with a persistent title/close row, a large chart
+or exact-data Table tab, and a 280px statistics/context rail. Stat details lead
+with current value, previous value and semantic period change. At narrow widths
+the rail stacks below the main content. Preserve the true bucket interval and
+all returned categories; opening details never reaggregates or queries again.
+All dashboard details retain the existing shadcn Dialog's default motion; do not
+add source-card flip/expand or return animations. Keep this layout isolated from
+other Console pages until explicitly adopted, without overriding shared Dialog defaults.
 
 The performance workspace uses the full available content width. Its first
 analysis layer retains the OpenRUM performance score alongside real overall LCP,
@@ -483,12 +586,42 @@ project is receiving traffic and whether it needs attention.
 - API owns browser request volume, failure rate, latency, normalized endpoints, and request samples.
 - 告警 owns product-quality rules, notification state, history, and investigation deep links.
 - 洞察 synthesizes meaningful changes across behavior, errors, performance, events, and APIs; every insight must show its evidence and open a filtered investigation rather than present an unexplained score.
-- 项目设置 owns project configuration, SDK keys, data/privacy rules, releases, usage, and quota. Organization membership, notification channels, appearance, and Instance administration remain account-scoped.
+- 项目设置 exposes **常规、接入指引、数据管理、用量统计**. Data management groups **采样配置、速率限制、入站过滤、URL 归一化、隐私脱敏** into route-backed page tabs with one shared header, width and task description. The sidebar highlights 数据管理 across those routes; keep existing deep links and independent saves. Sampling is `/settings/project/:projectId/sampling`, separate from the report at `/settings/project/:projectId/usage`. A failed usage estimate must not hide sampling controls. Organization membership, notification channels, appearance, and Instance administration remain account-scoped.
 - 接入、发布、用量、配额与开发造数据统一收进 **项目设置** 的上下文导航，不再占用主侧边栏入口。
 - 组织与成员、通知渠道、实例级系统设置统一从底部账户菜单进入；实例级设置仅对管理员显示。
 - Visual polish is part of the product promise for self-hosted users: analytics screens must preserve the same readable type scale, clear empty states, URL-backed filters, light/dark themes, and keyboard behavior as error screens.
 
 ## Component families
+
+### Organization usage statistics
+
+`/usage` is an organization-level page, separate from the project picker and
+project-scoped analysis. It is the only organization-level sidebar item above
+project navigation; clicking the brand/Logo remains the sole entry to the Project
+list. It compares accessible projects across all environments,
+with URL-backed organization, time and event-type filters, aggregate outcome
+cards, a stacked outcome trend and a searchable table sorted by accepted volume.
+Search filters only the table. Project detail links retain time and event type.
+
+The console reuses permission-checked project usage endpoints with at most four
+concurrent requests. Partial failures are explicit; failed rows do not become
+zero and shares are hidden until all projects load. Summaries use API totals,
+not the capped reason breakdown. At the current 5,000-row breakdown cap, hide
+the trend and recommend a narrower query. Transfer bytes are not disk usage;
+accepted volume share is not quota consumption, and processing outcomes are
+not necessarily disjoint unique events. Client-side losses not reported to the
+server cannot be represented as complete counts.
+
+### Project list presentation
+
+The project list offers three locally remembered views of the same API data:
+lightweight cards for quick entry, expanded trend cards for inspection, and a
+table for cross-project comparison. Keep the view switch labeled and keyboard
+accessible. All views share query-cache entries, show the last 24 hours in each
+project's default environment, and preserve PV, approximate UV, error events,
+reporting freshness and project entry. Do not turn missing or failed summaries
+into zero values, or render synthetic trends when there are no samples. Tables
+scroll horizontally on narrow screens; cards stack and controls wrap.
 
 - App shell, sidebar navigation, project switcher, operator card.
 - Select controls, tabs, buttons, status badges, KPI cells.

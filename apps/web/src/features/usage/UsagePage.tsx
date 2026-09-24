@@ -1,60 +1,84 @@
 import { useMemo } from "react";
+import { Link, useRouterState } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { DownloadIcon, GaugeIcon } from "lucide-react";
+import { DownloadIcon, GaugeIcon, SlidersHorizontalIcon } from "lucide-react";
 import { ConsolePage, ConsolePageHeader } from "@/components/layout/ConsolePage";
 import { AsyncError } from "@/components/ui/AsyncState";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { listOrganizations, listProjects, type Project } from "@/lib/api/projects";
+import { getProject, type Project } from "@/lib/api/projects";
 import { projectIdFromPathname } from "@/lib/projects/currentProject";
 import { getUsage, usageRange, usageURL } from "@/lib/api/usage";
-import { SamplingForm } from "./SamplingForm";
-import { ProjectSettingsNav } from "@/features/settings/ProjectSettingsNav";
+import { readUsageRange, usageTypes } from "./organizationUsage";
 
 export function UsagePage() {
   const projectId = projectIdFromPathname(window.location.pathname);
-  const organizations = useQuery({ queryKey: ["organizations"], queryFn: listOrganizations });
-  const organization = organizations.data?.organizations[0];
-  const projects = useQuery({
-    queryKey: ["projects", organization?.id],
-    queryFn: () => listProjects(organization!.id),
-    enabled: Boolean(organization),
+  const projectQuery = useQuery({
+    queryKey: ["project", projectId],
+    queryFn: ({ signal }) => getProject(projectId!, signal),
+    enabled: Boolean(projectId),
   });
-  if (organizations.isLoading || projects.isLoading) return <UsageSkeleton />;
-  const project =
-    projects.data?.projects.find((item) => item.id === projectId) ?? projects.data?.projects[0];
+  if (projectQuery.isLoading) return <UsageSkeleton />;
+  if (projectQuery.error)
+    return (
+      <ConsolePage width="wide">
+        <ConsolePageHeader title="用量统计" />
+        <AsyncError
+          title="项目加载失败"
+          error={projectQuery.error}
+          remediation="请确认项目存在且你有访问权限。"
+          onRetry={() => void projectQuery.refetch()}
+        />
+      </ConsolePage>
+    );
+  const project = projectQuery.data;
   if (!project)
     return (
       <ConsolePage width="wide">
-        <ConsolePageHeader title="用量与采样" description="请先创建并接入项目。" />
+        <ConsolePageHeader title="用量统计" description="请先创建并接入项目。" />
       </ConsolePage>
     );
   return <ProjectUsage project={project} />;
 }
 
 function ProjectUsage({ project }: { project: Project }) {
-  const range = useMemo(() => usageRange(7), []);
+  const fallback = useMemo(() => usageRange(7), []);
+  const search = useRouterState({ select: (state) => state.location.searchStr });
+  const range = useMemo(
+    () => readUsageRange(new URLSearchParams(search), fallback),
+    [search, fallback],
+  );
   const usage = useQuery({
-    queryKey: ["usage", project.id, range.from.toISOString(), range.to.toISOString()],
+    queryKey: [
+      "usage",
+      project.id,
+      range.from.toISOString(),
+      range.to.toISOString(),
+      range.eventType,
+    ],
     queryFn: ({ signal }) => getUsage(project.id, range, signal),
   });
   return (
-    <ConsolePage
-      width="wide"
-      rail={<ProjectSettingsNav projectId={project.id} />}
-      railLabel="项目设置导航"
-    >
+    <ConsolePage width="wide">
       <ConsolePageHeader
-        title="用量与采样"
-        description="解释最近 7 天每一类事件的接收、采样丢弃、拒绝与处理失败。"
+        title="用量统计"
+        description={`${project.name} · ${range.from.toLocaleString("zh-CN")} — ${range.to.toLocaleString("zh-CN")} · ${usageTypes.find(([type]) => type === range.eventType)?.[1] ?? "全部事件"}`}
         actions={
-          <Button asChild variant="outline">
-            <a href={usageURL(project.id, range, true)} download>
-              <DownloadIcon data-icon="inline-start" />
-              导出 CSV
-            </a>
-          </Button>
+          <>
+            <Button asChild variant="outline">
+              <Link to="/settings/project/$projectId/sampling" params={{ projectId: project.id }}>
+                <SlidersHorizontalIcon data-icon="inline-start" />
+                配置采样
+              </Link>
+            </Button>
+            <Button asChild variant="outline">
+              <a href={usageURL(project.id, range, true)} download>
+                <DownloadIcon data-icon="inline-start" />
+                导出 CSV
+              </a>
+            </Button>
+          </>
         }
       />
       {usage.isLoading ? <UsageSkeleton compact /> : null}
@@ -63,7 +87,7 @@ function ProjectUsage({ project }: { project: Project }) {
           <AsyncError
             error={usage.error}
             title="用量加载失败"
-            remediation="当前采样配置未改变；可重新加载，或凭 Request ID 联系管理员。"
+            remediation="可重新加载，或凭 Request ID 联系管理员。采样等配置可前往数据管理查看。"
             onRetry={() => void usage.refetch()}
           />
         </div>
@@ -90,9 +114,6 @@ function ProjectUsage({ project }: { project: Project }) {
                 </CardContent>
               </Card>
             ))}
-          </section>
-          <section className="mt-8">
-            <SamplingForm project={project} usage={usage.data} />
           </section>
           <section className="mt-8 overflow-hidden rounded-lg border border-border bg-card">
             <div className="flex items-center gap-2 border-b border-border px-5 py-4">

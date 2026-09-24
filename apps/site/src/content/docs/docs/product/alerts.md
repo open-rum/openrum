@@ -3,7 +3,7 @@ title: Alerts
 description: Notify operators when production Issues or health signals need attention.
 ---
 
-**Applies to:** Alpha / main. Status: Alpha implemented.
+**Applies to:** Alpha. Status: Alpha implemented.
 
 Alerts help operators notice recurring production Issues and Instance health problems without watching the Console continuously.
 

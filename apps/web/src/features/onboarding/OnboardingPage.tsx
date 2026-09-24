@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "@tanstack/react-router";
 import {
@@ -29,10 +29,10 @@ import {
   rotateProjectKey,
   sendTestEvent,
 } from "@/lib/api/client";
-import { listOrganizations, listProjects } from "@/lib/api/projects";
+import { getProject, listOrganizations } from "@/lib/api/projects";
 import { recordProductEvent } from "@/lib/telemetry/productEvents";
 import { ProjectCreatePage } from "@/features/projects/ProjectCreatePage";
-import { ProjectSettingsNav } from "@/features/settings/ProjectSettingsNav";
+import { getProjectPlatform } from "@/features/projects/projectPlatforms";
 import { ConnectionStatus } from "./ConnectionStatus";
 import { rejectGuidance } from "./guidance";
 import { InstallSnippet } from "./InstallSnippet";
@@ -40,28 +40,22 @@ import { InstallSnippet } from "./InstallSnippet";
 export function OnboardingPage() {
   const { projectId: routeProjectId } = useParams({ strict: false }) as { projectId?: string };
   const organizations = useQuery({ queryKey: ["organizations"], queryFn: listOrganizations });
-  const organization = organizations.data?.organizations[0];
-  const projects = useQuery({
-    queryKey: ["projects", organization?.id],
-    queryFn: () => listProjects(organization!.id),
-    enabled: Boolean(organization),
+  const project = useQuery({
+    queryKey: ["project", routeProjectId],
+    queryFn: ({ signal }) => getProject(routeProjectId!, signal),
+    enabled: Boolean(routeProjectId),
   });
-  const project = useMemo(
-    () =>
-      projects.data?.projects.find((item) => item.id === routeProjectId) ??
-      projects.data?.projects[0],
-    [projects.data, routeProjectId],
-  );
 
-  if (organizations.isLoading || projects.isLoading) return <OnboardingLoading />;
-  if (!organization || !project) return <ProjectCreatePage />;
-  return <ProjectOnboarding project={project} />;
+  if (organizations.isLoading || project.isLoading) return <OnboardingLoading />;
+  if (!organizations.data?.organizations.length || !routeProjectId) return <ProjectCreatePage />;
+  if (!project.data) return <ProjectCreatePage />;
+  return <ProjectOnboarding project={project.data} />;
 }
 
 function ProjectOnboarding({
   project,
 }: {
-  project: NonNullable<Awaited<ReturnType<typeof listProjects>>["projects"][number]>;
+  project: NonNullable<Awaited<ReturnType<typeof getProject>>>;
 }) {
   const [copied, setCopied] = useState(false);
   const canManageKey = project.role === "owner" || project.role === "admin";
@@ -109,11 +103,7 @@ function ProjectOnboarding({
   const canSendTest = project.role !== "viewer";
 
   return (
-    <ConsolePage
-      width="narrow"
-      rail={<ProjectSettingsNav projectId={project.id} />}
-      railLabel="项目设置导航"
-    >
+    <ConsolePage width="narrow">
       <ConsolePageHeader
         title="连接第一个真实页面"
         titleId="onboarding-title"
@@ -226,11 +216,16 @@ function ProjectOnboarding({
         <CardHeader>
           <CardTitle>SDK 配置</CardTitle>
           <CardDescription>
-            安装 <code>@openrum/browser</code>，把初始化代码放在应用入口。
+            根据项目的 {getProjectPlatform(project.sdkPlatform).label} 平台，把 Browser SDK
+            放在正确的客户端入口。
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <InstallSnippet dsn={dsn} environment={project.environment} />
+          <InstallSnippet
+            dsn={dsn}
+            environment={project.environment}
+            platform={project.sdkPlatform}
+          />
         </CardContent>
       </Card>
 

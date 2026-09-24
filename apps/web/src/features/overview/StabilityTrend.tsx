@@ -9,6 +9,7 @@ import {
   type ChartConfig,
 } from "@/components/ui/chart";
 import { useChartMotion } from "@/lib/charts/useChartMotion";
+import { smoothCurve } from "@/lib/charts/smoothCurve";
 import type { OverviewResponse } from "@/lib/api/client";
 import { bucketFormatter } from "./format";
 
@@ -91,7 +92,7 @@ export function StabilityTrend({ series }: { series: OverviewResponse["series"] 
               />
               <Line
                 dataKey="errorRate"
-                type="natural"
+                {...smoothCurve}
                 stroke="var(--color-errorRate)"
                 strokeWidth={2}
                 dot={false}
@@ -100,7 +101,7 @@ export function StabilityTrend({ series }: { series: OverviewResponse["series"] 
               />
               <Line
                 dataKey="apiFailureRate"
-                type="natural"
+                {...smoothCurve}
                 stroke="var(--color-apiFailureRate)"
                 strokeWidth={2}
                 dot={false}

@@ -1,7 +1,7 @@
 ---
 title: 架构
 description: 一个 Event 如何从浏览器走到 Console，以及每一步由谁负责。
-appliesTo: Alpha / main
+appliesTo: Alpha
 ---
 
 import { Aside } from "@astrojs/starlight/components";
@@ -50,8 +50,8 @@ ClickHouse 重启期间不丢 Event，同时也意味着 Event 可能已被接�
 | Redis      | 配额、状态和短期缓存                  | 配额约束能力下降                                       |
 | 对象存储   | Source Map Artifact，可选             | 无法上传新 Release；已有映射不受影响                   |
 
-表里只有 Kafka 的失效是有损的，这也是[容量规划](/docs/self-hosting/capacity/)为什么先从 Kafka
+表里只有 Kafka 的失效是有损的，这也是[容量规划](/zh/docs/self-hosting/capacity/)为什么先从 Kafka
 的保留余量算起、而不是先看 ClickHouse 磁盘。
 
-版本与配置见[外部依赖](/docs/self-hosting/dependencies/)，这些名字所属的领域语言见仓库根目录的
+版本与配置见[外部依赖](/zh/docs/self-hosting/dependencies/)，这些名字所属的领域语言见仓库根目录的
 `CONTEXT.md`。

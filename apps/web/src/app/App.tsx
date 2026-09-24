@@ -1,18 +1,20 @@
 import {
   Bell,
   ChartPieSlice,
+  CaretRight,
   CaretUpDown,
   Gauge,
   ListBullets,
   Pulse,
+  Rocket,
   SidebarSimple,
   Sliders,
   SquaresFour,
   WarningCircle,
   UsersThree,
 } from "@phosphor-icons/react";
-import { useEffect, useState, type ReactElement } from "react";
-import { LogsIcon } from "lucide-react";
+import { lazy, Suspense, useEffect, useState, type ReactElement } from "react";
+import { LogsIcon, ChartColumnIcon } from "lucide-react";
 import { useMutation, useQuery, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { Link, useParams, useRouterState } from "@tanstack/react-router";
 import { AccountMenu } from "@/components/account/AccountMenu";
@@ -20,6 +22,7 @@ import { BrandMark } from "@/components/brand/BrandMark";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ProjectSwitcher } from "@/features/projects/ProjectSwitcher";
+import { SettingsNav } from "@/features/settings/SettingsNav";
 import {
   AnalysisContextProvider,
   AnalysisTimeFilter,
@@ -27,12 +30,31 @@ import {
   useAnalysisContextState,
 } from "@/features/filters/AnalysisContextBar";
 import { listOrganizations, listProjects } from "@/lib/api/projects";
+import { storagePressureQueryOptions } from "@/lib/api/storagePressure";
+import { getConnectionStatus } from "@/lib/api/client";
 import { logout, sessionQueryOptions } from "@/lib/auth/session";
 import { rememberProject, selectProject } from "@/lib/projects/currentProject";
 import { AppShell } from "./AppShell";
 import { AppStatusBar } from "./AppStatusBar";
+import { StoragePressureBanner } from "./StoragePressureBanner";
+import { isPipelineDelayed } from "./pipelineStatus";
 
 const SIDEBAR_STORAGE_KEY = "openrum-sidebar-collapsed";
+const DevDataQuickEntry = import.meta.env.DEV
+  ? lazy(() =>
+      import("@/features/devdata/DevDataPage").then((module) => ({
+        default: module.DevDataQuickEntry,
+      })),
+    )
+  : null;
+
+function isSecondaryNavigationPath(pathname: string) {
+  return (
+    pathname.startsWith("/settings") ||
+    pathname.includes("/onboarding") ||
+    pathname.includes("/dev-data")
+  );
+}
 
 function formatEnvironmentLabel(value?: string) {
   if (!value) return "全部环境";
@@ -42,20 +64,63 @@ function formatEnvironmentLabel(value?: string) {
 }
 
 const primaryNavigation = [
-  { label: "数据大盘", icon: SquaresFour, to: "/projects/$projectId/overview" },
-  { label: "分析", icon: ChartPieSlice, to: "/projects/$projectId/analytics" },
-  { label: "错误", icon: WarningCircle, to: "/projects/$projectId/issues" },
-  { label: "日志", icon: LogsIcon, to: "/projects/$projectId/logs" },
-  { label: "性能", icon: Gauge, to: "/projects/$projectId/performance" },
-  { label: "事件", icon: ListBullets, to: "/projects/$projectId/events" },
-  { label: "API", icon: Pulse, to: "/projects/$projectId/apis" },
+  {
+    label: "数据大盘",
+    icon: SquaresFour,
+    to: "/projects/$projectId/overview",
+    preserveAnalysisContext: true,
+  },
+  {
+    label: "分析",
+    icon: ChartPieSlice,
+    to: "/projects/$projectId/analytics",
+    preserveAnalysisContext: true,
+  },
+  {
+    label: "错误",
+    icon: WarningCircle,
+    to: "/projects/$projectId/issues",
+    preserveAnalysisContext: true,
+  },
+  {
+    label: "日志",
+    icon: LogsIcon,
+    to: "/projects/$projectId/logs",
+    preserveAnalysisContext: true,
+  },
+  {
+    label: "性能",
+    icon: Gauge,
+    to: "/projects/$projectId/performance",
+    preserveAnalysisContext: true,
+  },
+  {
+    label: "事件",
+    icon: ListBullets,
+    to: "/projects/$projectId/events",
+    preserveAnalysisContext: true,
+  },
+  {
+    label: "API",
+    icon: Pulse,
+    to: "/projects/$projectId/apis",
+    preserveAnalysisContext: true,
+  },
   { label: "告警", icon: Bell, to: "/projects/$projectId/alerts" },
-  { label: "会话", icon: UsersThree, to: "/projects/$projectId/sessions" },
+  {
+    label: "会话",
+    icon: UsersThree,
+    to: "/projects/$projectId/sessions",
+    preserveAnalysisContext: true,
+  },
+  { label: "发布", icon: Rocket, to: "/projects/$projectId/releases" },
 ] as const;
 
 export function App() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(
-    () => window.localStorage.getItem(SIDEBAR_STORAGE_KEY) === "true",
+    () =>
+      !isSecondaryNavigationPath(window.location.pathname) &&
+      window.localStorage.getItem(SIDEBAR_STORAGE_KEY) === "true",
   );
   const { projectId: routeProjectId } = useParams({ strict: false }) as { projectId?: string };
   const pathname = useRouterState({
@@ -74,16 +139,22 @@ export function App() {
   const project = organization
     ? selectProject(projects, organization.id, routeProjectId)
     : undefined;
+  const connectionStatusQuery = useQuery({
+    queryKey: ["connection-status", routeProjectId],
+    queryFn: ({ signal }) => getConnectionStatus(routeProjectId!, signal),
+    enabled: Boolean(routeProjectId),
+    staleTime: 30_000,
+    refetchInterval: 30_000,
+  });
+  const storagePressureQuery = useQuery(storagePressureQueryOptions());
   const analysisContext = useAnalysisContextState(project, isAnalysisRoute(pathname));
   const currentEnvironment = formatEnvironmentLabel(analysisContext?.environment);
-  const projectSettingsActive = Boolean(
-    routeProjectId &&
-    (pathname.includes("/settings") ||
-      pathname.includes("/onboarding") ||
-      pathname.includes("/releases") ||
-      pathname.includes("/usage") ||
-      pathname.includes("/dev-data")),
-  );
+  const settingsActive = isSecondaryNavigationPath(pathname);
+  const [previousSettingsActive, setPreviousSettingsActive] = useState(settingsActive);
+  if (settingsActive !== previousSettingsActive) {
+    setPreviousSettingsActive(settingsActive);
+    if (settingsActive && sidebarCollapsed) setSidebarCollapsed(false);
+  }
   useEffect(() => {
     if (project) rememberProject(project);
   }, [project]);
@@ -111,8 +182,22 @@ export function App() {
     <AnalysisContextProvider value={analysisContext}>
       <AppShell
         sidebarCollapsed={sidebarCollapsed}
+        banner={
+          <StoragePressureBanner
+            pressure={storagePressureQuery.data}
+            canRecover={user.instanceRole === "instance_owner"}
+          />
+        }
+        floatingTools={
+          DevDataQuickEntry ? (
+            <Suspense fallback={null}>
+              <DevDataQuickEntry projects={projects} project={project} />
+            </Suspense>
+          ) : undefined
+        }
         statusBar={
           <AppStatusBar
+            dataDelayed={isPipelineDelayed(connectionStatusQuery.data)}
             context={
               analysisContext && isAnalysisRoute(pathname) ? <AnalysisTimeFilter /> : undefined
             }
@@ -136,86 +221,152 @@ export function App() {
         navigation={
           <TooltipProvider>
             <div className="sidebar__brand-row">
-              <ProjectSwitcher
-                organization={organization}
-                projects={projects}
-                project={project}
-                loading={organizationsQuery.isLoading || projectsQuery.isLoading}
-                currentEnvironment={analysisContext?.environment}
-                onEnvironmentChange={
-                  routeProjectId && analysisContext
-                    ? (environment) => analysisContext.update({ environment })
-                    : undefined
-                }
-              >
-                <Link
-                  className="brand"
-                  to="/projects"
-                  aria-label={
-                    routeProjectId && project
-                      ? `切换项目，当前为 ${project.name}，环境 ${currentEnvironment}`
-                      : "OpenRUM 项目列表"
+              {routeProjectId && project ? (
+                <ProjectSwitcher
+                  organization={organization}
+                  projects={projects}
+                  project={project}
+                  loading={organizationsQuery.isLoading || projectsQuery.isLoading}
+                  currentEnvironment={analysisContext?.environment}
+                  onEnvironmentChange={
+                    analysisContext
+                      ? (environment) => analysisContext.update({ environment })
+                      : undefined
                   }
                 >
-                  <BrandMark size="nav" />
-                  <span className="brand__identity">
-                    {routeProjectId && project ? (
-                      <>
-                        <strong>{project.name}</strong>
-                        <small>{currentEnvironment}</small>
-                      </>
-                    ) : (
-                      <strong>OpenRUM</strong>
-                    )}
+                  <Link
+                    className="brand"
+                    to="/projects"
+                    aria-label={`切换项目，当前为 ${project.name}，环境 ${currentEnvironment}`}
+                  >
+                    <BrandMark size="lockup" />
+                    <span className="brand__identity">
+                      <strong>{project.name}</strong>
+                      <small>{currentEnvironment}</small>
+                    </span>
+                    <CaretUpDown className="brand__switcher-icon" aria-hidden="true" />
+                  </Link>
+                </ProjectSwitcher>
+              ) : (
+                <Link className="brand" to="/projects" aria-label="OpenRUM 项目列表">
+                  <BrandMark size="lockup" />
+                  <span className="brand__identity brand__identity--product">
+                    <strong>OpenRUM</strong>
                   </span>
-                  <CaretUpDown className="brand__switcher-icon" aria-hidden="true" />
                 </Link>
-              </ProjectSwitcher>
+              )}
             </div>
 
-            <nav className="sidebar__nav" aria-label="主导航">
-              {primaryNavigation.map(({ label, icon: Icon, to }) => (
-                <SidebarTooltip key={to} label={label} enabled={sidebarCollapsed}>
-                  {project ? (
-                    <Link
-                      className="nav-item"
-                      to={to}
-                      params={{ projectId: project.id }}
-                      activeProps={{ className: "is-active" }}
-                      aria-label={label}
+            <div
+              className="sidebar-nav-switcher"
+              data-level={settingsActive ? "settings" : "primary"}
+            >
+              <div className="sidebar-nav-switcher__track">
+                <div
+                  className="sidebar-nav-switcher__panel"
+                  aria-hidden={settingsActive}
+                  inert={settingsActive ? true : undefined}
+                >
+                  <nav className="sidebar__nav" aria-label="主导航">
+                    {primaryNavigation.map((item) => {
+                      const { label, icon: Icon, to } = item;
+                      const sharedAnalysisSearch =
+                        "preserveAnalysisContext" in item &&
+                        item.preserveAnalysisContext &&
+                        analysisContext
+                          ? {
+                              from: analysisContext.from.toISOString(),
+                              to: analysisContext.to.toISOString(),
+                              environment: analysisContext.environment,
+                            }
+                          : undefined;
+                      return (
+                        <SidebarTooltip key={to} label={label} enabled={sidebarCollapsed}>
+                          {project ? (
+                            <Link
+                              className="nav-item"
+                              to={to}
+                              params={{ projectId: project.id }}
+                              search={sharedAnalysisSearch}
+                              activeProps={{ className: "is-active" }}
+                              aria-label={label}
+                            >
+                              <Icon size={17} />
+                              <span>{label}</span>
+                            </Link>
+                          ) : (
+                            <Link className="nav-item" to="/projects/new" aria-label={label}>
+                              <Icon size={17} />
+                              <span>{label}</span>
+                            </Link>
+                          )}
+                        </SidebarTooltip>
+                      );
+                    })}
+                    <SidebarTooltip
+                      label={project ? "项目设置" : "设置"}
+                      enabled={sidebarCollapsed}
                     >
-                      <Icon size={17} />
-                      <span>{label}</span>
-                    </Link>
-                  ) : (
-                    <Link className="nav-item" to="/projects/new" aria-label={label}>
-                      <Icon size={17} />
-                      <span>{label}</span>
-                    </Link>
-                  )}
-                </SidebarTooltip>
-              ))}
-              <SidebarTooltip label="项目设置" enabled={sidebarCollapsed}>
-                {project ? (
-                  <Link
-                    className={projectSettingsActive ? "nav-item is-active" : "nav-item"}
-                    to="/projects/$projectId/settings"
-                    params={{ projectId: project.id }}
-                    aria-label="项目设置"
-                  >
-                    <Sliders size={17} />
-                    <span>项目设置</span>
-                  </Link>
-                ) : (
-                  <Link className="nav-item" to="/projects/new" aria-label="项目设置">
-                    <Sliders size={17} />
-                    <span>项目设置</span>
-                  </Link>
-                )}
-              </SidebarTooltip>
-            </nav>
+                      {project ? (
+                        <Link
+                          className="nav-item"
+                          to="/settings/project/$projectId/general"
+                          params={{ projectId: project.id }}
+                          aria-label="项目设置"
+                        >
+                          <Sliders size={17} />
+                          <span>项目设置</span>
+                          <CaretRight
+                            className="nav-item__next"
+                            size={14}
+                            weight="bold"
+                            aria-hidden="true"
+                          />
+                        </Link>
+                      ) : (
+                        <Link className="nav-item" to="/settings/account" aria-label="设置">
+                          <Sliders size={17} />
+                          <span>设置</span>
+                          <CaretRight
+                            className="nav-item__next"
+                            size={14}
+                            weight="bold"
+                            aria-hidden="true"
+                          />
+                        </Link>
+                      )}
+                    </SidebarTooltip>
+                  </nav>
+                </div>
+
+                <div
+                  className="sidebar-nav-switcher__panel sidebar-nav-switcher__panel--settings"
+                  aria-hidden={!settingsActive}
+                  inert={!settingsActive ? true : undefined}
+                >
+                  <SettingsNav
+                    organizationName={organization?.name}
+                    project={project}
+                    showInstance={Boolean(user.instanceRole)}
+                  />
+                </div>
+              </div>
+            </div>
 
             <div className="sidebar__footer">
+              <nav className="sidebar__utility-nav" aria-label="组织快捷入口">
+                <SidebarTooltip label="用量统计" enabled={sidebarCollapsed}>
+                  <Link
+                    className="nav-item nav-item--utility"
+                    to="/usage"
+                    activeProps={{ className: "is-active" }}
+                    aria-label="用量统计"
+                  >
+                    <ChartColumnIcon size={17} />
+                    <span>用量统计</span>
+                  </Link>
+                </SidebarTooltip>
+              </nav>
               <div className="account-panel">
                 <AccountMenu
                   displayName={user.displayName}

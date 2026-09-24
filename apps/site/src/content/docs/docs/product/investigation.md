@@ -3,7 +3,7 @@ title: Investigation
 description: Move from a behavior change to Session, Issue and root cause.
 ---
 
-**Applies to:** Alpha / main.
+**Applies to:** Alpha.
 
 OpenRUM keeps behavior analytics and error monitoring in one investigation path so operators do not copy IDs between tools.
 

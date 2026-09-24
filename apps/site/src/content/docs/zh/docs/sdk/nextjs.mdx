@@ -108,4 +108,4 @@ export default function App({ Component, pageProps }: AppProps) {
 | 服务端渲染期间抛出的错误       | 不采集。SDK 只观测浏览器，这些错误留在 Next.js 的服务端日志里。             |
 | Route Handler 与 Server Action | 不直接采集。它们的失败会以浏览器侧失败的 fetch 或 XHR Request 呈现。        |
 | Middleware 与 Edge runtime     | 不支持。那里既没有 `window` 也没有`localStorage`。                          |
-| Source Map                     | 构建后按 Release 上传，见 [Release 与 Source Map](/docs/sdk/source-maps/)。 |
+| Source Map                     | 构建后按 Release 上传，见 [Release 与 Source Map](/zh/docs/sdk/source-maps/)。 |

@@ -8,6 +8,7 @@ import {
   YAxis,
 } from "recharts";
 import type { BehaviorTrendPoint } from "./types";
+import { smoothCurve } from "@/lib/charts/smoothCurve";
 
 export function BehaviorTrendChart({ data }: { data: BehaviorTrendPoint[] }) {
   const points = data.map((point) => ({
@@ -62,7 +63,7 @@ export function BehaviorTrendChart({ data }: { data: BehaviorTrendPoint[] }) {
             }}
           />
           <Area
-            type="monotone"
+            {...smoothCurve}
             dataKey="events"
             name="事件"
             stroke="var(--ds-primary)"
@@ -71,7 +72,7 @@ export function BehaviorTrendChart({ data }: { data: BehaviorTrendPoint[] }) {
             isAnimationActive={false}
           />
           <Area
-            type="monotone"
+            {...smoothCurve}
             dataKey="users"
             name="用户"
             stroke="var(--ds-info)"

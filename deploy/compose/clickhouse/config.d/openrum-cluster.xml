@@ -1,7 +1,7 @@
 <clickhouse>
-  <!-- Single-node development topology. Production supplies the same macros and
-       cluster name from its ClickHouse deployment, backed by an external
-       three-node Keeper quorum. -->
+  <!-- Single-node topology for local evaluation and single-host production.
+       This embedded Keeper is not highly available. Kubernetes production
+       supplies the same macros and cluster name with an external Keeper quorum. -->
   <keeper_server>
     <tcp_port>9181</tcp_port>
     <server_id>1</server_id>

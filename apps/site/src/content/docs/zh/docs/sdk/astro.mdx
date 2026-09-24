@@ -1,0 +1,108 @@
+---
+title: Astro
+description: 从 Astro 客户端脚本或 Island 初始化 OpenRUM Browser SDK。
+appliesTo: "@openrum/browser 0.1.0"
+---
+
+import { Aside, Tabs, TabItem } from "@astrojs/starlight/components";
+
+Astro 在服务端生成 HTML，只在明确指定的位置发送 JavaScript。因此，`@openrum/browser`
+必须放在客户端脚本或已激活的 Island 中，不能放在组件 frontmatter 里。
+
+<Aside type="danger" title="Frontmatter 在服务端运行">
+  `.astro` 文件 `---` 之间的代码在构建或请求期间执行，此时没有 `window`。在这里调用 `init()`
+  不会建立浏览器传输，事件也不会正常上报。
+</Aside>
+
+## 初始化
+
+<Tabs syncKey="astro-style">
+  <TabItem label="客户端脚本">
+
+在布局中加入 `<script>` 是最简单的方式。Astro 会打包该脚本，并且只在浏览器中执行。
+
+```astro
+---
+// src/layouts/Base.astro
+---
+
+<html lang="zh-CN">
+  <body>
+    <slot />
+    <script>
+      import { init } from "@openrum/browser";
+
+      init({
+        dsn: import.meta.env.PUBLIC_OPENRUM_DSN,
+        environment: import.meta.env.MODE,
+        release: import.meta.env.PUBLIC_APP_RELEASE,
+      });
+    </script>
+  </body>
+</html>
+```
+
+`PUBLIC_` 前缀使变量可以在浏览器代码中读取。DSN 是浏览器公开凭据，只允许向一个项目追加事件。
+
+  </TabItem>
+  <TabItem label="Island">
+
+如果项目已经激活框架组件，可以在该组件中初始化，并使用 `client:load` 只挂载一次。
+
+```tsx
+// src/components/Monitoring.tsx
+import { init } from "@openrum/browser";
+import { useEffect } from "react";
+
+export function Monitoring() {
+  useEffect(() => {
+    init({
+      dsn: import.meta.env.PUBLIC_OPENRUM_DSN,
+      environment: import.meta.env.MODE,
+      release: import.meta.env.PUBLIC_APP_RELEASE,
+    });
+  }, []);
+  return null;
+}
+```
+
+```astro
+---
+import { Monitoring } from "../components/Monitoring";
+---
+
+<Monitoring client:load />
+```
+
+`client:idle` 或 `client:visible` 会延迟初始化，可能错过早期错误和 Web Vitals，因此应使用 `client:load`。
+
+  </TabItem>
+</Tabs>
+
+## Island 共用同一个客户端
+
+已经存在客户端时，`init()` 会返回正在运行的实例；顶层 `captureEvent()` 和 `setUser()`
+也使用这个实例。因此一个页面上的 Island 会进入同一会话。只负责上报的 Island 无需再次初始化：
+
+```tsx
+import { captureEvent } from "@openrum/browser";
+
+captureEvent("newsletter_subscribed", { attributes: { placement: "footer" } });
+```
+
+首次 `init()` 之前这些辅助函数不会排队，而是直接跳过。
+
+## 导航
+
+静态 Astro 站点每次导航都会加载新文档，因此会形成新的页面浏览。启用
+[客户端路由](https://docs.astro.build/zh-cn/guides/view-transitions/) 后，SDK 会观察
+`history.pushState`；初始化脚本不会重复执行，无需额外保护。
+
+## 当前边界
+
+| 场景                     | 支持情况                                                            |
+| ------------------------ | ------------------------------------------------------------------- |
+| SSR 或构建错误           | 不采集，Browser SDK 只观察浏览器                                    |
+| Astro endpoint 和 action | 不直接采集；浏览器侧失败会表现为失败请求                            |
+| 路由模板                 | 尚未记录，参见[路由模式](/zh/docs/sdk/browser/#路由模式暂未被记录)  |
+| Source Map               | 构建后按 Release 上传，参见 [Source Map](/zh/docs/sdk/source-maps/) |

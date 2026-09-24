@@ -14,7 +14,7 @@ import {
   type ScrubRules,
 } from "@/lib/api/processing";
 import { canManageProjects, getProject } from "@/lib/api/projects";
-import { ProjectSettingsLayout } from "./ProjectSettingsLayout";
+import { ProjectDataSettingsShell } from "./ProjectDataSettingsShell";
 
 // Mirrors the built-in fragment list in internal/privacy. Shown rather than
 // described so nobody adds a rule for something already covered.
@@ -32,7 +32,7 @@ const builtinKeys = [
 ];
 
 export function ProjectScrubbingRoute() {
-  const { projectId } = useParams({ from: "/protected/projects/$projectId/settings/scrubbing" });
+  const { projectId } = useParams({ from: "/protected/settings/project/$projectId/scrubbing" });
   const project = useQuery({
     queryKey: ["project", projectId],
     queryFn: ({ signal }) => getProject(projectId, signal),
@@ -42,12 +42,7 @@ export function ProjectScrubbingRoute() {
     queryFn: ({ signal }) => getScrubRules(projectId, signal),
   });
   return (
-    <ProjectSettingsLayout
-      projectId={projectId}
-      titleId="project-scrubbing-title"
-      title="脱敏"
-      description="在内置脱敏之上追加你自己的规则。内置的邮箱、Bearer、JWT、信用卡和一份敏感 key 名单始终生效，这里只能加，不能关。"
-    >
+    <ProjectDataSettingsShell projectId={projectId} section="scrubbing">
       {rules.isLoading ? (
         <AsyncLoading label="正在加载脱敏规则…" />
       ) : rules.error ? (
@@ -65,7 +60,7 @@ export function ProjectScrubbingRoute() {
           role={project.data?.role}
         />
       ) : null}
-    </ProjectSettingsLayout>
+    </ProjectDataSettingsShell>
   );
 }
 

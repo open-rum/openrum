@@ -1,6 +1,22 @@
 import { expect, test } from "@playwright/test";
 import { mockOpenRUM, projectId } from "./mockOpenRUM";
 
+test("event filters use the shared search composer and URL-backed tokens", async ({ page }) => {
+  await mockOpenRUM(page, { projectExists: true });
+  await page.goto(`/projects/${projectId}/events`);
+  await expect(page.getByRole("heading", { name: "事件管理与探索" })).toBeVisible();
+
+  await page.keyboard.press("/");
+  const search = page.getByRole("textbox", { name: "搜索事件或添加筛选条件" });
+  await expect(search).toBeFocused();
+  await page.getByRole("button", { name: /^事件 / }).click();
+  await page.getByRole("button", { name: "全部点击", exact: true }).click();
+
+  await expect(page).toHaveURL(/eventKind=click/);
+  await expect(page.getByText("事件：全部点击")).toBeVisible();
+  await expect(page.getByRole("combobox", { name: "行为事件" })).toHaveCount(0);
+});
+
 test("an event sample opens its complete session with the selected event anchored", async ({
   page,
 }) => {

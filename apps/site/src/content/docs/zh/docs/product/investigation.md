@@ -3,7 +3,7 @@ title: 行为 → Session → Issue
 description: OpenRUM 推荐调查路径。
 ---
 
-**适用于：** Alpha / main。
+**适用于：** Alpha。
 
 OpenRUM 将行为分析与错误监控放在同一条调查路径中，避免在多个工具间复制 ID。
 

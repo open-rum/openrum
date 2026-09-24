@@ -1,7 +1,7 @@
 ---
 title: Custom Events
 description: How to send a Custom Event, the limits Ingest enforces on its name and payload, and the reserved ui.click schema.
-appliesTo: Alpha / main
+appliesTo: Alpha
 ---
 
 A Custom Event is a product milestone you decided to record. Page Views and clicks arrive on

@@ -1,7 +1,7 @@
 ---
 title: Inbound filters
 description: Stop crawler traffic, extension errors and known noise from entering a project, after measuring what each rule would remove.
-appliesTo: Alpha / main
+appliesTo: Alpha
 ---
 
 Inbound filters decide which reports never become data. They live under **Project settings → Inbound filters** and apply per project.

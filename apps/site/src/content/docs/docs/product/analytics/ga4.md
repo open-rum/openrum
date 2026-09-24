@@ -1,7 +1,7 @@
 ---
 title: Compared with GA4
 description: A feature-by-feature comparison with Google Analytics 4, including the three gaps worth knowing before you migrate.
-appliesTo: Alpha / main
+appliesTo: Alpha
 ---
 
 Only the GA4 features that matter for a product team are listed. "Partial" means the

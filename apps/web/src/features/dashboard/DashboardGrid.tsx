@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import {
   DndContext,
   DragOverlay,
@@ -22,9 +22,7 @@ import {
   ArrowUpIcon,
   CopyIcon,
   GripVerticalIcon,
-  MoreHorizontalIcon,
-  Maximize2Icon,
-  XIcon,
+  ChartNoAxesCombinedIcon,
   Settings2Icon,
   Trash2Icon,
 } from "lucide-react";
@@ -60,16 +58,8 @@ import {
 import { moduleRegistry } from "./registry";
 import { ModuleContent } from "./ModuleContent";
 import { effectiveOverviewFilters, type ModuleQuery } from "./queries";
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
+import { Dialog } from "@/components/ui/dialog";
+import { ModuleDetailsDialog } from "./ModuleDetailsDialog";
 
 type GridProps = {
   widgets: StoredWidget[];
@@ -139,103 +129,107 @@ export function DashboardGrid({
                   record={record}
                   query={queries.get(record.id)}
                   filters={filters}
-                  actions={
-                    editing ? (
-                      <div className="flex items-center gap-1">
-                        {handle}
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon-sm"
-                              aria-label={`${typeof record.title === "string" ? record.title : "模块"} 操作`}
-                              disabled={disabled}
+                  showDescription={editing}
+                  actions={(openDetails) => (
+                    <div className="flex items-center gap-1">
+                      {editing ? handle : null}
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            className="dashboard-settings-trigger"
+                            aria-label={`${typeof record.title === "string" ? record.title : "模块"} 操作`}
+                            disabled={disabled}
+                          >
+                            <Settings2Icon />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuGroup>
+                            <DropdownMenuItem disabled={!readWidget(record)} onSelect={openDetails}>
+                              <ChartNoAxesCombinedIcon />
+                              详细
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              disabled={!readWidget(record)}
+                              onSelect={() => {
+                                const widget = readWidget(record);
+                                if (widget) onConfigure(widget);
+                              }}
                             >
-                              <MoreHorizontalIcon />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuGroup>
-                              <DropdownMenuItem
-                                disabled={!readWidget(record)}
-                                onSelect={() => {
-                                  const widget = readWidget(record);
-                                  if (widget) onConfigure(widget);
-                                }}
-                              >
-                                <Settings2Icon />
-                                配置模块
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                disabled={widgets.length >= MAX_WIDGETS || !readWidget(record)}
-                                onSelect={() =>
-                                  onChange([
-                                    ...widgets.slice(0, index + 1),
-                                    {
-                                      ...record,
-                                      id: crypto.randomUUID(),
-                                      title: `${record.title} 副本`.slice(0, 80),
-                                    },
-                                    ...widgets.slice(index + 1),
-                                  ])
-                                }
-                              >
-                                <CopyIcon />
-                                复制模块
-                              </DropdownMenuItem>
-                            </DropdownMenuGroup>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuGroup>
-                              <DropdownMenuLabel>尺寸</DropdownMenuLabel>
-                              {readWidget(record)
-                                ? moduleRegistry[readWidget(record)!.type].sizes.map((size) => (
-                                    <DropdownMenuItem
-                                      key={size}
-                                      onSelect={() =>
-                                        onChange(
-                                          widgets.map((item) =>
-                                            item.id === record.id ? { ...item, size } : item,
-                                          ),
-                                        )
-                                      }
-                                    >
-                                      {sizeLabels[size]}
-                                      {record.size === size ? " ✓" : ""}
-                                    </DropdownMenuItem>
-                                  ))
-                                : null}
-                            </DropdownMenuGroup>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuGroup>
-                              <DropdownMenuItem
-                                disabled={index === 0}
-                                onSelect={() => move(record.id, index - 1)}
-                              >
-                                <ArrowUpIcon />
-                                上移
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                disabled={index === widgets.length - 1}
-                                onSelect={() => move(record.id, index + 1)}
-                              >
-                                <ArrowDownIcon />
-                                下移
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                variant="destructive"
-                                onSelect={() =>
-                                  onChange(widgets.filter((item) => item.id !== record.id))
-                                }
-                              >
-                                <Trash2Icon />
-                                移除模块
-                              </DropdownMenuItem>
-                            </DropdownMenuGroup>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-                    ) : undefined
-                  }
+                              <Settings2Icon />
+                              配置模块
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              disabled={widgets.length >= MAX_WIDGETS || !readWidget(record)}
+                              onSelect={() =>
+                                onChange([
+                                  ...widgets.slice(0, index + 1),
+                                  {
+                                    ...record,
+                                    id: crypto.randomUUID(),
+                                    title: `${record.title} 副本`.slice(0, 80),
+                                  },
+                                  ...widgets.slice(index + 1),
+                                ])
+                              }
+                            >
+                              <CopyIcon />
+                              复制模块
+                            </DropdownMenuItem>
+                          </DropdownMenuGroup>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuGroup>
+                            <DropdownMenuLabel>尺寸</DropdownMenuLabel>
+                            {readWidget(record)
+                              ? moduleRegistry[readWidget(record)!.type].sizes.map((size) => (
+                                  <DropdownMenuItem
+                                    key={size}
+                                    onSelect={() =>
+                                      onChange(
+                                        widgets.map((item) =>
+                                          item.id === record.id ? { ...item, size } : item,
+                                        ),
+                                      )
+                                    }
+                                  >
+                                    {sizeLabels[size]}
+                                    {record.size === size ? " ✓" : ""}
+                                  </DropdownMenuItem>
+                                ))
+                              : null}
+                          </DropdownMenuGroup>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuGroup>
+                            <DropdownMenuItem
+                              disabled={index === 0}
+                              onSelect={() => move(record.id, index - 1)}
+                            >
+                              <ArrowUpIcon />
+                              上移
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              disabled={index === widgets.length - 1}
+                              onSelect={() => move(record.id, index + 1)}
+                            >
+                              <ArrowDownIcon />
+                              下移
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              variant="destructive"
+                              onSelect={() =>
+                                onChange(widgets.filter((item) => item.id !== record.id))
+                              }
+                            >
+                              <Trash2Icon />
+                              移除模块
+                            </DropdownMenuItem>
+                          </DropdownMenuGroup>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  )}
                 />
               )}
             </SortableModule>
@@ -308,26 +302,30 @@ export function ModuleCard({
   query,
   filters,
   actions,
+  showDescription = false,
 }: {
   record: StoredWidget;
   query?: ModuleQuery;
   filters: OverviewFilters;
-  actions?: ReactNode;
+  actions: (openDetails: () => void) => ReactNode;
+  showDescription?: boolean;
 }) {
   const widget = readWidget(record);
   const effective =
     widget?.data.source === "overview" ? effectiveOverviewFilters(widget, filters) : undefined;
   const freshness = query?.data?.result.freshness;
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const cardRef = useRef<HTMLDivElement>(null);
   const title = typeof record.title === "string" ? record.title : "暂不可用的模块";
   return (
     <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
       <Card
-        className="dashboard-module h-full"
+        ref={cardRef}
+        className={cn("dashboard-module h-full", widget?.type === "stat" && "relative isolate")}
         data-module-title={title}
         size={widget?.type === "stat" ? "sm" : "default"}
       >
-        <CardHeader className="dashboard-module-header">
+        <CardHeader className="dashboard-module-header relative z-10">
           <div className="min-w-0">
             <CardTitle className="flex items-center gap-2">
               <span className="truncate" title={title}>
@@ -342,33 +340,14 @@ export function ModuleCard({
                 />
               ) : null}
             </CardTitle>
-            {actions || !widget ? (
+            {showDescription || !widget ? (
               <CardDescription>
                 {widget ? widgetDescription(widget) : `${record.type} · v${record.version}`}
               </CardDescription>
             ) : null}
           </div>
           <CardAction className="flex items-center gap-2">
-            {actions ??
-              (widget ? (
-                <TooltipProvider delayDuration={250}>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <DialogTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          className="dashboard-detail-trigger"
-                          aria-label={`${title} 详情`}
-                        >
-                          <Maximize2Icon />
-                        </Button>
-                      </DialogTrigger>
-                    </TooltipTrigger>
-                    <TooltipContent>查看详情与数据表</TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              ) : null)}
+            {actions(() => setDetailsOpen(true))}
           </CardAction>
         </CardHeader>
         {effective?.release || effective?.route ? (
@@ -382,27 +361,7 @@ export function ModuleCard({
           <ModuleContent record={record} query={query} filters={filters} />
         </CardContent>
       </Card>
-      <DialogContent className="dashboard-detail-dialog sm:max-w-4xl" showCloseButton={false}>
-        <DialogHeader className="pr-8">
-          <DialogTitle>{title} 详情</DialogTitle>
-          <DialogDescription>当前筛选范围内的统计口径、详细数值与数据表。</DialogDescription>
-          <DialogClose asChild>
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              className="absolute top-2 right-2"
-              aria-label="关闭详情"
-            >
-              <XIcon />
-            </Button>
-          </DialogClose>
-        </DialogHeader>
-        <div className="dashboard-detail-body">
-          {detailsOpen ? (
-            <ModuleContent record={record} query={query} filters={filters} detailed />
-          ) : null}
-        </div>
-      </DialogContent>
+      <ModuleDetailsDialog record={record} query={query} filters={filters} sourceRef={cardRef} />
     </Dialog>
   );
 }

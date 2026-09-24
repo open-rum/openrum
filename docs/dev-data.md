@@ -2,7 +2,8 @@
 
 The generator synthesizes traffic for a project on demand, so a query or a page
 under development has something realistic to run against. It is reachable from
-the console at **造数据** (`/projects/{id}/dev-data`) and over the API at
+the console's bottom-right floating flask icon **造数据** (a quick-entry Dialog available from
+any Console page), the legacy `/projects/{id}/dev-data` route, and over the API at
 `POST /api/v1/projects/{id}/dev-data`.
 
 This is separate from the [demo data generator](demo-data.md). The demo
@@ -17,7 +18,7 @@ validation at the ingest endpoint, then Kafka, then the consumer, which performs
 URL normalization, route templating, error fingerprinting, sampling arithmetic
 and the materialized-view rollups.
 
-That costs a client DSN and a few seconds of consumer lag. In exchange, data
+That uses the Project's default client DSN and a few seconds of consumer lag. In exchange, data
 generated here cannot disagree with production data about the shape of a row. A
 generator that wrote ClickHouse directly could produce combinations the pipeline
 never emits, and a query validated against those would be wrong in production.
@@ -31,7 +32,7 @@ guarded elsewhere:
 
 - `NewDevDataHandler` returns `nil` unless `APP_ENV=development`, and `nil`
   registers no routes.
-- The console route and its navigation entry are declared inside an
+- The console route and its lazy-loaded quick entry are declared inside an
   `import.meta.env.DEV` branch, so a production bundle contains no reference to
   the page.
 
@@ -40,14 +41,40 @@ owners, admins and members hold.
 
 ## The client DSN
 
-You have to supply the Project's client DSN. The Console extracts its write-only
-credential before calling the development-only API. Public DSNs can also be
-copied again from Project settings; their ingest capability is bounded by
-Origin checks, rate limits, rotation, and revocation.
+The API looks up the current default public key for the selected Project on each
+run. No manual DSN or browser-stored credential is needed. Old globally stored
+DSNs are ignored, avoiding stale keys and accidental cross-project writes.
+API clients may still supply `writeKey`, but it must be an active public key
+belonging to the requested Project. A stopped Project cannot generate data.
 
-The development-data form keeps the DSN in `localStorage` so it is entered once
-per browser.
-Copy the Project's default value under **项目设置 → 客户端 DSN**.
+## Quick workflow
+
+1. Open **造数据** using the bottom-right floating flask icon without leaving the current page.
+2. Confirm the Project, write Environment and data window. The current analysis
+   range and specific Environment are selected by default; “all environments”
+   falls back to the Project's default Environment for writes.
+3. Choose a preset and session count: 100 for a quick check, 300 for fuller
+   charts, up to 5,000. Large runs are synchronous and can take time; start small.
+4. Generate. The form locks during delivery to prevent duplicate submissions.
+5. Inspect accepted/rejected/failed/unsent counts. The Console checks a unique
+   session sample every two seconds for up to roughly 30 seconds, then refreshes
+   Project queries once the sample is queryable. This proves sample availability,
+   not that every event was stored. Use **检查入库并刷新** to check again.
+6. **按生成范围查看大盘** opens the exact returned time range and Environment.
+   Other per-page filters are not automatically cleared on the underlying page.
+
+### Localhost filtering pitfall
+
+The previous generator used the first allowed Origin for both the request header
+and simulated page URLs. If that Origin was `http://127.0.0.1:4173` and the
+Project enforced the localhost inbound filter, Ingest accepted every event but
+the Consumer discarded them all. A 202 response alone never proved storage.
+
+The generator now keeps these separate: the transport `Origin` remains allowed
+by the Project, while a local simulated page origin becomes
+`https://shop.example.com`. This models a deployed test site without disabling
+inbound filters. Advanced JSON can deliberately supply local page URLs to test
+filtering. All other filters, rate limits, and storage-pressure guards still apply.
 
 ## Presets
 
@@ -81,6 +108,11 @@ Presets deliberately plant findings rather than only producing volume:
 
 Sessions are spread evenly across the chosen window rather than clustered at one
 instant, which is what gives per-minute rollups and trend charts a shape.
+The API accepts explicit `from`/`to` (both required together) and `environment`,
+or `minutes` ending at request time. Windows are bounded to the last 30 days.
+Journey tails are fitted into the selected window so events do not leak into
+the future or past the dashboard's end time. UI time and Environment selections
+override the corresponding fields in advanced JSON.
 
 Backdating is safe. The pipeline rewrites a timestamp only when it is
 implausible — before the year 2000, or more than 24 hours in the future — and
@@ -96,8 +128,8 @@ is the same structure the API accepts. Its shape:
 ```jsonc
 {
   "seed": 1757030400000000000, // the same seed replays the same dataset
-  "environment": "production", // overwritten by the server from the project
-  "baseUrl": "https://shop.example.com", // must be an origin the project allows
+  "environment": "production", // overridden by the selected write environment
+  "baseUrl": "https://shop.example.com", // simulated page origin, not transport Origin
   "sessions": 300,
   "from": "2026-09-04T12:00:00Z",
   "to": "2026-09-05T12:00:00Z",
@@ -159,10 +191,9 @@ Points worth knowing when authoring one:
   value of `0.01` is how a low-volume endpoint is created.
 - **Vital ratings** are computed from the value using the published Core Web
   Vitals thresholds. A scenario cannot state a value and a contradictory rating.
-- **`environment` and `baseUrl`** are overwritten by the server from the
-  project. Ingest rejects an envelope whose environment differs from the
-  project's, and enforces the project's CORS allowlist, so leaving these to the
-  caller would mean whole batches silently failing.
+- **`environment`** must be one of the Project's registered Environments.
+  **`baseUrl`** in advanced JSON controls simulated pages; it is intentionally
+  independent of the transport Origin, which always comes from the allowlist.
 - **Weights** need no particular scale; they are summed and compared against a
   draw. Omitting every weight in a list makes the draw uniform.
 - **Validation reports every problem at once**, because the scenario is usually
@@ -244,3 +275,26 @@ A non-zero rejected count means individual events failed schema validation; a
 non-zero failed count means whole envelopes were refused, most often because the
 DSN is wrong, the origin is not in the project's allowlist, or the
 scenario's environment does not match the project's.
+
+Delivery stops at the first failed batch and returns the counts already accepted,
+the last failure, and remaining unsent batches. There is no automatic replay.
+An Ingest hard-stop response is explicitly reported as a storage failure, not as
+successful generation. If the sample never becomes queryable, check Consumer
+health, inbound filters, and retention before generating another batch.
+
+## Agent code map and regression checks
+
+| Concern                                                      | Code                                                     |
+| ------------------------------------------------------------ | -------------------------------------------------------- |
+| Floating entry, form, sample polling, query refresh          | `apps/web/src/features/devdata/DevDataPage.tsx`          |
+| Development-only floating entry integration                  | `apps/web/src/app/App.tsx`, `AppShell.tsx`               |
+| Typed request/result                                         | `apps/web/src/lib/api/devData.ts`                        |
+| Permission, default key, environment/window checks, delivery | `services/api/internal/handlers/dev_data.go`             |
+| Scenario generation and bounded journey timestamps           | `internal/devdata/build.go`, `presets.go`, `scenario.go` |
+| Local page filtering (do not disable for fixtures)           | `internal/filter/filter.go`                              |
+
+Run `go test ./internal/devdata ./services/api/internal/handlers` and
+`pnpm --filter @openrum/web exec vitest run src/features/devdata/DevDataPage.test.tsx`.
+For a real smoke test, use a small active local Project, verify accepted events
+are queryable and visible in the returned dashboard scope, and confirm the
+default DSN, filters and disabled-project protection remain unchanged.

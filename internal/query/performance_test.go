@@ -26,6 +26,14 @@ func TestPerformanceRepositoryFiltersRoutesFacetsDistributionAndSamples(t *testi
 	projectID := uuid.MustParse("018f4d9c-83a1-76c9-81c2-3020ab660000")
 	from := time.Date(2026, 9, 3, 8, 0, 0, 0, time.UTC)
 	rows := make([]map[string]any, 0, 86)
+	// These rows share the time range but must contribute neither PV/vitals nor
+	// facet options. The optimized WHERE must preserve those semantics.
+	for _, index := range []int{1, 3, 4} {
+		unrelated := fixtureRow(t, fixture, fixture.Events[index], from.Add(10*time.Minute))
+		unrelated["event_id"] = uuid.NewString()
+		unrelated["route"], unrelated["browser"], unrelated["country"] = "/unrelated", "UnrelatedBrowser", "FR"
+		rows = append(rows, unrelated)
+	}
 	for index := range 80 {
 		row := metricRow(t, fixtureRow(t, fixture, fixture.Events[2], from.Add(time.Duration(index)*time.Minute)), "LCP", 1000+float64(index*10), uuid.NewString())
 		row["browser"] = map[bool]string{true: "Chrome", false: "Safari"}[index%2 == 0]

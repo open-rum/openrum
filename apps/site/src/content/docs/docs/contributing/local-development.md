@@ -6,7 +6,7 @@ description: Work on OpenRUM services, SDK, console and public site.
 > Canonical source: `docs/local-development.md`. Edit the repository file; this page is generated during `pnpm site:build`.
 
 
-This guide is for developing OpenRUM from source. If you only want to evaluate the product, use the Docker-only flow in the [quickstart](quickstart.md).
+This is the contributor reference for developing OpenRUM from source. For a step-by-step first run, use the [local development tutorial](/docs/getting-started/local-development/). To evaluate the product without running host development processes, use [Compose deployment](/docs/self-hosting/compose/).
 
 ## Toolchain
 
@@ -52,22 +52,22 @@ The two modes share that address and therefore do not run at the same time. Ente
 
 ### Commands
 
-| Command                       | Effect                                                                        |
-| ----------------------------- | ----------------------------------------------------------------------------- |
-| `pnpm openrum dev`            | API and console from source, everything else in containers                     |
-| `pnpm openrum up`             | Every service in a container                                                  |
-| `pnpm openrum status`         | What is running, and what is not ready yet                                    |
-| `pnpm openrum logs [service]` | Follow logs; a host service tails its own file                                |
-| `pnpm openrum restart <name>` | Restart one service and wait for it to come back                              |
-| `pnpm openrum stop`           | Stop everything, keeping the containers and their data                        |
-| `pnpm openrum down`           | Remove the containers, keeping the volumes                                    |
-| `pnpm openrum reset`          | Remove the containers and delete every local database, after confirming       |
+| Command                       | Effect                                                                  |
+| ----------------------------- | ----------------------------------------------------------------------- |
+| `pnpm openrum dev`            | API and console from source, everything else in containers              |
+| `pnpm openrum up`             | Every service in a container                                            |
+| `pnpm openrum status`         | What is running, and what is not ready yet                              |
+| `pnpm openrum logs [service]` | Follow logs; a host service tails its own file                          |
+| `pnpm openrum restart <name>` | Restart one service and wait for it to come back                        |
+| `pnpm openrum stop`           | Stop everything, keeping the containers and their data                  |
+| `pnpm openrum down`           | Remove the containers, keeping the volumes                              |
+| `pnpm openrum reset`          | Remove the containers and delete every local database, after confirming |
 
 Ports and credentials come from `deploy/compose/.env`, falling back to the committed `deploy/compose/.env.example`. Both halves of the stack read that one file, so changing `CONSOLE_PORT` there moves the console in both modes.
 
 Supervised host processes are detached from the terminal that started them, so closing it does not take the stack down. Their process identifiers and logs live in `.openrum/`, which git ignores. Process supervision uses sessions and process groups, so the command runs on macOS and Linux; on Windows, use WSL.
 
-The underlying Compose commands remain available and are what the [quickstart](quickstart.md) uses. `openrum` adds the parts Compose cannot express: waiting for readiness rather than for launch, supervising the host half, deriving that half's environment from the same file, naming the process behind a port conflict, and reporting both halves in one place.
+The underlying Compose commands remain available; see [Compose deployment](/docs/self-hosting/compose/). `openrum` adds the parts Compose cannot express: waiting for readiness rather than for launch, supervising the host half, deriving that half's environment from the same file, naming the process behind a port conflict, and reporting both halves in one place.
 
 Use the development account:
 
@@ -173,6 +173,8 @@ See [demo data](demo-data.md) for reseeding and dataset details.
 
 To generate traffic on demand while working on a query or a page, use the
 [development data generator](dev-data.md). It is available in the console at
-**造数据** and posts through the real ingest endpoint, so the rows it produces
+the bottom-right floating flask icon's **造数据** quick-entry Dialog. It follows the selected Project,
+Environment and analysis range, uses the default DSN automatically, and checks a
+queryable sample after delivery. It posts through the real ingest endpoint, so the rows it produces
 have been through the same normalization and aggregation as production traffic.
 

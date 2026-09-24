@@ -30,6 +30,39 @@ captureEvent("checkout_started", {
 await client.close();
 ```
 
+Without a bundler, load the immutable IIFE build from the OpenRUM Instance that issued the DSN:
+
+Synchronous loading initializes as early as possible, but blocks HTML parsing while the bundle downloads:
+
+```html
+<script src="https://rum.example.com/sdk/browser/0.1.0/openrum.min.js"></script>
+<script>
+  OpenRUM.init({
+    dsn: "https://YOUR_PUBLIC_DSN@rum.example.com/ingest/v1/envelope",
+    environment: "production",
+  });
+</script>
+```
+
+Asynchronous loading is recommended for most pages because it does not block HTML parsing. Initialize only from `onload`; placing `OpenRUM.init()` immediately after a script with the `async` attribute creates a race:
+
+```html
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.src = "https://rum.example.com/sdk/browser/0.1.0/openrum.min.js";
+    script.async = true;
+    script.onload = function () {
+      OpenRUM.init({
+        dsn: "https://YOUR_PUBLIC_DSN@rum.example.com/ingest/v1/envelope",
+        environment: "production",
+      });
+    };
+    document.head.appendChild(script);
+  })();
+</script>
+```
+
 `init()` installs the default integrations and returns the active client. Repeated calls while it is running return the same client. Use `captureEvent`, `setUser`, `setTag`, `addBreadcrumb`, `getClient` and `close` for the shipped singleton API; advanced integrations can use `OpenRUMClient` directly.
 
 ## Structured logs
@@ -43,7 +76,7 @@ init({
   dsn: import.meta.env.VITE_OPENRUM_DSN,
   // Optional: leave unset to keep all console output local.
   captureConsole: ["warn", "error"],
-  beforeSendLog: (log) => log.level === "debug" ? null : log,
+  beforeSendLog: (log) => (log.level === "debug" ? null : log),
 });
 logger.info("checkout started", { "order.id": "order-123", items: 3 });
 logger.error("payment failed", { "error.code": "UPSTREAM_TIMEOUT" });

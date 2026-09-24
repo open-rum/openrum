@@ -1,4 +1,5 @@
 {
   "artifact": "packages/browser-sdk/dist/index.js",
+  "iifeArtifact": "packages/browser-sdk/dist/index.iife.js",
   "maxBytes": 30720
 }

@@ -1,5 +1,12 @@
 # Local OpenRUM Alpha
 
+For a single-host production deployment, use the separate
+[`production.compose.yml`](production.compose.yml),
+[production Docker guide](../../apps/site/src/content/docs/docs/self-hosting/docker-production.mdx)
+and [operations guide](../../apps/site/src/content/docs/docs/self-hosting/docker-operations.mdx).
+Do not use this Demo stack for production. Kubernetes/Helm remains the recommended
+production path when you need a cluster.
+
 This Compose file starts the full core product: console, API, ingest, consumer, worker, PostgreSQL, ClickHouse, Kafka and Redis. Object storage is intentionally optional and is not bundled. The stack also runs migrations and an idempotent demo seeder.
 
 ```sh

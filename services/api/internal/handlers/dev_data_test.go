@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/rs/zerolog"
@@ -26,6 +27,12 @@ func (stub devDataProjectStub) GetForUser(context.Context, uuid.UUID, uuid.UUID)
 	return stub.access, stub.err
 }
 
+type devDataKeyStub struct{ keys []metadata.ProjectKey }
+
+func (stub devDataKeyStub) ListForUser(context.Context, uuid.UUID, uuid.UUID) ([]metadata.ProjectKey, metadata.OrganizationRole, error) {
+	return stub.keys, metadata.RoleAdmin, nil
+}
+
 // The generator must be absent outside development rather than merely refusing
 // requests, so a misconfigured deployment cannot expose it at all.
 func TestNewDevDataHandlerOnlyExistsInDevelopment(t *testing.T) {
@@ -39,16 +46,16 @@ func TestNewDevDataHandlerOnlyExistsInDevelopment(t *testing.T) {
 	}
 }
 
-func TestDevDataRequiresAWriteKeyItCannotRecover(t *testing.T) {
+func TestDevDataRejectsMissingDefaultKey(t *testing.T) {
 	handler, router, _ := devDataFixture(t, nil)
-	_ = handler
+	handler.keys = devDataKeyStub{}
 
 	response := performDevDataRequest(router, devDataProjectID, `{"preset":"storefront","sessions":2}`)
 
 	if response.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d body = %s", response.Code, response.Body.String())
 	}
-	if !strings.Contains(response.Body.String(), "WRITE_KEY_REQUIRED") {
+	if !strings.Contains(response.Body.String(), "INVALID_PROJECT_KEY") {
 		t.Fatalf("body = %s", response.Body.String())
 	}
 }
@@ -176,7 +183,8 @@ func devDataFixture(t *testing.T, ingestURL *string) (*DevDataHandler, http.Hand
 	if ingestURL != nil {
 		target = *ingestURL
 	}
-	handler := NewDevDataHandler("development", projects, target, zerolog.Nop())
+	handler := NewDevDataHandler("development", projects, target, zerolog.Nop(), devDataKeyStub{keys: []metadata.ProjectKey{{PublicKey: "orr_pk_local", IsDefault: true}}})
+	handler.now = func() time.Time { return time.Date(2026, 9, 22, 6, 0, 0, 0, time.UTC) }
 	if handler == nil {
 		t.Fatal("development produced no handler")
 	}
@@ -187,6 +195,128 @@ func devDataFixture(t *testing.T, ingestURL *string) (*DevDataHandler, http.Hand
 	router.Handle("GET /api/v1/projects/{projectId}/dev-data/presets", authenticated(http.HandlerFunc(handler.Presets)))
 	router.Handle("POST /api/v1/projects/{projectId}/dev-data", authenticated(csrf(http.HandlerFunc(handler.Create))))
 	return handler, router, userID
+}
+
+func TestDevDataScopeAndLocalhostSimulation(t *testing.T) {
+	var events int
+	ingest := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var batch struct {
+			Context struct {
+				Environment string `json:"environment"`
+				Page        struct {
+					URL string `json:"url"`
+				} `json:"page"`
+			} `json:"context"`
+			Events []struct {
+				Timestamp time.Time `json:"timestamp"`
+			} `json:"events"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&batch); err != nil {
+			t.Error(err)
+		}
+		if r.Header.Get("Origin") != "http://127.0.0.1:4173" || r.Header.Get("X-OpenRUM-Key") != "orr_pk_local" {
+			t.Error("wrong transport identity")
+		}
+		if batch.Context.Environment != "test" || !strings.HasPrefix(batch.Context.Page.URL, "https://shop.example.com/") {
+			t.Errorf("context: %+v", batch.Context)
+		}
+		from := time.Date(2026, 9, 22, 5, 0, 0, 0, time.UTC)
+		for _, ev := range batch.Events {
+			if ev.Timestamp.Before(from) || !ev.Timestamp.Before(from.Add(time.Minute)) {
+				t.Errorf("out of range: %s", ev.Timestamp)
+			}
+		}
+		events += len(batch.Events)
+		writeJSON(w, http.StatusAccepted, map[string]any{"accepted": len(batch.Events), "rejected": []any{}})
+	}))
+	defer ingest.Close()
+	handler, router, _ := devDataFixture(t, &ingest.URL)
+	stub := handler.projects.(devDataProjectStub)
+	stub.access.Project.AllowedOrigins = []string{"http://127.0.0.1:4173"}
+	stub.access.Project.Environments = []string{"production", "test"}
+	handler.projects = stub
+	response := performDevDataRequest(router, devDataProjectID, `{"sessions":10,"environment":"test","from":"2026-09-22T05:00:00Z","to":"2026-09-22T05:01:00Z"}`)
+	var result devDataResponse
+	_ = json.Unmarshal(response.Body.Bytes(), &result)
+	if response.Code != 202 || result.Accepted != events || events == 0 || result.ProbeEventID == "" || result.Environment != "test" {
+		t.Fatalf("response: %s", response.Body.String())
+	}
+}
+
+func TestDevDataRejectsInvalidScopeAndForeignKeys(t *testing.T) {
+	for _, body := range []string{
+		`{"writeKey":"orr_pk_other_project"}`, `{"environment":"missing"}`,
+		`{"from":"2026-09-22T05:00:00Z"}`, `{"minutes":999999999}`,
+		`{"from":"2026-09-22T06:00:00Z","to":"2026-09-22T05:00:00Z"}`,
+		`{"from":"2026-09-23T06:00:00Z","to":"2026-09-23T07:00:00Z"}`,
+	} {
+		_, router, _ := devDataFixture(t, nil)
+		response := performDevDataRequest(router, devDataProjectID, body)
+		if response.Code != 400 {
+			t.Errorf("%s: %d %s", body, response.Code, response.Body.String())
+		}
+	}
+	handler, router, _ := devDataFixture(t, nil)
+	stub := handler.projects.(devDataProjectStub)
+	stub.access.Project.Status = metadata.ProjectStatusDisabled
+	handler.projects = stub
+	if response := performDevDataRequest(router, devDataProjectID, `{}`); response.Code != 409 {
+		t.Fatalf("disabled project: %d", response.Code)
+	}
+}
+
+func TestDevDataHardStopIsNotSuccessfulGeneration(t *testing.T) {
+	ingest := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-OpenRUM-Storage-Pressure", "hard-stop")
+		writeJSON(w, 202, map[string]any{"accepted": 0, "rejected": []any{}})
+	}))
+	defer ingest.Close()
+	_, router, _ := devDataFixture(t, &ingest.URL)
+	response := performDevDataRequest(router, devDataProjectID, `{"sessions":2}`)
+	var result devDataResponse
+	_ = json.Unmarshal(response.Body.Bytes(), &result)
+	if result.Accepted != 0 || result.Failed != 1 || result.LastError == "" || result.Unsent == 0 || result.ProbeEventID != "" {
+		t.Fatalf("result: %s", response.Body.String())
+	}
+}
+
+func TestDevDataLocalOriginsDoNotBecomeFilteredPageURLs(t *testing.T) {
+	for _, origin := range []string{"http://127.0.0.1:4173", "http://127.0.0.2", "http://[::1]", "http://app.localhost", "http://app.local"} {
+		project := metadata.Project{AllowedOrigins: []string{origin}}
+		if simulatedBaseURL(project) != "https://shop.example.com" || defaultBaseURL(project) != origin {
+			t.Errorf("origin=%s", origin)
+		}
+	}
+	for _, origin := range []string{"https://shop.example.com", "http://192.168.1.1", "https://localhost.example.com"} {
+		if simulatedBaseURL(metadata.Project{AllowedOrigins: []string{origin}}) != origin {
+			t.Errorf("must preserve non-localhost application %s", origin)
+		}
+	}
+}
+
+func TestDevDataPreservesPartialAcceptanceWithoutReplaying(t *testing.T) {
+	calls := 0
+	ingest := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		if calls == 2 {
+			w.WriteHeader(http.StatusTooManyRequests)
+			_, _ = w.Write([]byte(`{"error":{"code":"RATE_LIMITED"}}`))
+			return
+		}
+		var payload struct {
+			Events []json.RawMessage `json:"events"`
+		}
+		_ = json.NewDecoder(r.Body).Decode(&payload)
+		writeJSON(w, 202, map[string]any{"accepted": len(payload.Events), "rejected": []any{}})
+	}))
+	defer ingest.Close()
+	_, router, _ := devDataFixture(t, &ingest.URL)
+	response := performDevDataRequest(router, devDataProjectID, `{"sessions":10}`)
+	var result devDataResponse
+	_ = json.Unmarshal(response.Body.Bytes(), &result)
+	if calls != 2 || result.Accepted == 0 || result.Failed != 1 || result.Unsent == 0 || !strings.Contains(result.LastError, "429") {
+		t.Fatalf("result: %s", response.Body.String())
+	}
 }
 
 func performDevDataRequest(router http.Handler, projectID uuid.UUID, body string) *httptest.ResponseRecorder {

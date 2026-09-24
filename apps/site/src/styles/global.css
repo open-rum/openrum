@@ -1,9 +1,15 @@
 @import "tailwindcss";
-@import "@fontsource-variable/geist";
+@import "tw-animate-css";
+@import "@fontsource-variable/ibm-plex-sans";
 @import "@openrum/design-tokens/tokens.css";
 @import "@openrum/ui/styles.css";
 
 @source "../../../../packages/ui/src";
+
+@theme inline {
+  --color-background: var(--ds-surface);
+  --color-foreground: var(--ds-text);
+}
 
 :root {
   --site-nav-height: 56px;
@@ -25,7 +31,6 @@
   --sl-color-gray-2: var(--ds-text-muted);
   --sl-color-gray-3: var(--ds-text-muted);
   --sl-color-gray-4: var(--ds-border);
-  --sl-color-gray-5: var(--ds-border-soft);
   --sl-color-gray-6: var(--ds-surface-subtle);
   --sl-color-gray-7: var(--ds-surface);
   --sl-color-black: var(--ds-canvas);
@@ -96,11 +101,15 @@ a:not(.ui-button) {
 .site-brand {
   display: inline-flex;
   align-items: center;
-  gap: 9px;
+  gap: var(--brand-lockup-gap);
   font-weight: 750;
   letter-spacing: -0.035em;
   text-decoration: none;
-  font-size: 1.32rem;
+  font-size: var(--brand-lockup-name-size);
+}
+.site-brand .brand-mark svg {
+  width: var(--brand-lockup-mark-size);
+  height: var(--brand-lockup-mark-size);
 }
 .brand-mark {
   display: grid;
@@ -233,7 +242,9 @@ a:not(.ui-button) {
   padding: 84px 0;
   border-bottom: 1px solid var(--ds-border);
 }
-.card-grid {
+/* Only marketing pages use this three-column grid. Starlight also names its
+   native two-column CardGrid `.card-grid`, so keep this rule out of docs. */
+.site-container > .card-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 14px;
@@ -377,7 +388,7 @@ a:not(.ui-button) {
   text-align: center;
 }
 @media (max-width: 900px) {
-  .card-grid,
+  .site-container > .card-grid,
   .proof-grid {
     grid-template-columns: 1fr 1fr;
   }
@@ -404,9 +415,6 @@ a:not(.ui-button) {
   .site-nav {
     gap: 12px;
   }
-  .site-nav .site-brand {
-    font-size: 1.18rem;
-  }
   .site-nav .icon-action {
     width: 32px;
     height: 32px;
@@ -417,7 +425,7 @@ a:not(.ui-button) {
   .site-container {
     width: min(100% - 28px, 1320px);
   }
-  .card-grid,
+  .site-container > .card-grid,
   .proof-grid {
     grid-template-columns: 1fr;
   }

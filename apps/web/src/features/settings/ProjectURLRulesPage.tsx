@@ -15,12 +15,12 @@ import {
   type URLRules,
 } from "@/lib/api/processing";
 import { canManageProjects, getProject } from "@/lib/api/projects";
-import { ProjectSettingsLayout } from "./ProjectSettingsLayout";
+import { ProjectDataSettingsShell } from "./ProjectDataSettingsShell";
 
 const targets = Object.keys(urlRuleTargetLabels) as URLRuleTarget[];
 
 export function ProjectURLRulesRoute() {
-  const { projectId } = useParams({ from: "/protected/projects/$projectId/settings/url-rules" });
+  const { projectId } = useParams({ from: "/protected/settings/project/$projectId/url-rules" });
   const project = useQuery({
     queryKey: ["project", projectId],
     queryFn: ({ signal }) => getProject(projectId, signal),
@@ -30,12 +30,7 @@ export function ProjectURLRulesRoute() {
     queryFn: ({ signal }) => getURLRules(projectId, signal),
   });
   return (
-    <ProjectSettingsLayout
-      projectId={projectId}
-      titleId="project-url-rules-title"
-      title="URL 归一化"
-      description="把同一个路由的不同地址合成一行。内置规则已经能认出 UUID、纯数字、长十六进制和长不透明串；这里补的是它认不出来的那些，比如四位短 slug。"
-    >
+    <ProjectDataSettingsShell projectId={projectId} section="url-rules">
       {rules.isLoading ? (
         <AsyncLoading label="正在加载归一化规则…" />
       ) : rules.error ? (
@@ -53,7 +48,7 @@ export function ProjectURLRulesRoute() {
           role={project.data?.role}
         />
       ) : null}
-    </ProjectSettingsLayout>
+    </ProjectDataSettingsShell>
   );
 }
 

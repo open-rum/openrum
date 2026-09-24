@@ -20,6 +20,8 @@ import {
   overviewMetricLabels,
   overviewMetricNames,
   sizeLabels,
+  statAppearanceLabels,
+  type StatAppearance,
   supportsWorldMap,
   withBreakdownDimension,
   viewLabels,
@@ -140,7 +142,9 @@ export function ModuleFields({
             <FieldDescription>
               {widget.type === "stat"
                 ? "取整个时间范围的聚合值。"
-                : "时间桶由服务端决定，跟随全局时间范围。"}
+                : widget.type === "breakdown"
+                  ? "按所选维度统计当前时间范围；用户和会话可能跨分组重复。"
+                  : "时间桶由服务端决定，跟随全局时间范围。"}
             </FieldDescription>
           </Field>
         </>
@@ -208,31 +212,61 @@ export function ModuleFields({
           </FieldDescription>
         </Field>
       ) : null}
-      <Field>
-        <FieldLabel>展示方式</FieldLabel>
-        <ToggleGroup
-          type="single"
-          variant="outline"
-          value={widget.view}
-          onValueChange={(value) => {
-            if (value) onChange({ ...widget, view: value as WidgetView });
-          }}
-          aria-label="展示方式"
-        >
-          {views
-            .filter((view) => view !== "map" || supportsWorldMap(widget))
-            .map((view) => (
-              <ToggleGroupItem key={view} value={view}>
-                {viewLabels[view]}
+      {widget.type === "stat" ? (
+        <Field>
+          <FieldLabel>卡片外观</FieldLabel>
+          <ToggleGroup
+            type="single"
+            variant="outline"
+            className="grid w-full grid-cols-1 sm:grid-cols-3"
+            value={widget.statAppearance ?? "plain"}
+            onValueChange={(value) => {
+              if (value) onChange({ ...widget, statAppearance: value as StatAppearance });
+            }}
+            aria-label="卡片外观"
+          >
+            {Object.entries(statAppearanceLabels).map(([value, label]) => (
+              <ToggleGroupItem key={value} value={value}>
+                {label}
               </ToggleGroupItem>
             ))}
-        </ToggleGroup>
-        {widget.view === "map" ? (
+          </ToggleGroup>
           <FieldDescription>
-            展示全部返回国家，颜色越深数量越多；悬停或点按查看数值。
+            趋势使用当前时间范围的真实数据；数值仍为整个周期的汇总。
           </FieldDescription>
-        ) : null}
-      </Field>
+        </Field>
+      ) : (
+        <Field>
+          <FieldLabel>展示方式</FieldLabel>
+          <ToggleGroup
+            type="single"
+            variant="outline"
+            value={widget.view}
+            onValueChange={(value) => {
+              if (value) onChange({ ...widget, view: value as WidgetView });
+            }}
+            aria-label="展示方式"
+          >
+            {views
+              .filter((view) => view !== "map" || supportsWorldMap(widget))
+              .map((view) => (
+                <ToggleGroupItem key={view} value={view}>
+                  {viewLabels[view]}
+                </ToggleGroupItem>
+              ))}
+          </ToggleGroup>
+          {widget.view === "map" ? (
+            <FieldDescription>
+              展示全部返回国家，颜色越深数量越多；悬停或点按查看数值。
+            </FieldDescription>
+          ) : null}
+          {widget.view === "donut" ? (
+            <FieldDescription>
+              左侧圆环、右侧排行；超过 6 类时保留前 5 类，其余合并为“其他”。占比基于已返回分组。
+            </FieldDescription>
+          ) : null}
+        </Field>
+      )}
       <Field>
         <FieldLabel>模块尺寸</FieldLabel>
         <ToggleGroup

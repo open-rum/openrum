@@ -12,6 +12,7 @@ type AuthSource string
 type OrganizationRole string
 type InstanceRole string
 type ProjectStatus string
+type SDKPlatform string
 
 const (
 	UserStatusActive   UserStatus = "active"
@@ -31,6 +32,14 @@ const (
 	ProjectStatusActive   ProjectStatus = "active"
 	ProjectStatusDisabled ProjectStatus = "disabled"
 	ProjectStatusDeleting ProjectStatus = "deleting"
+
+	SDKPlatformJavaScript SDKPlatform = "javascript"
+	SDKPlatformReact      SDKPlatform = "react"
+	SDKPlatformVue        SDKPlatform = "vue"
+	SDKPlatformNextJS     SDKPlatform = "nextjs"
+	SDKPlatformNuxt       SDKPlatform = "nuxt"
+	SDKPlatformAngular    SDKPlatform = "angular"
+	SDKPlatformSvelte     SDKPlatform = "svelte"
 
 	// OverLimitReject refuses a request that is over the project's ingest
 	// limit. The cap is exact, and whichever callers arrive first in a second
@@ -95,6 +104,7 @@ type Project struct {
 	OrganizationID uuid.UUID
 	Name           string
 	Slug           string
+	SDKPlatform    SDKPlatform
 	AllowedOrigins []string
 	// Environment is the default Environment selected when a project opens.
 	Environment string

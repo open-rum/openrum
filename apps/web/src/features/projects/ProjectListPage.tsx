@@ -7,6 +7,9 @@ import {
   Clock3Icon,
   EyeIcon,
   FolderKanbanIcon,
+  LayoutGridIcon,
+  ChartNoAxesCombinedIcon,
+  ListIcon,
   PlusIcon,
   PlugIcon,
   UsersIcon,
@@ -48,6 +51,17 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { useChartMotion } from "@/lib/charts/useChartMotion";
+import { smoothCurve } from "@/lib/charts/smoothCurve";
 import { getOverview, type OverviewResponse } from "@/lib/api/client";
 import {
   canManageProjects,
@@ -56,6 +70,7 @@ import {
   type Project,
 } from "@/lib/api/projects";
 import { rememberProject } from "@/lib/projects/currentProject";
+import { ProjectPlatformIcon, getProjectPlatform } from "./projectPlatforms";
 
 const compactNumber = new Intl.NumberFormat("zh-CN", {
   notation: "compact",
@@ -81,7 +96,40 @@ const activityChartConfig = {
   },
 } satisfies ChartConfig;
 
+const views = [
+  {
+    value: "compact",
+    label: "轻量卡片",
+    icon: LayoutGridIcon,
+    description: "把项目身份和关键指标放在首位，适合快速进入项目。",
+  },
+  {
+    value: "trends",
+    label: "趋势卡片",
+    icon: ChartNoAxesCombinedIcon,
+    description: "展开访问趋势与配置信息，适合逐个观察项目。",
+  },
+  {
+    value: "table",
+    label: "数据表格",
+    icon: ListIcon,
+    description: "对齐所有项目的指标和上报时间，适合横向比较。",
+  },
+] as const;
+type ProjectView = (typeof views)[number]["value"];
+const viewStorageKey = "openrum-project-list-view";
+
+function initialView(): ProjectView {
+  try {
+    const saved = localStorage.getItem(viewStorageKey);
+    return views.find((view) => view.value === saved)?.value ?? "compact";
+  } catch {
+    return "compact";
+  }
+}
+
 export function ProjectListPage() {
+  const [view, setView] = useState<ProjectView>(initialView);
   const [selectedOrganizationId, setSelectedOrganizationId] = useState("");
   const organizationsQuery = useQuery({
     queryKey: ["organizations"],
@@ -154,7 +202,11 @@ export function ProjectListPage() {
           }}
         />
       ) : null}
-      {!organizationsQuery.isLoading && !projectsQuery.isLoading && projects.length === 0 ? (
+      {!organizationsQuery.isLoading &&
+      !projectsQuery.isLoading &&
+      !organizationsQuery.error &&
+      !projectsQuery.error &&
+      projects.length === 0 ? (
         <div className="border border-border bg-card">
           <EmptyState
             icon={FolderKanbanIcon}
@@ -178,18 +230,94 @@ export function ProjectListPage() {
         </div>
       ) : null}
       {projects.length ? (
-        <div className="grid gap-4 lg:grid-cols-2" aria-label="项目列表">
-          {projects.map((project) => (
-            <ProjectCard key={project.id} project={project} />
-          ))}
+        <div className="flex flex-col gap-5">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <p className="text-sm font-medium">
+                {projects.length} 个项目{" "}
+                <span className="ml-2 font-normal text-muted-foreground">
+                  最近 24 小时 · 各项目默认环境
+                </span>
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {views.find((item) => item.value === view)?.description}
+              </p>
+            </div>
+            <ToggleGroup
+              type="single"
+              value={view}
+              variant="selection"
+              aria-label="项目展示方式"
+              className="max-w-full flex-wrap rounded-lg border bg-card p-1"
+              onValueChange={(value) => {
+                const next = views.find((item) => item.value === value)?.value;
+                if (!next) return;
+                setView(next);
+                try {
+                  localStorage.setItem(viewStorageKey, next);
+                } catch {
+                  /* Preference storage is optional. */
+                }
+              }}
+            >
+              {views.map(({ value, label, icon: Icon }) => (
+                <ToggleGroupItem key={value} value={value}>
+                  <Icon />
+                  {label}
+                </ToggleGroupItem>
+              ))}
+            </ToggleGroup>
+          </div>
+          {view === "table" ? (
+            <div className="overflow-hidden rounded-xl border bg-card" aria-label="项目列表">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>项目</TableHead>
+                    <TableHead>状态</TableHead>
+                    <TableHead>24h PV</TableHead>
+                    <TableHead>24h UV</TableHead>
+                    <TableHead>错误事件</TableHead>
+                    <TableHead>PV 趋势</TableHead>
+                    <TableHead>最近上报</TableHead>
+                    <TableHead>
+                      <span className="sr-only">操作</span>
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {projects.map((project) => (
+                    <ProjectTableRow key={project.id} project={project} />
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          ) : (
+            <div
+              className={
+                view === "compact"
+                  ? "grid gap-4 md:grid-cols-2 xl:grid-cols-3"
+                  : "grid gap-5 lg:grid-cols-2"
+              }
+              aria-label="项目列表"
+            >
+              {projects.map((project) =>
+                view === "compact" ? (
+                  <CompactProjectCard key={project.id} project={project} />
+                ) : (
+                  <ProjectCard key={project.id} project={project} />
+                ),
+              )}
+            </div>
+          )}
         </div>
       ) : null}
     </ConsolePage>
   );
 }
 
-function ProjectCard({ project }: { project: Project }) {
-  const overviewQuery = useQuery({
+function useProjectOverview(project: Project) {
+  return useQuery({
     queryKey: ["project-card-overview", project.id],
     queryFn: ({ signal }) => {
       const to = new Date();
@@ -208,12 +336,19 @@ function ProjectCard({ project }: { project: Project }) {
     staleTime: 30_000,
     refetchInterval: 60_000,
   });
+}
+
+function ProjectCard({ project }: { project: Project }) {
+  const overviewQuery = useProjectOverview(project);
   const overview = overviewQuery.data;
 
   return (
     <Card className="min-h-88">
       <CardHeader className="border-b">
-        <CardTitle>{project.name}</CardTitle>
+        <CardTitle className="flex items-center gap-2">
+          <ProjectPlatformIcon platform={project.sdkPlatform} className="size-4" />
+          {project.name}
+        </CardTitle>
         <CardDescription>
           {project.slug} · {project.environments?.length ?? 1} 个环境
         </CardDescription>
@@ -265,33 +400,9 @@ function ProjectCard({ project }: { project: Project }) {
 }
 
 function ProjectActivity({ overview }: { overview: OverviewResponse }) {
-  const data = overview.series.map((point) => ({
-    bucket: point.bucket,
-    pageViews: point.pageViews.value,
-  }));
-  const hasActivity =
-    overview.kpis.pageViews.value > 0 || data.some((point) => point.pageViews > 0);
-
   return (
     <>
-      <div className="grid grid-cols-3 divide-x divide-border rounded-lg border border-border">
-        <ProjectMetric
-          icon={EyeIcon}
-          label="24h PV"
-          value={formatMetric(overview.kpis.pageViews.value)}
-        />
-        <ProjectMetric
-          icon={UsersIcon}
-          label="24h UV"
-          value={`${overview.kpis.uniqueUsers.approximate ? "≈" : ""}${formatMetric(overview.kpis.uniqueUsers.value)}`}
-        />
-        <ProjectMetric
-          icon={CircleAlertIcon}
-          label="错误事件"
-          value={formatMetric(overview.kpis.errorRate.numerator)}
-        />
-      </div>
-
+      <ProjectMetrics overview={overview} />
       <section className="flex flex-1 flex-col gap-2" aria-label="最近 24 小时 PV 趋势">
         <div className="flex items-center justify-between gap-3">
           <div>
@@ -300,71 +411,230 @@ function ProjectActivity({ overview }: { overview: OverviewResponse }) {
           </div>
           <FreshnessLabel freshness={overview.freshness} />
         </div>
-        {hasActivity ? (
-          <ChartContainer
-            className="h-28 w-full aspect-auto"
-            config={activityChartConfig}
-            initialDimension={{ width: 480, height: 112 }}
-            role="img"
-            aria-label="最近 24 小时 PV 折线图"
-          >
-            <LineChart data={data} margin={{ top: 8, right: 4, bottom: 0, left: 4 }}>
-              <CartesianGrid
-                vertical={false}
-                stroke="var(--ds-border-soft)"
-                strokeDasharray="2 3"
-              />
-              <XAxis
-                dataKey="bucket"
-                axisLine={false}
-                tickLine={false}
-                tickMargin={8}
-                minTickGap={56}
-                tickFormatter={(value: string) => timeFormatter.format(new Date(value))}
-              />
-              <ChartTooltip
-                cursor={{ stroke: "var(--ds-border-strong)" }}
-                content={
-                  <ChartTooltipContent
-                    hideIndicator
-                    labelFormatter={(_, payload) => {
-                      const bucket = payload[0]?.payload?.bucket as string | undefined;
-                      return bucket ? dateTimeFormatter.format(new Date(bucket)) : "";
-                    }}
-                    formatter={(value) => (
-                      <div className="flex min-w-32 items-center justify-between gap-4">
-                        <span className="text-muted-foreground">PV</span>
-                        <span className="font-mono font-medium tabular-nums">
-                          {preciseNumber.format(Number(value))}
-                        </span>
-                      </div>
-                    )}
-                  />
-                }
-              />
-              <Line
-                type="linear"
-                dataKey="pageViews"
-                stroke="var(--color-pageViews)"
-                strokeWidth={2}
-                dot={false}
-                activeDot={{ r: 3 }}
-                isAnimationActive={false}
-              />
-            </LineChart>
-          </ChartContainer>
-        ) : (
-          <Empty className="h-28 gap-2 rounded-lg border border-border p-3">
-            <EmptyHeader className="gap-1">
-              <EmptyTitle>暂无访问数据</EmptyTitle>
-              <EmptyDescription className="text-xs">
-                完成 SDK 接入后将在这里展示趋势。
-              </EmptyDescription>
-            </EmptyHeader>
-          </Empty>
-        )}
+        <ProjectTrend overview={overview} />
       </section>
     </>
+  );
+}
+
+function ProjectMetrics({ overview }: { overview: OverviewResponse }) {
+  return (
+    <div className="grid grid-cols-3 divide-x divide-border">
+      <ProjectMetric
+        icon={EyeIcon}
+        label="24h PV"
+        value={formatMetric(overview.kpis.pageViews.value)}
+      />
+      <ProjectMetric
+        icon={UsersIcon}
+        label="24h UV"
+        value={`${overview.kpis.uniqueUsers.approximate ? "≈" : ""}${formatMetric(overview.kpis.uniqueUsers.value)}`}
+      />
+      <ProjectMetric
+        icon={CircleAlertIcon}
+        label="错误事件"
+        value={formatMetric(overview.kpis.errorRate.numerator)}
+      />
+    </div>
+  );
+}
+
+function ProjectTrend({
+  overview,
+  compact = false,
+}: {
+  overview: OverviewResponse;
+  compact?: boolean;
+}) {
+  const animate = useChartMotion();
+  const data = overview.series.map((point) => ({
+    bucket: point.bucket,
+    pageViews: point.pageViews.value,
+  }));
+  const hasActivity =
+    overview.kpis.pageViews.value > 0 || data.some((point) => point.pageViews > 0);
+
+  return hasActivity ? (
+    <ChartContainer
+      className={compact ? "h-12 w-full aspect-auto" : "h-28 w-full aspect-auto"}
+      config={activityChartConfig}
+      initialDimension={{ width: 480, height: 112 }}
+      role="img"
+      aria-label="最近 24 小时 PV 折线图"
+    >
+      <LineChart data={data} margin={{ top: 8, right: 4, bottom: 0, left: 4 }}>
+        {!compact && (
+          <CartesianGrid vertical={false} stroke="var(--ds-border-soft)" strokeDasharray="2 3" />
+        )}
+        <XAxis
+          hide={compact}
+          dataKey="bucket"
+          axisLine={false}
+          tickLine={false}
+          tickMargin={8}
+          minTickGap={56}
+          tickFormatter={(value: string) => timeFormatter.format(new Date(value))}
+        />
+        <ChartTooltip
+          cursor={{ stroke: "var(--ds-border-strong)" }}
+          content={
+            <ChartTooltipContent
+              hideIndicator
+              labelFormatter={(_, payload) => {
+                const bucket = payload[0]?.payload?.bucket as string | undefined;
+                return bucket ? dateTimeFormatter.format(new Date(bucket)) : "";
+              }}
+              formatter={(value) => (
+                <div className="flex min-w-32 items-center justify-between gap-4">
+                  <span className="text-muted-foreground">PV</span>
+                  <span className="font-mono font-medium tabular-nums">
+                    {preciseNumber.format(Number(value))}
+                  </span>
+                </div>
+              )}
+            />
+          }
+        />
+        <Line
+          {...smoothCurve}
+          dataKey="pageViews"
+          stroke="var(--color-pageViews)"
+          strokeWidth={2}
+          dot={false}
+          activeDot={{ r: 3 }}
+          isAnimationActive={animate}
+        />
+      </LineChart>
+    </ChartContainer>
+  ) : compact ? (
+    <div className="flex h-12 items-center text-xs text-muted-foreground">暂无访问数据</div>
+  ) : (
+    <Empty className="h-28 gap-2 rounded-lg border border-border p-3">
+      <EmptyHeader className="gap-1">
+        <EmptyTitle>暂无访问数据</EmptyTitle>
+        <EmptyDescription className="text-xs">完成 SDK 接入后将在这里展示趋势。</EmptyDescription>
+      </EmptyHeader>
+    </Empty>
+  );
+}
+
+function ProjectEntry({ project }: { project: Project }) {
+  return (
+    <Button asChild size="sm" variant="outline">
+      <Link
+        to="/projects/$projectId/analytics"
+        params={{ projectId: project.id }}
+        onClick={() => rememberProject(project)}
+      >
+        进入项目<span className="sr-only">：{project.name}</span>
+      </Link>
+    </Button>
+  );
+}
+
+function CompactProjectCard({ project }: { project: Project }) {
+  const query = useProjectOverview(project);
+  return (
+    <Card className="gap-4">
+      <CardHeader>
+        <div className="mb-2 flex items-center justify-between gap-3">
+          <div className="flex size-10 items-center justify-center rounded-lg bg-muted">
+            <ProjectPlatformIcon platform={project.sdkPlatform} className="size-5" />
+          </div>
+          <Badge variant="outline">{statusLabel(project.status)}</Badge>
+        </div>
+        <CardTitle className="truncate text-base" title={project.name}>
+          {project.name}
+        </CardTitle>
+        <CardDescription className="truncate">
+          {getProjectPlatform(project.sdkPlatform).label} · {project.slug} ·{" "}
+          {project.environments?.length ?? 1} 个环境
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="flex flex-1 flex-col gap-3">
+        {query.data ? (
+          <>
+            <ProjectMetrics overview={query.data} />
+            <ProjectTrend overview={query.data} compact />
+            <FreshnessLabel freshness={query.data.freshness} />
+          </>
+        ) : query.isError ? (
+          <p className="text-sm text-muted-foreground" role="status">
+            摘要暂不可用，仍可进入项目。
+          </p>
+        ) : (
+          <Skeleton className="h-32" aria-label="正在加载项目摘要" />
+        )}
+      </CardContent>
+      <CardFooter className="justify-between gap-2">
+        <span className="truncate text-xs text-muted-foreground" title={project.environment}>
+          默认 {project.environment}
+        </span>
+        <ProjectEntry project={project} />
+      </CardFooter>
+    </Card>
+  );
+}
+
+function ProjectTableRow({ project }: { project: Project }) {
+  const query = useProjectOverview(project);
+  const data = query.data;
+  return (
+    <TableRow>
+      <TableCell className="py-5">
+        <div className="flex items-center gap-3">
+          <ProjectPlatformIcon platform={project.sdkPlatform} className="size-5" />
+          <div className="min-w-0">
+            <Link
+              className="block max-w-52 truncate font-medium hover:underline"
+              title={project.name}
+              to="/projects/$projectId/analytics"
+              params={{ projectId: project.id }}
+              onClick={() => rememberProject(project)}
+            >
+              {project.name}
+            </Link>
+            <p className="mt-1 text-xs text-muted-foreground">
+              默认 {project.environment} · {project.environments?.length ?? 1} 个环境
+            </p>
+          </div>
+        </div>
+      </TableCell>
+      <TableCell>
+        <Badge variant="outline">{statusLabel(project.status)}</Badge>
+      </TableCell>
+      {data ? (
+        <>
+          <TableCell className="tabular-nums">{formatMetric(data.kpis.pageViews.value)}</TableCell>
+          <TableCell className="tabular-nums">
+            {data.kpis.uniqueUsers.approximate ? "≈" : ""}
+            {formatMetric(data.kpis.uniqueUsers.value)}
+          </TableCell>
+          <TableCell className="tabular-nums">
+            {formatMetric(data.kpis.errorRate.numerator)}
+          </TableCell>
+          <TableCell>
+            <div className="w-28">
+              <ProjectTrend overview={data} compact />
+            </div>
+          </TableCell>
+          <TableCell>
+            <FreshnessLabel freshness={data.freshness} />
+          </TableCell>
+        </>
+      ) : (
+        <TableCell colSpan={5}>
+          {query.isError ? (
+            <span className="text-muted-foreground">摘要暂不可用</span>
+          ) : (
+            <Skeleton className="h-6" aria-label="正在加载项目摘要" />
+          )}
+        </TableCell>
+      )}
+      <TableCell>
+        <ProjectEntry project={project} />
+      </TableCell>
+    </TableRow>
   );
 }
 
@@ -380,7 +650,7 @@ function ProjectMetric({
   return (
     <div className="flex min-w-0 flex-col gap-1 px-3 py-2.5">
       <span className="flex items-center gap-1 text-xs text-muted-foreground">
-        <Icon aria-hidden="true" /> {label}
+        <Icon className="size-3.5 shrink-0" aria-hidden="true" /> {label}
       </span>
       <strong className="truncate text-base font-semibold tabular-nums">{value}</strong>
     </div>
@@ -393,7 +663,8 @@ function FreshnessLabel({ freshness }: { freshness: OverviewResponse["freshness"
   }
   return (
     <span className="flex items-center gap-1 text-xs text-muted-foreground">
-      <Clock3Icon aria-hidden="true" /> {formatRelativeTime(freshness.ageSeconds)}上报
+      <Clock3Icon className="size-3.5 shrink-0" aria-hidden="true" />{" "}
+      {formatRelativeTime(freshness.ageSeconds)}上报
     </span>
   );
 }

@@ -1,7 +1,7 @@
 ---
 title: Instrumentation recipes
 description: What to emit for signup conversion, checkout, feature adoption, search and content engagement, and the query each one enables.
-appliesTo: Alpha / main
+appliesTo: Alpha
 ---
 
 Each recipe is the smallest set of Events that answers one question, plus the query it makes
