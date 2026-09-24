@@ -1,7 +1,7 @@
 ---
 title: 入库标记
 description: OpenRUM 在归一化阶段给事件打上的标记，以及每个标记对数据意味着什么。
-appliesTo: Alpha / main
+appliesTo: Alpha
 ---
 
 每条入库的事件都带一个 `ingest_flags` 数组。标记记录的是管线对这条事件的观察结果，而不是 SDK 上报的内容本身。标记不会改动事件自身的字段，所以被打了标记的事件依然是完整的。

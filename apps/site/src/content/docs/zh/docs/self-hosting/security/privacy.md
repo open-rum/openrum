@@ -3,7 +3,7 @@ title: 安全与隐私默认值
 description: 采集边界、RBAC、CSRF 与密钥处理。
 ---
 
-**适用于：** Alpha / main。
+**适用于：** Alpha。
 
 ## 采集边界
 

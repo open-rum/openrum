@@ -1,22 +1,35 @@
 // @vitest-environment jsdom
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, fireEvent, render, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, waitFor, within } from "@testing-library/react";
 import { delay, http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { IssuesPage } from "./IssuesPage";
 
 const projectId = "018f4d9c-83a1-76c9-81c2-3020ab660000";
 const organizationId = "018f4d9c-83a1-76c9-81c2-3020ab660001";
 const server = setupServer();
-beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
+beforeAll(() => {
+  vi.stubGlobal(
+    "ResizeObserver",
+    class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    },
+  );
+  server.listen({ onUnhandledRequest: "error" });
+});
 afterEach(() => {
   cleanup();
   server.resetHandlers();
   window.history.replaceState({}, "", "/issues");
 });
-afterAll(() => server.close());
+afterAll(() => {
+  server.close();
+  vi.unstubAllGlobals();
+});
 
 describe("issues page states", () => {
   it("renders loading then empty state", async () => {
@@ -63,6 +76,50 @@ describe("issues page states", () => {
     expect(view.getByText("本页 1 个问题")).toBeTruthy();
   });
 
+  it("renders real overview charts and switches impact and distribution dimensions", async () => {
+    useControlPlaneHandlers();
+    server.use(
+      http.get(`/api/v1/projects/${projectId}/issues`, () =>
+        HttpResponse.json({ issues: [issue("checkout")], facets: emptyFacets() }),
+      ),
+      http.get(`/api/v1/projects/${projectId}/issues/overview`, () =>
+        HttpResponse.json({
+          trend: [
+            {
+              bucket: "2026-09-11T10:00:00Z",
+              events: 12,
+              anonymousUsers: 8,
+              identifiedUsers: 5,
+              sessions: 9,
+              pages: 7,
+            },
+            {
+              bucket: "2026-09-11T11:00:00Z",
+              events: 18,
+              anonymousUsers: 11,
+              identifiedUsers: 7,
+              sessions: 13,
+              pages: 10,
+            },
+          ],
+          errorTypes: [{ value: "TypeError", events: 20 }],
+          pages: [{ value: "/checkout", events: 16 }],
+          countries: [{ value: "CN", events: 14 }],
+        }),
+      ),
+    );
+    const view = renderPage();
+    await waitFor(() => expect(view.getByLabelText("错误概览图表")).toBeTruthy());
+    expect(view.getByLabelText("问题次数趋势")).toBeTruthy();
+    expect(view.getByLabelText("发生错误的独立会话。趋势")).toBeTruthy();
+
+    fireEvent.click(within(view.getByLabelText("切换影响范围")).getByText("用户"));
+    expect(view.getByText("匿名用户与已设置 user.id 的业务用户。")).toBeTruthy();
+
+    fireEvent.click(within(view.getByLabelText("切换错误分布维度")).getByText("国家"));
+    expect(view.getByText("按异常国家查看错误占比。")).toBeTruthy();
+  });
+
   it("renders a bounded error state", async () => {
     useControlPlaneHandlers();
     server.use(
@@ -75,15 +132,17 @@ describe("issues page states", () => {
     expect(view.container.textContent).not.toContain("private-clickhouse");
   });
 
-  it("searches this page without an extra request and restores the query from the URL", async () => {
+  it("searches Issue titles on the server and restores the legacy query from the URL", async () => {
     useControlPlaneHandlers();
-    let requests = 0;
     window.history.replaceState({}, "", "/issues?search=checkout");
     server.use(
-      http.get(`/api/v1/projects/${projectId}/issues`, () => {
-        requests++;
+      http.get(`/api/v1/projects/${projectId}/issues`, ({ request }) => {
+        const title = new URL(request.url).searchParams.get("title")?.toLowerCase();
+        const issues = [issue("checkout"), issue("profile")].filter(
+          (candidate) => !title || candidate.title.toLowerCase().includes(title),
+        );
         return HttpResponse.json({
-          issues: [issue("checkout"), issue("profile")],
+          issues,
           facets: emptyFacets(),
         });
       }),
@@ -91,11 +150,16 @@ describe("issues page states", () => {
     const view = renderPage();
     await waitFor(() => expect(view.getByText("TypeError: checkout")).toBeTruthy());
     expect(view.queryByText("TypeError: profile")).toBeNull();
-    fireEvent.change(view.getByRole("searchbox"), { target: { value: "not-found" } });
-    expect(view.getByText("本页没有匹配的搜索结果")).toBeTruthy();
-    fireEvent.click(view.getByText("清除搜索"));
-    expect(view.getByText("TypeError: profile")).toBeTruthy();
-    expect(requests).toBe(1);
+    expect(view.getByText("错误标题：checkout")).toBeTruthy();
+    fireEvent.click(view.getByLabelText("移除筛选：错误标题：checkout"));
+    await waitFor(() => expect(view.getByText("TypeError: profile")).toBeTruthy());
+    const composer = view.getByLabelText("搜索错误或添加筛选条件");
+    fireEvent.change(composer, { target: { value: "not-found" } });
+    fireEvent.keyDown(composer, { key: "Enter" });
+    await waitFor(() => expect(view.getByText("当前范围没有匹配的问题")).toBeTruthy());
+    fireEvent.click(view.getByText("清除筛选"));
+    await waitFor(() => expect(view.getByText("TypeError: profile")).toBeTruthy());
+    expect(new URLSearchParams(window.location.search).has("search")).toBe(false);
   });
 
   it("paginates independently of browser history, including empty intermediate pages", async () => {
@@ -143,7 +207,17 @@ describe("issues page states", () => {
     );
     const view = renderPage();
     await waitFor(() => expect(view.getByText("TypeError: checkout")).toBeTruthy());
-    expect(view.getByRole("combobox", { name: "浏览器" }).textContent).toContain("Safari");
+    expect(view.getByRole("combobox", { name: "问题状态" }).textContent).toContain("已解决");
+    expect(view.getByText("浏览器：Safari")).toBeTruthy();
+    expect(view.queryByText("维度筛选")).toBeNull();
+    fireEvent.focus(view.getByLabelText("搜索错误或添加筛选条件"));
+    expect(view.getByText("添加筛选条件")).toBeTruthy();
+    expect(view.getByText("错误标题")).toBeTruthy();
+    expect(view.getByText("错误类型")).toBeTruthy();
+    expect(view.getByText("Fingerprint")).toBeTruthy();
+    expect(view.getByText("用户 ID")).toBeTruthy();
+    expect(view.getByText("国家 / 地区")).toBeTruthy();
+    expect(view.getByText("页面 Route")).toBeTruthy();
     fireEvent.click(view.getByText("清除筛选"));
     const search = new URLSearchParams(window.location.search);
     expect(search.get("environment")).toBe("production");
@@ -229,6 +303,14 @@ function useControlPlaneHandlers() {
             updatedAt: "2026-09-03T00:00:00Z",
           },
         ],
+      }),
+    ),
+    http.get(`/api/v1/projects/${projectId}/issues/overview`, () =>
+      HttpResponse.json({
+        trend: [],
+        errorTypes: [],
+        pages: [],
+        countries: [],
       }),
     ),
   );

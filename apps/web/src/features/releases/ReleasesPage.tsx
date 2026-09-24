@@ -42,7 +42,6 @@ import {
   type Release,
 } from "@/lib/api/releases";
 import { listOrganizations, listProjects, type Project } from "@/lib/api/projects";
-import { ProjectSettingsNav } from "@/features/settings/ProjectSettingsNav";
 
 export function ReleasesPage() {
   const { projectId } = useParams({ strict: false }) as { projectId?: string };
@@ -90,11 +89,7 @@ function ProjectReleases({ project }: { project: Project }) {
     },
   });
   return (
-    <ConsolePage
-      width="wide"
-      rail={<ProjectSettingsNav projectId={project.id} />}
-      railLabel="项目设置导航"
-    >
+    <ConsolePage width="wide">
       <ConsolePageHeader
         title="Release 与 Source Map"
         description="将压缩代码安全还原到源码；Source Map 只上传到私有 OSS，不进入公开构建。"

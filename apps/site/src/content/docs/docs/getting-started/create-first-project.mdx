@@ -1,0 +1,71 @@
+---
+title: Create your first project
+description: Create a Project, install the Browser SDK and verify the first Event.
+---
+
+import { Steps } from "@astrojs/starlight/components";
+
+**Applies to:** Alpha.
+
+First complete [Local development](/docs/getting-started/local-development/) or [Production deployment](/docs/getting-started/production-deployment/) and sign in. One Project represents one web product and can contain several Environments.
+
+<Steps>
+
+1. ## Create a Project
+   1. Sign in at your Instance URL (locally, `http://127.0.0.1:4173`).
+   2. Use the top-left project switcher to open **All projects**, then **Create project**.
+   3. Enter a name and slug, and select the SDK platform such as React, Vue or JavaScript.
+   4. Add the monitored application's origin, such as `http://127.0.0.1:5173` or `https://shop.example.com`, without a path or trailing slash. This is the application URL, not the Console URL.
+   5. Configure Environments such as `development` and `production`. After creation, onboarding displays the selected platform's instructions.
+   6. Copy the default DSN from **Project Settings → Onboarding**. It includes the public Ingest URL and a write-only key; you do not need a separate write key.
+
+   **Success:** The Project exists and onboarding shows its DSN and installation instructions.
+
+1. ## Install the Browser SDK
+
+   ```sh
+   pnpm add @openrum/browser
+   ```
+
+   ```ts title="src/monitoring.ts"
+   import { captureEvent, init } from "@openrum/browser";
+
+   init({
+     dsn: import.meta.env.VITE_OPENRUM_DSN,
+     environment: "development",
+     release: "storefront@0.1.0",
+   });
+
+   captureEvent("first_event", {
+     attributes: { source: "create-first-project" },
+   });
+   ```
+
+   For the snippet above, set `VITE_OPENRUM_DSN` in your Vite application's local environment file and restart its development server. Use `production` when deploying a production application. Initialize before application code, outside React render functions.
+
+   For a runnable repository example, copy `examples/react-vite/.env.example` to `examples/react-vite/.env.local`, set the DSN, then run:
+
+   ```sh
+   pnpm --filter @openrum/browser build
+   pnpm --filter @openrum/example-react-vite dev --host 127.0.0.1
+   ```
+
+   See the [Browser SDK](/docs/sdk/browser/) guide for framework setup, and
+   [Next.js](/docs/sdk/nextjs/) or [Astro](/docs/sdk/astro/) if the application renders on the
+   server.
+
+1. ## Verify the first Event
+   1. Open your app and trigger a page view or the `first_event` Custom Event. The repository example's button sends `demo_checkout` instead.
+   2. Select the same Project and Environment, and the last 15 minutes. Open **Events** and allow a few seconds for delivery and consumption.
+   3. Open **Sessions** and confirm the same `session_id` groups related page, API and error events.
+   4. If you raised an error, follow it to an **Issue** and inspect Session context.
+
+</Steps>
+
+## Troubleshooting
+
+- Event missing: confirm ingest health, write-key Origin allowlist and that Consumer / ClickHouse are healthy.
+- CORS or network failure: the DSN address must match the public Ingest URL and allowed Origins.
+- Source Map frames unavailable: expected until optional object storage is configured. Core monitoring still works.
+
+Next: [Domain model](/docs/getting-started/domain-model/), [Self-hosting overview](/docs/self-hosting/overview/), or [Investigation](/docs/product/investigation/).

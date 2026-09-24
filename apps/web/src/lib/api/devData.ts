@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { createOpenRUMDSNForInstance, parseOpenRUMDSN } from "@openrum/protocol/dsn";
 import { csrfHeaders } from "@/lib/auth/session";
 import { requestJSON } from "./client";
 
@@ -37,6 +36,15 @@ const resultSchema = z.object({
   failed: z.number(),
   elapsedMs: z.number(),
   message: z.string(),
+  from: z.string(),
+  to: z.string(),
+  environment: z.string(),
+  baseUrl: z.string(),
+  probeEventId: z.string().optional(),
+  probeSessionId: z.string().optional(),
+  probeAt: z.string().optional(),
+  lastError: z.string().optional(),
+  unsent: z.number(),
 });
 
 export type DevDataPreset = z.infer<typeof presetSchema>;
@@ -45,7 +53,9 @@ export type DevDataPresetsResponse = z.infer<typeof presetsResponseSchema>;
 export type DevDataResult = z.infer<typeof resultSchema>;
 
 export type DevDataRequest = {
-  dsn: string;
+  environment: string;
+  from?: string;
+  to?: string;
   preset?: string;
   sessions?: number;
   minutes?: number;
@@ -66,43 +76,16 @@ export function getDevDataPresets(
 }
 
 export function generateDevData(projectId: string, body: DevDataRequest): Promise<DevDataResult> {
-  const { writeKey } = parseOpenRUMDSN(body.dsn);
   return requestJSON(resultSchema, `/api/v1/projects/${projectId}/dev-data`, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...csrfHeaders() },
-    body: JSON.stringify({ ...body, dsn: undefined, writeKey }),
+    body: JSON.stringify(body),
   });
 }
 
-const dsnStorageKey = "openrum.devdata.dsn";
-
-// Keep the DSN locally to spare re-entry on every development-data run.
-export function readStoredDSN(): string {
-  try {
-    const current = window.localStorage.getItem(dsnStorageKey);
-    if (current) return current;
-    const legacyKey = window.localStorage.getItem("openrum.devdata.writeKey");
-    if (!legacyKey) return "";
-    const dsn = createOpenRUMDSNForInstance(window.location.origin, legacyKey);
-    window.localStorage.setItem(dsnStorageKey, dsn);
-    window.localStorage.removeItem("openrum.devdata.writeKey");
-    return dsn;
-  } catch {
-    return "";
-  }
-}
-
-export function storeDSN(value: string): void {
-  try {
-    if (value) window.localStorage.setItem(dsnStorageKey, value);
-    else window.localStorage.removeItem(dsnStorageKey);
-  } catch {
-    // A blocked storage API only costs convenience, so it is not worth
-    // surfacing as an error.
-  }
-}
-
 export const devDataWindows = [
+  { label: "最近 5 分钟", minutes: 5 },
+  { label: "最近 15 分钟", minutes: 15 },
   { label: "最近 1 小时", minutes: 60 },
   { label: "最近 6 小时", minutes: 360 },
   { label: "最近 24 小时", minutes: 1_440 },

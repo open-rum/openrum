@@ -5,6 +5,7 @@ import react from "../../assets/tech/react.svg?raw";
 import clickhouse from "../../assets/tech/clickhouse.svg?raw";
 import postgres from "../../assets/tech/postgresql.svg?raw";
 import kafka from "../../assets/tech/apachekafka.svg?raw";
+import TechStackIcons from "./TechStackIcons";
 const { lang = "en" } = Astro.props;
 const zh = lang === "zh";
 const docs = zh ? "/zh/docs" : "/docs";
@@ -18,17 +19,4 @@ const items = [
 ];
 ---
 
-<ul class="lp-tech-dock" aria-label={zh ? "技术栈" : "Technology stack"}>
-  {
-    items.map(({ name, icon, href }, index) => (
-      <li style={`--lp-order:${index}`}>
-        <a href={href} class="lp-tech-link" aria-label={name}>
-          <Fragment set:html={icon} />
-          <span class="lp-tech-label" aria-hidden="true">
-            {name}
-          </span>
-        </a>
-      </li>
-    ))
-  }
-</ul>
+<TechStackIcons client:load items={items} label={zh ? "技术栈" : "Technology stack"} />

@@ -19,15 +19,25 @@ import {
   CardAction,
   CardContent,
   CardDescription,
+  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
+import {
+  Field,
+  FieldDescription,
+  FieldGroup,
+  FieldLabel,
+  FieldLegend,
+  FieldSeparator,
+  FieldSet,
+} from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue,
@@ -69,6 +79,78 @@ const errorMessages: Record<string, string> = {
   incompatible_endpoint:
     "当前 Endpoint 与所选 Provider 的签名或寻址方式不兼容，请检查 Provider 和 Path-style 设置。",
   network: "无法连接对象存储，请检查 Endpoint 和网络出口。",
+};
+
+type StorageProviderPreset = "oss" | "aws" | "r2" | "minio" | "s3";
+
+type StorageProviderOption = {
+  label: string;
+  provider: "oss" | "s3";
+  description: string;
+  regionPlaceholder: string;
+  endpointPlaceholder: string;
+  endpointRequired: boolean;
+  forcePathStyle: boolean;
+  accessKeyLabel: string;
+  secretKeyLabel: string;
+};
+
+const providerOptions: Record<StorageProviderPreset, StorageProviderOption> = {
+  oss: {
+    label: "Alibaba OSS",
+    provider: "oss",
+    description: "使用阿里云 OSS 原生协议；标准公网 Endpoint 可根据 Region 自动解析。",
+    regionPlaceholder: "cn-hangzhou",
+    endpointPlaceholder: "https://oss-cn-hangzhou.aliyuncs.com",
+    endpointRequired: false,
+    forcePathStyle: false,
+    accessKeyLabel: "OSS Access Key ID",
+    secretKeyLabel: "OSS Access Key Secret",
+  },
+  aws: {
+    label: "Amazon S3",
+    provider: "s3",
+    description: "使用 AWS Signature V4；标准区域 Endpoint 可以留空。",
+    regionPlaceholder: "ap-southeast-1",
+    endpointPlaceholder: "留空使用 AWS 默认 Endpoint",
+    endpointRequired: false,
+    forcePathStyle: false,
+    accessKeyLabel: "AWS Access Key ID",
+    secretKeyLabel: "AWS Secret Access Key",
+  },
+  r2: {
+    label: "Cloudflare R2",
+    provider: "s3",
+    description: "通过 R2 的 S3-compatible Endpoint 连接。",
+    regionPlaceholder: "auto",
+    endpointPlaceholder: "https://<account-id>.r2.cloudflarestorage.com",
+    endpointRequired: true,
+    forcePathStyle: false,
+    accessKeyLabel: "R2 Access Key ID",
+    secretKeyLabel: "R2 Secret Access Key",
+  },
+  minio: {
+    label: "MinIO",
+    provider: "s3",
+    description: "连接自托管 MinIO；默认启用 Path-style 寻址。",
+    regionPlaceholder: "us-east-1",
+    endpointPlaceholder: "https://minio.example.com",
+    endpointRequired: true,
+    forcePathStyle: true,
+    accessKeyLabel: "MinIO Access Key",
+    secretKeyLabel: "MinIO Secret Key",
+  },
+  s3: {
+    label: "其他 S3-compatible",
+    provider: "s3",
+    description: "适用于 Ceph 及其他兼容 AWS Signature V4 的对象存储。",
+    regionPlaceholder: "us-east-1",
+    endpointPlaceholder: "https://storage.example.com",
+    endpointRequired: true,
+    forcePathStyle: true,
+    accessKeyLabel: "Access Key ID",
+    secretKeyLabel: "Secret Access Key",
+  },
 };
 
 export function ObjectStoragePage() {
@@ -145,11 +227,21 @@ function StorageContent({
         </Alert>
       ) : null}
 
+      <ManagedStorageCard
+        available={storage.managedSecretsAvailable}
+        storage={storage}
+        onConfigured={onConfigured}
+      />
+
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(380px,0.7fr)]">
         <Card>
           <CardHeader className="border-b">
-            <CardTitle>部署配置</CardTitle>
-            <CardDescription>以下字段只读，修改后需要重新部署服务。</CardDescription>
+            <CardTitle>当前生效配置</CardTitle>
+            <CardDescription>
+              {storage.credentialSource === "managed_encrypted"
+                ? "配置由控制台加密托管，可在上方完成安全轮换。"
+                : "部署环境和运行时角色配置只读，不会在控制台回显 Secret。"}
+            </CardDescription>
             <CardAction>
               <Badge variant={storage.configured ? "outline" : "destructive"}>
                 {storage.configured ? "已配置" : "未配置"}
@@ -163,7 +255,7 @@ function StorageContent({
               value={storage.providerLabel}
               secondary={
                 storage.provider === "none"
-                  ? "设置 OBJECT_STORAGE_PROVIDER=oss 或 s3 后启用"
+                  ? "尚未连接，可使用上方配置向导启用"
                   : storage.provider === "oss"
                     ? "Alibaba OSS 原生协议"
                     : "Amazon S3、MinIO、R2、Ceph 等"
@@ -232,85 +324,144 @@ function StorageContent({
           </CardContent>
         </Card>
       </div>
-      <ManagedStorageCard available={storage.managedSecretsAvailable} onConfigured={onConfigured} />
     </div>
   );
 }
 
 function ManagedStorageCard({
   available,
+  storage,
   onConfigured,
 }: {
   available: boolean;
+  storage: ObjectStorageStatus;
   onConfigured: () => void;
 }) {
-  const [provider, setProvider] = useState<"oss" | "s3">("oss");
-  const [endpoint, setEndpoint] = useState("");
-  const [bucket, setBucket] = useState("");
-  const [region, setRegion] = useState("");
+  const initialPreset: StorageProviderPreset =
+    storage.provider === "oss"
+      ? "oss"
+      : storage.provider === "s3" && storage.endpoint.startsWith("http")
+        ? "s3"
+        : storage.provider === "s3"
+          ? "aws"
+          : "oss";
+  const [preset, setPreset] = useState<StorageProviderPreset>(initialPreset);
+  const [endpoint, setEndpoint] = useState(
+    storage.endpoint.startsWith("http") ? storage.endpoint : "",
+  );
+  const [bucket, setBucket] = useState(storage.bucket);
+  const [region, setRegion] = useState(storage.region);
   const [accessKeyId, setAccessKeyId] = useState("");
   const [secretAccessKey, setSecretAccessKey] = useState("");
-  const [forcePathStyle, setForcePathStyle] = useState(false);
+  const [forcePathStyle, setForcePathStyle] = useState(
+    providerOptions[initialPreset].forcePathStyle,
+  );
   const [reauthenticationOpen, setReauthenticationOpen] = useState(false);
+  const option = providerOptions[preset];
+  const endpointMissing = option.endpointRequired && endpoint.trim() === "";
+  const canSave =
+    available &&
+    bucket.trim() !== "" &&
+    region.trim() !== "" &&
+    accessKeyId.trim() !== "" &&
+    secretAccessKey.trim() !== "" &&
+    !endpointMissing;
   const save = useMutation({
     mutationFn: () =>
       putManagedObjectStorage({
-        provider,
-        endpoint,
-        bucket,
-        region,
+        provider: option.provider,
+        endpoint: endpoint.trim(),
+        bucket: bucket.trim(),
+        region: region.trim(),
         accessKeyId,
         secretAccessKey,
         forcePathStyle,
       }),
     onSuccess: () => {
+      setAccessKeyId("");
       setSecretAccessKey("");
       onConfigured();
     },
   });
+
+  function changePreset(value: string) {
+    const nextPreset = value as StorageProviderPreset;
+    setPreset(nextPreset);
+    setEndpoint("");
+    setAccessKeyId("");
+    setSecretAccessKey("");
+    setForcePathStyle(providerOptions[nextPreset].forcePathStyle);
+    save.reset();
+  }
+
   return (
     <Card>
       <CardHeader className="border-b">
-        <CardTitle>控制台托管凭证</CardTitle>
+        <CardTitle>配置对象存储</CardTitle>
         <CardDescription>
-          可选功能。候选配置会先完成隔离的写入、读取和删除测试，全部通过后才替换当前加密记录。
+          选择 Provider 并填写连接信息。保存前会先完成写入、读取和删除验证。
         </CardDescription>
+        <CardAction>
+          <Badge variant={available ? "outline" : "secondary"}>
+            {available ? "页面配置已启用" : "需要启用安全存储"}
+          </Badge>
+        </CardAction>
       </CardHeader>
-      <CardContent className="pt-5">
-        {!available ? (
-          <Alert>
-            <LockKeyholeIcon />
-            <AlertTitle>部署方尚未授权托管 Secret</AlertTitle>
-            <AlertDescription>
-              如需启用，请通过 Kubernetes Secret 或环境变量设置 OPENRUM_ALLOW_MANAGED_SECRETS=true
-              与 32 字节 Base64 OPENRUM_MASTER_KEY。推荐生产环境继续使用 RAM/IAM Role。
-            </AlertDescription>
-          </Alert>
-        ) : (
-          <FieldGroup>
-            <div className="grid gap-4 md:grid-cols-2">
-              <Field>
-                <FieldLabel htmlFor="managed-provider">Provider</FieldLabel>
-                <Select
-                  value={provider}
-                  onValueChange={(value) => setProvider(value as "oss" | "s3")}
-                >
-                  <SelectTrigger id="managed-provider">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="oss">Alibaba OSS</SelectItem>
-                    <SelectItem value="s3">S3-compatible</SelectItem>
-                  </SelectContent>
-                </Select>
-              </Field>
+      <CardContent>
+        <FieldGroup>
+          {!available ? (
+            <Alert>
+              <LockKeyholeIcon />
+              <AlertTitle>页面保存功能尚未启用</AlertTitle>
+              <AlertDescription>
+                如需启用，请通过 Kubernetes Secret 或环境变量设置 OPENRUM_ALLOW_MANAGED_SECRETS=true
+                与 32 字节 Base64 OPENRUM_MASTER_KEY。你仍可先查看和填写下面的配置项。
+              </AlertDescription>
+            </Alert>
+          ) : null}
+
+          <FieldSet>
+            <FieldLegend>1. 选择 Provider</FieldLegend>
+            <FieldDescription>选择具体服务后，表单只展示该服务需要的配置。</FieldDescription>
+            <Field>
+              <FieldLabel htmlFor="managed-provider">Provider</FieldLabel>
+              <Select value={preset} onValueChange={changePreset}>
+                <SelectTrigger id="managed-provider" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    {(
+                      Object.entries(providerOptions) as Array<
+                        [StorageProviderPreset, StorageProviderOption]
+                      >
+                    ).map(([value, item]) => (
+                      <SelectItem key={value} value={value}>
+                        {item.label}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+              <FieldDescription>{option.description}</FieldDescription>
+            </Field>
+          </FieldSet>
+
+          <FieldSeparator />
+
+          <FieldSet>
+            <FieldLegend>2. 连接信息</FieldLegend>
+            <FieldDescription>
+              Bucket 和 Region 必填；标准 OSS、S3 可自动选择 Endpoint。
+            </FieldDescription>
+            <div className="grid gap-5 md:grid-cols-2">
               <Field>
                 <FieldLabel htmlFor="managed-region">Region</FieldLabel>
                 <Input
                   id="managed-region"
                   value={region}
                   onChange={(event) => setRegion(event.target.value)}
-                  placeholder="cn-shanghai"
+                  placeholder={option.regionPlaceholder}
                 />
               </Field>
               <Field>
@@ -319,42 +470,32 @@ function ManagedStorageCard({
                   id="managed-bucket"
                   value={bucket}
                   onChange={(event) => setBucket(event.target.value)}
+                  placeholder="openrum-artifacts"
                 />
               </Field>
-              <Field>
-                <FieldLabel htmlFor="managed-endpoint">Endpoint（可选）</FieldLabel>
+              <Field className="md:col-span-2">
+                <FieldLabel htmlFor="managed-endpoint">
+                  Endpoint{option.endpointRequired ? "" : "（可选）"}
+                </FieldLabel>
                 <Input
                   id="managed-endpoint"
                   value={endpoint}
                   onChange={(event) => setEndpoint(event.target.value)}
-                  placeholder="https://…"
+                  placeholder={option.endpointPlaceholder}
+                  required={option.endpointRequired}
                 />
-              </Field>
-              <Field>
-                <FieldLabel htmlFor="managed-access-key">Access Key ID</FieldLabel>
-                <Input
-                  id="managed-access-key"
-                  value={accessKeyId}
-                  onChange={(event) => setAccessKeyId(event.target.value)}
-                  autoComplete="off"
-                />
-              </Field>
-              <Field>
-                <FieldLabel htmlFor="managed-secret-key">Secret Access Key</FieldLabel>
-                <Input
-                  id="managed-secret-key"
-                  value={secretAccessKey}
-                  onChange={(event) => setSecretAccessKey(event.target.value)}
-                  type="password"
-                  autoComplete="new-password"
-                />
+                <FieldDescription>
+                  {option.endpointRequired
+                    ? "此 Provider 需要完整的 HTTPS Endpoint。"
+                    : "留空时根据 Region 使用服务商默认 Endpoint。"}
+                </FieldDescription>
               </Field>
             </div>
-            {provider === "s3" ? (
+            {option.provider === "s3" && preset !== "aws" ? (
               <Field orientation="horizontal">
                 <div>
-                  <FieldLabel htmlFor="force-path-style">Force path-style</FieldLabel>
-                  <FieldDescription>MinIO、Ceph 和部分兼容服务通常需要开启。</FieldDescription>
+                  <FieldLabel htmlFor="force-path-style">Path-style 寻址</FieldLabel>
+                  <FieldDescription>MinIO、Ceph 和部分兼容服务需要开启。</FieldDescription>
                 </div>
                 <Switch
                   id="force-path-style"
@@ -363,30 +504,66 @@ function ManagedStorageCard({
                 />
               </Field>
             ) : null}
-            <div>
-              <Button
-                onClick={() => setReauthenticationOpen(true)}
-                disabled={save.isPending || !bucket || !region || !accessKeyId || !secretAccessKey}
-              >
-                {save.isPending ? "正在验证并轮换…" : "验证并原子轮换"}
-              </Button>
-              {save.data ? (
-                <p className="mt-3 text-sm text-muted-foreground">
-                  已切换到加密配置版本 {save.data.version}，主密钥版本 {save.data.keyId}。
-                </p>
-              ) : null}
-            </div>
-            <ReauthenticationDialog
-              open={reauthenticationOpen}
-              onOpenChange={setReauthenticationOpen}
-              onConfirmed={() => save.mutateAsync()}
-              title="确认轮换对象存储凭证"
-              description="候选凭证测试通过后会立即替换运行时配置。请重新验证 Instance Owner 身份。"
-              confirmLabel="验证并原子轮换"
-            />
-          </FieldGroup>
-        )}
+          </FieldSet>
+
+          <FieldSeparator />
+
+          <FieldSet>
+            <FieldLegend>3. 访问凭证</FieldLegend>
+            <FieldDescription>
+              Access Key 加密保存；Secret 保存成功后不会再次显示。
+            </FieldDescription>
+            <FieldGroup className="md:grid md:grid-cols-2">
+              <Field>
+                <FieldLabel htmlFor="managed-access-key">{option.accessKeyLabel}</FieldLabel>
+                <Input
+                  id="managed-access-key"
+                  value={accessKeyId}
+                  onChange={(event) => setAccessKeyId(event.target.value)}
+                  autoComplete="off"
+                />
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="managed-secret-key">{option.secretKeyLabel}</FieldLabel>
+                <Input
+                  id="managed-secret-key"
+                  value={secretAccessKey}
+                  onChange={(event) => setSecretAccessKey(event.target.value)}
+                  type="password"
+                  autoComplete="new-password"
+                />
+              </Field>
+            </FieldGroup>
+          </FieldSet>
+
+          {save.data ? <ProbeResult probe={save.data.probe} /> : null}
+        </FieldGroup>
       </CardContent>
+      <CardFooter className="flex-col items-stretch justify-between gap-3 sm:flex-row sm:items-center">
+        <div className="flex flex-col gap-1">
+          <p className="text-sm font-medium">连接测试通过后才会应用配置</p>
+          <p className="text-xs text-muted-foreground">
+            保存需要重新验证 Instance Owner 身份，并写入审计日志。
+          </p>
+        </div>
+        <Button onClick={() => setReauthenticationOpen(true)} disabled={save.isPending || !canSave}>
+          <ShieldCheckIcon data-icon="inline-start" />
+          {!available
+            ? "启用安全存储后可保存"
+            : save.isPending
+              ? "正在测试并保存…"
+              : "测试连接并保存"}
+        </Button>
+      </CardFooter>
+      <ReauthenticationDialog
+        open={reauthenticationOpen}
+        onOpenChange={setReauthenticationOpen}
+        onConfirmed={() => save.mutateAsync()}
+        title="确认保存对象存储配置"
+        description="系统将使用候选凭证执行写入、读取和删除测试；全部通过后才替换当前配置。"
+        confirmLabel="测试并应用配置"
+        confirmVariant="default"
+      />
     </Card>
   );
 }

@@ -1,0 +1,95 @@
+---
+title: 环境与启动
+description: 准备工具、获取代码、启动本地开发环境并登录控制台。
+appliesTo: Alpha
+---
+
+import { Steps, Aside, LinkCard } from "@astrojs/starlight/components";
+
+本教程帮助你在电脑上运行 OpenRUM 并修改代码。完成后，控制台默认地址为 `http://127.0.0.1:4173`。
+
+<Steps>
+
+1. ## 准备工具
+   - **Git：** 用于获取代码；检查：`git --version`
+   - **Docker：** Docker Engine 或 Desktop，支持 Compose v2；检查：`docker info`、`docker compose version`
+   - **Node.js：** 24；检查：`node --version`
+   - **pnpm：** 11.11.0；检查：`pnpm --version`
+   - **Go：** 1.26，精确工具链见仓库 `go.mod`；检查：`go version`
+
+   先启动 Docker。建议为 Docker 环境分配至少 8 GB 内存，并预留镜像和数据库磁盘空间。命令管理器支持 macOS、Linux；Windows 请在 WSL 中运行。
+
+   **成功标志：** Docker 可以连接，其他命令能输出版本。无法连接 Docker 时，先启动 Docker Desktop 或 Docker 服务。
+
+1. ## 获取代码与安装依赖
+
+   如果已经有源码，直接进入仓库根目录；否则执行：
+
+   ```sh
+   git clone https://github.com/openrum/openrum.git
+   cd openrum
+   corepack enable
+   pnpm install --frozen-lockfile
+   ```
+
+   仓库根目录同时包含 `package.json`、`go.mod` 和 `deploy/`。后续命令都在这里执行。
+
+   **成功标志：** 依赖安装完成，没有错误退出。首次安装需要下载依赖。
+
+1. ## 检查本地配置
+
+   首次体验无需填写数据库或对象存储凭据。命令优先读取 `deploy/compose/.env`；没有时使用 `.env.example` 中的本地默认值。
+
+   <Aside type="caution" title="保留已有配置">
+     如果 `.env` 已存在，直接编辑，不要用复制命令覆盖。
+   </Aside>
+
+   需要修改配置且 `.env` 不存在时，执行：
+
+   ```sh
+   cp deploy/compose/.env.example deploy/compose/.env
+   ```
+
+   控制台默认端口为 `4173`，宿主机 API 使用 `8080`。依赖还会占用 `5433`、`8123`、`9000`、`9092`、`6379`，Ingest 使用 `8081`。发生冲突时先查看命令报告的占用进程，再调整支持配置的端口。
+
+   **成功标志：** 配置准备完成。默认凭据仅用于本地开发。
+
+1. ## 启动开发环境
+
+   ```sh
+   pnpm openrum dev
+   ```
+
+   该命令构建所需镜像与 Browser SDK，启动基础设施和数据管道，执行数据库迁移与演示数据初始化，再从源码启动 API 和控制台。
+
+   | 运行位置             | 服务                                                           |
+   | -------------------- | -------------------------------------------------------------- |
+   | Docker 容器          | PostgreSQL、ClickHouse、Kafka、Redis、Ingest、Consumer、Worker |
+   | 当前电脑上的源码进程 | API、控制台开发服务器                                          |
+
+   首次启动需要下载镜像和编译。等待命令输出服务状态表，再检查：
+
+   ```sh
+   pnpm openrum status
+   ```
+
+   **成功标志：** 依赖及 API 就绪，控制台开发服务器运行并显示访问地址。失败时执行 `pnpm openrum logs api` 或查看对应服务日志。
+
+1. ## 登录控制台
+
+   打开 `http://127.0.0.1:4173`，使用本地演示账号：
+
+   ```text title="本地演示账号" frame="none"
+   Email: demo@openrum.local
+   Password: OpenRUM-demo-2026!
+   ```
+
+   **成功标志：** 进入项目列表，并能打开演示项目。保持访问地址一致，混用 `localhost`、`127.0.0.1` 或不同端口可能导致同源检查失败。
+
+</Steps>
+
+<LinkCard
+  title="下一步：接入与验证"
+  href="/zh/docs/getting-started/local-development/connect-app/"
+  description="接入示例应用，验证第一条事件和会话。"
+/>

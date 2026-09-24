@@ -337,7 +337,9 @@ func (repository *PerformanceRepository) samples(ctx context.Context, filters Pe
 }
 
 func performanceAggregateWhere(filters PerformanceFilters, includeRoute bool) (string, []any) {
-	where := "project_id=? AND timestamp>=? AND timestamp<? AND NOT has(ingest_flags,'synthetic')"
+	// Prune unrelated types using the (project_id,event_type,timestamp) sort key.
+	// PV counts and all five vital distributions retain the same population.
+	where := "project_id=? AND event_type IN ('page_view','web_vital') AND timestamp>=? AND timestamp<? AND NOT has(ingest_flags,'synthetic')"
 	arguments := []any{filters.ProjectID, filters.From, filters.To}
 	for _, item := range []struct{ column, value string }{{"environment", filters.Environment}, {"release", filters.Release}, {"browser", filters.Browser}, {"device_type", filters.DeviceType}, {"country", filters.Country}} {
 		if item.value != "" {
@@ -517,6 +519,9 @@ func (repository *PerformanceRepository) filterOptions(ctx context.Context, filt
 			facetFilters.Release = ""
 		}
 		where, arguments := performanceAggregateWhere(facetFilters, false)
+		// HAVING already excludes groups without this metric. Push that predicate
+		// down so each facet scans only its relevant metric rather than all rows.
+		where += " AND " + performanceMetricPredicate(filters.Metric)
 		samples := performanceSampleColumn(filters.Metric)
 		rows, err := repository.database.QueryContext(ctx, `SELECT `+dimension.column+`,`+samples+` AS option_samples FROM rum_events WHERE `+where+` AND `+dimension.column+`!='' GROUP BY `+dimension.column+` HAVING option_samples>0 ORDER BY option_samples DESC, `+dimension.column+` LIMIT 100`, arguments...)
 		if err != nil {

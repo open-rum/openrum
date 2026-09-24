@@ -162,7 +162,7 @@ export async function requestJSON<T>(
   return result.data;
 }
 
-export function getOverview(filters: OverviewFilters, signal?: AbortSignal) {
+export function getOverview(filters: OverviewFilters, signal?: AbortSignal, maxPoints?: number) {
   const parameters = new URLSearchParams({
     from: filters.from.toISOString(),
     to: filters.to.toISOString(),
@@ -170,6 +170,7 @@ export function getOverview(filters: OverviewFilters, signal?: AbortSignal) {
   if (filters.environment) parameters.set("environment", filters.environment);
   if (filters.release) parameters.set("release", filters.release);
   if (filters.route) parameters.set("route", filters.route);
+  if (maxPoints) parameters.set("maxPoints", String(maxPoints));
   return requestJSON(
     overviewResponseSchema,
     `/api/v1/projects/${encodeURIComponent(filters.projectId)}/overview?${parameters.toString()}`,

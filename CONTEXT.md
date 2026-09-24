@@ -24,6 +24,10 @@ _Avoid_: Tenant, account, workspace
 A web product whose browser activity is monitored as one reporting boundary. A Project can contain several Environments.
 _Avoid_: App, application, service
 
+**SDK Platform**:
+The frontend framework or browser toolchain selected for a Project, such as JavaScript, React, Vue, or Next.js. It chooses the onboarding recipe and Project icon; it does not change accepted Event types or Environment boundaries.
+_Avoid_: Project type, runtime, event platform
+
 **Environment**:
 A deployment scope within a Project, such as production, canary, test, or development.
 _Avoid_: Stage, namespace
@@ -31,6 +35,10 @@ _Avoid_: Stage, namespace
 **Project Settings**:
 Configuration and operating tools whose scope is the currently selected Project.
 _Avoid_: App settings, project management
+
+**Project Rate Limit**:
+A per-second request boundary shared by every DSN and Environment in one Project. It counts Ingest requests rather than the Events carried by those requests.
+_Avoid_: Environment quota, event limit, sampling rate
 
 **Instance Settings**:
 Configuration and maintenance controls whose scope is the whole Instance and which are visible only to an Instance Administrator.

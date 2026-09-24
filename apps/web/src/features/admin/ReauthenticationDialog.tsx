@@ -20,6 +20,7 @@ export function ReauthenticationDialog({
   title,
   description,
   confirmLabel = "确认并继续",
+  confirmVariant = "destructive",
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -27,6 +28,7 @@ export function ReauthenticationDialog({
   title: string;
   description: string;
   confirmLabel?: string;
+  confirmVariant?: React.ComponentProps<typeof Button>["variant"];
 }) {
   const [password, setPassword] = useState("");
   const confirm = useMutation({
@@ -84,7 +86,7 @@ export function ReauthenticationDialog({
             取消
           </Button>
           <Button
-            variant="destructive"
+            variant={confirmVariant}
             disabled={!password || confirm.isPending}
             onClick={() => confirm.mutate()}
           >

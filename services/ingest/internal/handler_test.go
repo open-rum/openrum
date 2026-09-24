@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 	"time"
 
@@ -48,6 +49,10 @@ type fakeAcceptor struct {
 	accepted *AcceptedEnvelope
 	err      error
 }
+
+type fakeStoragePressureGate struct{ blocked bool }
+
+func (gate fakeStoragePressureGate) HardStop() bool { return gate.blocked }
 
 type fakeConnectionStatus struct {
 	sdkSeen    []time.Time
@@ -107,6 +112,33 @@ func TestHandlerAcceptsValidatedIdentityAndGzipEnvelopes(t *testing.T) {
 				t.Fatalf("CORS origin = %q", response.Header().Get("Access-Control-Allow-Origin"))
 			}
 		})
+	}
+}
+
+func TestHandlerDropsWithoutRetryWhenStorageHardStopIsActive(t *testing.T) {
+	authenticator := &fakeAuthenticator{}
+	acceptor := &fakeAcceptor{}
+	handler := NewHandler(
+		authenticator,
+		fakeLimiter{allowIP: false, allowProject: false},
+		acceptor,
+		zerolog.Nop(),
+		WithStoragePressureGate(fakeStoragePressureGate{blocked: true}),
+	)
+	response := httptest.NewRecorder()
+
+	testRouter(handler).ServeHTTP(response, ingestRequest(validEnvelope(t)))
+
+	if response.Code != http.StatusAccepted || authenticator.calls != 0 || acceptor.accepted != nil {
+		t.Fatalf("status=%d auth_calls=%d accepted=%+v body=%s", response.Code, authenticator.calls, acceptor.accepted, response.Body.String())
+	}
+	if response.Header().Get("X-OpenRUM-Storage-Pressure") != "hard-stop" ||
+		response.Header().Get("Access-Control-Allow-Origin") != "*" {
+		t.Fatalf("headers=%v", response.Header())
+	}
+	var result Acceptance
+	if err := json.Unmarshal(response.Body.Bytes(), &result); err != nil || result.Accepted != 0 {
+		t.Fatalf("result=%+v err=%v", result, err)
 	}
 }
 
@@ -255,6 +287,8 @@ func TestHandlerRejectsAuthOriginRateAndSchemaFailures(t *testing.T) {
 		body       []byte
 		wantStatus int
 		wantCode   string
+		wantScope  string
+		wantLimit  string
 	}{
 		{name: "missing key", configure: func(_ *fakeAuthenticator, _ *fakeLimiter, request *http.Request) { request.Header.Del("X-OpenRUM-Key") }, wantStatus: 401, wantCode: "INVALID_KEY"},
 		{name: "invalid key", configure: func(auth *fakeAuthenticator, _ *fakeLimiter, _ *http.Request) {
@@ -263,8 +297,8 @@ func TestHandlerRejectsAuthOriginRateAndSchemaFailures(t *testing.T) {
 		{name: "origin", configure: func(_ *fakeAuthenticator, _ *fakeLimiter, request *http.Request) {
 			request.Header.Set("Origin", "https://evil.example")
 		}, wantStatus: 403, wantCode: "ORIGIN_REJECTED"},
-		{name: "ip rate", configure: func(_ *fakeAuthenticator, limiter *fakeLimiter, _ *http.Request) { limiter.allowIP = false }, wantStatus: 429, wantCode: "RATE_LIMITED"},
-		{name: "project rate", configure: func(_ *fakeAuthenticator, limiter *fakeLimiter, _ *http.Request) { limiter.allowProject = false }, wantStatus: 429, wantCode: "RATE_LIMITED"},
+		{name: "ip rate", configure: func(_ *fakeAuthenticator, limiter *fakeLimiter, _ *http.Request) { limiter.allowIP = false }, wantStatus: 429, wantCode: "RATE_LIMITED", wantScope: "ip", wantLimit: "1000"},
+		{name: "project rate", configure: func(_ *fakeAuthenticator, limiter *fakeLimiter, _ *http.Request) { limiter.allowProject = false }, wantStatus: 429, wantCode: "RATE_LIMITED", wantScope: "project", wantLimit: "5000"},
 		{name: "schema", body: []byte(`{"schema_version":"invalid"}`), wantStatus: 400, wantCode: "INVALID_ENVELOPE"},
 		{name: "environment", body: bytes.ReplaceAll(validEnvelope(t), []byte(`"environment": "production"`), []byte(`"environment": "staging"`)), wantStatus: 400, wantCode: "ENVIRONMENT_MISMATCH"},
 	}
@@ -288,6 +322,15 @@ func TestHandlerRejectsAuthOriginRateAndSchemaFailures(t *testing.T) {
 			assertError(t, response, test.wantStatus, test.wantCode)
 			if test.wantStatus == http.StatusTooManyRequests && response.Header().Get("Retry-After") != "1" {
 				t.Fatalf("Retry-After = %q", response.Header().Get("Retry-After"))
+			}
+			if scope := response.Header().Get("X-OpenRUM-RateLimit-Scope"); scope != test.wantScope {
+				t.Fatalf("X-OpenRUM-RateLimit-Scope = %q, want %q", scope, test.wantScope)
+			}
+			if limit := response.Header().Get("X-OpenRUM-RateLimit-Limit"); limit != test.wantLimit {
+				t.Fatalf("X-OpenRUM-RateLimit-Limit = %q, want %q", limit, test.wantLimit)
+			}
+			if test.wantScope == "project" && !strings.Contains(response.Header().Get("Access-Control-Expose-Headers"), "X-OpenRUM-RateLimit-Scope") {
+				t.Fatalf("rate-limit diagnostics are not exposed through CORS: %q", response.Header().Get("Access-Control-Expose-Headers"))
 			}
 		})
 	}

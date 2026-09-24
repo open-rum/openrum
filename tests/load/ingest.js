@@ -1,6 +1,7 @@
 import http from "k6/http";
 import { check } from "k6";
 import { Counter } from "k6/metrics";
+import { createLoadEvents } from "./events.mjs";
 
 const batchSize = Number(__ENV.BATCH_SIZE || 100);
 const eventRate = Number(__ENV.EVENT_RATE || 10000);
@@ -21,6 +22,8 @@ export const options = {
     },
   },
   thresholds: {
+    checks: ["rate==1"],
+    dropped_iterations: ["count==0"],
     http_req_failed: ["rate<0.01"],
     http_req_duration: ["p(95)<250"],
   },
@@ -30,14 +33,7 @@ export default function () {
   const sessionId = uuid();
   const pageId = uuid();
   const now = new Date().toISOString();
-  const events = Array.from({ length: batchSize }, (_, index) => ({
-    event_id: uuid(),
-    type: "custom",
-    timestamp: now,
-    name: "load_probe",
-    attributes: { load_run_id: runId, sequence: String(index) },
-    measurements: { batch_size: batchSize },
-  }));
+  const events = createLoadEvents(batchSize, now, runId, uuid, __ENV.WORKLOAD);
   const body = JSON.stringify({
     schema_version: "1.0",
     sent_at: now,
@@ -47,7 +43,10 @@ export default function () {
       session_id: sessionId,
       page_id: pageId,
       anonymous_user_id: `load-${sessionId}`,
-      page: { url: `${__ENV.PAGE_URL || "https://load.example.com"}/run/${runId}` },
+      page: {
+        url: `${__ENV.PAGE_URL || "https://load.example.com"}/run/${runId}`,
+        route: "/benchmark",
+      },
       tags: { load_run_id: runId },
     },
     events,
@@ -63,16 +62,17 @@ export default function () {
       },
     },
   );
-  const accepted = check(response, {
-    "durably accepted": (current) => current.status === 202 || current.status === 207,
-  });
-  if (accepted) {
-    try {
-      acceptedEvents.add(Number(response.json("accepted") || 0));
-    } catch {
-      // The status check reports malformed success responses.
-    }
+  let count = 0;
+  try {
+    count = Number(response.json("accepted") || 0);
+  } catch {
+    /* Invalid/empty responses are not accepted events. */
   }
+  check(response, {
+    "entire batch durably accepted": (current) =>
+      (current.status === 202 || current.status === 207) && count === batchSize,
+  });
+  acceptedEvents.add(count);
 }
 
 function uuid() {

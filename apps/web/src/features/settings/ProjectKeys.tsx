@@ -4,7 +4,7 @@ import { useParams } from "@tanstack/react-router";
 import { ArrowClockwise, Check, Copy, Key, Plus, Trash } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import { apiFetch, csrfHeaders } from "@/lib/auth/session";
-import { ProjectSettingsLayout } from "./ProjectSettingsLayout";
+import { SettingsShell } from "./SettingsShell";
 
 type ProjectKey = {
   id: string;
@@ -25,7 +25,7 @@ type ProjectKeysProps = {
 };
 
 export function ProjectKeysRoute() {
-  const { projectId } = useParams({ from: "/protected/projects/$projectId/settings/keys" });
+  const { projectId } = useParams({ from: "/protected/settings/project/$projectId/keys" });
   return <ProjectKeys projectId={projectId} />;
 }
 
@@ -109,8 +109,7 @@ export function ProjectKeys({ projectId }: ProjectKeysProps) {
   }
 
   return (
-    <ProjectSettingsLayout
-      projectId={projectId}
+    <SettingsShell
       titleId="project-keys-title"
       title="客户端 DSN"
       description="每个项目自动拥有一个默认 DSN，浏览器 SDK 正常接入只需要复制这一项。"
@@ -336,7 +335,7 @@ export function ProjectKeys({ projectId }: ProjectKeysProps) {
           </div>
         </details>
       </div>
-    </ProjectSettingsLayout>
+    </SettingsShell>
   );
 }
 

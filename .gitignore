@@ -2,6 +2,7 @@
 .env
 .env.*
 !.env.example
+!deploy/compose/.env.production.example
 deploy/compose/.env
 .openrum/
 # `go build ./cmd/openrum` drops the binary here; the command is meant to be

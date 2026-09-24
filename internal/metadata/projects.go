@@ -19,6 +19,7 @@ type CreateProjectInput struct {
 	OrganizationID  uuid.UUID
 	Name            string
 	Slug            string
+	SDKPlatform     SDKPlatform
 	AllowedOrigins  []string
 	Environment     string
 	Environments    []string
@@ -31,6 +32,7 @@ type CreateProjectInput struct {
 type UpdateProjectInput struct {
 	Name            *string
 	Slug            *string
+	SDKPlatform     *SDKPlatform
 	AllowedOrigins  *[]string
 	Environment     *string
 	Environments    *[]string
@@ -56,7 +58,7 @@ func NewProjectRepository(database *sql.DB) *ProjectRepository {
 
 func (repository *ProjectRepository) ListForOrganization(ctx context.Context, userID, organizationID uuid.UUID) ([]Project, error) {
 	rows, err := repository.database.QueryContext(ctx,
-		`SELECT projects.id, projects.organization_id, projects.name, projects.slug, to_json(projects.allowed_origins),
+		`SELECT projects.id, projects.organization_id, projects.name, projects.slug, projects.sdk_platform, to_json(projects.allowed_origins),
 		        projects.environment, `+projectEnvironmentsSQL+`, projects.retention_days, projects.event_sample_rate, projects.api_sample_rate,
 		        projects.error_sample_rate, projects.ingest_rate_limit, projects.over_limit_behavior,
 		        projects.status, projects.created_at, projects.updated_at
@@ -84,7 +86,7 @@ func (repository *ProjectRepository) GetForUser(ctx context.Context, userID, pro
 	var allowedOriginsJSON []byte
 	var environmentsJSON []byte
 	err := repository.database.QueryRowContext(ctx,
-		`SELECT projects.id, projects.organization_id, projects.name, projects.slug, to_json(projects.allowed_origins),
+		`SELECT projects.id, projects.organization_id, projects.name, projects.slug, projects.sdk_platform, to_json(projects.allowed_origins),
 		        projects.environment, `+projectEnvironmentsSQL+`, projects.retention_days, projects.event_sample_rate, projects.api_sample_rate,
 		        projects.error_sample_rate, projects.ingest_rate_limit, projects.over_limit_behavior,
 		        projects.status, projects.created_at, projects.updated_at, organization_members.role
@@ -92,7 +94,7 @@ func (repository *ProjectRepository) GetForUser(ctx context.Context, userID, pro
 		 JOIN organization_members ON organization_members.organization_id=projects.organization_id
 		 WHERE projects.id=$1 AND organization_members.user_id=$2 AND projects.status!='deleting'`,
 		projectID, userID,
-	).Scan(&access.Project.ID, &access.Project.OrganizationID, &access.Project.Name, &access.Project.Slug,
+	).Scan(&access.Project.ID, &access.Project.OrganizationID, &access.Project.Name, &access.Project.Slug, &access.Project.SDKPlatform,
 		&allowedOriginsJSON, &access.Project.Environment, &environmentsJSON, &access.Project.RetentionDays,
 		&access.Project.EventSampleRate, &access.Project.APISampleRate, &access.Project.ErrorSampleRate,
 		&access.Project.IngestRateLimit, &access.Project.OverLimitBehavior, &access.Project.Status, &access.Project.CreatedAt, &access.Project.UpdatedAt, &access.Role)
@@ -167,6 +169,9 @@ func (repository *ProjectRepository) CreateWithKey(ctx context.Context, actorID 
 }
 
 func (repository *ProjectRepository) create(ctx context.Context, actorID uuid.UUID, input CreateProjectInput, keyName string) (Project, *ProjectKeyCredential, error) {
+	if input.SDKPlatform == "" {
+		input.SDKPlatform = SDKPlatformJavaScript
+	}
 	transaction, err := repository.database.BeginTx(ctx, nil)
 	if err != nil {
 		return Project{}, nil, err
@@ -190,14 +195,14 @@ func (repository *ProjectRepository) create(ctx context.Context, actorID uuid.UU
 	var allowedOriginsJSON []byte
 	err = transaction.QueryRowContext(ctx,
 		`INSERT INTO projects
-		 (id, organization_id, name, slug, allowed_origins, environment, retention_days, event_sample_rate, api_sample_rate,
+		 (id, organization_id, name, slug, sdk_platform, allowed_origins, environment, retention_days, event_sample_rate, api_sample_rate,
 		  error_sample_rate)
-		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
-		 RETURNING name, slug, to_json(allowed_origins), environment, retention_days, event_sample_rate, api_sample_rate,
+		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+		 RETURNING name, slug, sdk_platform, to_json(allowed_origins), environment, retention_days, event_sample_rate, api_sample_rate,
 		           error_sample_rate, ingest_rate_limit, over_limit_behavior, status, created_at, updated_at`,
-		project.ID, input.OrganizationID, input.Name, input.Slug, allowedOrigins, input.Environment,
+		project.ID, input.OrganizationID, input.Name, input.Slug, input.SDKPlatform, allowedOrigins, input.Environment,
 		input.RetentionDays, input.EventSampleRate, input.APISampleRate, input.ErrorSampleRate,
-	).Scan(&project.Name, &project.Slug, &allowedOriginsJSON, &project.Environment, &project.RetentionDays,
+	).Scan(&project.Name, &project.Slug, &project.SDKPlatform, &allowedOriginsJSON, &project.Environment, &project.RetentionDays,
 		&project.EventSampleRate, &project.APISampleRate, &project.ErrorSampleRate,
 		&project.IngestRateLimit, &project.OverLimitBehavior, &project.Status,
 		&project.CreatedAt, &project.UpdatedAt)
@@ -268,6 +273,18 @@ func (repository *ProjectRepository) Update(ctx context.Context, actorID, projec
 	if !canManageProjectSettings(actorRole) {
 		return Project{}, ErrForbidden
 	}
+	if input.Status != nil && *input.Status == ProjectStatusActive {
+		var purgeActive bool
+		if err := transaction.QueryRowContext(ctx, `SELECT EXISTS (
+			SELECT 1 FROM project_data_purges WHERE project_id=$1
+			AND status IN ('queued','running','retry','verifying')
+		)`, projectID).Scan(&purgeActive); err != nil {
+			return Project{}, err
+		}
+		if purgeActive {
+			return Project{}, ErrProjectDataPurgeInProgress
+		}
+	}
 
 	var allowedOrigins any
 	if input.AllowedOrigins != nil {
@@ -294,20 +311,20 @@ func (repository *ProjectRepository) Update(ctx context.Context, actorID, projec
 	samplingChanged := input.EventSampleRate != nil || input.APISampleRate != nil || input.ErrorSampleRate != nil
 	row := transaction.QueryRowContext(ctx,
 		`UPDATE projects SET
-		   name=COALESCE($1, name), slug=COALESCE($2, slug), allowed_origins=COALESCE($3, allowed_origins),
-		   environment=COALESCE($4, environment), retention_days=COALESCE($5, retention_days),
-		   event_sample_rate=COALESCE($6, event_sample_rate), api_sample_rate=COALESCE($7, api_sample_rate),
-		   error_sample_rate=COALESCE($8, error_sample_rate), status=COALESCE($9, status),
-		   ingest_rate_limit=CASE WHEN $10 THEN $11::integer ELSE ingest_rate_limit END,
-		   over_limit_behavior=COALESCE($12, over_limit_behavior),
-		   sdk_config_version=CASE WHEN $13 THEN sdk_config_version+1 ELSE sdk_config_version END,
-		   sdk_config_effective_at=CASE WHEN $13 THEN now() ELSE sdk_config_effective_at END,
+		   name=COALESCE($1, name), slug=COALESCE($2, slug), sdk_platform=COALESCE($3, sdk_platform), allowed_origins=COALESCE($4, allowed_origins),
+		   environment=COALESCE($5, environment), retention_days=COALESCE($6, retention_days),
+		   event_sample_rate=COALESCE($7, event_sample_rate), api_sample_rate=COALESCE($8, api_sample_rate),
+		   error_sample_rate=COALESCE($9, error_sample_rate), status=COALESCE($10, status),
+		   ingest_rate_limit=CASE WHEN $11 THEN $12::integer ELSE ingest_rate_limit END,
+		   over_limit_behavior=COALESCE($13, over_limit_behavior),
+		   sdk_config_version=CASE WHEN $14 THEN sdk_config_version+1 ELSE sdk_config_version END,
+		   sdk_config_effective_at=CASE WHEN $14 THEN now() ELSE sdk_config_effective_at END,
 		   updated_at=now()
-		 WHERE id=$14
-		 RETURNING id, organization_id, name, slug, to_json(allowed_origins), environment, json_build_array(environment), retention_days,
+		 WHERE id=$15
+		 RETURNING id, organization_id, name, slug, sdk_platform, to_json(allowed_origins), environment, json_build_array(environment), retention_days,
 		           event_sample_rate, api_sample_rate, error_sample_rate, ingest_rate_limit, over_limit_behavior,
 		           status, created_at, updated_at`,
-		input.Name, input.Slug, allowedOrigins, input.Environment, input.RetentionDays, input.EventSampleRate,
+		input.Name, input.Slug, input.SDKPlatform, allowedOrigins, input.Environment, input.RetentionDays, input.EventSampleRate,
 		input.APISampleRate, input.ErrorSampleRate, status, input.IngestRateLimit != nil, ingestRateLimit,
 		overLimitBehavior, samplingChanged, projectID)
 	project, err := scanProject(row)
@@ -355,7 +372,7 @@ func scanProject(scanner rowScanner) (Project, error) {
 	var project Project
 	var allowedOriginsJSON []byte
 	var environmentsJSON []byte
-	err := scanner.Scan(&project.ID, &project.OrganizationID, &project.Name, &project.Slug, &allowedOriginsJSON,
+	err := scanner.Scan(&project.ID, &project.OrganizationID, &project.Name, &project.Slug, &project.SDKPlatform, &allowedOriginsJSON,
 		&project.Environment, &environmentsJSON, &project.RetentionDays, &project.EventSampleRate, &project.APISampleRate,
 		&project.ErrorSampleRate, &project.IngestRateLimit, &project.OverLimitBehavior, &project.Status, &project.CreatedAt, &project.UpdatedAt)
 	if err != nil {

@@ -149,7 +149,7 @@ CI：lint → unit test → protocol compatibility → build → integration tes
 ### Security Considerations
 
 - Argon2id 密码；登录按 IP + account 限流。
-- 256-bit 随机会话，数据库只存哈希；12 小时绝对过期、30 分钟空闲过期。
+- 256-bit 随机会话，数据库只存哈希；登录后 30 天绝对过期、30 天空闲过期。
 - 状态变更校验 Origin 与 CSRF token。
 - owner/admin/member/viewer RBAC 在 API 服务端强制。
 - Browser SDK 对外只接收一个 DSN；DSN 内的项目 write key 只允许 ingest，可轮换/吊销。作为浏览器公开凭证，其明文与校验哈希同时保存，授权用户可随时复制。

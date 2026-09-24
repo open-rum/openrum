@@ -10,7 +10,7 @@ export function AuthFrame({ children }: { children: ReactNode }) {
     <div className="auth-page">
       <header className="auth-toolbar">
         <div className="auth-brand">
-          <BrandMark />
+          <BrandMark size="lockup" />
           <span>OpenRUM</span>
         </div>
         <ThemeToggle compact />

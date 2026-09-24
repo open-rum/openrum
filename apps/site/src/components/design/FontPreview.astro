@@ -1,15 +1,17 @@
 ---
+import "@fontsource-variable/geist/wght.css";
 import "@fontsource-variable/inter/wght.css";
 import "@fontsource-variable/ibm-plex-sans/wght.css";
 import "@fontsource-variable/manrope/wght.css";
+import "@fontsource-variable/exo-2/wght.css";
 
 const fonts = [
   {
     id: "geist",
     name: "Geist",
     family: "Geist Variable",
-    tag: "当前字体",
-    note: "简洁、紧凑，延续现有界面。",
+    tag: "原字体",
+    note: "简洁、紧凑，便于和当前字体进行对比。",
     url: "https://vercel.com/font",
   },
   {
@@ -24,7 +26,7 @@ const fonts = [
     id: "plex",
     name: "IBM Plex Sans",
     family: "IBM Plex Sans Variable",
-    tag: "工程气质",
+    tag: "当前字体",
     note: "字形更有辨识度，适合监控与开发工具。",
     url: "https://www.ibm.com/plex/",
   },
@@ -36,6 +38,14 @@ const fonts = [
     note: "更圆润、舒展，适合标题和简洁的数据卡片。",
     url: "https://fontsource.org/fonts/manrope",
   },
+  {
+    id: "exo-2",
+    name: "Exo 2",
+    family: "Exo 2 Variable",
+    tag: "未来感",
+    note: "更具未来感和速度感，适合产品标题与关键指标。",
+    url: "https://fontsource.org/fonts/exo-2",
+  },
 ];
 ---
 
@@ -46,9 +56,9 @@ const fonts = [
       <select data-font-select aria-label="预览英文字体">
         {
           fonts.map((font) => (
-            <option value={font.id} data-family={font.family}>
+            <option value={font.id} data-family={font.family} selected={font.id === "plex"}>
               {font.name}
-              {font.id === "geist" ? "（当前）" : ""}
+              {font.id === "plex" ? "（当前）" : ""}
             </option>
           ))
         }
@@ -64,7 +74,8 @@ const fonts = [
     <button class="ui-button ui-button-neutral" type="button" data-font-reset>恢复当前字体</button>
   </div>
   <p class="ds-font-note">
-    切换会预览本页文字和图表。中文单独选择；Logo 字标为 SVG。当前产品字体仍是 Geist。
+    切换会预览本页文字、顶部 OpenRUM 字样和图表。中文单独选择；正式 Logo 字标仍为
+    SVG，当前产品字体为 IBM Plex Sans。
   </p>
   <div class="ds-font-options" role="group" aria-label="推荐字体对比">
     {
@@ -90,7 +101,7 @@ const fonts = [
             <button
               type="button"
               data-font-choice={font.id}
-              aria-pressed={font.id === "geist"}
+              aria-pressed={font.id === "plex"}
               aria-label={`预览 ${font.name}`}
             >
               预览此字体
@@ -130,7 +141,7 @@ const fonts = [
   </div>
   <div class="ds-font-specimen">
     <div class="ds-font-specimen-heading">
-      <span data-font-current>Geist + 系统黑体</span><span>界面示例 · 非线上数据</span>
+      <span data-font-current>IBM Plex Sans + 系统黑体</span><span>界面示例 · 非线上数据</span>
     </div>
     <p data-font-custom>看清每一次用户体验。Real user monitoring · 0123456789</p>
     <div class="ds-font-metrics">
@@ -206,7 +217,7 @@ const fonts = [
   }
   .ds-font-options {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(5, minmax(0, 1fr));
     gap: 12px;
     margin-block: 24px;
   }

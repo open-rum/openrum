@@ -45,6 +45,33 @@ export const issuesResponseSchema = z.object({
 
 export type IssuesResponse = z.infer<typeof issuesResponseSchema>;
 
+const issueOverviewPointSchema = z.object({
+  bucket: isoTime,
+  events: z.number().int().nonnegative(),
+  anonymousUsers: z.number().int().nonnegative(),
+  identifiedUsers: z.number().int().nonnegative(),
+  sessions: z.number().int().nonnegative(),
+  pages: z.number().int().nonnegative(),
+});
+
+const issueDistributionItemSchema = z.object({
+  value: z.string(),
+  events: z.number().int().nonnegative(),
+});
+
+export const issueOverviewResponseSchema = z.object({
+  // Optional for rolling upgrades; old servers must not receive invented labels.
+  from: isoTime.optional(),
+  to: isoTime.optional(),
+  intervalSeconds: z.number().int().positive().optional(),
+  trend: z.array(issueOverviewPointSchema),
+  errorTypes: z.array(issueDistributionItemSchema),
+  pages: z.array(issueDistributionItemSchema),
+  countries: z.array(issueDistributionItemSchema),
+});
+
+export type IssueOverviewResponse = z.infer<typeof issueOverviewResponseSchema>;
+
 const issueSchema = issuesResponseSchema.shape.issues.element;
 const issueFacetsSchema = issuesResponseSchema.shape.facets;
 const trendPointSchema = z.object({
@@ -55,6 +82,9 @@ const trendPointSchema = z.object({
 });
 
 export const issueDetailResponseSchema = z.object({
+  from: isoTime.optional(),
+  to: isoTime.optional(),
+  intervalSeconds: z.number().int().positive().optional(),
   issue: issueSchema,
   trend: z.array(trendPointSchema),
   facets: issueFacetsSchema,
@@ -146,6 +176,11 @@ export type IssueFilters = {
   from: Date;
   to: Date;
   environment?: string;
+  /** Server-side substring match against the Issue title (latest error message). */
+  title?: string;
+  errorType?: string;
+  fingerprint?: string;
+  userId?: string;
   release?: string;
   browser?: string;
   deviceType?: string;
@@ -154,8 +189,6 @@ export type IssueFilters = {
   status?: IssueStatus;
   sort: "events" | "users" | "last_seen";
   cursor?: string;
-  /** Local, current-page search; the query API does not provide full-text search. */
-  search?: string;
 };
 
 export function getIssues(filters: IssueFilters, signal?: AbortSignal) {
@@ -163,6 +196,20 @@ export function getIssues(filters: IssueFilters, signal?: AbortSignal) {
   return requestJSON(
     issuesResponseSchema,
     `/api/v1/projects/${encodeURIComponent(filters.projectId)}/issues?${parameters.toString()}`,
+    { signal },
+  );
+}
+
+export function getIssueOverview(filters: IssueFilters, signal?: AbortSignal) {
+  const parameters = serializeIssueFilters({
+    ...filters,
+    cursor: undefined,
+    status: undefined,
+    sort: "events",
+  });
+  return requestJSON(
+    issueOverviewResponseSchema,
+    `/api/v1/projects/${encodeURIComponent(filters.projectId)}/issues/overview?${parameters.toString()}`,
     { signal },
   );
 }
@@ -250,6 +297,10 @@ export function parseIssueFilters(
     from: validRange ? from : fallback.from,
     to: validRange ? to : fallback.to,
     environment: clean(search.get("environment")),
+    title: clean(search.get("title") ?? search.get("search"))?.slice(0, 200),
+    errorType: clean(search.get("errorType")),
+    fingerprint: clean(search.get("fingerprint")),
+    userId: clean(search.get("userId") ?? search.get("user.id")),
     release: clean(search.get("release")),
     browser: clean(search.get("browser")),
     deviceType: clean(search.get("deviceType")),
@@ -257,7 +308,6 @@ export function parseIssueFilters(
     route: clean(search.get("route")),
     status: status.success ? status.data : undefined,
     sort,
-    search: clean(search.get("search"))?.slice(0, 200),
     cursor: cursor && /^[A-Za-z0-9_-]{1,512}$/.test(cursor) ? cursor : undefined,
   };
 }
@@ -270,6 +320,10 @@ export function serializeIssueFilters(filters: IssueFilters) {
   });
   for (const [key, value] of [
     ["environment", filters.environment],
+    ["title", filters.title],
+    ["errorType", filters.errorType],
+    ["fingerprint", filters.fingerprint],
+    ["userId", filters.userId],
     ["release", filters.release],
     ["browser", filters.browser],
     ["deviceType", filters.deviceType],
@@ -277,7 +331,6 @@ export function serializeIssueFilters(filters: IssueFilters) {
     ["route", filters.route],
     ["status", filters.status],
     ["cursor", filters.cursor],
-    ["search", filters.search],
   ] as const) {
     if (value) parameters.set(key, value);
   }

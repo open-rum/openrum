@@ -117,6 +117,10 @@ func (handler *AnalyticsHandler) Get(writer http.ResponseWriter, request *http.R
 
 func parseBehaviorFilters(request *http.Request, projectID uuid.UUID) (query.BehaviorFilters, error) {
 	values := request.URL.Query()
+	maxPoints, err := parseSeriesPointBudget(values.Get("maxPoints"))
+	if err != nil {
+		return query.BehaviorFilters{}, query.ErrInvalidBehaviorFilters
+	}
 	from, err := time.Parse(time.RFC3339Nano, values.Get("from"))
 	if err != nil {
 		return query.BehaviorFilters{}, err
@@ -128,6 +132,6 @@ func parseBehaviorFilters(request *http.Request, projectID uuid.UUID) (query.Beh
 	return query.NormalizeBehaviorFilters(query.BehaviorFilters{
 		ProjectID: projectID, From: from, To: to, Environment: values.Get("environment"),
 		EventKind: values.Get("eventKind"), EventName: values.Get("eventName"), Dimension: values.Get("dimension"),
-		Measurement: values.Get("measurement"),
+		Measurement: values.Get("measurement"), MaxPoints: maxPoints,
 	})
 }

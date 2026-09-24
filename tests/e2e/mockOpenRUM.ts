@@ -22,6 +22,12 @@ export async function mockOpenRUM(
   let releaseCreated = true;
   let artifactReady = false;
   const projectSettings: MutableProject = { ...defaultProjectSettings };
+  let dataPurge = {
+    projectId,
+    status: "idle",
+    attempts: 0,
+    lastError: "",
+  };
   let inboundFilters: InboundFilters = {
     builtin: { ...defaultInboundFilters.builtin },
     rules: [],
@@ -48,6 +54,16 @@ export async function mockOpenRUM(
       });
     if (path === "/api/v1/auth/reauthenticate")
       return json(route, { elevated: true, expiresInSeconds: 300 });
+    if (path === "/api/v1/storage-pressure")
+      return json(route, {
+        mode: "normal",
+        level: "normal",
+        usedPercent: 42,
+        automaticSamplingActive: false,
+        automaticSamplingRate: null,
+        ingestBlocked: false,
+        observedAt: now,
+      });
     if (path === "/api/v1/admin/configuration" && request.method() === "PATCH") {
       const body = request.postDataJSON() as {
         namespace: string;
@@ -146,6 +162,7 @@ export async function mockOpenRUM(
     if (path === `/api/v1/organizations/${organizationId}/projects`) {
       if (request.method() === "POST") {
         projectCreated = true;
+        Object.assign(projectSettings, request.postDataJSON() as Partial<MutableProject>);
         return json(route, project(true, role, projectSettings), 201);
       }
       return json(route, {
@@ -166,6 +183,13 @@ export async function mockOpenRUM(
             ]
           : [],
       });
+    }
+    if (path === `/api/v1/projects/${projectId}/data-purge`) {
+      if (request.method() === "POST") {
+        dataPurge = { ...dataPurge, status: "queued" };
+        return json(route, dataPurge, 202);
+      }
+      return json(route, dataPurge);
     }
     if (path === `/api/v1/projects/${projectId}`) {
       if (request.method() === "PATCH") {
@@ -212,6 +236,8 @@ export async function mockOpenRUM(
         202,
       );
     }
+    if (path === `/api/v1/projects/${projectId}/overview/config`)
+      return json(route, { config: null, revision: 0, updatedAt: null });
     if (path === `/api/v1/projects/${projectId}/overview`) return json(route, overview());
     if (path === `/api/v1/projects/${projectId}/analytics/funnels/query`)
       return json(route, {
@@ -591,6 +617,7 @@ function behaviorAnalytics() {
       { kind: "click", name: "click", metric: metric(6400, 2870, 3120) },
     ],
     properties: [],
+    measurements: [],
     freshness: { latestReceivedAt: now, ageSeconds: 5, stale: false },
     sampleCount: 18420,
     rowLimit: 100,
@@ -968,12 +995,16 @@ function issues() {
 type MutableProject = {
   name: string;
   slug: string;
+  sdkPlatform: "javascript" | "react" | "vue" | "nextjs" | "nuxt" | "angular" | "svelte";
   allowedOrigins: string[];
   environment: string;
   retentionDays: number;
   eventSampleRate: number;
   apiSampleRate: number;
   errorSampleRate: number;
+  ingestRateLimit: number | null;
+  overLimitBehavior: "reject" | "sample";
+  defaultIngestRateLimit: number;
   status: "active" | "disabled";
 };
 
@@ -991,12 +1022,16 @@ const defaultInboundFilters: InboundFilters = {
 const defaultProjectSettings: MutableProject = {
   name: "Magic Moment H5",
   slug: "magic-moment-h5",
+  sdkPlatform: "react",
   allowedOrigins: ["http://127.0.0.1:4174"],
   environment: "production",
   retentionDays: 14,
   eventSampleRate: 1,
   apiSampleRate: 0.2,
   errorSampleRate: 1,
+  ingestRateLimit: null,
+  overLimitBehavior: "reject",
+  defaultIngestRateLimit: 5000,
   status: "active",
 };
 

@@ -1,7 +1,7 @@
 ---
 title: 入站过滤
 description: 在真正丢弃之前先量清影响，把爬虫流量、扩展错误和已知噪声挡在项目数据之外。
-appliesTo: Alpha / main
+appliesTo: Alpha
 ---
 
 入站过滤决定哪些上报不会变成数据。入口在**项目设置 → 入站过滤**，按项目独立配置。

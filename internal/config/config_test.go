@@ -32,6 +32,9 @@ func TestLoadValidConfigurationForEveryService(t *testing.T) {
 			if configuration.KafkaEventTopic != "rum-events-v1" {
 				t.Fatalf("KafkaEventTopic = %q, want rum-events-v1", configuration.KafkaEventTopic)
 			}
+			if configuration.KafkaRetention != 7*24*time.Hour {
+				t.Fatalf("KafkaRetention = %s, want 168h", configuration.KafkaRetention)
+			}
 			if configuration.ObjectStorageProvider != ObjectStorageProviderNone {
 				t.Fatalf("ObjectStorageProvider = %q, want optional storage disabled", configuration.ObjectStorageProvider)
 			}
@@ -82,6 +85,36 @@ func TestLoadRejectsInvalidCommonValues(t *testing.T) {
 				t.Fatalf("load() error = %v, want error containing %q", err, test.want)
 			}
 		})
+	}
+}
+
+func TestStoragePressureConfiguration(t *testing.T) {
+	base := map[string]string{
+		"APP_ENV": "test", "PUBLIC_BASE_URL": "http://localhost:8080",
+		"POSTGRES_DSN": "postgres://localhost/openrum", "CLICKHOUSE_DSN": "clickhouse://localhost/openrum",
+		"KAFKA_BROKERS": "localhost:9092", "REDIS_ADDR": "localhost:6379",
+		"OPENRUM_STORAGE_PRESSURE_GUARD_ENABLED": "true",
+		"OPENRUM_STORAGE_WARNING_FREE_RATIO":     "0.20",
+		"OPENRUM_STORAGE_CRITICAL_FREE_RATIO":    "0.12",
+		"OPENRUM_STORAGE_HARD_STOP_FREE_RATIO":   "0.06",
+		"OPENRUM_STORAGE_RECOVERY_FREE_RATIO":    "0.14",
+		"OPENRUM_STORAGE_EMERGENCY_SAMPLE_RATE":  "0.05",
+		"OPENRUM_STORAGE_POLL_INTERVAL":          "45s",
+	}
+	configuration, err := load(ServiceAPI, mapLookup(base))
+	if err != nil {
+		t.Fatal(err)
+	}
+	pressure := configuration.StoragePressure
+	if !pressure.Enabled || pressure.WarningFreeRatio != 0.20 || pressure.CriticalFreeRatio != 0.12 ||
+		pressure.HardStopFreeRatio != 0.06 || pressure.RecoveryFreeRatio != 0.14 ||
+		pressure.EmergencyRate != 0.05 || pressure.PollInterval != 45*time.Second {
+		t.Fatalf("pressure=%+v", pressure)
+	}
+
+	base["OPENRUM_STORAGE_RECOVERY_FREE_RATIO"] = "0.10"
+	if _, err := load(ServiceAPI, mapLookup(base)); err == nil || !strings.Contains(err.Error(), "hard stop < critical <= recovery < warning") {
+		t.Fatalf("invalid ratio ordering err=%v", err)
 	}
 }
 

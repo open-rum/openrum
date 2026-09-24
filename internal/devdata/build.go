@@ -67,6 +67,7 @@ func Build(scenario Scenario) ([]Batch, Summary, error) {
 			session.release = releases.pick(random).Value
 		}
 		built := buildSession(scenario, session, random)
+		fitSessionWindow(built, scenario.From, scenario.To)
 		batches = append(batches, built...)
 	}
 	for _, batch := range batches {
@@ -77,6 +78,41 @@ func Build(scenario Scenario) ([]Batch, Summary, error) {
 		}
 	}
 	return batches, summary, nil
+}
+
+// A journey can last longer than the space remaining in the selected window.
+// Shift it back when possible, otherwise compress it, preserving event order.
+func fitSessionWindow(batches []Batch, from, to time.Time) {
+	var first, last time.Time
+	for _, batch := range batches {
+		for _, ev := range batch.Envelope.Events {
+			at, _ := time.Parse(time.RFC3339Nano, ev.Timestamp)
+			if first.IsZero() || at.Before(first) {
+				first = at
+			}
+			if last.IsZero() || at.After(last) {
+				last = at
+			}
+		}
+	}
+	end := to.Add(-time.Millisecond)
+	if !last.After(end) {
+		return
+	}
+	start := end.Add(-last.Sub(first))
+	scale := 1.0
+	if start.Before(from) {
+		start = from
+		scale = float64(end.Sub(from)) / float64(last.Sub(first))
+	}
+	for i := range batches {
+		for j := range batches[i].Envelope.Events {
+			ev := &batches[i].Envelope.Events[j]
+			at, _ := time.Parse(time.RFC3339Nano, ev.Timestamp)
+			ev.Timestamp = timestamp(start.Add(time.Duration(float64(at.Sub(first)) * scale)))
+		}
+		batches[i].Envelope.SentAt = timestamp(end)
+	}
 }
 
 type sessionSeed struct {

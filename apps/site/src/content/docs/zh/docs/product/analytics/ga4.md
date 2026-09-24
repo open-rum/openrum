@@ -1,7 +1,7 @@
 ---
 title: 和 GA4 的对比
 description: 逐条对比 Google Analytics 4，以及迁移之前值得先知道的三个缺口。
-appliesTo: Alpha / main
+appliesTo: Alpha
 ---
 
 只列产品团队真正用得上的能力。「部分」表示能力存在但形态更窄，具体差别写在备注里。

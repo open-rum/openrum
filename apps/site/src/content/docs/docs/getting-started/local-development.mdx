@@ -1,0 +1,95 @@
+---
+title: Environment and startup
+description: Prepare tools, get the source, start local development and sign in.
+appliesTo: Alpha
+---
+
+import { Steps, Aside, LinkCard } from "@astrojs/starlight/components";
+
+This guide runs OpenRUM on your computer so you can change its code. The default Console URL is `http://127.0.0.1:4173`.
+
+<Steps>
+
+1. ## Prepare your tools
+   - **Git:** Fetch the source — check: `git --version`
+   - **Docker:** Engine or Desktop with Compose v2 — check: `docker info`, `docker compose version`
+   - **Node.js:** 24 — check: `node --version`
+   - **pnpm:** 11.11.0 — check: `pnpm --version`
+   - **Go:** 1.26; see `go.mod` for the exact toolchain — check: `go version`
+
+   Start Docker first. Allocate at least 8 GB of memory to the local Docker environment and leave disk space for images and databases. The command manager supports macOS and Linux; use WSL on Windows.
+
+   **Success:** Docker responds and the other commands print versions. If Docker cannot connect, start Docker Desktop or the Docker service.
+
+1. ## Get the code and install dependencies
+
+   If you already have the source, enter its root directory. Otherwise:
+
+   ```sh
+   git clone https://github.com/openrum/openrum.git
+   cd openrum
+   corepack enable
+   pnpm install --frozen-lockfile
+   ```
+
+   The repository root contains `package.json`, `go.mod` and `deploy/`. Run subsequent commands there.
+
+   **Success:** Dependency installation finishes without errors. The first installation downloads packages.
+
+1. ## Check local configuration
+
+   No database or object-storage credentials need to be filled in for the first run. Commands prefer `deploy/compose/.env`, falling back to the local defaults in `.env.example`.
+
+   <Aside type="caution" title="Keep existing configuration">
+     If `.env` already exists, edit it rather than overwriting it with the copy command.
+   </Aside>
+
+   To customize configuration when `.env` does not exist:
+
+   ```sh
+   cp deploy/compose/.env.example deploy/compose/.env
+   ```
+
+   The Console uses port `4173` and the host API uses `8080`. Dependencies also use `5433`, `8123`, `9000`, `9092` and `6379`; Ingest uses `8081`. For a conflict, inspect the reported process before changing a configurable port.
+
+   **Success:** Configuration is ready. Default credentials are for local development only.
+
+1. ## Start development
+
+   ```sh
+   pnpm openrum dev
+   ```
+
+   The command builds required images and the Browser SDK, starts infrastructure and pipeline services, applies migrations and the demo seed, then starts the API and Console from source.
+
+   | Location                          | Services                                                       |
+   | --------------------------------- | -------------------------------------------------------------- |
+   | Docker containers                 | PostgreSQL, ClickHouse, Kafka, Redis, Ingest, Consumer, Worker |
+   | Source processes on your computer | API, Console development server                                |
+
+   The first run downloads images and compiles code. Wait for the service status table, then check:
+
+   ```sh
+   pnpm openrum status
+   ```
+
+   **Success:** Dependencies and API are ready, and the Console development server is running with its URL displayed. On failure, use `pnpm openrum logs api` or inspect the affected service.
+
+1. ## Sign in
+
+   Open `http://127.0.0.1:4173` with the local demo account:
+
+   ```text title="Local demo account" frame="none"
+   Email: demo@openrum.local
+   Password: OpenRUM-demo-2026!
+   ```
+
+   **Success:** You can open the project list and demo Project. Keep the origin consistent: switching between `localhost`, `127.0.0.1` or ports can fail same-origin checks.
+
+</Steps>
+
+<LinkCard
+  title="Next: Connect and verify"
+  href="/docs/getting-started/local-development/connect-app/"
+  description="Connect the example app and verify the first Event and Session."
+/>

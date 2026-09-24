@@ -3,7 +3,7 @@ import BrandMark from "./BrandMark.astro";
 import BrandWordmark from "./BrandWordmark.astro";
 const { lang = "en" } = Astro.props;
 const zh = lang === "zh";
-const release = import.meta.env.PUBLIC_OPENRUM_RELEASE || "Alpha / main";
+const release = import.meta.env.PUBLIC_OPENRUM_RELEASE || "Alpha";
 const commit = import.meta.env.PUBLIC_COMMIT_SHA || "local";
 const repository = import.meta.env.PUBLIC_REPOSITORY_URL || "https://github.com/openrum/openrum";
 ---

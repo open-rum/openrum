@@ -1,0 +1,47 @@
+---
+title: 接入与验证
+description: 接入 React 示例应用，发送自定义事件并在控制台验证。
+appliesTo: Alpha
+---
+
+import { Steps, Aside, LinkCard } from "@astrojs/starlight/components";
+
+先完成[环境与启动](/zh/docs/getting-started/local-development/)并登录控制台，再按下面步骤验证完整上报链路。
+
+<Steps>
+
+1. ## 接入示例应用
+
+   按[创建第一个项目](/zh/docs/getting-started/create-first-project/)创建 React 项目，添加 `development` 环境，并在“接入”页复制 DSN。
+
+   在仓库根目录执行；若已有 `.env.local`，直接编辑它：
+
+   ```sh
+   cp examples/react-vite/.env.example examples/react-vite/.env.local
+   ```
+
+   把 `VITE_OPENRUM_DSN` 替换为复制的完整 DSN，再启动：
+
+   ```sh
+   pnpm --filter @openrum/example-react-vite dev --host 127.0.0.1
+   ```
+
+   打开终端实际打印的地址，例如 `http://127.0.0.1:5173`。把这个地址加入项目允许的 Origin，不含路径或结尾斜杠。示例固定使用 `development` 环境。
+
+   **成功标志：** 页面出现“上报 Custom Event”“发起 API Request”“触发 Error”按钮，不再显示替换 DSN 的提示。
+
+1. ## 验证数据
+   1. 点击“上报 Custom Event”，发送 `demo_checkout` 事件。
+   2. 返回控制台，选择刚创建的项目、`development` 环境和“最近 15 分钟”。
+   3. 打开“事件”，查询 `demo_checkout`，等待几秒完成接收和消费。
+   4. 打开对应会话，查看页面访问和自定义事件，再用错误按钮验证错误链路。
+
+   **成功标志：** 能找到新事件及其会话。大盘没有数据时，先检查项目、环境和时间范围，再检查事件页及 Consumer 日志。
+
+</Steps>
+
+<LinkCard
+  title="下一步：日常开发与排查"
+  href="/zh/docs/getting-started/local-development/workflow/"
+  description="了解热更新、重启、造数据和常见问题。"
+/>

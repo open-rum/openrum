@@ -1,7 +1,7 @@
 ---
 title: 自定义事件
 description: 怎么上报一个自定义事件、Ingest 对事件名和载荷的限制，以及 ui.click 保留 schema。
-appliesTo: Alpha / main
+appliesTo: Alpha
 ---
 
 自定义事件是你决定记录下来的产品里程碑。页面访问和点击会自动上报，

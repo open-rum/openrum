@@ -1,12 +1,11 @@
-/* eslint-disable react-refresh/only-export-components -- router-owned lazy boundaries are not Fast Refresh modules */
 import { PlayCircle, WarningCircle } from "@phosphor-icons/react";
-import { lazy } from "react";
 import { type QueryClient } from "@tanstack/react-query";
 import {
   Outlet,
   createRootRouteWithContext,
   createRoute,
   createRouter,
+  lazyRouteComponent,
   redirect,
 } from "@tanstack/react-router";
 import { HTTPError, getSetupStatus, safeReturnTo, sessionQueryOptions } from "@/lib/auth/session";
@@ -14,141 +13,125 @@ import { LoginRoutePage } from "@/features/auth/LoginPage";
 import { SetupPage } from "@/features/auth/SetupPage";
 import { App } from "./App";
 import { PlannedPage } from "./PlannedPage";
+import { RouteLoading } from "./RouteLoading";
 import { queryClient } from "./queryClient";
 
-const OverviewPage = lazy(() =>
-  import("@/features/overview/OverviewPage").then((module) => ({ default: module.OverviewPage })),
+const OverviewPage = lazyRouteComponent(
+  () => import("@/features/overview/OverviewPage"),
+  "OverviewPage",
 );
-const AnalysisPage = lazy(() =>
-  import("@/features/analytics/AnalysisPage").then((module) => ({ default: module.AnalysisPage })),
+const AnalysisPage = lazyRouteComponent(
+  () => import("@/features/analytics/AnalysisPage"),
+  "AnalysisPage",
 );
-const FunnelsPage = lazy(() =>
-  import("@/features/analytics/FunnelsPage").then((module) => ({ default: module.FunnelsPage })),
+const FunnelsPage = lazyRouteComponent(
+  () => import("@/features/analytics/FunnelsPage"),
+  "FunnelsPage",
 );
-const PathsPage = lazy(() =>
-  import("@/features/analytics/PathsPage").then((module) => ({ default: module.PathsPage })),
+const PathsPage = lazyRouteComponent(() => import("@/features/analytics/PathsPage"), "PathsPage");
+const RetentionPage = lazyRouteComponent(
+  () => import("@/features/analytics/RetentionPage"),
+  "RetentionPage",
 );
-const RetentionPage = lazy(() =>
-  import("@/features/analytics/RetentionPage").then((module) => ({
-    default: module.RetentionPage,
-  })),
+const SessionsPage = lazyRouteComponent(
+  () => import("@/features/sessions/SessionsPage"),
+  "SessionsPage",
 );
-const SessionsPage = lazy(() =>
-  import("@/features/sessions/SessionsPage").then((module) => ({ default: module.SessionsPage })),
+const SessionDetailPage = lazyRouteComponent(
+  () => import("@/features/sessions/SessionDetailPage"),
+  "SessionDetailPage",
 );
-const SessionDetailPage = lazy(() =>
-  import("@/features/sessions/SessionDetailPage").then((module) => ({
-    default: module.SessionDetailPage,
-  })),
+const EventsPage = lazyRouteComponent(() => import("@/features/events/EventsPage"), "EventsPage");
+const LogsPage = lazyRouteComponent(() => import("@/features/logs/LogsPage"), "LogsPage");
+const OnboardingPage = lazyRouteComponent(
+  () => import("@/features/onboarding/OnboardingPage"),
+  "OnboardingPage",
 );
-const EventsPage = lazy(() =>
-  import("@/features/events/EventsPage").then((module) => ({ default: module.EventsPage })),
+const ProjectEntryPage = lazyRouteComponent(
+  () => import("@/features/projects/ProjectEntryPage"),
+  "ProjectEntryPage",
 );
-const LogsPage = lazy(() =>
-  import("@/features/logs/LogsPage").then((module) => ({ default: module.LogsPage })),
+const ProjectListPage = lazyRouteComponent(
+  () => import("@/features/projects/ProjectListPage"),
+  "ProjectListPage",
 );
-const OnboardingPage = lazy(() =>
-  import("@/features/onboarding/OnboardingPage").then((module) => ({
-    default: module.OnboardingPage,
-  })),
+const ProjectCreatePage = lazyRouteComponent(
+  () => import("@/features/projects/ProjectCreatePage"),
+  "ProjectCreatePage",
 );
-const ProjectEntryPage = lazy(() =>
-  import("@/features/projects/ProjectEntryPage").then((module) => ({
-    default: module.ProjectEntryPage,
-  })),
+const IssuesPage = lazyRouteComponent(() => import("@/features/issues/IssuesPage"), "IssuesPage");
+const IssueDetailPage = lazyRouteComponent(
+  () => import("@/features/issues/IssueDetailPage"),
+  "IssueDetailPage",
 );
-const ProjectListPage = lazy(() =>
-  import("@/features/projects/ProjectListPage").then((module) => ({
-    default: module.ProjectListPage,
-  })),
+const ReleasesPage = lazyRouteComponent(
+  () => import("@/features/releases/ReleasesPage"),
+  "ReleasesPage",
 );
-const ProjectCreatePage = lazy(() =>
-  import("@/features/projects/ProjectCreatePage").then((module) => ({
-    default: module.ProjectCreatePage,
-  })),
+const PerformancePage = lazyRouteComponent(
+  () => import("@/features/performance/PerformancePage"),
+  "PerformancePage",
 );
-const IssuesPage = lazy(() =>
-  import("@/features/issues/IssuesPage").then((module) => ({ default: module.IssuesPage })),
+const ApisPage = lazyRouteComponent(() => import("@/features/apis/ApisPage"), "ApisPage");
+const UsagePage = lazyRouteComponent(() => import("@/features/usage/UsagePage"), "UsagePage");
+const OrganizationUsagePage = lazyRouteComponent(
+  () => import("@/features/usage/OrganizationUsagePage"),
+  "OrganizationUsagePage",
 );
-const IssueDetailPage = lazy(() =>
-  import("@/features/issues/IssueDetailPage").then((module) => ({
-    default: module.IssueDetailPage,
-  })),
+const AlertsPage = lazyRouteComponent(() => import("@/features/alerts/AlertsPage"), "AlertsPage");
+const ChannelsPage = lazyRouteComponent(
+  () => import("@/features/settings/ChannelsPage"),
+  "ChannelsPage",
 );
-const ReleasesPage = lazy(() =>
-  import("@/features/releases/ReleasesPage").then((module) => ({ default: module.ReleasesPage })),
+const AccountPage = lazyRouteComponent(
+  () => import("@/features/settings/AccountPage"),
+  "AccountPage",
 );
-const PerformancePage = lazy(() =>
-  import("@/features/performance/PerformancePage").then((module) => ({
-    default: module.PerformancePage,
-  })),
+const MembersPage = lazyRouteComponent(
+  () => import("@/features/settings/MembersPage"),
+  "MembersPage",
 );
-const ApisPage = lazy(() =>
-  import("@/features/apis/ApisPage").then((module) => ({ default: module.ApisPage })),
+const ProjectKeysRoute = lazyRouteComponent(
+  () => import("@/features/settings/ProjectKeys"),
+  "ProjectKeysRoute",
 );
-const UsagePage = lazy(() =>
-  import("@/features/usage/UsagePage").then((module) => ({ default: module.UsagePage })),
+const ProjectSettingsRoute = lazyRouteComponent(
+  () => import("@/features/settings/ProjectSettingsPage"),
+  "ProjectSettingsRoute",
 );
-const AlertsPage = lazy(() =>
-  import("@/features/alerts/AlertsPage").then((module) => ({ default: module.AlertsPage })),
+const ProjectFiltersRoute = lazyRouteComponent(
+  () => import("@/features/settings/ProjectFiltersPage"),
+  "ProjectFiltersRoute",
 );
-const ChannelsPage = lazy(() =>
-  import("@/features/settings/ChannelsPage").then((module) => ({ default: module.ChannelsPage })),
+const ProjectURLRulesRoute = lazyRouteComponent(
+  () => import("@/features/settings/ProjectURLRulesPage"),
+  "ProjectURLRulesRoute",
 );
-const AccountPage = lazy(() =>
-  import("@/features/settings/AccountPage").then((module) => ({ default: module.AccountPage })),
+const ProjectScrubbingRoute = lazyRouteComponent(
+  () => import("@/features/settings/ProjectScrubbingPage"),
+  "ProjectScrubbingRoute",
 );
-const MembersPage = lazy(() =>
-  import("@/features/settings/MembersPage").then((module) => ({ default: module.MembersPage })),
+const ProjectQuotaRoute = lazyRouteComponent(
+  () => import("@/features/settings/ProjectQuotaPage"),
+  "ProjectQuotaRoute",
 );
-const ProjectKeysRoute = lazy(() =>
-  import("@/features/settings/ProjectKeys").then((module) => ({
-    default: module.ProjectKeysRoute,
-  })),
+const ProjectSamplingRoute = lazyRouteComponent(
+  () => import("@/features/settings/ProjectSamplingPage"),
+  "ProjectSamplingRoute",
 );
-const ProjectSettingsRoute = lazy(() =>
-  import("@/features/settings/ProjectSettingsPage").then((module) => ({
-    default: module.ProjectSettingsRoute,
-  })),
+const AdminOverviewPage = lazyRouteComponent(
+  () => import("@/features/admin/AdminOverviewPage"),
+  "AdminOverviewPage",
 );
-const ProjectFiltersRoute = lazy(() =>
-  import("@/features/settings/ProjectFiltersPage").then((module) => ({
-    default: module.ProjectFiltersRoute,
-  })),
+const ObjectStoragePage = lazyRouteComponent(
+  () => import("@/features/admin/ObjectStoragePage"),
+  "ObjectStoragePage",
 );
-const ProjectURLRulesRoute = lazy(() =>
-  import("@/features/settings/ProjectURLRulesPage").then((module) => ({
-    default: module.ProjectURLRulesRoute,
-  })),
+const DataRetentionPage = lazyRouteComponent(
+  () => import("@/features/admin/DataRetentionPage"),
+  "DataRetentionPage",
 );
-const ProjectScrubbingRoute = lazy(() =>
-  import("@/features/settings/ProjectScrubbingPage").then((module) => ({
-    default: module.ProjectScrubbingRoute,
-  })),
-);
-const ProjectQuotaRoute = lazy(() =>
-  import("@/features/settings/ProjectQuotaPage").then((module) => ({
-    default: module.ProjectQuotaRoute,
-  })),
-);
-const AdminOverviewPage = lazy(() =>
-  import("@/features/admin/AdminOverviewPage").then((module) => ({
-    default: module.AdminOverviewPage,
-  })),
-);
-const ObjectStoragePage = lazy(() =>
-  import("@/features/admin/ObjectStoragePage").then((module) => ({
-    default: module.ObjectStoragePage,
-  })),
-);
-const DataRetentionPage = lazy(() =>
-  import("@/features/admin/DataRetentionPage").then((module) => ({
-    default: module.DataRetentionPage,
-  })),
-);
-const AuditPage = lazy(() =>
-  import("@/features/admin/AuditPage").then((module) => ({ default: module.AuditPage })),
-);
+const AuditPage = lazyRouteComponent(() => import("@/features/admin/AuditPage"), "AuditPage");
 
 type RouterContext = {
   queryClient: QueryClient;
@@ -413,13 +396,17 @@ const projectApisRoute = createRoute({
 const usageRoute = createRoute({
   getParentRoute: () => protectedRoute,
   path: "/usage",
-  component: UsagePage,
+  component: OrganizationUsagePage,
 });
 
-const projectUsageRoute = createRoute({
+const legacyProjectUsageRoute = createRoute({
   getParentRoute: () => protectedRoute,
   path: "/projects/$projectId/usage",
-  component: UsagePage,
+  beforeLoad: ({ params, location }) => {
+    throw redirect({
+      href: `/settings/project/${encodeURIComponent(params.projectId)}/usage${location.searchStr}`,
+    });
+  },
 });
 
 const alertsRoute = createRoute({
@@ -432,98 +419,232 @@ const projectAlertsRoute = createRoute({
   path: "/projects/$projectId/alerts",
   component: AlertsPage,
 });
-const channelsRoute = createRoute({
-  getParentRoute: () => protectedRoute,
-  path: "/settings/channels",
-  component: ChannelsPage,
-});
+// Settings addresses carry their scope as a path segment — account, org, project or
+// instance — so a settings link is unambiguous about which of the four it belongs to and
+// survives being shared. The three separate navigations these replace had no such marker.
 
-const settingsRoute = createRoute({
-  getParentRoute: () => protectedRoute,
-  path: "/settings",
-  component: MembersPage,
-});
+const requireInstanceRole = async ({ context }: { context: { queryClient: QueryClient } }) => {
+  const user = await context.queryClient.ensureQueryData(sessionQueryOptions());
+  if (!user.instanceRole) throw redirect({ to: "/projects" });
+};
 
-const accountRoute = createRoute({
+const settingsAccountRoute = createRoute({
   getParentRoute: () => protectedRoute,
-  path: "/account",
+  path: "/settings/account",
   component: AccountPage,
 });
 
-const adminRoute = createRoute({
+const settingsMembersRoute = createRoute({
   getParentRoute: () => protectedRoute,
-  path: "/admin",
-  beforeLoad: async ({ context }) => {
-    const user = await context.queryClient.ensureQueryData(sessionQueryOptions());
-    if (!user.instanceRole) throw redirect({ to: "/projects" });
-  },
-  component: AdminOverviewPage,
+  path: "/settings/org/members",
+  component: MembersPage,
 });
 
-const adminObjectStorageRoute = createRoute({
+const settingsChannelsRoute = createRoute({
   getParentRoute: () => protectedRoute,
-  path: "/admin/object-storage",
-  beforeLoad: async ({ context }) => {
-    const user = await context.queryClient.ensureQueryData(sessionQueryOptions());
-    if (!user.instanceRole) throw redirect({ to: "/projects" });
-  },
-  component: ObjectStoragePage,
+  path: "/settings/org/channels",
+  component: ChannelsPage,
 });
 
-const adminDataRetentionRoute = createRoute({
+const settingsProjectGeneralRoute = createRoute({
   getParentRoute: () => protectedRoute,
-  path: "/admin/data-retention",
-  beforeLoad: async ({ context }) => {
-    const user = await context.queryClient.ensureQueryData(sessionQueryOptions());
-    if (!user.instanceRole) throw redirect({ to: "/projects" });
-  },
-  component: DataRetentionPage,
-});
-
-const adminAuditRoute = createRoute({
-  getParentRoute: () => protectedRoute,
-  path: "/admin/audit",
-  beforeLoad: async ({ context }) => {
-    const user = await context.queryClient.ensureQueryData(sessionQueryOptions());
-    if (!user.instanceRole) throw redirect({ to: "/projects" });
-  },
-  component: AuditPage,
-});
-
-const projectSettingsRoute = createRoute({
-  getParentRoute: () => protectedRoute,
-  path: "/projects/$projectId/settings",
+  path: "/settings/project/$projectId/general",
   component: ProjectSettingsRoute,
 });
 
-const projectKeysRoute = createRoute({
+const settingsProjectKeysRoute = createRoute({
   getParentRoute: () => protectedRoute,
-  path: "/projects/$projectId/settings/keys",
+  path: "/settings/project/$projectId/keys",
   component: ProjectKeysRoute,
 });
 
-const projectFiltersRoute = createRoute({
+const settingsProjectFiltersRoute = createRoute({
   getParentRoute: () => protectedRoute,
-  path: "/projects/$projectId/settings/filters",
+  path: "/settings/project/$projectId/filters",
   component: ProjectFiltersRoute,
 });
 
-const projectURLRulesRoute = createRoute({
+const settingsProjectURLRulesRoute = createRoute({
   getParentRoute: () => protectedRoute,
-  path: "/projects/$projectId/settings/url-rules",
+  path: "/settings/project/$projectId/url-rules",
   component: ProjectURLRulesRoute,
 });
 
-const projectScrubbingRoute = createRoute({
+const settingsProjectScrubbingRoute = createRoute({
   getParentRoute: () => protectedRoute,
-  path: "/projects/$projectId/settings/scrubbing",
+  path: "/settings/project/$projectId/scrubbing",
   component: ProjectScrubbingRoute,
 });
 
-const projectQuotaRoute = createRoute({
+const settingsProjectQuotaRoute = createRoute({
+  getParentRoute: () => protectedRoute,
+  path: "/settings/project/$projectId/quota",
+  component: ProjectQuotaRoute,
+});
+
+const settingsProjectSamplingRoute = createRoute({
+  getParentRoute: () => protectedRoute,
+  path: "/settings/project/$projectId/sampling",
+  component: ProjectSamplingRoute,
+});
+
+const settingsProjectUsageRoute = createRoute({
+  getParentRoute: () => protectedRoute,
+  path: "/settings/project/$projectId/usage",
+  component: UsagePage,
+});
+
+const settingsInstanceRoute = createRoute({
+  getParentRoute: () => protectedRoute,
+  path: "/settings/instance",
+  beforeLoad: requireInstanceRole,
+  component: AdminOverviewPage,
+});
+
+const settingsInstanceRetentionRoute = createRoute({
+  getParentRoute: () => protectedRoute,
+  path: "/settings/instance/retention",
+  beforeLoad: requireInstanceRole,
+  component: DataRetentionPage,
+});
+
+const settingsInstanceObjectStorageRoute = createRoute({
+  getParentRoute: () => protectedRoute,
+  path: "/settings/instance/object-storage",
+  beforeLoad: requireInstanceRole,
+  component: ObjectStoragePage,
+});
+
+const settingsInstanceAuditRoute = createRoute({
+  getParentRoute: () => protectedRoute,
+  path: "/settings/instance/audit",
+  beforeLoad: requireInstanceRole,
+  component: AuditPage,
+});
+
+// The old addresses are in the documentation, in bookmarks and in links people have sent
+// each other, so every one of them keeps resolving. They redirect rather than render, so
+// there is exactly one canonical address per setting and the rail never highlights two.
+const legacySettingsRoute = createRoute({
+  getParentRoute: () => protectedRoute,
+  path: "/settings",
+  beforeLoad: () => {
+    throw redirect({ to: "/settings/org/members" });
+  },
+});
+
+const legacyChannelsRoute = createRoute({
+  getParentRoute: () => protectedRoute,
+  path: "/settings/channels",
+  beforeLoad: () => {
+    throw redirect({ to: "/settings/org/channels" });
+  },
+});
+
+const legacyAccountRoute = createRoute({
+  getParentRoute: () => protectedRoute,
+  path: "/account",
+  beforeLoad: () => {
+    throw redirect({ to: "/settings/account" });
+  },
+});
+
+const legacyAdminRoute = createRoute({
+  getParentRoute: () => protectedRoute,
+  path: "/admin",
+  beforeLoad: () => {
+    throw redirect({ to: "/settings/instance" });
+  },
+});
+
+const legacyAdminObjectStorageRoute = createRoute({
+  getParentRoute: () => protectedRoute,
+  path: "/admin/object-storage",
+  beforeLoad: () => {
+    throw redirect({ to: "/settings/instance/object-storage" });
+  },
+});
+
+const legacyAdminDataRetentionRoute = createRoute({
+  getParentRoute: () => protectedRoute,
+  path: "/admin/data-retention",
+  beforeLoad: () => {
+    throw redirect({ to: "/settings/instance/retention" });
+  },
+});
+
+const legacyAdminAuditRoute = createRoute({
+  getParentRoute: () => protectedRoute,
+  path: "/admin/audit",
+  beforeLoad: () => {
+    throw redirect({ to: "/settings/instance/audit" });
+  },
+});
+
+const legacyProjectSettingsRoute = createRoute({
+  getParentRoute: () => protectedRoute,
+  path: "/projects/$projectId/settings",
+  beforeLoad: ({ params }) => {
+    throw redirect({
+      to: "/settings/project/$projectId/general",
+      params: { projectId: params.projectId },
+    });
+  },
+});
+
+const legacyProjectKeysRoute = createRoute({
+  getParentRoute: () => protectedRoute,
+  path: "/projects/$projectId/settings/keys",
+  beforeLoad: ({ params }) => {
+    throw redirect({
+      to: "/settings/project/$projectId/keys",
+      params: { projectId: params.projectId },
+    });
+  },
+});
+
+const legacyProjectFiltersRoute = createRoute({
+  getParentRoute: () => protectedRoute,
+  path: "/projects/$projectId/settings/filters",
+  beforeLoad: ({ params }) => {
+    throw redirect({
+      to: "/settings/project/$projectId/filters",
+      params: { projectId: params.projectId },
+    });
+  },
+});
+
+const legacyProjectURLRulesRoute = createRoute({
+  getParentRoute: () => protectedRoute,
+  path: "/projects/$projectId/settings/url-rules",
+  beforeLoad: ({ params }) => {
+    throw redirect({
+      to: "/settings/project/$projectId/url-rules",
+      params: { projectId: params.projectId },
+    });
+  },
+});
+
+const legacyProjectScrubbingRoute = createRoute({
+  getParentRoute: () => protectedRoute,
+  path: "/projects/$projectId/settings/scrubbing",
+  beforeLoad: ({ params }) => {
+    throw redirect({
+      to: "/settings/project/$projectId/scrubbing",
+      params: { projectId: params.projectId },
+    });
+  },
+});
+
+const legacyProjectQuotaRoute = createRoute({
   getParentRoute: () => protectedRoute,
   path: "/projects/$projectId/settings/quota",
-  component: ProjectQuotaRoute,
+  beforeLoad: ({ params }) => {
+    throw redirect({
+      to: "/settings/project/$projectId/quota",
+      params: { projectId: params.projectId },
+    });
+  },
 });
 
 const plannedRoutes = [
@@ -540,10 +661,9 @@ const plannedRoutes = [
 // reference to it at all, rather than shipping a chunk that is never loaded.
 const devDataRoutes = import.meta.env.DEV
   ? (() => {
-      const DevDataPage = lazy(() =>
-        import("@/features/devdata/DevDataPage").then((module) => ({
-          default: module.DevDataPage,
-        })),
+      const DevDataPage = lazyRouteComponent(
+        () => import("@/features/devdata/DevDataPage"),
+        "DevDataPage",
       );
       return [
         createRoute({
@@ -603,22 +723,37 @@ const routeTree = rootRoute.addChildren([
     apisRoute,
     projectApisRoute,
     usageRoute,
-    projectUsageRoute,
+    legacyProjectUsageRoute,
     alertsRoute,
     projectAlertsRoute,
-    channelsRoute,
-    settingsRoute,
-    accountRoute,
-    adminRoute,
-    adminObjectStorageRoute,
-    adminDataRetentionRoute,
-    adminAuditRoute,
-    projectSettingsRoute,
-    projectKeysRoute,
-    projectFiltersRoute,
-    projectURLRulesRoute,
-    projectScrubbingRoute,
-    projectQuotaRoute,
+    settingsAccountRoute,
+    settingsMembersRoute,
+    settingsChannelsRoute,
+    settingsProjectGeneralRoute,
+    settingsProjectKeysRoute,
+    settingsProjectFiltersRoute,
+    settingsProjectURLRulesRoute,
+    settingsProjectScrubbingRoute,
+    settingsProjectQuotaRoute,
+    settingsProjectSamplingRoute,
+    settingsProjectUsageRoute,
+    settingsInstanceRoute,
+    settingsInstanceRetentionRoute,
+    settingsInstanceObjectStorageRoute,
+    settingsInstanceAuditRoute,
+    legacySettingsRoute,
+    legacyChannelsRoute,
+    legacyAccountRoute,
+    legacyAdminRoute,
+    legacyAdminObjectStorageRoute,
+    legacyAdminDataRetentionRoute,
+    legacyAdminAuditRoute,
+    legacyProjectSettingsRoute,
+    legacyProjectKeysRoute,
+    legacyProjectFiltersRoute,
+    legacyProjectURLRulesRoute,
+    legacyProjectScrubbingRoute,
+    legacyProjectQuotaRoute,
     ...devDataRoutes,
     ...protectedChildren,
   ]),
@@ -637,6 +772,7 @@ export const router = createRouter({
   routeTree,
   context: { queryClient },
   defaultPreload: "intent",
+  defaultPendingComponent: RouteLoading,
   scrollRestoration: ({ location }) => {
     const routeChanged = location.pathname !== scrolledPathname;
     scrolledPathname = location.pathname;

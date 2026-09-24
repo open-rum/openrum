@@ -24,6 +24,7 @@ type OverviewFilters struct {
 	Environment string    `json:"environment,omitempty"`
 	Release     string    `json:"release,omitempty"`
 	Route       string    `json:"route,omitempty"`
+	MaxPoints   int       `json:"maxPoints,omitempty"`
 }
 
 func NormalizeOverviewFilters(filters OverviewFilters) (OverviewFilters, error) {
@@ -31,7 +32,7 @@ func NormalizeOverviewFilters(filters OverviewFilters) (OverviewFilters, error) 
 	filters.Release = strings.TrimSpace(filters.Release)
 	filters.Route = strings.TrimSpace(filters.Route)
 	if filters.ProjectID == uuid.Nil || filters.From.IsZero() || filters.To.IsZero() ||
-		!filters.To.After(filters.From) || filters.To.Sub(filters.From) > MaxOverviewRange {
+		!filters.To.After(filters.From) || filters.To.Sub(filters.From) > MaxOverviewRange || !validSeriesPointBudget(filters.MaxPoints) {
 		return OverviewFilters{}, ErrInvalidOverviewFilters
 	}
 	if filters.Environment != "" && !queryEnvironmentPattern.MatchString(filters.Environment) {

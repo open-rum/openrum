@@ -13,8 +13,10 @@ test("API list groups dynamic routes, server sorts and opens a safe detail drawe
   await expect(list.getByText("https://api.example/products/:id")).toBeVisible();
   await expect(page.locator("body")).not.toContainText("/ingest/v1/envelope");
 
-  await page.getByLabel("API 排序").click();
-  await page.getByRole("option", { name: "P95 延迟" }).click();
+  const filterSearch = page.getByRole("textbox", { name: "搜索 API 或添加筛选条件" });
+  await filterSearch.click();
+  await page.getByRole("button", { name: /^排序 / }).click();
+  await page.getByRole("button", { name: "P95 延迟", exact: true }).click();
   await expect(page).toHaveURL(/sort=p95/);
   await list.getByText("https://api.example/products/:id").click();
   const drawer = page.getByRole("dialog", { name: "https://api.example/products/:id" });
@@ -67,14 +69,18 @@ test("API filters narrow the list by method and endpoint search", async ({ page 
   await mockOpenRUM(page, { projectExists: true });
   await page.goto("/apis");
 
+  const filterSearch = page.getByRole("textbox", { name: "搜索 API 或添加筛选条件" });
+  await filterSearch.click();
   await page.getByRole("button", { name: "POST", exact: true }).click();
   await expect(page).toHaveURL(/methods=POST/);
 
-  await page.getByLabel("搜索 endpoint").fill("orders");
+  await filterSearch.fill("orders");
   await page.getByRole("button", { name: "查询" }).click();
   await expect(page).toHaveURL(/search=orders/);
+  await expect(page.getByText("Endpoint：orders")).toBeVisible();
 
-  await page.getByRole("button", { name: "清除筛选" }).click();
+  await page.getByRole("button", { name: "移除筛选：Endpoint：orders" }).click();
+  await page.getByRole("button", { name: "移除筛选：方法：POST" }).click();
   await expect(page).not.toHaveURL(/search=orders/);
 });
 
@@ -97,7 +103,9 @@ test("API detail explains status codes, latency shape and links to the session",
   await expect(drawer.getByRole("cell", { name: "macOS" })).toBeVisible();
 
   await drawer.getByRole("link", { name: "查看会话" }).click();
-  await expect(page).toHaveURL(/\/sessions\?.*search=018f4d9c-83a1-76c9-81c2-3020ab667099/);
+  await expect(page).toHaveURL(
+    /\/sessions\/018f4d9c-83a1-76c9-81c2-3020ab667099\?.*event=018f4d9c/,
+  );
 });
 
 test("opening a detail drawer holds the page still, while changing route returns to the top", async ({

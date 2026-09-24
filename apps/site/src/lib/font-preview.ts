@@ -28,7 +28,7 @@ if (lab) {
     });
     const url = new URL(location.href);
     for (const [key, value, defaultValue] of [
-      ["font", latin.value, "geist"],
+      ["font", latin.value, "plex"],
       ["cjk", chinese.value, "system"],
     ]) {
       if (value === defaultValue) url.searchParams.delete(key);
@@ -76,7 +76,7 @@ if (lab) {
   size.addEventListener("input", updateSample);
   weight.addEventListener("change", updateSample);
   lab.querySelector("[data-font-reset]")!.addEventListener("click", () => {
-    latin.value = "geist";
+    latin.value = "plex";
     chinese.value = "system";
     size.value = "24";
     weight.value = "400";

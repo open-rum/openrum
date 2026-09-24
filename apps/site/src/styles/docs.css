@@ -118,42 +118,36 @@
   overflow-x: auto;
 }
 
-/* Keep this unlayered to match the global anchor reset. Prose links use neutral
-   text and an underline; heading anchor icons are separate affordances. */
-.sl-markdown-content a:not(:where(.not-content *, .sl-anchor-link)) {
-  color: var(--sl-color-text-accent);
+/* Keep this unlayered to match the global anchor reset. Only prose links use
+   underlines; Starlight's heading anchors and LinkCards retain native styles. */
+.sl-markdown-content a:not(:where(.not-content *, .sl-anchor-link, .sl-link-card *)) {
+  color: color-mix(in oklch, var(--ds-secondary), var(--ds-text) 25%);
   text-decoration: underline;
   text-decoration-thickness: 1px;
   text-underline-offset: 0.2em;
   text-decoration-color: color-mix(in oklch, currentColor, transparent 55%);
 }
-.sl-markdown-content a:hover:not(:where(.not-content *, .sl-anchor-link)) {
-  color: var(--sl-color-text-accent);
+.sl-markdown-content a:hover:not(:where(.not-content *, .sl-anchor-link, .sl-link-card *)) {
+  color: color-mix(in oklch, var(--ds-secondary), var(--ds-text) 25%);
   text-decoration-color: currentColor;
 }
 
-/* Deploying an Instance and instrumenting an application are the two jobs a reader
-   arrives with, and picking between them is the whole purpose of the index. CardGrid's
-   auto-fill sized the pair narrower than the eight task cards underneath, which read as
-   the opposite priority. */
-.docs-entry-grid .card-grid {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+.docs-deployment-choice {
+  position: relative;
+  min-width: 0;
 }
-@media (max-width: 50rem) {
-  .docs-entry-grid .card-grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
-
-/* Expressive Code prints a macOS-style titlebar above shell blocks, and for those the
-   title is always empty: it rendered as a 34px washed-out strip per block that read as
-   a broken element. Hidden visually, kept for screen readers, which still announce
-   "Terminal window". Blocks that declare a file name keep their tab. */
-.expressive-code .frame.is-terminal > .header {
+.docs-deployment-badge.sl-badge {
   position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
+  top: -0.75rem;
+  right: 1rem;
+  z-index: 1;
+  padding: 0.2rem 0.65rem;
+  border-color: var(--ds-primary);
+  border-radius: 999px;
+  color: var(--ds-primary-foreground);
+  background: var(--ds-primary);
+  font-family: inherit;
+  font-size: 0.75rem;
+  font-weight: 650;
+  pointer-events: none;
 }

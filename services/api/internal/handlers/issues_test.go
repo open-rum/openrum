@@ -18,17 +18,23 @@ import (
 )
 
 type fakeIssueQueries struct {
-	page  query.IssuePage
-	trend []query.IssueTrendPoint
-	calls int
+	page     query.IssuePage
+	trend    []query.IssueTrendPoint
+	overview query.IssueOverview
+	calls    int
+	last     query.IssueFilters
 }
 
-func (queries *fakeIssueQueries) List(context.Context, query.IssueFilters) (query.IssuePage, error) {
+func (queries *fakeIssueQueries) List(_ context.Context, filters query.IssueFilters) (query.IssuePage, error) {
 	queries.calls++
+	queries.last = filters
 	return queries.page, nil
 }
 func (queries *fakeIssueQueries) Trend(context.Context, query.IssueFilters, string) ([]query.IssueTrendPoint, error) {
 	return queries.trend, nil
+}
+func (queries *fakeIssueQueries) Overview(context.Context, query.IssueFilters) (query.IssueOverview, error) {
+	return queries.overview, nil
 }
 
 type fakeIssueEvents struct{ page query.EventPage }
@@ -54,6 +60,34 @@ func TestIssueHandlerListsPermissionSafeAggregates(t *testing.T) {
 	router.ServeHTTP(response, request)
 	if response.Code != http.StatusOK || queries.calls != 1 || !strings.Contains(response.Body.String(), "v1:abc") {
 		t.Fatalf("status=%d calls=%d body=%s", response.Code, queries.calls, response.Body.String())
+	}
+}
+
+func TestIssueHandlerParsesIssueSpecificFilters(t *testing.T) {
+	userID, projectID := uuid.New(), uuid.New()
+	queries := &fakeIssueQueries{page: query.IssuePage{Issues: []query.IssueSummary{}}}
+	handler := NewIssueHandler(fakeOverviewProjects{access: metadata.ProjectAccess{Role: metadata.RoleViewer}}, queries, fakeIssueEvents{}, fakeIssueStates{}, zerolog.Nop())
+	router := issueTestRouter(handler, userID)
+	request := httptest.NewRequest(http.MethodGet, issueURL(projectID, "/issues")+"&title=checkout&errorType=TypeError&fingerprint=v1%3Acheckout&userId=customer-1", nil)
+	request.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "valid"})
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, request)
+	if response.Code != http.StatusOK || queries.last.Title != "checkout" || queries.last.ErrorType != "TypeError" || queries.last.Fingerprint != "v1:checkout" || queries.last.UserID != "customer-1" {
+		t.Fatalf("status=%d filters=%+v body=%s", response.Code, queries.last, response.Body.String())
+	}
+}
+
+func TestIssueHandlerReturnsOverviewAggregates(t *testing.T) {
+	userID, projectID := uuid.New(), uuid.New()
+	queries := &fakeIssueQueries{overview: query.IssueOverview{Trend: []query.IssueOverviewPoint{{Events: 12, AnonymousUsers: 8, IdentifiedUsers: 5}}}}
+	handler := NewIssueHandler(fakeOverviewProjects{access: metadata.ProjectAccess{Role: metadata.RoleViewer}}, queries, fakeIssueEvents{}, fakeIssueStates{}, zerolog.Nop())
+	router := issueTestRouter(handler, userID)
+	request := httptest.NewRequest(http.MethodGet, issueURL(projectID, "/issues/overview"), nil)
+	request.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "valid"})
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, request)
+	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), `"anonymousUsers":8`) || !strings.Contains(response.Body.String(), `"identifiedUsers":5`) {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
 	}
 }
 
@@ -99,6 +133,7 @@ func issueTestRouter(handler *IssueHandler, userID uuid.UUID) http.Handler {
 	router := httpx.NewRouter(zerolog.Nop())
 	authenticated := httpx.RequireSession(connectionFixtureAuthenticator{principal: auth.Principal{UserID: userID}})
 	router.Handle("GET /api/v1/projects/{projectId}/issues", authenticated(http.HandlerFunc(handler.List)))
+	router.Handle("GET /api/v1/projects/{projectId}/issues/overview", authenticated(http.HandlerFunc(handler.Overview)))
 	router.Handle("PATCH /api/v1/projects/{projectId}/issues/{fingerprint}", authenticated(http.HandlerFunc(handler.Patch)))
 	return router
 }

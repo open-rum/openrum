@@ -43,9 +43,6 @@
   height: 76px;
   border-bottom: 1px solid var(--ds-border);
 }
-.p1-header .site-brand {
-  font-size: 1.35rem;
-}
 .p1-header nav {
   display: flex;
   align-items: center;
@@ -549,9 +546,6 @@
   gap: 20px;
   padding-block: 35px 26px;
 }
-.p1-footer .site-brand {
-  font-size: 1.1rem;
-}
 .p1-footer > span {
   font-size: 11px;
   color: var(--ds-text-muted);
@@ -892,9 +886,6 @@
   .p1-mobile-menu {
     display: block;
   }
-  .p1-header .site-brand {
-    font-size: 1.2rem;
-  }
   .p1-hero {
     grid-template-columns: 1fr;
     padding-block: 55px 60px;
@@ -1016,10 +1007,6 @@
   .p1-nav-actions .ui-button {
     font-size: 10px;
     padding-inline: 11px;
-  }
-  .p1-header .site-brand {
-    font-size: 1.05rem;
-    gap: 6px;
   }
   .p1-header {
     gap: 10px;

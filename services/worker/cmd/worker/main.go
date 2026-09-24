@@ -43,7 +43,12 @@ func registerWorker(ctx context.Context, _ *httpx.Router, configuration config.C
 		return nil, err
 	}
 	deletionJob := worker.NewProjectDeletionJob(worker.NewPostgresProjectDeletionStore(database), worker.NewClickHouseProjectDeleter(clickHouse), storage)
+	dataPurgeJob := worker.NewProjectDataPurgeJob(worker.NewPostgresProjectDataPurgeStore(database), worker.NewClickHouseProjectDeleter(clickHouse), storage)
 	retentionJob := worker.NewRetentionCleanupJob(metadata.NewMaintenanceJobRepository(database), worker.NewClickHouseRetentionCleaner(clickHouse))
+	emergencyCleanupJob := worker.NewEmergencyCleanupJob(
+		metadata.NewEmergencyCleanupRepository(database),
+		worker.NewClickHouseEmergencyPartitionCleaner(clickHouse),
+	)
 	if storage != nil {
 		mapper := sourcemap.NewMapper(sourcemap.NewArtifactCatalog(database), storage, sourcemap.NewCache(256<<20))
 		job := worker.NewSourceMapJob(worker.NewClickHouseMappings(clickHouse), mapper)
@@ -52,7 +57,9 @@ func registerWorker(ctx context.Context, _ *httpx.Router, configuration config.C
 		logger.Info().Msg("object storage is disabled; source map processing is paused")
 	}
 	go runProjectDeletionWorker(ctx, deletionJob, logger)
+	go runProjectDataPurgeWorker(ctx, dataPurgeJob, logger)
 	go runRetentionWorker(ctx, retentionJob, logger)
+	go runEmergencyCleanupWorker(ctx, emergencyCleanupJob, logger)
 	// The dispatcher is nil until a delivery implementation exists: breaches are
 	// recorded in alert_evaluations and shown in the console, but nothing is
 	// sent to notification channels yet.
@@ -67,6 +74,26 @@ func registerWorker(ctx context.Context, _ *httpx.Router, configuration config.C
 	)
 	go runAlertScheduler(ctx, alertScheduler, logger)
 	return func() error { return errors.Join(database.Close(), clickHouse.Close()) }, nil
+}
+
+func runEmergencyCleanupWorker(ctx context.Context, job *worker.EmergencyCleanupJob, logger zerolog.Logger) {
+	ticker := time.NewTicker(2 * time.Second)
+	defer ticker.Stop()
+	for {
+		jobCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
+		processed, err := job.RunOne(jobCtx)
+		cancel()
+		if err != nil && !errors.Is(err, context.Canceled) {
+			logger.Error().Err(err).Msg("emergency storage cleanup step failed")
+		} else if processed {
+			logger.Info().Msg("emergency storage cleanup step completed")
+		}
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+		}
+	}
 }
 
 // runAlertScheduler keeps the scheduler alive across failures. Run returns on
@@ -116,6 +143,26 @@ func runProjectDeletionWorker(ctx context.Context, job *worker.ProjectDeletionJo
 			logger.Error().Err(err).Msg("project deletion failed")
 		} else if processed {
 			logger.Info().Msg("project deletion completed")
+		}
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+		}
+	}
+}
+
+func runProjectDataPurgeWorker(ctx context.Context, job *worker.ProjectDataPurgeJob, logger zerolog.Logger) {
+	ticker := time.NewTicker(30 * time.Second)
+	defer ticker.Stop()
+	for {
+		jobCtx, cancel := context.WithTimeout(ctx, 5*time.Minute)
+		processed, err := job.RunOne(jobCtx)
+		cancel()
+		if err != nil && !errors.Is(err, context.Canceled) {
+			logger.Error().Err(err).Msg("project data deletion failed")
+		} else if processed {
+			logger.Info().Msg("project data deletion step completed")
 		}
 		select {
 		case <-ctx.Done():

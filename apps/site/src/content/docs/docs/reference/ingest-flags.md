@@ -1,7 +1,7 @@
 ---
 title: Ingest flags
 description: The markers OpenRUM attaches to an event during normalization, and what each one means for your data.
-appliesTo: Alpha / main
+appliesTo: Alpha
 ---
 
 Every stored event carries an `ingest_flags` array. A flag records something the pipeline observed about the event that is not part of what the SDK sent. Flags never change the event's own fields, so a flagged event is still complete.

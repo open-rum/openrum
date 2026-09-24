@@ -1,6 +1,3 @@
 {
-  "maxHtmlBytes": 120000,
-  "maxAssetBytes": 350000,
-  "maxTotalAssetBytes": 1800000,
   "maxExternalScripts": 0
 }

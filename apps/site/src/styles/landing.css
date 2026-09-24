@@ -5,11 +5,10 @@
    Three hard constraints shape everything below:
    - `design:check` rejects raw colour literals in apps/site/src, so every tint is a
      `color-mix(in oklch, …)` over a `--ds-*` token.
-   - The user-approved Light Rays background is progressively loaded after first paint;
-     native rendering is capped and suspended offscreen. Performance gates still apply.
-   - Decorative gradients are deliberately absent. The one exception is the ambient
-     aurora behind the hero and the closer, which is a light source rather than a
-     surface treatment: nothing that reads as a shape is filled with a gradient. */
+   - The hero has no Light Rays background. Stroke Text progressively enhances its
+     server-rendered heading, respecting reduced motion and keeping static fallback copy.
+   - Decorative effects stay outside the headline so the Stroke Text animation remains
+     the hero's only focal motion. */
 
 .lp-page {
   margin-top: calc(0px - var(--site-nav-height));
@@ -112,7 +111,7 @@
   }
 }
 
-/* ---------- Centered hero and progressive Light Rays background ---------- */
+/* ---------- Centered hero and Stroke Text heading ---------- */
 .lp-hero {
   position: relative;
   isolation: isolate;
@@ -127,6 +126,28 @@
   z-index: 1;
   text-align: center;
 }
+.lp-hero-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 24px;
+  padding: 6px 12px;
+  border: 1px solid color-mix(in srgb, var(--ds-primary) 35%, var(--ds-border));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ds-primary) 12%, var(--ds-canvas));
+  color: var(--ds-text);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 18px;
+  letter-spacing: 0.02em;
+}
+.lp-hero-badge-dot {
+  width: 6px;
+  height: 6px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--ds-primary);
+}
 .lp-hero h1 {
   margin: 0;
   font: 560 clamp(3.25rem, 5.9vw, 5.25rem)/1.12 var(--font-product-sans);
@@ -137,9 +158,6 @@
   overflow: hidden;
   padding: 0 0.06em 0.08em;
   margin-bottom: -0.08em;
-}
-.lp-title-ink {
-  display: block;
 }
 .lp-accent {
   color: var(--ds-brand);
@@ -162,6 +180,9 @@
 }
 .lp-hero .lp-cta {
   justify-content: center;
+}
+.lp-hero .lp-cta-button {
+  border-radius: 9999px;
 }
 .lp-cta .ui-button {
   min-height: 48px;
@@ -186,53 +207,6 @@
 }
 .lp-cta-button:hover svg[data-icon="inline-end"] {
   transform: translateX(3px);
-}
-.lp-rays {
-  position: absolute;
-  inset: 0;
-  z-index: 3;
-  pointer-events: none;
-  overflow: hidden;
-  mix-blend-mode: multiply;
-  mask-image: linear-gradient(to bottom, black 85%, transparent 100%);
-}
-.lp-rays canvas {
-  display: block;
-  width: 100%;
-  height: 100%;
-  opacity: 0;
-  transition: opacity 1.2s ease;
-}
-.lp-rays.is-ready canvas {
-  opacity: 0.85;
-}
-.dark .lp-rays {
-  mix-blend-mode: normal;
-}
-.dark .lp-rays.is-ready canvas {
-  opacity: 1;
-}
-.lp-rays-fallback {
-  --lp-ray-faint: 92%;
-  --lp-ray-strong: 87%;
-  position: absolute;
-  inset: 0;
-  background: conic-gradient(
-    from 165deg at 50% -20%,
-    transparent 0deg,
-    color-mix(in oklch, var(--ds-light-ray-color), transparent var(--lp-ray-faint)) 7deg,
-    transparent 12deg,
-    color-mix(in oklch, var(--ds-light-ray-color), transparent var(--lp-ray-strong)) 19deg,
-    transparent 27deg
-  );
-  transition: opacity 1.2s;
-}
-.dark .lp-rays-fallback {
-  --lp-ray-faint: 88%;
-  --lp-ray-strong: 80%;
-}
-.lp-rays.is-ready .lp-rays-fallback {
-  opacity: 0;
 }
 .lp-hero::after {
   position: absolute;
@@ -276,53 +250,17 @@
 }
 .lp-tech-link svg {
   display: block;
-  width: 27px;
-  height: 27px;
+  width: 22px;
+  height: 22px;
 }
 .lp-tech-dock li:first-child svg {
-  width: 36px;
-  height: 36px;
+  width: 30px;
+  height: 30px;
 }
 .lp-tech-link:hover,
 .lp-tech-link:focus-visible {
   color: var(--ds-brand);
   transform: translateY(-5px) scale(1.1);
-}
-.lp-tech-label {
-  position: absolute;
-  top: calc(100% + 9px);
-  left: 50%;
-  padding: 4px 9px;
-  border: 1px solid var(--ds-border);
-  border-radius: var(--radius-sm);
-  background: var(--ds-surface);
-  color: var(--ds-text-secondary);
-  font-size: 11px;
-  white-space: nowrap;
-  opacity: 0;
-  visibility: hidden;
-  transform: translate(-50%, -3px);
-  transition:
-    opacity 0.15s,
-    transform 0.15s,
-    visibility 0.15s;
-  pointer-events: none;
-}
-.lp-tech-link:hover .lp-tech-label,
-.lp-tech-link:focus-visible .lp-tech-label {
-  visibility: visible;
-  opacity: 1;
-  transform: translate(-50%, 0);
-}
-@keyframes lp-title-enter {
-  from {
-    transform: translateY(110%);
-    opacity: 0;
-  }
-  to {
-    transform: translateY(0);
-    opacity: 1;
-  }
 }
 @keyframes lp-content-enter {
   from {
@@ -345,12 +283,6 @@
   }
 }
 @media (prefers-reduced-motion: no-preference) {
-  .lp-title-line:first-child .lp-title-ink {
-    animation: lp-title-enter 0.9s cubic-bezier(0.16, 1, 0.3, 1) 0.08s both;
-  }
-  .lp-title-line.lp-accent .lp-title-ink {
-    animation: lp-title-enter 0.9s cubic-bezier(0.16, 1, 0.3, 1) 0.2s both;
-  }
   .lp-hero-copy {
     animation: lp-content-enter 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.36s both;
   }
@@ -376,18 +308,10 @@
     min-height: calc(640px + var(--site-nav-height));
     padding: calc(110px + var(--site-nav-height)) 0 110px;
   }
-  .lp-rays {
-    left: -25%;
-    right: -25%;
-  }
   .lp-hero h1 {
     font-size: clamp(2rem, 8.6vw, 2.625rem);
     line-height: 1.16;
     letter-spacing: -0.052em;
-  }
-  .lp-title-ink {
-    max-width: 9.5em;
-    margin-inline: auto;
   }
   .lp-accent {
     margin-top: 7px;
@@ -416,18 +340,15 @@
     height: 36px;
   }
   .lp-tech-link svg {
-    width: 25px;
-    height: 25px;
+    width: 20px;
+    height: 20px;
   }
   .lp-tech-dock li:first-child svg {
-    width: 32px;
-    height: 32px;
+    width: 26px;
+    height: 26px;
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .lp-rays canvas {
-    transition: none;
-  }
   .lp-tech-link:hover,
   .lp-tech-link:focus-visible,
   .lp-cta-button:hover,
@@ -737,105 +658,6 @@
   background: var(--ds-danger-soft);
   color: color-mix(in oklch, var(--ds-danger), var(--ds-text) 30%);
   font: 650 0.66rem/1.5 var(--font-mono);
-}
-
-/* ---------- Feature cards ---------- */
-.lp-features {
-  padding-block: 74px 60px;
-}
-.lp-feature-heading {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 40px;
-  margin-bottom: 38px;
-}
-.lp-feature-heading h2 {
-  margin: 0;
-  font-size: 36px;
-  font-weight: 520;
-  line-height: 1.18;
-  letter-spacing: -0.045em;
-}
-.lp-feature-heading h2 span {
-  color: var(--ds-text-muted);
-}
-.lp-feature-heading > p {
-  margin: 0;
-  font-size: 14px;
-  line-height: 1.8;
-  color: var(--ds-text-muted);
-}
-.lp-feature-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 16px;
-}
-.lp-feature-card {
-  padding: 32px;
-  transition:
-    border-color 0.2s,
-    transform 0.2s;
-  box-shadow: none;
-  background: var(--ds-canvas);
-}
-.lp-feature-card:hover {
-  border-color: color-mix(in oklch, var(--ds-brand), transparent 60%);
-  transform: translateY(-3px);
-}
-.lp-feature-icon {
-  color: var(--ds-brand);
-  margin-bottom: 25px;
-}
-.lp-feature-label {
-  margin: 0 0 13px;
-  font-size: 12px;
-  color: var(--ds-text-muted);
-}
-.lp-feature-card h3 {
-  margin: 0;
-  font-size: 23px;
-  font-weight: 520;
-  line-height: 1.25;
-  letter-spacing: -0.035em;
-}
-.lp-feature-card h3 span {
-  display: block;
-}
-.lp-feature-card-content p {
-  margin: 17px 0 0;
-  color: var(--ds-text-muted);
-  font-size: 13px;
-  line-height: 1.8;
-  max-width: 32ch;
-}
-@media (max-width: 800px) {
-  .lp-feature-heading {
-    display: block;
-  }
-  .lp-feature-heading > p {
-    margin-top: 20px;
-  }
-  .lp-feature-heading h2 {
-    font-size: 32px;
-  }
-  .lp-feature-grid {
-    grid-template-columns: 1fr;
-  }
-  .lp-feature-card-content p {
-    max-width: 48ch;
-  }
-}
-@media (max-width: 480px) {
-  .lp-features {
-    padding-top: 48px;
-  }
-  .lp-feature-heading h2 {
-    font-size: 29px;
-  }
-  .lp-feature-card {
-    padding: 25px;
-  }
 }
 
 /* ---------- Four capability pillars ---------- */
@@ -1349,557 +1171,6 @@
   line-height: 1.65;
 }
 
-/* ---------- Closing call to action ---------- */
-
-.lp-closer {
-  position: relative;
-  overflow: hidden;
-  padding: 62px 54px;
-  border: 1px solid color-mix(in oklch, var(--ds-primary), transparent 66%);
-  border-radius: 22px;
-  background: color-mix(in oklch, var(--ds-primary), transparent 92%);
-  text-align: center;
-}
-.lp-closer .lp-eyebrow {
-  position: relative;
-}
-.lp-closer h2 {
-  position: relative;
-  margin: 12px auto 0;
-  max-width: 22ch;
-  font-size: clamp(1.9rem, 3.4vw, 2.9rem);
-  line-height: 1.08;
-  letter-spacing: -0.045em;
-  text-wrap: balance;
-}
-.lp-closer p {
-  position: relative;
-  margin: 18px auto 0;
-  max-width: 46ch;
-  color: var(--ds-text-muted);
-  line-height: 1.7;
-}
-.lp-closer .lp-cta {
-  position: relative;
-  justify-content: center;
-}
-
-/* ---------- Architecture & reliability ----------
-
-   The floor a developer reads to decide whether the thing is real. Three layers,
-   each quieter than the last: the pipeline diagram carries the argument, three
-   short principles say why it holds, and two cards underneath give the numbers —
-   what it costs to run, and what has been measured. Density drops as the eye
-   descends on purpose; the diagram is allowed to be the only loud thing. */
-
-.lp-reliability .lp-head {
-  max-width: 820px;
-}
-.lp-pipeline {
-  margin: 0;
-  padding: 30px 26px 18px;
-  border: 1px solid var(--lp-hairline);
-  border-radius: 20px;
-  background: color-mix(in oklch, var(--ds-surface), var(--ds-canvas) 40%);
-  overflow: hidden;
-}
-.lp-pipeline-svg {
-  display: block;
-  width: 100%;
-  height: auto;
-  font-family: var(--font-product-sans);
-}
-/* Nodes are a step lighter than the panel so they read as objects sitting on it;
-   Kafka is the one node on the brand colour, because it is the one place an
-   Envelope becomes durable and the whole section is an argument about that. */
-.lp-node rect {
-  fill: color-mix(in oklch, var(--ds-surface), var(--ds-text) 3%);
-  stroke: var(--ds-border);
-  stroke-width: 1.25;
-}
-.lp-node-kafka rect {
-  fill: var(--ds-brand-soft);
-  stroke: var(--ds-brand);
-  stroke-width: 1.5;
-}
-.lp-node-side rect {
-  stroke-dasharray: 0;
-  fill: color-mix(in oklch, var(--ds-surface), var(--ds-canvas) 30%);
-}
-.lp-node-title {
-  fill: var(--ds-text);
-  font-size: 13.5px;
-  font-weight: 620;
-  letter-spacing: -0.01em;
-  text-anchor: middle;
-}
-.lp-node-kafka .lp-node-title {
-  fill: var(--ds-brand);
-}
-.lp-node-side .lp-node-title {
-  font-size: 12.5px;
-  font-weight: 560;
-  fill: var(--ds-text-secondary);
-}
-.lp-node-sub {
-  fill: var(--ds-text-muted);
-  font-size: 10.5px;
-  text-anchor: middle;
-}
-.lp-edge {
-  stroke: color-mix(in oklch, var(--ds-text), transparent 62%);
-  stroke-width: 1.5;
-  fill: none;
-}
-.lp-edge-head {
-  fill: color-mix(in oklch, var(--ds-text), transparent 55%);
-}
-.lp-edge-quota {
-  stroke-dasharray: 4 5;
-}
-/* Drawn over the plain edge rather than replacing it, so the arrowhead stays in
-   the neutral colour and only the run of the line carries the brand. */
-.lp-edge-ack {
-  stroke: var(--ds-brand);
-  stroke-width: 2;
-  stroke-dasharray: 7 7;
-}
-.lp-edge-label {
-  fill: var(--ds-text-muted);
-  font: 500 10.5px/1 var(--font-mono);
-}
-.lp-node-pulse {
-  fill: none;
-  stroke: var(--ds-brand);
-  stroke-width: 1.5;
-  opacity: 0;
-  transform-box: fill-box;
-  transform-origin: center;
-}
-.lp-ack rect {
-  fill: var(--ds-brand-soft);
-  stroke: color-mix(in oklch, var(--ds-brand), transparent 45%);
-}
-.lp-ack text {
-  fill: var(--ds-brand);
-  font: 650 11px/1 var(--font-mono);
-  text-anchor: middle;
-}
-/* Packets ride the spine on an offset-path. Invisible unless the browser can run
-   the animation — a stationary dot on the line would read as a node. */
-.lp-packet {
-  fill: var(--ds-primary);
-  stroke: color-mix(in oklch, var(--ds-primary), transparent 65%);
-  stroke-width: 6;
-  opacity: 0;
-  offset-path: var(--lp-packet-path);
-  offset-rotate: 0deg;
-}
-@supports (offset-path: path("M0 0 L1 1")) {
-  @media (prefers-reduced-motion: no-preference) {
-    .lp-packet {
-      animation: lp-travel 6s linear infinite;
-      animation-delay: var(--lp-packet-delay, 0s);
-    }
-    /* A 2s loop with a 1.7s lead lands the ring on each packet's arrival at the
-       Kafka node: the node sits 30% along a 6s path with packets 2s apart. */
-    .lp-node-pulse {
-      animation: lp-node-pulse 2s cubic-bezier(0.2, 0, 0, 1) 1.7s infinite;
-    }
-    .lp-edge-ack {
-      animation: lp-dash-flow 1.4s linear infinite;
-    }
-  }
-}
-@keyframes lp-travel {
-  0% {
-    offset-distance: 0%;
-    opacity: 0;
-  }
-  4% {
-    opacity: 1;
-  }
-  95% {
-    opacity: 1;
-  }
-  100% {
-    offset-distance: 100%;
-    opacity: 0;
-  }
-}
-@keyframes lp-node-pulse {
-  0% {
-    opacity: 0.7;
-    transform: scale(0.97);
-  }
-  70%,
-  100% {
-    opacity: 0;
-    transform: scale(1.08);
-  }
-}
-@keyframes lp-dash-flow {
-  to {
-    stroke-dashoffset: -14;
-  }
-}
-/* The same six steps as a list. Screen readers get it always; sighted readers get
-   it under 800px, where the diagram's labels would fall below legible size. */
-.lp-pipeline-list {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  margin: -1px;
-  padding: 0;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
-}
-.lp-pipeline-legend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 22px;
-  margin: 16px 0 0;
-  color: var(--ds-text-muted);
-  font-size: 0.74rem;
-}
-.lp-pipeline-legend span {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-}
-.lp-legend-line {
-  display: inline-block;
-  width: 22px;
-  height: 0;
-  border-top: 1.5px solid color-mix(in oklch, var(--ds-text), transparent 55%);
-}
-.lp-legend-dashed {
-  border-top-style: dashed;
-}
-.lp-legend-ack {
-  display: inline-block;
-  width: 10px;
-  height: 10px;
-  border-radius: 999px;
-  background: var(--ds-primary);
-  box-shadow: 0 0 0 3px color-mix(in oklch, var(--ds-primary), transparent 70%);
-}
-
-.lp-principles {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 22px 32px;
-  margin: 44px 0 0;
-  padding: 0;
-  list-style: none;
-}
-.lp-principle {
-  padding-top: 18px;
-  border-top: 1px solid var(--lp-hairline);
-}
-.lp-principle-index {
-  display: block;
-  margin-bottom: 14px;
-  color: var(--ds-brand);
-  font: 650 0.74rem/1 var(--font-mono);
-  letter-spacing: 0.06em;
-}
-.lp-principle h3 {
-  margin: 0 0 9px;
-  font-size: 1.06rem;
-  font-weight: 620;
-  letter-spacing: -0.025em;
-}
-.lp-principle p {
-  margin: 0;
-  color: var(--ds-text-muted);
-  font-size: 0.88rem;
-  line-height: 1.7;
-}
-
-.lp-reliability-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
-  gap: 24px;
-  margin-top: 56px;
-}
-.lp-block-title {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  margin: 0 0 16px;
-  color: var(--ds-text-muted);
-  font-size: 0.74rem;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-}
-.lp-tiers {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
-}
-.lp-tier {
-  display: flex;
-  flex-direction: column;
-  padding: 22px;
-  border: 1px solid var(--lp-hairline);
-  border-radius: 16px;
-  background: var(--ds-surface);
-  transition: border-color var(--motion-normal) var(--ease-standard);
-}
-.lp-tier:hover {
-  border-color: color-mix(in oklch, var(--ds-brand), transparent 55%);
-}
-.lp-tier-production {
-  border-color: color-mix(in oklch, var(--ds-brand), transparent 70%);
-}
-.lp-tier header {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 14px;
-}
-.lp-tier-icon {
-  display: grid;
-  width: 32px;
-  height: 32px;
-  place-items: center;
-  border-radius: 9px;
-  background: var(--ds-brand-soft);
-  color: var(--ds-brand);
-}
-.lp-tier-name {
-  font-size: 1rem;
-  font-weight: 620;
-  letter-spacing: -0.02em;
-}
-.lp-tier-stack {
-  margin-left: auto;
-  color: var(--ds-text-muted);
-  font: 500 0.7rem/1 var(--font-mono);
-  white-space: nowrap;
-}
-.lp-tier > p {
-  margin: 0;
-  color: var(--ds-text-muted);
-  font-size: 0.86rem;
-  line-height: 1.66;
-}
-.lp-tier-figures {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 26px;
-  margin: 18px 0 0;
-}
-.lp-tier-figures dd {
-  margin: 0;
-  font-size: 1.85rem;
-  font-weight: 640;
-  line-height: 1;
-  letter-spacing: -0.045em;
-}
-.lp-tier-figures dt {
-  margin-top: 5px;
-  color: var(--ds-text-muted);
-  font-size: 0.68rem;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-.lp-tier-note {
-  margin: 12px 0 0;
-  color: var(--ds-text-muted);
-  font-size: 0.76rem;
-  line-height: 1.55;
-}
-.lp-tier-note + .lp-tier-note {
-  margin-top: 4px;
-}
-.lp-tier .lp-tile-link {
-  margin-top: auto;
-  padding-top: 16px;
-}
-
-/* The evidence card is on the dark hero surface in both themes, like the terminal
-   in the next section: one dark object per screen is what gives the page its
-   rhythm, and the numbers in here are the ones worth setting apart. */
-.lp-evidence {
-  display: flex;
-  flex-direction: column;
-  padding: 24px;
-  border: 1px solid color-mix(in oklch, var(--ds-border), transparent 10%);
-  border-radius: 16px;
-  background: var(--ds-hero-surface);
-  color: var(--ds-hero-foreground);
-  box-shadow: var(--shadow-elevated);
-}
-.lp-evidence .lp-block-title {
-  color: color-mix(in oklch, var(--ds-hero-foreground), transparent 40%);
-}
-.lp-evidence .lp-block-title svg {
-  color: var(--ds-primary);
-}
-.lp-evidence-lead {
-  margin: 0;
-  color: color-mix(in oklch, var(--ds-hero-foreground), transparent 30%);
-  font-size: 0.86rem;
-  line-height: 1.68;
-}
-.lp-evidence-stats {
-  display: grid;
-  gap: 18px;
-  margin: 24px 0 0;
-}
-.lp-evidence-stat {
-  padding-top: 16px;
-  border-top: 1px solid color-mix(in oklch, var(--ds-hero-foreground), transparent 86%);
-}
-.lp-evidence-stat dd {
-  margin: 0;
-  color: var(--ds-primary);
-  font: 640 1.7rem/1.05 var(--font-product-sans);
-  letter-spacing: -0.04em;
-  font-variant-numeric: tabular-nums;
-}
-.lp-evidence-stat dt {
-  margin-top: 7px;
-  color: color-mix(in oklch, var(--ds-hero-foreground), transparent 34%);
-  font-size: 0.82rem;
-  line-height: 1.55;
-}
-.lp-evidence-footnote {
-  margin: 22px 0 0;
-  color: color-mix(in oklch, var(--ds-hero-foreground), transparent 40%);
-  font-size: 0.74rem;
-  line-height: 1.6;
-}
-/* Says "failed" in the record's own words. A page that reports a failed gate next
-   to the numbers it kept is more credible than one that only reports the numbers. */
-.lp-evidence-status {
-  display: inline-block;
-  margin: 0 8px 0 0;
-  padding: 2px 8px;
-  border: 1px solid color-mix(in oklch, var(--ds-warning), transparent 40%);
-  border-radius: 999px;
-  color: var(--ds-hero-foreground);
-  font: 600 0.66rem/1.5 var(--font-mono);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  vertical-align: 1px;
-}
-.lp-evidence .lp-tile-link {
-  margin-top: auto;
-  padding-top: 18px;
-  color: var(--ds-primary);
-}
-
-/* Staggered entrance: the reveal timeline is shared, so the offset is expressed
-   as a shift of the range rather than a delay, which scroll-linked animations
-   do not have. */
-@supports (animation-timeline: view()) {
-  @media (prefers-reduced-motion: no-preference) {
-    .lp-principle.lp-reveal {
-      animation-range: entry calc(8% + var(--lp-order, 0) * 7%) cover
-        calc(26% + var(--lp-order, 0) * 7%);
-    }
-    .lp-evidence-stat {
-      animation: lp-rise linear both;
-      animation-timeline: view();
-      animation-range: entry calc(6% + var(--lp-order, 0) * 8%) cover
-        calc(24% + var(--lp-order, 0) * 8%);
-    }
-  }
-}
-
-@media (max-width: 1000px) {
-  .lp-reliability-grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
-@media (max-width: 800px) {
-  .lp-pipeline {
-    padding: 20px 18px 16px;
-  }
-  .lp-pipeline-svg,
-  .lp-legend-ack,
-  .lp-pipeline-legend span:last-child {
-    display: none;
-  }
-  .lp-pipeline-list {
-    position: static;
-    width: auto;
-    height: auto;
-    margin: 0;
-    clip-path: none;
-    white-space: normal;
-    display: grid;
-    gap: 0;
-    list-style: none;
-    counter-reset: lp-step;
-  }
-  .lp-pipeline-list li {
-    position: relative;
-    display: grid;
-    grid-template-columns: 14px minmax(0, 1fr);
-    gap: 4px 14px;
-    padding: 10px 0 10px;
-  }
-  .lp-pipeline-list li::before {
-    grid-row: 1 / span 2;
-    width: 10px;
-    height: 10px;
-    margin-top: 5px;
-    border: 2px solid var(--ds-brand);
-    border-radius: 999px;
-    content: "";
-    background: var(--ds-surface);
-  }
-  .lp-pipeline-list li:nth-child(3)::before {
-    background: var(--ds-primary);
-  }
-  .lp-pipeline-list li:not(:last-child)::after {
-    position: absolute;
-    top: 26px;
-    bottom: -8px;
-    left: 6px;
-    width: 1.5px;
-    content: "";
-    background: color-mix(in oklch, var(--ds-text), transparent 75%);
-  }
-  .lp-pipeline-list strong {
-    font-size: 0.95rem;
-    letter-spacing: -0.02em;
-  }
-  .lp-pipeline-list span {
-    grid-column: 2;
-    color: var(--ds-text-muted);
-    font-size: 0.8rem;
-  }
-  .lp-principles {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 18px;
-  }
-}
-@media (max-width: 640px) {
-  .lp-tiers {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .lp-tier-stack {
-    display: none;
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .lp-packet,
-  .lp-node-pulse {
-    animation: none;
-    opacity: 0;
-  }
-  .lp-edge-ack {
-    animation: none;
-  }
-}
-
 /* ---------- Scroll-linked reveal ---------- */
 
 /* Guarded by @supports and expressed only through opacity and transform: browsers
@@ -1979,9 +1250,6 @@
   }
   .lp-top-pages li {
     grid-template-columns: 5rem minmax(0, 1fr) 2.75rem;
-  }
-  .lp-closer {
-    padding: 44px 24px;
   }
   .lp-tile-icon {
     margin-bottom: 22px;

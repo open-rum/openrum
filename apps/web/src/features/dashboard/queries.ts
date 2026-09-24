@@ -8,6 +8,7 @@ import {
 } from "@/lib/api/analytics";
 import type { OverviewFilters } from "@/lib/filters/schema";
 import { readWidget, type StoredWidget, type Widget } from "./model";
+import { DASHBOARD_MAX_POINTS, useDashboardPointBudget } from "./chartDensity";
 
 export type DashboardData =
   | { source: "overview"; result: OverviewResponse }
@@ -61,7 +62,12 @@ export function effectiveOverviewFilters(
   };
 }
 
-export function moduleQueryOptions(widget: Widget, filters: OverviewFilters, userId: string) {
+export function moduleQueryOptions(
+  widget: Widget,
+  filters: OverviewFilters,
+  userId: string,
+  maxPoints = DASHBOARD_MAX_POINTS,
+) {
   const { from, to, environment, projectId } = filters;
   const base = [
     "dashboard-data",
@@ -70,6 +76,7 @@ export function moduleQueryOptions(widget: Widget, filters: OverviewFilters, use
     from.toISOString(),
     to.toISOString(),
     environment ?? "",
+    maxPoints,
   ] as const;
   if (widget.data.source === "overview") {
     const effective = effectiveOverviewFilters(widget, filters);
@@ -78,9 +85,10 @@ export function moduleQueryOptions(widget: Widget, filters: OverviewFilters, use
       queryFn: ({ signal }: { signal: AbortSignal }): Promise<DashboardData> =>
         limited(signal, async () => ({
           source: "overview",
-          result: await getOverview(effective, signal),
+          result: await getOverview(effective, signal, maxPoints),
         })),
       staleTime: 30_000,
+      enabled: maxPoints > 0,
     };
   }
   const data = widget.data;
@@ -89,6 +97,7 @@ export function moduleQueryOptions(widget: Widget, filters: OverviewFilters, use
     from,
     to,
     environment,
+    maxPoints,
     eventKind: data.eventKind,
     eventName: data.eventName,
     dimension: data.dimension as BehaviorDimension,
@@ -101,6 +110,7 @@ export function moduleQueryOptions(widget: Widget, filters: OverviewFilters, use
         result: await getBehaviorAnalytics(eventFilters, signal),
       })),
     staleTime: 30_000,
+    enabled: maxPoints > 0,
   };
 }
 
@@ -109,12 +119,13 @@ export function useDashboardQueries(
   filters: OverviewFilters,
   userId: string,
 ) {
+  const maxPoints = useDashboardPointBudget();
   const options = new Map<string, ReturnType<typeof moduleQueryOptions>>();
   const identities = new Map<string, string>();
   for (const record of widgets) {
     const widget = readWidget(record);
     if (!widget) continue;
-    const query = moduleQueryOptions(widget, filters, userId);
+    const query = moduleQueryOptions(widget, filters, userId, maxPoints);
     const key = JSON.stringify(query.queryKey);
     options.set(key, query);
     identities.set(widget.id, key);
@@ -126,5 +137,6 @@ export function useDashboardQueries(
 }
 
 export function useModulePreview(widget: Widget, filters: OverviewFilters, userId: string) {
-  return useQuery(moduleQueryOptions(widget, filters, userId));
+  const maxPoints = useDashboardPointBudget();
+  return useQuery(moduleQueryOptions(widget, filters, userId, maxPoints));
 }

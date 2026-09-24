@@ -21,8 +21,12 @@
   backdrop-filter: blur(20px);
   border-bottom: 1px solid var(--ds-border);
 }
-.ds-topbar .site-brand {
-  font-size: 1.15rem;
+.ds-preview-wordmark {
+  font-family: var(--font-product-sans);
+  font-size: var(--brand-lockup-name-size);
+  font-weight: 650;
+  line-height: 1;
+  letter-spacing: -0.035em;
 }
 .ds-topbar-divider {
   height: 19px;

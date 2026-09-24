@@ -2,10 +2,12 @@
 import "../styles/global.css";
 import "../styles/design/workbench.css";
 import BrandMark from "../components/BrandMark.astro";
-import BrandWordmark from "../components/BrandWordmark.astro";
 import PaletteBootstrap from "../components/PaletteBootstrap.astro";
 import AppearanceControls from "../components/design/AppearanceControls.astro";
 const { title = "Design system", gallery = false } = Astro.props;
+const canonical = new URL(Astro.url.pathname, Astro.site);
+const release = import.meta.env.PUBLIC_OPENRUM_RELEASE || "Alpha";
+const commit = import.meta.env.PUBLIC_COMMIT_SHA || "local";
 const sections = [
   ["brand", "品牌标识"],
   ["citrus", "Citrus 配色"],
@@ -27,13 +29,16 @@ const sections = [
       content="OpenRUM 可视化设计规范、品牌资产、Citrus 主题、图表和落地页方案。"
     />
     <meta name="robots" content="noindex,follow" />
+    <link rel="canonical" href={canonical} />
     <link rel="icon" href="/favicon.svg" /><PaletteBootstrap manageTheme />
   </head>
   <body class:list={["ds-body", { "ds-gallery-body": gallery }]}>
     <a class="ds-skip-link" href="#design-main">跳到设计规范</a>
     <header class="ds-topbar">
       <a href="/" class="site-brand" aria-label="OpenRUM 首页"
-        ><span class="brand-mark"><BrandMark /></span><BrandWordmark /></a
+        ><span class="brand-mark"><BrandMark /></span><span class="ds-preview-wordmark"
+          >OpenRUM</span
+        ></a
       >
       <span class="ds-topbar-divider"></span><a href="/design/" class="ds-workspace-name"
         >Design system</a
@@ -72,5 +77,6 @@ const sections = [
     }
     <main id="design-main" class:list={["ds-main", { "ds-main-wide": gallery }]}><slot /></main>
     <div class="ds-live-status" role="status" aria-live="polite" data-design-status></div>
+    <span class="sr-only" data-openrum-build>Release {release} · commit {commit}</span>
   </body>
 </html>

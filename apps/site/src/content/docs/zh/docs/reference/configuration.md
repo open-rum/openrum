@@ -1,7 +1,7 @@
 ---
 title: 配置参考
 description: OpenRUM 各服务的环境变量参考，自动生成。
-appliesTo: Alpha / main
+appliesTo: Alpha
 ---
 
 <!-- GENERATED: scripts/docs/generate-reference.mjs -->
@@ -28,10 +28,16 @@ appliesTo: Alpha / main
 | `OBJECT_STORAGE_PROVIDER` | 可选的 oss 或 s3 provider。 |
 | `OBJECT_STORAGE_REGION` | 可选的服务或特性配置；约束条件见源码中的校验逻辑。 |
 | `OPENRUM_ALLOW_MANAGED_SECRETS` | 显式开启由 Console 托管的加密凭据。 |
+| `OPENRUM_CONSUMER_FLUSH_INTERVAL` | 可选的服务或特性配置；约束条件见源码中的校验逻辑。 |
+| `OPENRUM_CONSUMER_WORKERS` | 可选的服务或特性配置；约束条件见源码中的校验逻辑。 |
+| `OPENRUM_KAFKA_RETENTION_DURATION` | 真实 Event topic 保留期，用于计算 Consumer 剩余排空时间。 |
 | `OPENRUM_MASTER_KEY` | 恰好 32 字节外部密钥的 Base64 值；绝不存入 PostgreSQL。 |
 | `OPENRUM_MASTER_KEY_ID` | 可选的服务或特性配置；约束条件见源码中的校验逻辑。 |
 | `OPENRUM_OBJECT_STORAGE_ENDPOINT_ALLOWLIST` | 可选的服务或特性配置；约束条件见源码中的校验逻辑。 |
 | `OPENRUM_OSS_ENDPOINT_ALLOWLIST` | 可选的服务或特性配置；约束条件见源码中的校验逻辑。 |
+| `OPENRUM_STORAGE_EMERGENCY_SAMPLE_RATE` | 保护生效期间的 Browser SDK 临时采样上限。 |
+| `OPENRUM_STORAGE_POLL_INTERVAL` | 检查 ClickHouse system.disks 容量的间隔。 |
+| `OPENRUM_STORAGE_PRESSURE_GUARD_ENABLED` | 启用 ClickHouse 低容量时的 Browser SDK 自动采样保护。 |
 | `OSS_ACCESS_KEY_ID` | 可选的服务或特性配置；约束条件见源码中的校验逻辑。 |
 | `OSS_ACCESS_KEY_SECRET` | 可选的服务或特性配置；约束条件见源码中的校验逻辑。 |
 | `OSS_BUCKET` | 可选的服务或特性配置；约束条件见源码中的校验逻辑。 |

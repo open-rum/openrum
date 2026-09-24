@@ -16,6 +16,29 @@ func testWindow() (time.Time, time.Time) {
 	return to.Add(-24 * time.Hour), to
 }
 
+func TestBuildKeepsLongJourneysInsideShortWindow(t *testing.T) {
+	for _, width := range []time.Duration{time.Second, time.Minute, time.Hour} {
+		from, _ := testWindow()
+		to := from.Add(width)
+		scenario := PresetScenario("api-surface", from, to)
+		scenario.Environment = "production"
+		scenario.BaseURL = "https://shop.example.com"
+		scenario.Sessions = 100
+		batches, _, err := Build(scenario)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, batch := range batches {
+			for _, ev := range batch.Envelope.Events {
+				at, err := time.Parse(time.RFC3339Nano, ev.Timestamp)
+				if err != nil || at.Before(from) || !at.Before(to) {
+					t.Fatalf("width=%s timestamp=%s", width, ev.Timestamp)
+				}
+			}
+		}
+	}
+}
+
 // Every generated envelope has to pass the same schema the ingest endpoint
 // applies. Without this the generator could produce data that only fails once
 // it is already halfway through a manual test.

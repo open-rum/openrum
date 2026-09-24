@@ -25,11 +25,16 @@ type sdkConfigReader interface {
 	Get(context.Context, uuid.UUID, time.Time) (metadata.ProjectSDKConfig, error)
 }
 
+type emergencySamplingProvider interface {
+	EmergencySampling(time.Time) (float64, time.Time, bool)
+}
+
 type SDKConfigHandler struct {
-	keys   sdkConfigKeys
-	config sdkConfigReader
-	logger zerolog.Logger
-	now    func() time.Time
+	keys      sdkConfigKeys
+	config    sdkConfigReader
+	logger    zerolog.Logger
+	now       func() time.Time
+	emergency emergencySamplingProvider
 }
 
 type sdkConfigResponse struct {
@@ -43,10 +48,15 @@ type sdkConfigResponse struct {
 	Emergency           bool     `json:"emergency"`
 	EmergencySampleRate *float64 `json:"emergencySampleRate,omitempty"`
 	EmergencyExpiresAt  *string  `json:"emergencyExpiresAt,omitempty"`
+	EmergencyReason     string   `json:"emergencyReason,omitempty"`
 }
 
-func NewSDKConfigHandler(keys sdkConfigKeys, config sdkConfigReader, logger zerolog.Logger) *SDKConfigHandler {
-	return &SDKConfigHandler{keys: keys, config: config, logger: logger, now: time.Now}
+func NewSDKConfigHandler(keys sdkConfigKeys, config sdkConfigReader, logger zerolog.Logger, emergency ...emergencySamplingProvider) *SDKConfigHandler {
+	handler := &SDKConfigHandler{keys: keys, config: config, logger: logger, now: time.Now}
+	if len(emergency) > 0 {
+		handler.emergency = emergency[0]
+	}
+	return handler
 }
 
 func (handler *SDKConfigHandler) Get(writer http.ResponseWriter, request *http.Request) {
@@ -82,6 +92,19 @@ func (handler *SDKConfigHandler) Get(writer http.ResponseWriter, request *http.R
 		response.EmergencySampleRate = &capRate
 		expires := config.EmergencyExpiresAt.UTC().Format(time.RFC3339Nano)
 		response.EmergencyExpiresAt = &expires
+		response.EmergencyReason = "project_override"
+	}
+	if handler.emergency != nil {
+		if rate, expiresAt, active := handler.emergency.EmergencySampling(now); active {
+			capRate := math.Min(1, math.Max(0, rate))
+			if response.EmergencySampleRate == nil || capRate < *response.EmergencySampleRate {
+				response.EmergencySampleRate = &capRate
+				expires := expiresAt.UTC().Format(time.RFC3339Nano)
+				response.EmergencyExpiresAt = &expires
+				response.EmergencyReason = "storage_pressure"
+			}
+			response.Emergency = true
+		}
 	}
 	writer.Header().Set("Content-Type", "application/json; charset=utf-8")
 	writer.Header().Set("Cache-Control", "private, max-age=300")

@@ -1,0 +1,47 @@
+---
+title: Connect and verify
+description: Connect the React example, send an event and verify it in the Console.
+appliesTo: Alpha
+---
+
+import { Steps, Aside, LinkCard } from "@astrojs/starlight/components";
+
+Complete [Environment and startup](/docs/getting-started/local-development/) and sign in, then verify the end-to-end event path below.
+
+<Steps>
+
+1. ## Connect the example app
+
+   Follow [Create your first project](/docs/getting-started/create-first-project/) to create a React Project, add the `development` Environment and copy its DSN from onboarding.
+
+   From the repository root, copy the example configuration; edit the existing file instead if you already have one:
+
+   ```sh
+   cp examples/react-vite/.env.example examples/react-vite/.env.local
+   ```
+
+   Replace `VITE_OPENRUM_DSN` with the complete DSN, then start:
+
+   ```sh
+   pnpm --filter @openrum/example-react-vite dev --host 127.0.0.1
+   ```
+
+   Open the actual URL printed by Vite, for example `http://127.0.0.1:5173`. Add that origin to the Project allowlist without a path or trailing slash. The example uses the `development` Environment.
+
+   **Success:** The page shows Custom Event, API Request and Error buttons, without the reminder to replace the DSN.
+
+1. ## Verify data
+   1. Click the Custom Event button to send `demo_checkout`.
+   2. In the Console select your Project, `development` and the last 15 minutes.
+   3. Search Events for `demo_checkout`, allowing a few seconds for ingest and consumption.
+   4. Open its Session to see the Page View and Custom Event; use the Error button to check the error path too.
+
+   **Success:** The new Event and Session are visible. If the overview is empty, check Project, Environment and time range, then Events and Consumer logs.
+
+</Steps>
+
+<LinkCard
+  title="Next: Development and troubleshooting"
+  href="/docs/getting-started/local-development/workflow/"
+  description="Learn how to update code, restart services, generate data and troubleshoot."
+/>

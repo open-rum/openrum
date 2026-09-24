@@ -1,0 +1,325 @@
+{
+  "date": "2026-09-18",
+  "scope": "local single machine; discovery runs are not production capacity",
+  "attempts": [
+    {
+      "id": "local-baseline-2k",
+      "start": "2026-09-18T09:55:51.350Z",
+      "end": "2026-09-18T09:56:22.606Z",
+      "duration": "30s",
+      "eventsPerSecond": 2000,
+      "queriesPerSecond": 10,
+      "accepted": 60000,
+      "stored": 60000,
+      "unique": 60000,
+      "observedReconciliationSeconds": 0.139,
+      "ingest": {
+        "p95ms": 25.066481599999996,
+        "p99ms": 117.28780582999998,
+        "failurePercent": 0,
+        "dropped": 0,
+        "requests": 600
+      },
+      "query": {
+        "p95ms": 154.063,
+        "p99ms": 210.930917,
+        "failurePercent": 0,
+        "dropped": 0,
+        "requests": 301
+      }
+    },
+    {
+      "id": "local-mixed-10k",
+      "start": "2026-09-18T09:56:33.207Z",
+      "end": "2026-09-18T09:57:34.688Z",
+      "duration": "60s",
+      "eventsPerSecond": 10000,
+      "queriesPerSecond": 30,
+      "accepted": 235600,
+      "stored": 235600,
+      "unique": 235600,
+      "observedReconciliationSeconds": 112.574,
+      "ingest": {
+        "p95ms": 414.58485655,
+        "p99ms": 1308.65481924,
+        "failurePercent": 0,
+        "dropped": 111,
+        "requests": 5890
+      },
+      "query": {
+        "p95ms": 384.3255,
+        "p99ms": 979.979959,
+        "failurePercent": 0,
+        "dropped": 0,
+        "requests": 1801
+      }
+    },
+    {
+      "id": "local-workers4-5k",
+      "start": "2026-09-18T10:00:12.741Z",
+      "end": "2026-09-18T10:00:43.981Z",
+      "duration": "30s",
+      "eventsPerSecond": 5000,
+      "queriesPerSecond": 30,
+      "accepted": 150100,
+      "stored": 150100,
+      "unique": 150100,
+      "observedReconciliationSeconds": 30.691,
+      "ingest": {
+        "p95ms": 24.304375,
+        "p99ms": 49.039459,
+        "failurePercent": 0,
+        "dropped": 0,
+        "requests": 1501
+      },
+      "query": {
+        "p95ms": 275.883792,
+        "p99ms": 385.281625,
+        "failurePercent": 0,
+        "dropped": 0,
+        "requests": 901
+      }
+    },
+    {
+      "id": "local-workers12-5k",
+      "start": "2026-09-18T10:01:24.805Z",
+      "end": "2026-09-18T10:01:56.231Z",
+      "duration": "30s",
+      "eventsPerSecond": 5000,
+      "queriesPerSecond": 30,
+      "accepted": 150000,
+      "stored": 150000,
+      "unique": 150000,
+      "observedReconciliationSeconds": 10.31,
+      "ingest": {
+        "p95ms": 43.218548249999984,
+        "p99ms": 139.11322699999982,
+        "failurePercent": 0,
+        "dropped": 0,
+        "requests": 1500
+      },
+      "query": {
+        "p95ms": 443.24601314999995,
+        "p99ms": 731.1833414999999,
+        "failurePercent": 0,
+        "dropped": 0,
+        "requests": 900
+      }
+    },
+    {
+      "id": "local-workers12-10k",
+      "start": "2026-09-18T10:02:15.424Z",
+      "end": "2026-09-18T10:03:17.242Z",
+      "duration": "60s",
+      "eventsPerSecond": 10000,
+      "queriesPerSecond": 30,
+      "accepted": 594800,
+      "stored": 594800,
+      "unique": 594800,
+      "observedReconciliationSeconds": 61.381,
+      "ingest": {
+        "p95ms": 425.4431880499997,
+        "p99ms": 811.4552447399999,
+        "failurePercent": 0,
+        "dropped": 53,
+        "requests": 5948
+      },
+      "query": {
+        "p95ms": 1839.85345955,
+        "p99ms": 3213.7460367500003,
+        "failurePercent": 0,
+        "dropped": 9,
+        "requests": 1792
+      }
+    },
+    {
+      "id": "local-tuned-5k",
+      "start": "2026-09-18T10:04:31.946Z",
+      "end": "2026-09-18T10:05:39.813Z",
+      "duration": "60s",
+      "eventsPerSecond": 5000,
+      "queriesPerSecond": 30,
+      "accepted": 292300,
+      "stored": 292300,
+      "unique": 292300,
+      "observedReconciliationSeconds": 40.971,
+      "ingest": {
+        "p95ms": 1417.3290072999998,
+        "p99ms": 2180.0634807399997,
+        "failurePercent": 0,
+        "dropped": 78,
+        "requests": 2923
+      },
+      "query": {
+        "p95ms": 10035.97378855,
+        "p99ms": 10130.19085809,
+        "failurePercent": 16.8944099378882,
+        "dropped": 191,
+        "requests": 1610
+      }
+    },
+    {
+      "id": "local-pruned-5k",
+      "start": "2026-09-18T10:08:02.428Z",
+      "end": "2026-09-18T10:09:04.869Z",
+      "duration": "60s",
+      "eventsPerSecond": 5000,
+      "queriesPerSecond": 30,
+      "accepted": 300000,
+      "stored": 300000,
+      "unique": 300000,
+      "observedReconciliationSeconds": 20.74,
+      "ingest": {
+        "p95ms": 133.49728929999984,
+        "p99ms": 443.59359667,
+        "failurePercent": 0,
+        "dropped": 1,
+        "requests": 3000
+      },
+      "query": {
+        "p95ms": 1462.7372384999992,
+        "p99ms": 2620.714633,
+        "failurePercent": 0.448681996634885,
+        "dropped": 18,
+        "requests": 1783
+      }
+    },
+    {
+      "id": "local-bounded-5k",
+      "start": "2026-09-18T10:11:07.209Z",
+      "end": "2026-09-18T10:12:11.759Z",
+      "duration": "60s",
+      "eventsPerSecond": 5000,
+      "queriesPerSecond": 30,
+      "accepted": 293700,
+      "stored": 293700,
+      "unique": 293700,
+      "observedReconciliationSeconds": 31.648,
+      "ingest": {
+        "p95ms": 518.6394921999996,
+        "p99ms": 1434.6924072399997,
+        "failurePercent": 0,
+        "dropped": 63,
+        "requests": 2937
+      },
+      "query": {
+        "p95ms": 10009.5992718,
+        "p99ms": 10064.09187936,
+        "failurePercent": 24.67451952882827,
+        "dropped": 188,
+        "requests": 1613
+      }
+    },
+    {
+      "id": "local-sustained-3k",
+      "start": "2026-09-18T10:12:53.607Z",
+      "end": "2026-09-18T10:17:55.120Z",
+      "duration": "300s",
+      "eventsPerSecond": 3000,
+      "queriesPerSecond": 10,
+      "accepted": 883500,
+      "stored": 883500,
+      "unique": 883500,
+      "observedReconciliationSeconds": 30.868,
+      "ingest": {
+        "p95ms": 1578.276866999996,
+        "p99ms": 3959.58307084,
+        "failurePercent": 0,
+        "dropped": 166,
+        "requests": 8835
+      },
+      "query": {
+        "p95ms": 10005.881868949999,
+        "p99ms": 10171.92420268,
+        "failurePercent": 5.710401087695445,
+        "dropped": 58,
+        "requests": 2942
+      }
+    },
+    {
+      "id": "local-single-machine-20260918",
+      "start": "2026-09-18T10:19:02.076Z",
+      "end": "2026-09-18T10:24:05.383Z",
+      "duration": "300s",
+      "eventsPerSecond": 3000,
+      "queriesPerSecond": 10,
+      "accepted": 899300,
+      "stored": 899300,
+      "unique": 899300,
+      "observedReconciliationSeconds": 10.892,
+      "ingest": {
+        "p95ms": 54.922033399999954,
+        "p99ms": 363.15255727999937,
+        "failurePercent": 0,
+        "dropped": 8,
+        "requests": 8993
+      },
+      "query": {
+        "p95ms": 651.1985256499985,
+        "p99ms": 1623.3859581699994,
+        "failurePercent": 1.7333333333333332,
+        "dropped": 0,
+        "requests": 3000
+      },
+      "passed": false,
+      "notes": "300-second sustained run; current pruned-query API max_threads=2, Consumer 12 workers / 50ms. Failed on 52 query errors and 8 dropped ingest iterations; system.metric_log merges at default8192. All accepted events reconciled."
+    },
+    {
+      "id": "local-final-2k-20260918",
+      "start": "2026-09-18T10:24:41.822Z",
+      "end": "2026-09-18T10:29:43.582Z",
+      "duration": "300s",
+      "eventsPerSecond": 2000,
+      "queriesPerSecond": 10,
+      "accepted": 600100,
+      "stored": 600100,
+      "unique": 600100,
+      "observedReconciliationSeconds": 0.319,
+      "ingest": {
+        "p95ms": 50.471583,
+        "p99ms": 138.012417,
+        "failurePercent": 0,
+        "dropped": 0,
+        "requests": 6001
+      },
+      "query": {
+        "p95ms": 685.163792,
+        "p99ms": 1435.402542,
+        "failurePercent": 0.9996667777407532,
+        "dropped": 0,
+        "requests": 3001
+      },
+      "passed": false,
+      "notes": "300-second run; current pruned-query API max_threads=2, Consumer 12 workers / 50ms, system.metric_log merge_max_block_size=1024. Ingest passed all gates, query failed checks; all accepted events reconciled."
+    },
+    {
+      "id": "local-confirm-1k-20260918",
+      "start": "2026-09-18T10:29:51.727Z",
+      "end": "2026-09-18T10:32:53.883Z",
+      "duration": "180s",
+      "eventsPerSecond": 1000,
+      "queriesPerSecond": 5,
+      "accepted": 180100,
+      "stored": 180100,
+      "unique": 180100,
+      "observedReconciliationSeconds": 0.198,
+      "ingest": {
+        "p95ms": 60.033041,
+        "p99ms": 175.988958,
+        "failurePercent": 0,
+        "dropped": 0,
+        "requests": 1801
+      },
+      "query": {
+        "p95ms": 577.4186857499994,
+        "p99ms": 1081.1920309099999,
+        "failurePercent": 0.4444444444444444,
+        "dropped": 0,
+        "requests": 900
+      },
+      "passed": false,
+      "notes": "Conservative 180-second confirmation after the main 300-second 2k run; same tuned profile. Ingest passed but query checks failed on ClickHouse global memory protection. This does not validate a stable capacity ceiling."
+    }
+  ],
+  "toolingNote": "Protocol-invalid local-mixed-10k excluded as capacity evidence. A five-second mixed protocol smoke run accepted/stored 5100 events; its initial wrong-tag reconciliation was interrupted and corrected. No fabricated passing sustained run."
+}

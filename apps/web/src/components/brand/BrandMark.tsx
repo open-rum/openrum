@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils";
 
 const sizes = {
   sm: "size-5 [&_svg]:size-5",
-  nav: "size-6 [&_svg]:size-6",
+  lockup: "size-7 [&_svg]:size-7",
   md: "size-9 [&_svg]:size-9",
 } as const;
 

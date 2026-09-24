@@ -12,6 +12,7 @@ import {
   TriangleAlertIcon,
 } from "lucide-react";
 import { AsyncError, AsyncLoading } from "@/components/ui/AsyncState";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -244,26 +245,57 @@ function PipelineMetric({
 }
 
 function Capacity({ capacity }: { capacity: AdminOverview["pipeline"]["capacity"] }) {
-  const percent =
-    capacity.usedBytes !== null && capacity.capacityBytes
-      ? Math.min(100, (capacity.usedBytes / capacity.capacityBytes) * 100)
-      : null;
+  const percent = capacity.usedPercent;
+  const pressureLabel = {
+    normal: "容量正常",
+    warning: "容量偏低",
+    critical: "容量紧急",
+    unknown: "状态未知",
+  }[capacity.pressure];
   return (
     <div className="flex flex-col gap-3">
       <Separator />
-      <PipelineMetric
-        icon={HardDriveIcon}
-        label="ClickHouse 存储"
-        value={
-          percent === null
-            ? "容量暂不可用"
-            : `${formatBytes(capacity.usedBytes!)} / ${formatBytes(capacity.capacityBytes!)}`
-        }
-      />
+      <div className="flex items-start justify-between gap-3">
+        <PipelineMetric
+          icon={HardDriveIcon}
+          label="ClickHouse 存储"
+          value={
+            percent === null
+              ? "容量暂不可用"
+              : `${formatBytes(capacity.usedBytes!)} / ${formatBytes(capacity.capacityBytes!)}`
+          }
+        />
+        <Badge variant={capacity.pressure === "critical" ? "destructive" : "outline"}>
+          {pressureLabel}
+        </Badge>
+      </div>
       {percent !== null ? (
-        <div className="h-2 overflow-hidden rounded-full bg-muted">
-          <div className="h-full bg-primary" style={{ width: `${percent}%` }} />
-        </div>
+        <>
+          <div className="h-2 overflow-hidden rounded-full bg-muted">
+            <div
+              className={cn(
+                "h-full",
+                capacity.pressure === "critical" ? "bg-destructive" : "bg-primary",
+              )}
+              style={{ width: `${percent}%` }}
+            />
+          </div>
+          <div className="flex justify-between text-xs text-muted-foreground">
+            <span>已用 {percent.toFixed(1)}%</span>
+            <span>剩余 {formatBytes(capacity.freeBytes!)}</span>
+          </div>
+        </>
+      ) : null}
+      {capacity.automaticSamplingActive ? (
+        <Alert variant={capacity.ingestBlocked ? "destructive" : "warning"}>
+          <TriangleAlertIcon aria-hidden="true" />
+          <AlertTitle>{capacity.ingestBlocked ? "数据接入已暂停" : "自动降采样已启用"}</AlertTitle>
+          <AlertDescription>
+            {capacity.ingestBlocked
+              ? "Ingest 正在丢弃新上报，ClickHouse 降回 90% 以下后自动恢复。"
+              : `Browser SDK 采样率临时限制为 ${Math.round((capacity.automaticSamplingRate ?? 0) * 100)}%，达到 95% 后暂停数据接入。`}
+          </AlertDescription>
+        </Alert>
       ) : null}
       <p className="text-xs text-muted-foreground">{capacity.detail}</p>
     </div>

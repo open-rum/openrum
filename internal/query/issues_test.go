@@ -5,6 +5,7 @@ package query
 import (
 	"context"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -70,10 +71,18 @@ func TestIssuesRepositoryJoinsStateFiltersFacetsTrendAndCursor(t *testing.T) {
 		row["error_message"] = "Cannot submit checkout"
 		return row
 	}
+	checkoutPage, paymentPage := uuid.New(), uuid.New()
+	checkoutOne := makeError("v1:checkout", "production", "Chrome", "user-a", from.Add(5*time.Minute))
+	checkoutOne["user_id"], checkoutOne["page_id"], checkoutOne["route"], checkoutOne["country"] = "customer-1", checkoutPage.String(), "/checkout", "US"
+	checkoutTwo := makeError("v1:checkout", "production", "Chrome", "user-b", from.Add(10*time.Minute))
+	checkoutTwo["user_id"], checkoutTwo["page_id"], checkoutTwo["route"], checkoutTwo["country"] = "customer-1", checkoutPage.String(), "/checkout", "US"
+	payment := makeError("v1:payment", "production", "Safari", "user-c", from.Add(15*time.Minute))
+	payment["user_id"], payment["page_id"], payment["route"], payment["country"] = "", paymentPage.String(), "/payment", "CN"
+	payment["error_type"], payment["error_message"] = "RangeError", "Payment token missing"
 	insertOverviewRows(t, ctx, clickhouse, []map[string]any{
-		makeError("v1:checkout", "production", "Chrome", "user-a", from.Add(5*time.Minute)),
-		makeError("v1:checkout", "production", "Chrome", "user-b", from.Add(10*time.Minute)),
-		makeError("v1:payment", "production", "Safari", "user-c", from.Add(15*time.Minute)),
+		checkoutOne,
+		checkoutTwo,
+		payment,
 		makeError("v1:staging", "staging", "Firefox", "user-d", from.Add(20*time.Minute)),
 	})
 	eventID, sessionID := uuid.New(), uuid.New()
@@ -107,6 +116,18 @@ func TestIssuesRepositoryJoinsStateFiltersFacetsTrendAndCursor(t *testing.T) {
 		t.Fatalf("second page=%+v err=%v", second, err)
 	}
 	filters.Cursor = ""
+	filters.ErrorType, filters.Title = "RangeError", "token"
+	filtered, err := repository.List(ctx, filters)
+	if err != nil || len(filtered.Issues) != 1 || filtered.Issues[0].Fingerprint != "v1:payment" {
+		t.Fatalf("issue-specific filtered page=%+v err=%v", filtered, err)
+	}
+	filters.ErrorType, filters.Title = "", ""
+	filters.UserID = "customer-1"
+	userFiltered, err := repository.List(ctx, filters)
+	if err != nil || len(userFiltered.Issues) != 1 || userFiltered.Issues[0].Fingerprint != "v1:checkout" || userFiltered.Issues[0].Events != 2 {
+		t.Fatalf("user filtered page=%+v err=%v", userFiltered, err)
+	}
+	filters.UserID = ""
 	filters.Status = metadata.IssueStatusResolved
 	resolved, err := repository.List(ctx, filters)
 	if err != nil || len(resolved.Issues) != 1 || resolved.Issues[0].Fingerprint != "v1:checkout" {
@@ -118,6 +139,20 @@ func TestIssuesRepositoryJoinsStateFiltersFacetsTrendAndCursor(t *testing.T) {
 	trend, err := repository.Trend(ctx, filters, "v1:checkout")
 	if err != nil || len(trend) != 2 || trend[0].Events != 1 || trend[1].Events != 1 {
 		t.Fatalf("trend=%+v err=%v", trend, err)
+	}
+	filters.Status = ""
+	overview, err := repository.Overview(ctx, filters)
+	var overviewEvents, identifiedUsers uint64
+	var foundAnonymousOnlyBucket bool
+	for _, point := range overview.Trend {
+		overviewEvents += point.Events
+		identifiedUsers += point.IdentifiedUsers
+		if point.Bucket.Equal(from.Add(15*time.Minute)) && point.IdentifiedUsers == 0 {
+			foundAnonymousOnlyBucket = true
+		}
+	}
+	if err != nil || overviewEvents != 3 || identifiedUsers == 0 || !foundAnonymousOnlyBucket || len(overview.ErrorTypes) != 1 || len(overview.Pages) != 2 || len(overview.Countries) != 2 {
+		t.Fatalf("overview=%+v events=%d identified=%d err=%v", overview, overviewEvents, identifiedUsers, err)
 	}
 	events := NewEventRepository(clickhouse)
 	eventPage, err := events.ListIssueEvents(ctx, projectID, "v1:event-detail", from, from.Add(time.Hour), 1, "")
@@ -143,6 +178,8 @@ func TestIssueFiltersRejectUnboundedQueriesAndUnsafeCursor(t *testing.T) {
 		{ProjectID: uuid.New(), From: from, To: from.Add(31 * 24 * time.Hour)},
 		{ProjectID: uuid.New(), From: from, To: from.Add(time.Hour), Limit: 101},
 		{ProjectID: uuid.New(), From: from, To: from.Add(time.Hour), Cursor: "not-base64"},
+		{ProjectID: uuid.New(), From: from, To: from.Add(time.Hour), Title: strings.Repeat("x", 201)},
+		{ProjectID: uuid.New(), From: from, To: from.Add(time.Hour), UserID: strings.Repeat("x", 129)},
 	} {
 		if _, _, err := normalizeIssueFilters(filters); err != ErrInvalidIssueFilters {
 			t.Fatalf("filters=%+v err=%v", filters, err)

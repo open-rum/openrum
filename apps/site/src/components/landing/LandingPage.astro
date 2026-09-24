@@ -1,21 +1,19 @@
 ---
 import {
   ArrowRight,
-  BarChart3,
-  Bug,
   Check,
   Database,
-  Gauge,
   Github,
   PlayCircle,
   Server,
   ShieldCheck,
   TriangleAlert,
 } from "lucide-astro";
-import LightRays from "./LightRays.astro";
+import StrokeText from "./StrokeText.jsx";
 import BrandMark from "../BrandMark.astro";
 import TechStack from "./TechStack.astro";
 import Reliability from "./Reliability.astro";
+import FeatureBento from "./FeatureBento.astro";
 import PublicLayout from "../../layouts/PublicLayout.astro";
 import "../../styles/landing.css";
 const { lang = "en" } = Astro.props;
@@ -25,8 +23,8 @@ const repository = import.meta.env.PUBLIC_REPOSITORY_URL || "https://github.com/
 const docs = zh ? "/zh/docs" : "/docs";
 const copy = zh
   ? {
-      sloganLead: "了解你的用户，",
-      sloganAccent: "快速修复问题。",
+      sloganLead: "了解你的用户",
+      sloganAccent: "快速修复问题",
       description: "追踪应用错误、分析用户行为、监控应用性能，数据完全掌握在自己手里。",
       quick: "立即开始",
       exampleTag: "示例",
@@ -81,15 +79,10 @@ const copy = zh
       terminalTitle: "本地启动一套完整实例",
       terminalComment: "# 拉起全部服务",
       terminalNote: "容器就绪后访问 http://127.0.0.1:4173 完成初始化，无需注册任何账号。",
-      closerEyebrow: "开源",
-      closerTitle: "为开发者而生，由开发者共建",
-      closerBody: "现在就把监控放进你自己的基础设施，或先看压测方法与失败结果再决定。",
-      deploy: "选择部署路径",
-      evidence: "查看可复现证据",
     }
   : {
-      sloganLead: "Understand your users.",
-      sloganAccent: "Fix issues faster.",
+      sloganLead: "Understand your users",
+      sloganAccent: "Fix issues faster",
       description:
         "Track errors, analyze user behavior, and monitor application performance — all on your own infrastructure.",
       quick: "Get started",
@@ -156,50 +149,8 @@ const copy = zh
       terminalComment: "# start every service",
       terminalNote:
         "Once the containers report ready, open http://127.0.0.1:4173 to finish setup. No account signup required.",
-      closerEyebrow: "Open source",
-      closerTitle: "Built by developers, for developers",
-      closerBody:
-        "Put monitoring inside your own infrastructure, or read the benchmark method and the failed overload results first.",
-      deploy: "Choose a deployment path",
-      evidence: "Review reproducible evidence",
     };
 const proofIcons = [Server, Database, ShieldCheck];
-const featureIcons = [Bug, BarChart3, Gauge];
-const featureCards = zh
-  ? [
-      [
-        "错误追踪",
-        "找到根源，修复问题。",
-        "堆栈、面包屑与 Source Map，让定位问题需要的上下文触手可及。",
-      ],
-      [
-        "行为分析",
-        "看见旅程，理解影响。",
-        "关联页面浏览、会话与自定义事件，了解用户如何使用你的产品。",
-      ],
-      [
-        "真实用户性能",
-        "衡量体验，找到瓶颈。",
-        "在真实用户的浏览器里，监控 Web Vitals、资源耗时与 API 请求。",
-      ],
-    ]
-  : [
-      [
-        "Error tracking",
-        "Find the source. Fix the issue.",
-        "Stack traces, breadcrumbs and Source Maps. The context you need, right where you need it.",
-      ],
-      [
-        "Behavior analytics",
-        "See the journey. Understand the impact.",
-        "Connect page views, sessions and Custom Events to understand what your users do.",
-      ],
-      [
-        "Real-user performance",
-        "Measure the experience. Find the friction.",
-        "Web Vitals, resource timing and API requests, measured where they matter: in the browser.",
-      ],
-    ];
 const trendAxis = ["Jul 26", "Jul 27", "Jul 28", "Jul 29", "Jul 30", "Jul 31", "Aug 1"];
 const stackFrames = [
   ["TypeError: Cannot read properties of undefined (reading 'map')", ""],
@@ -215,13 +166,23 @@ const pageTitle = zh
 <PublicLayout title={pageTitle} description={copy.description} lang={lang}>
   <div class="lp-page">
     <section class="lp-hero" aria-labelledby="lp-hero-title">
-      <LightRays />
       <div class="site-container lp-hero-content">
+        <p class="lp-hero-badge">
+          <span class="lp-hero-badge-dot" aria-hidden="true"></span>
+          Open Source <span aria-hidden="true">·</span> Alpha
+        </p>
         <h1 id="lp-hero-title">
-          <span class="lp-title-line"><span class="lp-title-ink">{copy.sloganLead}</span></span>
-          <span class="lp-title-line lp-accent"
-            ><span class="lp-title-ink">{copy.sloganAccent}</span></span
-          >
+          <span class="lp-title-line">
+            <StrokeText client:load text={copy.sloganLead} fillColor="var(--ds-action-contrast)" />
+          </span>
+          <span class="lp-title-line lp-accent">
+            <StrokeText
+              client:load
+              text={copy.sloganAccent}
+              strokeColor="var(--ds-primary)"
+              fillColor="var(--ds-action-contrast)"
+            />
+          </span>
         </h1>
         <p class="lp-hero-copy">{copy.description}</p>
         <div class="lp-cta">
@@ -239,45 +200,9 @@ const pageTitle = zh
       </div>
     </section>
 
-    <section class="lp-features site-container" aria-labelledby="lp-features-title">
-      <div class="lp-feature-heading lp-reveal">
-        <h2 id="lp-features-title">
-          {zh ? "看清全貌，" : "The whole picture."}<br /><span
-            >{zh ? "在一处理解用户体验。" : "One place to understand it."}</span
-          >
-        </h2>
-        <p>
-          {zh ? "从用户的第一次点击，到问题的根源。" : "From the first click to the root cause."}<br
-          />{zh ? "让用户行为与产品稳定性关联起来。" : "Connect behavior with reliability."}
-        </p>
-      </div>
-      <div class="lp-feature-grid">
-        {
-          featureCards.map(([label, title, body], index) => {
-            const Icon = featureIcons[index];
-            return (
-              <article class="ui-card lp-feature-card lp-reveal">
-                <div class="lp-feature-card-header">
-                  <Icon class="lp-feature-icon" size={26} />
-                  <p class="lp-feature-label">{label}</p>
-                  <h3>
-                    {title.split(zh ? "，" : ". ").map((line, part, lines) => (
-                      <span>
-                        {line}
-                        {part < lines.length - 1 ? (zh ? "，" : ".") : ""}
-                      </span>
-                    ))}
-                  </h3>
-                </div>
-                <div class="lp-feature-card-content">
-                  <p>{body}</p>
-                </div>
-              </article>
-            );
-          })
-        }
-      </div>
-    </section>
+    <FeatureBento lang={lang} />
+
+    <Reliability lang={lang} />
 
     <section class="lp-section lp-rule">
       <div class="site-container lp-split lp-reveal">
@@ -388,8 +313,6 @@ const pageTitle = zh
       </div>
     </section>
 
-    <Reliability lang={lang} />
-
     <section class="lp-section lp-rule">
       <div class="site-container">
         <div class="lp-head lp-reveal">
@@ -440,28 +363,6 @@ docker compose <span class="lp-terminal-flag">--env-file</span> deploy/compose/.
 curl --fail http://127.0.0.1:4173/health/ready</code></pre>
             </div>
             <p class="lp-terminal-note">{copy.terminalNote}</p>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <section class="lp-section lp-section-tight lp-rule">
-      <div class="site-container">
-        <div class="lp-closer lp-reveal">
-          <div class="lp-aurora"></div>
-          <p class="lp-eyebrow">{copy.closerEyebrow}</p>
-          <h2>{copy.closerTitle}</h2>
-          <p>{copy.closerBody}</p>
-          <div class="lp-cta">
-            <a class="ui-button ui-button-contrast lp-cta-button" href={`${prefix}/self-host`}
-              >{copy.deploy}<ArrowRight size={16} /></a
-            >
-            <a class="ui-button ui-button-neutral lp-cta-button" href={repository}
-              ><Github size={16} />GitHub</a
-            >
-            <a class="ui-button ui-button-neutral lp-cta-button" href={`${prefix}/benchmarks`}
-              >{copy.evidence}</a
-            >
           </div>
         </div>
       </div>

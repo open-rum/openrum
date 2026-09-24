@@ -4,6 +4,9 @@ import "../styles/design/workbench.css";
 import "../styles/design/landing-01.css";
 import PaletteBootstrap from "../components/PaletteBootstrap.astro";
 import AppearanceControls from "../components/design/AppearanceControls.astro";
+const canonical = new URL(Astro.url.pathname, Astro.site);
+const release = import.meta.env.PUBLIC_OPENRUM_RELEASE || "Alpha";
+const commit = import.meta.env.PUBLIC_COMMIT_SHA || "local";
 ---
 
 <!doctype html>
@@ -14,7 +17,10 @@ import AppearanceControls from "../components/design/AppearanceControls.astro";
     </title><meta name="description" content="OpenRUM Landing Page Spec v1 静态参考预览。" /><meta
       name="robots"
       content="noindex,follow"
-    /><link rel="icon" href="/favicon.svg" /><PaletteBootstrap manageTheme /></head
+    /><link rel="canonical" href={canonical} /><link
+      rel="icon"
+      href="/favicon.svg"
+    /><PaletteBootstrap manageTheme /></head
   ><body>
     <div class="p1-preview-tools">
       <a href="/design/landing/" data-preview-link="/design/landing/">← 方案对比</a><span
@@ -22,5 +28,6 @@ import AppearanceControls from "../components/design/AppearanceControls.astro";
       ><AppearanceControls />
     </div>
     <div class="p1-page"><slot /></div>
+    <span class="sr-only" data-openrum-build>Release {release} · commit {commit}</span>
   </body>
 </html>

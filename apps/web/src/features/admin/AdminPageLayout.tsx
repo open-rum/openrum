@@ -1,7 +1,6 @@
 import type { ReactNode } from "react";
 
 import { ConsolePage, ConsolePageHeader } from "@/components/layout/ConsolePage";
-import { AdminNav } from "./AdminNav";
 
 export function AdminPageLayout({
   title,
@@ -15,7 +14,7 @@ export function AdminPageLayout({
   children: ReactNode;
 }) {
   return (
-    <ConsolePage width="wide" rail={<AdminNav />} railLabel="系统设置">
+    <ConsolePage width="wide">
       <ConsolePageHeader title={title} description={description} actions={actions} />
       {children}
     </ConsolePage>

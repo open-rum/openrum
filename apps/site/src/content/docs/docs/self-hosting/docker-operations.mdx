@@ -1,0 +1,82 @@
+---
+title: Operate production Docker
+description: Back up, restore, monitor and upgrade a single-host OpenRUM deployment.
+appliesTo: Alpha
+---
+
+import { Aside, Steps } from "@astrojs/starlight/components";
+
+Use this guide only with the separate [production Docker stack](/docs/self-hosting/docker-production/). It does not change the local Demo Compose project. All commands run from the repository root on the Linux server unless stated otherwise.
+
+## Daily checks
+
+```sh
+docker compose --env-file deploy/compose/.env.production \
+  -f deploy/compose/production.compose.yml ps
+docker compose --env-file deploy/compose/.env.production \
+  -f deploy/compose/production.compose.yml logs --tail=100 api ingest consumer worker edge
+```
+
+Monitor ClickHouse disk free space and the [storage-pressure states](/docs/self-hosting/storage-pressure/), Kafka consumer lag, failed containers, TLS renewal, backup age and the host's CPU, memory and disk. Only TCP `80`/`443` and UDP `443` should be exposed by Compose. Put alerts outside this one server so a host outage cannot silence its own alert.
+
+## Consistent backup
+
+The bundled backup script **stops the entire stack**, archives PostgreSQL, ClickHouse, Kafka, Redis and Caddy volumes, then restarts it. Schedule downtime. It is a simple offline backup, not continuous PITR; your maximum data loss is the interval since the last verified copy. Use a separate disk or mounted backup destination with enough free space:
+
+```sh
+backup_dir="/mnt/openrum-backups/openrum-$(date -u +%Y%m%dT%H%M%SZ)"
+bash deploy/compose/backup-production.sh "$backup_dir"
+```
+
+The script refuses to reuse an existing destination and writes `SHA256SUMS`. It does **not** include `.env.production`: back up that file separately, encrypted, because the database passwords and bootstrap token are required to recover the Instance. It also does not back up an external object-storage bucket; protect that bucket with the provider's versioning and backup policy. The Caddy volume contains TLS private keys; encrypt the archives and copy both archives and private configuration off the server. Test restore on a replacement host before accepting production traffic and periodically thereafter. For larger data volumes, use a consistent provider snapshot while the stack is stopped instead of a long `tar` outage.
+
+<Aside type="danger" title="Do not delete volumes during normal operation">
+  `docker compose down` keeps data volumes. `down --volumes` deletes the databases, Kafka backlog,
+  Redis state and certificate storage. Never use it as a routine stop or upgrade command.
+</Aside>
+
+## Restore on a replacement host
+
+<Steps>
+
+1. ## Prepare an empty host
+
+   Install Docker and Compose, check out the **same OpenRUM revision**, restore the encrypted `.env.production` with mode `600`, and build or load the exact `OPENRUM_IMAGE` from the original deployment. Point DNS at this host only when verification is complete. Do not run `compose up` yet.
+
+1. ## Verify and restore the archives
+
+   Copy the decrypted backup directory to the host, then run:
+
+   ```sh
+   bash deploy/compose/restore-production.sh /mnt/openrum-backups/openrum-YYYYMMDDTHHMMSSZ
+   ```
+
+   This verifies `SHA256SUMS` and refuses to overwrite any existing `openrum-production` container or volume. If a previous restore failed partway through, investigate and use a fresh host or a deliberately cleaned test project; the script will not delete partial data for you.
+
+1. ## Start and validate before cutover
+
+   ```sh
+   docker compose --env-file deploy/compose/.env.production \
+     -f deploy/compose/production.compose.yml up -d --wait
+   ```
+
+   Check HTTPS and `/health/ready`, then verify administrator login, project settings, one historical event and one newly ingested event. Confirm Kafka lag drains. Record the restored backup timestamp and any missing events before switching real traffic.
+
+</Steps>
+
+## Upgrade
+
+Take and verify a backup first. Pin the new source revision and use a **new** `OPENRUM_IMAGE` tag. Build it, then schedule a maintenance window: stop the edge and application services, run migrations, start the stack and verify. Example commands after changing the tag in `.env.production`:
+
+```sh
+docker compose --env-file deploy/compose/.env.production \
+  -f deploy/compose/production.compose.yml build migrate
+docker compose --env-file deploy/compose/.env.production \
+  -f deploy/compose/production.compose.yml stop edge web api ingest consumer worker
+docker compose --env-file deploy/compose/.env.production \
+  -f deploy/compose/production.compose.yml run --rm migrate
+docker compose --env-file deploy/compose/.env.production \
+  -f deploy/compose/production.compose.yml up -d --wait
+```
+
+Migrations are forward-only in practice. Reverting the image does **not** revert PostgreSQL or ClickHouse schema; recover from the pre-upgrade backup on a separate host if compatibility breaks. See the [general upgrade contract](/docs/self-hosting/upgrades/). A single-host Compose update has planned downtime and no rolling deployment.

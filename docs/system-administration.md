@@ -28,9 +28,10 @@
 
 ## 3. 导航与页面结构
 
-Route 前缀统一为 `/admin`，在常规一级导航底部增加仅实例管理员可见的“系统管理”入口。
+实例管理是统一设置中心里的第四个范围，Route 前缀为 `/settings/instance`。设置入口在一级导航底部，
+「实例」这一组只在用户具备实例角色时渲染。原先的 `/admin` 前缀全部重定向到对应的新地址，书签不会失效。
 
-### 3.1 实例概览 `/admin`
+### 3.1 实例概览 `/settings/instance`
 
 - OpenRUM 版本、部署模式、运行时间和最近升级时间
 - API、Ingest、Consumer、Worker、PostgreSQL、ClickHouse、Kafka、Redis、OSS 状态
@@ -44,7 +45,7 @@ Kafka Lag、Worker 心跳和失败维护任务在对应采集能力落地前返�
 看似真实的占位数字。`/api/v1/auth/me` 仅返回当前用户的实例角色，不返回实例成员列表；控制台据此隐藏
 系统管理入口，同时管理 API 始终再次执行服务端实例 RBAC。
 
-### 3.2 数据生命周期 `/admin/data-retention`
+### 3.2 数据生命周期 `/settings/instance/retention`
 
 - 原始事件默认保留时间：默认 14 天
 - 分钟级聚合默认保留时间：默认 90 天
@@ -55,7 +56,12 @@ Kafka Lag、Worker 心跳和失败维护任务在对应采集能力落地前返�
 - 后台任务：等待、运行、完成、部分失败、取消；显示下一次清理时间
 - “立即清理”属于危险操作，需要重新验证密码、输入实例名称并产生审计记录
 
-### 3.3 对象存储 `/admin/object-storage`
+已增加独立的“紧急存储恢复”流程。它只在 ClickHouse 使用率达到 85% 后启用，自动按
+最旧 Project/月生成推荐方案，只选择已结束超过 24 小时的完整自然月，并通过整分区删除释放空间。Instance
+Owner 需要输入固定确认文案和当前密码；后台全局串行执行并展示进度。若安全候选不足以
+降到 85%，页面会要求同时扩容。完成清理不会绕过硬熔断，仍需容量探测确认低于 90%。
+
+### 3.3 对象存储 `/settings/instance/object-storage`
 
 - Provider：Alibaba OSS 原生协议，或 Amazon S3 / MinIO / R2 / Ceph 等 S3-compatible 服务
 - Region、Endpoint、Bucket、Prefix 和服务端加密方式
@@ -77,20 +83,20 @@ Kafka Lag、Worker 心跳和失败维护任务在对应采集能力落地前返�
 - Compose 不再内置 MinIO 或创建 Bucket，由实例管理员选择并配置外部 Provider。
 - `PUT /api/v1/admin/object-storage/managed` 仅在部署显式授权时可用。候选凭证先经过隔离探测，成功后使用 AES-GCM 信封加密写入 `instance_secrets`，再原子切换进程内 Storage；读取 API 永不返回凭证明文。
 
-### 3.4 认证与访问 `/admin/authentication`
+### 3.4 认证与访问 `/settings/instance/authentication`（待开放）
 
 - 本地登录开关、OIDC Provider、允许域名、默认组织角色
 - Instance Owner 列表、最近登录和会话撤销
 - Bootstrap 已关闭状态，不提供重新开放按钮
 - 修改认证配置需要重新验证当前密码，并保留本地 Owner 应急入口
 
-### 3.5 通知与邮件 `/admin/notifications`
+### 3.5 通知与邮件 `/settings/instance/notifications`（待开放）
 
 - 全局 SMTP 发件配置和测试邮件
 - 平台运维 Webhook/Alertmanager 出口
 - 与组织级“产品质量告警渠道”分开，避免项目成员收到基础设施 Secret 或内部拓扑
 
-### 3.6 维护与审计 `/admin/maintenance`
+### 3.6 维护与审计 `/settings/instance/audit`
 
 - 数据库迁移版本、待执行/失败后台任务、备份状态和最近恢复演练
 - 配置变更审计：操作者、字段、旧/新值摘要、来源、时间、请求 ID
@@ -194,6 +200,9 @@ Secret 与非敏感设置分表，避免普通配置读取路径意外加载密�
 - `POST /api/v1/admin/retention-policy/preview`
 - `POST /api/v1/admin/retention-jobs`
 - `GET /api/v1/admin/maintenance-jobs`
+- `POST /api/v1/admin/emergency-cleanup/preview`
+- `POST /api/v1/admin/emergency-cleanup/jobs`
+- `GET /api/v1/admin/emergency-cleanup/jobs/latest`
 - `GET /api/v1/admin/object-storage`
 - `POST /api/v1/admin/object-storage/test`
 - `PUT /api/v1/admin/object-storage/managed`

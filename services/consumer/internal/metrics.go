@@ -10,22 +10,29 @@ import (
 )
 
 type Metrics struct {
-	messages       *prometheus.CounterVec
-	events         *prometheus.CounterVec
-	deadLetters    *prometheus.CounterVec
-	filtered       *prometheus.CounterVec
-	rewritten      *prometheus.CounterVec
-	kafkaLag       prometheus.Gauge
-	dataFreshness  prometheus.Gauge
-	processingTime prometheus.Histogram
-	insertBatches  *prometheus.CounterVec
-	insertRows     prometheus.Histogram
-	insertDuration prometheus.Histogram
+	messages        *prometheus.CounterVec
+	events          *prometheus.CounterVec
+	deadLetters     *prometheus.CounterVec
+	filtered        *prometheus.CounterVec
+	rewritten       *prometheus.CounterVec
+	kafkaLag        prometheus.Gauge
+	kafkaHeadroom   prometheus.Gauge
+	kafkaRetention  time.Duration
+	dataFreshness   prometheus.Gauge
+	processingTime  prometheus.Histogram
+	insertBatches   *prometheus.CounterVec
+	insertRows      prometheus.Histogram
+	insertDuration  prometheus.Histogram
+	storageWritable prometheus.Gauge
 }
 
 func NewMetrics(registerer interface {
 	Register(...prometheus.Collector) error
-}) (*Metrics, error) {
+}, retention ...time.Duration) (*Metrics, error) {
+	kafkaRetention := time.Duration(0)
+	if len(retention) > 0 {
+		kafkaRetention = retention[0]
+	}
 	messages := prometheus.NewCounterVec(prometheus.CounterOpts{
 		Namespace: "openrum", Subsystem: "consumer", Name: "messages_total", Help: "Kafka messages by processing outcome.",
 	}, []string{"outcome"})
@@ -55,6 +62,11 @@ func NewMetrics(registerer interface {
 	kafkaLag := prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: "openrum", Subsystem: "consumer", Name: "kafka_lag_seconds", Help: "Age of the latest fetched Kafka message.",
 	})
+	kafkaHeadroom := prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace: "openrum", Subsystem: "consumer", Name: "kafka_retention_headroom_seconds",
+		Help: "Configured Kafka retention duration minus the age of the message currently blocked in processing; -1 means unknown.",
+	})
+	kafkaHeadroom.Set(-1)
 	dataFreshness := prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: "openrum", Subsystem: "consumer", Name: "data_freshness_seconds", Help: "Age of the newest event durably written to ClickHouse.",
 	})
@@ -73,19 +85,30 @@ func NewMetrics(registerer interface {
 		Namespace: "openrum", Subsystem: "consumer", Name: "clickhouse_insert_duration_seconds", Help: "ClickHouse insert duration including retry.",
 		Buckets: []float64{0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5},
 	})
-	if err := registerer.Register(messages, events, deadLetters, filtered, rewritten, kafkaLag, dataFreshness, processingTime, insertBatches, insertRows, insertDuration); err != nil {
+	storageWritable := prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace: "openrum", Subsystem: "storage", Name: "write_available",
+		Help:        "Whether the most recent real storage write succeeded; -1 means no write observed.",
+		ConstLabels: prometheus.Labels{"backend": "clickhouse"},
+	})
+	storageWritable.Set(-1)
+	if err := registerer.Register(messages, events, deadLetters, filtered, rewritten, kafkaLag, kafkaHeadroom, dataFreshness, processingTime, insertBatches, insertRows, insertDuration, storageWritable); err != nil {
 		return nil, err
 	}
 	return &Metrics{
 		messages: messages, events: events, deadLetters: deadLetters, filtered: filtered, rewritten: rewritten,
-		kafkaLag: kafkaLag, dataFreshness: dataFreshness,
+		kafkaLag: kafkaLag, kafkaHeadroom: kafkaHeadroom, kafkaRetention: kafkaRetention, dataFreshness: dataFreshness,
 		processingTime: processingTime, insertBatches: insertBatches, insertRows: insertRows, insertDuration: insertDuration,
+		storageWritable: storageWritable,
 	}, nil
 }
 
 func (metrics *Metrics) observeFetched(messageTime time.Time) {
 	if !messageTime.IsZero() {
-		metrics.kafkaLag.Set(max(0, time.Since(messageTime).Seconds()))
+		lag := max(0, time.Since(messageTime).Seconds())
+		metrics.kafkaLag.Set(lag)
+		if metrics.kafkaRetention > 0 {
+			metrics.kafkaHeadroom.Set(max(0, metrics.kafkaRetention.Seconds()-lag))
+		}
 	}
 }
 
@@ -121,6 +144,9 @@ func (metrics *Metrics) ObserveClickHouseBatch(rows int, duration time.Duration,
 	outcome := "success"
 	if err != nil {
 		outcome = "error"
+		metrics.storageWritable.Set(0)
+	} else {
+		metrics.storageWritable.Set(1)
 	}
 	metrics.insertBatches.WithLabelValues(outcome).Inc()
 	metrics.insertRows.Observe(float64(rows))

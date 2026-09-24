@@ -20,6 +20,26 @@ import (
 type issueQueries interface {
 	List(context.Context, query.IssueFilters) (query.IssuePage, error)
 	Trend(context.Context, query.IssueFilters, string) ([]query.IssueTrendPoint, error)
+	Overview(context.Context, query.IssueFilters) (query.IssueOverview, error)
+}
+
+func (handler *IssueHandler) Overview(writer http.ResponseWriter, request *http.Request) {
+	_, projectID, _, ok := handler.authorizeProject(writer, request, auth.ActionReadProject)
+	if !ok {
+		return
+	}
+	filters, err := parseIssueFilters(request, projectID)
+	if err != nil {
+		writeIssueValidationError(writer, request)
+		return
+	}
+	filters.Cursor = ""
+	result, err := handler.queries.Overview(request.Context(), filters)
+	if err != nil {
+		handler.writeQueryError(writer, request, err)
+		return
+	}
+	writeJSON(writer, http.StatusOK, result)
 }
 
 type issueEvents interface {
@@ -89,7 +109,11 @@ func (handler *IssueHandler) Get(writer http.ResponseWriter, request *http.Reque
 		handler.writeQueryError(writer, request, err)
 		return
 	}
-	writeJSON(writer, http.StatusOK, map[string]any{"issue": page.Issues[0], "trend": trend, "facets": page.Facets})
+	writeJSON(writer, http.StatusOK, map[string]any{
+		"issue": page.Issues[0], "trend": trend, "facets": page.Facets,
+		"from": filters.From, "to": filters.To,
+		"intervalSeconds": int64(query.ConsoleSeriesInterval(filters.To.Sub(filters.From), 5*time.Minute) / time.Second),
+	})
 }
 
 type patchIssueRequest struct {
@@ -237,6 +261,7 @@ func parseIssueFilters(request *http.Request, projectID uuid.UUID) (query.IssueF
 	filters := query.IssueFilters{
 		ProjectID: projectID, From: from, To: to, Environment: values.Get("environment"), Release: values.Get("release"),
 		Route: values.Get("route"), Browser: values.Get("browser"), DeviceType: values.Get("deviceType"), Country: values.Get("country"),
+		Title: values.Get("title"), ErrorType: values.Get("errorType"), Fingerprint: values.Get("fingerprint"), UserID: values.Get("userId"),
 		Status: metadata.IssueStatus(values.Get("status")), Limit: limit, Cursor: values.Get("cursor"),
 		Sort: values.Get("sort"),
 	}

@@ -6,7 +6,6 @@ import {
   LayoutGridIcon,
   LoaderCircleIcon,
   PlusIcon,
-  RefreshCwIcon,
   RotateCcwIcon,
   Settings2Icon,
 } from "lucide-react";
@@ -23,6 +22,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   ConsolePage,
   ConsolePageContent,
@@ -54,6 +54,7 @@ import {
 } from "./model";
 import { useDashboardQueries } from "./queries";
 import { DashboardGrid } from "./DashboardGrid";
+import { DashboardDensity } from "./DashboardDensity";
 
 const ModuleEditor = lazy(() => import("./ModuleEditor"));
 
@@ -70,11 +71,13 @@ export default function ProjectDashboard({ project }: { project: Project }) {
       />
     );
   return (
-    <PersonalDashboard
-      key={`${session.data.userId}:${project.id}`}
-      project={project}
-      userId={session.data.userId}
-    />
+    <DashboardDensity>
+      <PersonalDashboard
+        key={`${session.data.userId}:${project.id}`}
+        project={project}
+        userId={session.data.userId}
+      />
+    </DashboardDensity>
   );
 }
 
@@ -115,7 +118,6 @@ function PersonalDashboard({ project, userId }: { project: Project; userId: stri
     filters,
     userId,
   );
-  const refreshing = [...queries.values()].some((query) => query.isFetching);
   const blocker = useBlocker({
     shouldBlockFn: ({ current, next }) => dirty && current.pathname !== next.pathname,
     enableBeforeUnload: dirty,
@@ -136,10 +138,18 @@ function PersonalDashboard({ project, userId }: { project: Project; userId: stri
   }, [project.id]);
 
   function changeWidgets(widgets: StoredWidget[]) {
-    if (!busy && widgets.length <= MAX_WIDGETS)
-      setDraft((current) =>
-        current ? { ...current, config: { ...current.config, widgets } } : current,
-      );
+    if (busy || !saved.data || !compatible || widgets.length > MAX_WIDGETS) return;
+    if (!draft) {
+      save.reset();
+      setNotice("");
+    }
+    const baseline = saved.data.config ?? defaults;
+    const revision = saved.data.revision;
+    setDraft((current) => ({
+      baseline: current?.baseline ?? baseline,
+      revision: current?.revision ?? revision,
+      config: { ...(current?.config ?? baseline), widgets },
+    }));
   }
   function startEditing() {
     if (!saved.data || !compatible) return;
@@ -212,25 +222,22 @@ function PersonalDashboard({ project, userId }: { project: Project; userId: stri
         actions={
           <>
             {!editing ? (
-              <>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  aria-label="刷新数据"
-                  disabled={refreshing}
-                  onClick={() =>
-                    void client.invalidateQueries({
-                      queryKey: ["dashboard-data", userId, project.id],
-                    })
-                  }
-                >
-                  <RefreshCwIcon />
-                </Button>
-                <Button variant="outline" disabled={!compatible} onClick={startEditing}>
-                  <Settings2Icon data-icon="inline-start" />
-                  编辑概览
-                </Button>
-              </>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      aria-label="编辑概览"
+                      disabled={!compatible}
+                      onClick={startEditing}
+                    >
+                      <Settings2Icon />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>编辑概览</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             ) : (
               <>
                 <Button variant="ghost" disabled={busy} onClick={() => setConfirmation("reset")}>

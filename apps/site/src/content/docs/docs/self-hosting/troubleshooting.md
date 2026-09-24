@@ -3,7 +3,7 @@ title: Troubleshooting
 description: Diagnose local startup, missing Events, login and Source Map problems.
 ---
 
-**Applies to:** Alpha / main.
+**Applies to:** Alpha.
 
 ## Local Compose will not become healthy
 

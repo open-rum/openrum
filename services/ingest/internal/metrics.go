@@ -15,6 +15,8 @@ type Metrics struct {
 	envelopes         *prometheus.CounterVec
 	kafkaDuration     prometheus.Observer
 	acceptedBytes     prometheus.Counter
+	storageWritable   prometheus.Gauge
+	storageDrops      prometheus.Counter
 }
 
 func NewMetrics(registerer interface {
@@ -45,7 +47,17 @@ func NewMetrics(registerer interface {
 		Namespace: "openrum", Subsystem: "ingest", Name: "accepted_bytes_total",
 		Help: "Uncompressed envelope bytes durably accepted by Kafka.",
 	})
-	if err := registerer.Register(acceptedEvents, rejectedEvents, rejectedEnvelopes, envelopes, kafkaDuration, acceptedBytes); err != nil {
+	storageWritable := prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace: "openrum", Subsystem: "storage", Name: "write_available",
+		Help:        "Whether the most recent real storage write succeeded; -1 means no write observed.",
+		ConstLabels: prometheus.Labels{"backend": "kafka"},
+	})
+	storageWritable.Set(-1)
+	storageDrops := prometheus.NewCounter(prometheus.CounterOpts{
+		Namespace: "openrum", Subsystem: "ingest", Name: "storage_pressure_dropped_envelopes_total",
+		Help: "Envelopes deliberately dropped while the storage-pressure hard stop is active.",
+	})
+	if err := registerer.Register(acceptedEvents, rejectedEvents, rejectedEnvelopes, envelopes, kafkaDuration, acceptedBytes, storageWritable, storageDrops); err != nil {
 		return nil, err
 	}
 	return &Metrics{
@@ -55,10 +67,18 @@ func NewMetrics(registerer interface {
 		envelopes:         envelopes,
 		kafkaDuration:     kafkaDuration,
 		acceptedBytes:     acceptedBytes,
+		storageWritable:   storageWritable,
+		storageDrops:      storageDrops,
 	}, nil
 }
 
+func (metrics *Metrics) observeStoragePressureDrop() {
+	metrics.storageDrops.Inc()
+	metrics.envelopes.WithLabelValues("storage_pressure_dropped").Inc()
+}
+
 func (metrics *Metrics) observeAccepted(envelope AcceptedEnvelope, duration time.Duration) {
+	metrics.storageWritable.Set(1)
 	metrics.kafkaDuration.Observe(duration.Seconds())
 	metrics.acceptedBytes.Add(float64(len(envelope.Raw)))
 	for _, current := range envelope.Envelope.Events {
@@ -83,6 +103,7 @@ func (metrics *Metrics) observeRejectedOnly(rejections []Rejection) {
 }
 
 func (metrics *Metrics) observeUnavailable(duration time.Duration) {
+	metrics.storageWritable.Set(0)
 	metrics.kafkaDuration.Observe(duration.Seconds())
 	metrics.envelopes.WithLabelValues("unavailable").Inc()
 	metrics.rejectedEnvelopes.WithLabelValues("INGEST_UNAVAILABLE").Inc()

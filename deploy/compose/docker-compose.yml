@@ -39,7 +39,11 @@ services:
         soft: 262144
         hard: 262144
     healthcheck:
-      test: ["CMD-SHELL", "clickhouse-client --host 127.0.0.1 --user $${CLICKHOUSE_USER} --password $${CLICKHOUSE_PASSWORD} --query 'SELECT 1' >/dev/null 2>&1"]
+      test:
+        [
+          "CMD-SHELL",
+          "clickhouse-client --host 127.0.0.1 --user $${CLICKHOUSE_USER} --password $${CLICKHOUSE_PASSWORD} --query 'SELECT 1' >/dev/null 2>&1",
+        ]
       interval: 5s
       timeout: 3s
       retries: 30
@@ -65,12 +69,17 @@ services:
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
       KAFKA_MESSAGE_MAX_BYTES: "2097152"
       KAFKA_REPLICA_FETCH_MAX_BYTES: "2097152"
+      KAFKA_LOG_RETENTION_HOURS: "168"
     ports:
       - "${KAFKA_PORT:-9092}:9092"
     volumes:
       - kafka-data:/var/lib/kafka/data
     healthcheck:
-      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server 127.0.0.1:9092 >/dev/null 2>&1"]
+      test:
+        [
+          "CMD-SHELL",
+          "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server 127.0.0.1:9092 >/dev/null 2>&1",
+        ]
       interval: 10s
       timeout: 5s
       retries: 20
@@ -138,7 +147,17 @@ services:
       APP_ENV: development
       PUBLIC_BASE_URL: http://127.0.0.1:${CONSOLE_PORT:-4173}
       KAFKA_BROKERS: kafka:19092
+      OPENRUM_CONSUMER_WORKERS: ${OPENRUM_CONSUMER_WORKERS:-4}
+      OPENRUM_CONSUMER_FLUSH_INTERVAL: ${OPENRUM_CONSUMER_FLUSH_INTERVAL:-10ms}
+      OPENRUM_KAFKA_RETENTION_DURATION: ${OPENRUM_KAFKA_RETENTION_DURATION:-168h}
       REDIS_ADDR: redis:6379
+      OPENRUM_STORAGE_PRESSURE_GUARD_ENABLED: ${OPENRUM_STORAGE_PRESSURE_GUARD_ENABLED:-true}
+      OPENRUM_STORAGE_WARNING_FREE_RATIO: ${OPENRUM_STORAGE_WARNING_FREE_RATIO:-0.15}
+      OPENRUM_STORAGE_CRITICAL_FREE_RATIO: ${OPENRUM_STORAGE_CRITICAL_FREE_RATIO:-0.10}
+      OPENRUM_STORAGE_HARD_STOP_FREE_RATIO: ${OPENRUM_STORAGE_HARD_STOP_FREE_RATIO:-0.05}
+      OPENRUM_STORAGE_RECOVERY_FREE_RATIO: ${OPENRUM_STORAGE_RECOVERY_FREE_RATIO:-0.10}
+      OPENRUM_STORAGE_EMERGENCY_SAMPLE_RATE: ${OPENRUM_STORAGE_EMERGENCY_SAMPLE_RATE:-0.10}
+      OPENRUM_STORAGE_POLL_INTERVAL: ${OPENRUM_STORAGE_POLL_INTERVAL:-30s}
       # Country resolution is only believable behind a proxy that overwrites the
       # header. Here that proxy is the bundled nginx, so the whole compose
       # network is trusted; a real deployment must narrow this to its edge.

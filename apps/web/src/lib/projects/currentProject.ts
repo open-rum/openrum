@@ -25,7 +25,7 @@ export function readRecentProjectId(organizationId: string) {
 }
 
 export function projectIdFromPathname(pathname: string) {
-  const match = pathname.match(/^\/projects\/([^/]+)(?:\/|$)/);
+  const match = pathname.match(/^\/(?:projects|settings\/project)\/([^/]+)(?:\/|$)/);
   return match ? decodeURIComponent(match[1]) : undefined;
 }
 

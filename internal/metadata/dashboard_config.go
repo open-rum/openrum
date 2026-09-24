@@ -20,13 +20,14 @@ type DashboardConfig struct {
 }
 
 type dashboardWidget struct {
-	ID      string `json:"id"`
-	Type    string `json:"type"`
-	Version int    `json:"version"`
-	Title   string `json:"title"`
-	Size    string `json:"size"`
-	View    string `json:"view"`
-	Data    struct {
+	ID             string          `json:"id"`
+	Type           string          `json:"type"`
+	Version        int             `json:"version"`
+	Title          string          `json:"title"`
+	Size           string          `json:"size"`
+	View           string          `json:"view"`
+	StatAppearance json.RawMessage `json:"statAppearance,omitempty"`
+	Data           struct {
 		Source    string   `json:"source"`
 		Metrics   []string `json:"metrics"`
 		Release   string   `json:"release,omitempty"`
@@ -78,6 +79,13 @@ func ValidateDashboardConfig(raw, previous json.RawMessage) error {
 }
 
 func validateDashboardWidget(w dashboardWidget) error {
+	if len(w.StatAppearance) > 0 {
+		var appearance string
+		// Retain legacy bottom variants for existing records and rolling upgrades.
+		if w.Type != "stat" || json.Unmarshal(w.StatAppearance, &appearance) != nil || !slices.Contains([]string{"plain", "line-right", "bar-right", "line-bottom", "area-bottom"}, appearance) {
+			return fmt.Errorf("invalid stat card appearance")
+		}
+	}
 	if !dashboardText(w.Title, 80) || strings.TrimSpace(w.Title) == "" || !slices.Contains([]string{"compact", "half", "full"}, w.Size) {
 		return fmt.Errorf("module title or size is invalid")
 	}
@@ -94,8 +102,8 @@ func validateDashboardWidget(w dashboardWidget) error {
 			return fmt.Errorf("invalid time-series view")
 		}
 	case "breakdown":
-		if w.Data.Source != "events" || !slices.Contains([]string{"bar", "table", "map"}, w.View) {
-			return fmt.Errorf("distributions require event data and a bar, table or country map view")
+		if w.Data.Source != "events" || !slices.Contains([]string{"bar", "table", "map", "donut"}, w.View) {
+			return fmt.Errorf("distributions require event data and a bar, table, donut or country map view")
 		}
 		if w.View == "map" && w.Data.Dimension != "country" {
 			return fmt.Errorf("map views require the country dimension")

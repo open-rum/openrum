@@ -1,0 +1,723 @@
+---
+import {
+  ArrowRight,
+  BarChart3,
+  Bug,
+  Gauge,
+  Route,
+  Activity,
+  BellRing,
+  MessageSquare,
+  ArrowDown,
+  Code2,
+} from "lucide-astro";
+
+const { lang = "en" } = Astro.props;
+const zh = lang === "zh";
+const docs = zh ? "/zh/docs" : "/docs";
+const features = [
+  {
+    id: "analytics",
+    icon: BarChart3,
+    label: zh ? "行为分析" : "Behavior analytics",
+    title: zh ? "看见每一次点击背后的意图。" : "Understand the intent behind every click.",
+    body: zh
+      ? "从 PV、UV 到转化漏斗和自定义事件，了解用户如何发现、使用并留在你的产品。"
+      : "Connect page views, unique visitors, funnels and custom events to understand how people use your product.",
+    href: "/product/analytics/",
+  },
+  {
+    id: "errors",
+    icon: Bug,
+    label: zh ? "错误监控" : "Error tracking",
+    title: zh ? "从异常，直达问题根源。" : "From an error to its source.",
+    body: zh
+      ? "聚合相同错误，结合源码、用户与会话上下文，找到真正需要修复的问题。"
+      : "Group errors and connect source code, users and session context to find what needs fixing.",
+    href: "/product/investigation/",
+  },
+  {
+    id: "sessions",
+    icon: Route,
+    label: zh ? "用户会话" : "Sessions",
+    title: zh ? "串起完整的用户旅程。" : "Follow the whole journey.",
+    body: zh
+      ? "在同一条时间线上关联页面、点击、日志与异常。"
+      : "Follow pages, clicks, logs and errors on one timeline.",
+    href: "/product/investigation/",
+  },
+  {
+    id: "performance",
+    icon: Gauge,
+    label: zh ? "性能监控" : "Performance",
+    title: zh ? "感知真实的使用体验。" : "Measure real experience.",
+    body: zh
+      ? "追踪 LCP、INP、CLS，按页面定位体验瓶颈。"
+      : "Track LCP, INP and CLS to find friction by page.",
+    href: "/product/performance/",
+  },
+  {
+    id: "api",
+    icon: Activity,
+    label: zh ? "API 监控" : "API monitoring",
+    title: zh ? "慢在哪，错在哪。" : "Find the slow. Fix the failed.",
+    body: zh
+      ? "查看请求耗时、失败原因，以及受影响的会话。"
+      : "Inspect request latency, failures and affected sessions.",
+    href: "/product/api-monitoring/",
+  },
+  {
+    id: "alerts",
+    icon: BellRing,
+    label: zh ? "告警通知" : "Alerts & notifications",
+    title: zh ? "异常发生，及时知晓。" : "Know when it matters.",
+    body: zh
+      ? "设置指标阈值与告警规则，通过 Webhook 对接团队 IM 通知。"
+      : "Set metric thresholds and alert rules. Connect team messaging through a webhook integration.",
+    href: "/product/alerts/",
+  },
+];
+---
+
+<section class="site-container feature-bento" id="features" aria-labelledby="feature-bento-title">
+  <header class="bento-heading">
+    <div>
+      <p class="lp-eyebrow">{zh ? "核心能力" : "One connected toolkit"}</p>
+      <h2 id="feature-bento-title">
+        {zh ? "从用户行为，到问题根源。" : "From user behavior to the root cause."}
+      </h2>
+    </div>
+    <p>
+      {zh ? "将行为、错误与性能串联起来，" : "Behavior, errors and performance, connected."}<br />{
+        zh ? "看清每一次访问。" : "See the story behind every visit."
+      }
+    </p>
+  </header>
+  <div class="bento-grid">
+    {
+      features.map(({ id, icon: Icon, label, title, body, href }) => (
+        <article class={`bento-card bento-${id}`}>
+          <div class="bento-copy">
+            <p class="bento-label">
+              <Icon size={18} aria-hidden="true" />
+              {label}
+            </p>
+            <h3>
+              <a href={`${docs}${href}`}>
+                {title}
+                <ArrowRight class="bento-arrow" size={18} aria-hidden="true" />
+              </a>
+            </h3>
+            <p class="bento-description">{body}</p>
+          </div>
+          <div class="bento-visual" aria-hidden="true">
+            {id === "analytics" && (
+              <>
+                <div class="bento-stat-row">
+                  <div>
+                    <span>{zh ? "页面浏览" : "Page views"}</span>
+                    <strong>128.4K</strong>
+                  </div>
+                  <div>
+                    <span>{zh ? "独立用户" : "Unique visitors"}</span>
+                    <strong>32.8K</strong>
+                  </div>
+                  <span class="bento-period">{zh ? "最近 7 天" : "Last 7 days"}</span>
+                </div>
+                <svg
+                  class="bento-trend"
+                  viewBox="0 0 540 110"
+                  fill="none"
+                  preserveAspectRatio="none"
+                >
+                  {[20, 55, 90].map((y) => (
+                    <path class="bento-gridline" d={`M0 ${y}H540`} />
+                  ))}
+                  <path
+                    class="bento-area"
+                    d="M0 92 25 85 45 90 65 65 90 74 115 52 140 58 165 34 190 47 215 37 240 62 265 40 290 48 315 23 340 35 365 19 390 31 415 16 440 24 465 8 490 19 515 6 540 12V110H0Z"
+                  />
+                  <path
+                    class="bento-line"
+                    d="M0 92 25 85 45 90 65 65 90 74 115 52 140 58 165 34 190 47 215 37 240 62 265 40 290 48 315 23 340 35 365 19 390 31 415 16 440 24 465 8 490 19 515 6 540 12"
+                  />
+                </svg>
+                <div class="bento-axis">
+                  <span>MON</span>
+                  <span>WED</span>
+                  <span>FRI</span>
+                  <span>SUN</span>
+                </div>
+              </>
+            )}
+            {id === "errors" && (
+              <>
+                <div class="bento-error-row">
+                  <span class="bento-error-icon">
+                    <Bug size={16} />
+                  </span>
+                  <div>
+                    <strong>TypeError</strong>
+                    <span>Cannot read properties of undefined</span>
+                  </div>
+                  <span class="bento-count">24</span>
+                </div>
+                <div class="bento-code">
+                  <span>
+                    <Code2 size={14} /> src/pages/checkout.tsx
+                  </span>
+                  <code>
+                    <span>42&nbsp; const cart = useCart();</span>
+                    <span class="bento-code-active">43&nbsp; cart.items.map(renderItem)</span>
+                    <span>44&nbsp; return checkout;</span>
+                  </code>
+                </div>
+                <div class="bento-context">
+                  <span>Source Map</span>
+                  <span>{zh ? "用户上下文" : "User context"}</span>
+                  <span>{zh ? "会话关联" : "Session linked"}</span>
+                </div>
+              </>
+            )}
+            {id === "sessions" && (
+              <ol class="bento-timeline">
+                {[
+                  ["00:00", "/products"],
+                  ["00:08", "add_to_cart"],
+                  ["00:24", "/checkout"],
+                ].map(([time, event]) => (
+                  <li>
+                    <i />
+                    <code>{event}</code>
+                    <span>{time}</span>
+                  </li>
+                ))}
+              </ol>
+            )}
+            {id === "performance" && (
+              <div class="bento-vitals">
+                {[
+                  ["LCP", "1.8", "s", 72],
+                  ["INP", "124", "ms", 54],
+                  ["CLS", "0.02", "", 30],
+                ].map(([metric, value, unit, width]) => (
+                  <div>
+                    <span>{metric}</span>
+                    <strong>
+                      {value}
+                      <small>{unit}</small>
+                    </strong>
+                    <div class="bento-meter">
+                      <i style={`width:${width}%`} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            {id === "api" && (
+              <div class="bento-requests">
+                {[
+                  ["GET", "/products", "86ms", 58],
+                  ["POST", "/cart", "124ms", 78],
+                  ["POST", "/checkout", "312ms", 95],
+                ].map(([method, path, time, width]) => (
+                  <div>
+                    <span>
+                      <b>{method}</b>
+                      <code>{path}</code>
+                      <em>{time}</em>
+                    </span>
+                    <div class="bento-meter">
+                      <i style={`width:${width}%`} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            {id === "alerts" && (
+              <div class="bento-alert-visual">
+                <div class="bento-alert-rule">
+                  <BellRing size={15} />
+                  <div>
+                    <strong>{zh ? "错误率 ≥ 2%" : "Error rate ≥ 2%"}</strong>
+                    <span>{zh ? "最近 5 分钟 · production" : "Last 5 min · production"}</span>
+                  </div>
+                </div>
+                <div class="bento-alert-connector">
+                  <ArrowDown size={12} />
+                  <span>Webhook</span>
+                </div>
+                <div class="bento-alert-message">
+                  <MessageSquare size={17} />
+                  <div>
+                    <strong>{zh ? "研发值班群" : "Team IM channel"}</strong>
+                    <span>{zh ? "错误率突增，请关注" : "Error spike needs attention"}</span>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </article>
+      ))
+    }
+  </div>
+  <p class="bento-note">
+    {zh ? "图中为功能示意，使用示例数据。" : "Product illustrations use example data."}
+  </p>
+</section>
+
+<style>
+  .feature-bento {
+    padding-block: 72px 88px;
+    scroll-margin-top: var(--site-nav-height);
+  }
+  .bento-heading {
+    display: flex;
+    justify-content: space-between;
+    align-items: end;
+    gap: 32px;
+    margin-bottom: 36px;
+  }
+  .bento-heading h2 {
+    max-width: 720px;
+    margin: 16px 0 0;
+    font-size: clamp(30px, 3vw, 40px);
+    font-weight: 550;
+    line-height: 1.2;
+    letter-spacing: -0.04em;
+    text-wrap: balance;
+  }
+  .bento-heading > p {
+    flex-shrink: 0;
+    margin: 0;
+    color: var(--ds-text-muted);
+    font-size: 16px;
+    line-height: 1.7;
+  }
+  .bento-grid {
+    display: grid;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    gap: 16px;
+  }
+  .bento-card {
+    position: relative;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    grid-column: span 3;
+    overflow: hidden;
+    border: 1px solid var(--ds-border);
+    border-radius: var(--radius-lg);
+    background: var(--ds-surface);
+    transition: border-color 180ms ease-out;
+  }
+  .bento-card:hover,
+  .bento-card:focus-within {
+    border-color: color-mix(in oklch, var(--ds-text) 35%, var(--ds-border));
+  }
+  .bento-analytics {
+    grid-column: span 7;
+  }
+  .bento-errors {
+    grid-column: span 5;
+  }
+  .bento-copy {
+    padding: 26px 24px 22px;
+  }
+  .bento-label {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    margin: 0 0 18px;
+    font-size: 13px;
+    font-weight: 550;
+    color: var(--ds-text-secondary);
+  }
+  .bento-label :global(svg) {
+    color: var(--ds-text);
+  }
+  h3 {
+    margin: 0;
+    font-size: 19px;
+    line-height: 1.4;
+    font-weight: 550;
+    letter-spacing: -0.025em;
+  }
+  .bento-analytics h3,
+  .bento-errors h3 {
+    font-size: 24px;
+  }
+  h3 a {
+    color: var(--ds-text);
+    text-decoration: none;
+  }
+  h3 a::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+  }
+  h3 a:focus-visible {
+    outline: none;
+  }
+  h3 a:focus-visible::after {
+    outline: 2px solid var(--ds-ring);
+    outline-offset: -3px;
+    border-radius: inherit;
+  }
+  :global(.bento-arrow) {
+    display: inline-block;
+    vertical-align: middle;
+    margin-left: 8px;
+    color: var(--ds-text-muted);
+    transition: transform 180ms ease-out;
+  }
+  .bento-card:hover :global(.bento-arrow) {
+    transform: translateX(3px);
+  }
+  .bento-description {
+    margin: 12px 0 0;
+    color: var(--ds-text-muted);
+    font-size: 14px;
+    line-height: 1.75;
+  }
+  .bento-visual {
+    margin: auto 24px 24px;
+    padding: 18px;
+    min-height: 156px;
+    border: 1px solid var(--ds-border);
+    border-radius: var(--radius-md);
+    background: var(--ds-canvas);
+  }
+  .bento-analytics .bento-visual,
+  .bento-errors .bento-visual {
+    min-height: 208px;
+  }
+  .bento-stat-row {
+    display: flex;
+    gap: 32px;
+    align-items: start;
+  }
+  .bento-stat-row div {
+    display: grid;
+    gap: 4px;
+  }
+  .bento-stat-row span,
+  .bento-axis {
+    color: var(--ds-text-muted);
+    font-size: 12px;
+  }
+  .bento-stat-row strong {
+    font-size: 28px;
+    line-height: 1.2;
+    font-weight: 550;
+    letter-spacing: -0.04em;
+  }
+  .bento-stat-row .bento-period {
+    margin-left: auto;
+  }
+  .bento-trend {
+    display: block;
+    width: 100%;
+    height: 100px;
+    margin-top: 16px;
+    overflow: visible;
+  }
+  .bento-gridline {
+    stroke: var(--ds-border);
+    stroke-dasharray: 3 5;
+  }
+  .bento-area {
+    fill: color-mix(in oklch, var(--ds-primary) 16%, transparent);
+  }
+  .bento-line {
+    stroke: var(--ds-primary);
+    stroke-width: 2.5;
+    stroke-linejoin: round;
+    vector-effect: non-scaling-stroke;
+  }
+  .bento-axis {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 8px;
+    font-size: 10px;
+    letter-spacing: 0.08em;
+  }
+  .bento-error-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .bento-error-icon {
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    width: 30px;
+    height: 30px;
+    border-radius: var(--radius-sm);
+    color: var(--ds-danger);
+    background: var(--ds-danger-soft);
+  }
+  .bento-error-row > div {
+    min-width: 0;
+    display: grid;
+    gap: 3px;
+  }
+  .bento-error-row strong {
+    font-size: 13px;
+  }
+  .bento-error-row div span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 12px;
+    color: var(--ds-text-muted);
+  }
+  .bento-count {
+    margin-left: auto;
+    font: 12px var(--font-mono);
+    color: var(--ds-text-muted);
+  }
+  .bento-code {
+    margin-top: 16px;
+    border: 1px solid var(--ds-border);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+  }
+  .bento-code > span {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 10px;
+    font-size: 11px;
+    border-bottom: 1px solid var(--ds-border);
+    color: var(--ds-text-muted);
+  }
+  .bento-code code {
+    display: grid;
+    padding-block: 8px;
+    font-size: 11px;
+    line-height: 1.7;
+  }
+  .bento-code code span {
+    padding-inline: 10px;
+    white-space: nowrap;
+  }
+  .bento-code-active {
+    background: var(--ds-danger-soft);
+    color: color-mix(in oklch, var(--ds-danger), var(--ds-text) 18%);
+  }
+  .bento-context {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 12px;
+  }
+  .bento-context span {
+    border: 1px solid var(--ds-border);
+    border-radius: var(--radius-sm);
+    padding: 3px 6px;
+    font-size: 10px;
+    color: var(--ds-text-secondary);
+  }
+  .bento-timeline {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: grid;
+    gap: 0;
+  }
+  .bento-timeline li {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    height: 38px;
+    font-size: 11px;
+  }
+  .bento-timeline li:not(:last-child)::before {
+    content: "";
+    position: absolute;
+    left: 3px;
+    top: 22px;
+    height: 33px;
+    width: 1px;
+    background: var(--ds-border);
+  }
+  .bento-timeline i {
+    position: relative;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--ds-primary);
+    flex-shrink: 0;
+  }
+  .bento-timeline code {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .bento-timeline span {
+    margin-left: auto;
+    color: var(--ds-text-muted);
+    font-size: 10px;
+  }
+  .bento-vitals {
+    display: grid;
+    gap: 13px;
+  }
+  .bento-vitals > div {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 6px;
+    font-size: 11px;
+  }
+  .bento-vitals strong {
+    font-size: 14px;
+    font-weight: 550;
+  }
+  .bento-vitals small {
+    font-size: 10px;
+    font-weight: 400;
+    margin-left: 3px;
+    color: var(--ds-text-muted);
+  }
+  .bento-meter {
+    grid-column: 1 / -1;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--ds-border);
+    overflow: hidden;
+  }
+  .bento-meter i {
+    display: block;
+    height: 100%;
+    background: var(--ds-primary);
+    border-radius: inherit;
+  }
+  .bento-requests {
+    display: grid;
+    gap: 18px;
+  }
+  .bento-requests > div > span {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    margin-bottom: 8px;
+    font-size: 10px;
+  }
+  .bento-requests b {
+    font-size: 9px;
+    font-weight: 500;
+    color: var(--ds-text-muted);
+  }
+  .bento-requests code {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .bento-requests em {
+    margin-left: auto;
+    font-style: normal;
+    color: var(--ds-text-muted);
+  }
+  .bento-requests .bento-meter i {
+    background: var(--ds-secondary);
+  }
+  .bento-alert-visual {
+    display: grid;
+    gap: 8px;
+  }
+  .bento-alert-rule,
+  .bento-alert-message {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .bento-alert-rule :global(svg),
+  .bento-alert-message :global(svg) {
+    flex-shrink: 0;
+  }
+  .bento-alert-rule > div,
+  .bento-alert-message > div {
+    min-width: 0;
+    display: grid;
+    gap: 3px;
+  }
+  .bento-alert-visual strong {
+    font-size: 11px;
+    font-weight: 550;
+  }
+  .bento-alert-visual span {
+    font-size: 10px;
+    color: var(--ds-text-muted);
+  }
+  .bento-alert-connector {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding-left: 3px;
+    color: var(--ds-text-muted);
+  }
+  .bento-alert-message {
+    padding: 9px;
+    border: 1px solid var(--ds-border);
+    border-left: 3px solid var(--ds-primary);
+    border-radius: var(--radius-sm);
+    background: var(--ds-surface);
+  }
+  .bento-note {
+    margin: 12px 0 0;
+    text-align: right;
+    font-size: 12px;
+    color: var(--ds-text-muted);
+  }
+  @media (max-width: 1100px) {
+    .bento-card {
+      grid-column: span 6;
+    }
+    .bento-heading {
+      display: block;
+    }
+    .bento-heading > p {
+      margin-top: 18px;
+    }
+  }
+  @media (max-width: 600px) {
+    .feature-bento {
+      padding-block: 48px 56px;
+    }
+    .bento-grid {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .bento-card {
+      grid-column: auto;
+    }
+    .bento-copy {
+      padding: 22px 20px;
+    }
+    .bento-visual {
+      margin-inline: 20px;
+      padding: 14px;
+    }
+    .bento-analytics h3,
+    .bento-errors h3 {
+      font-size: 21px;
+    }
+    .bento-stat-row {
+      gap: 20px;
+    }
+    .bento-stat-row strong {
+      font-size: 24px;
+    }
+    .bento-period {
+      display: none;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .bento-card,
+    :global(.bento-arrow) {
+      transition: none;
+    }
+  }
+</style>

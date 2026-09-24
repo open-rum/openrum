@@ -2,30 +2,31 @@
 title: OpenRUM documentation
 description: Run an OpenRUM Instance, or send your first Event from an application.
 template: splash
-appliesTo: Alpha / main
+appliesTo: Alpha
 ---
 
 import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
-OpenRUM is open-source, self-hosted frontend monitoring. Because you run the Instance
-yourself, there are two separate jobs here, and most readers only have one of them.
+OpenRUM is open-source, self-hosted frontend monitoring. Choose local development or production deployment, follow the steps to start an Instance and sign in, then connect your applications.
 
 ## Where to start
 
 <div class="docs-entry-grid">
   <CardGrid>
     <LinkCard
-      title="Run an Instance"
-      description="Bring up the stack with Compose or Helm, then keep it healthy. Start here if nothing is deployed yet."
-      href="/docs/getting-started/quickstart/"
+      title="Local development"
+      description="Prepare your computer, start services, change code and verify with the example app and test data generator."
+      href="/docs/getting-started/local-development/"
     />
     <LinkCard
-      title="Instrument an application"
-      description="Install the browser SDK, send Events to an Instance somebody already runs, and get readable stack traces."
-      href="/docs/sdk/browser/"
+      title="Production deployment"
+      description="Prepare data services, an image and HTTPS, deploy with Helm, create an administrator and connect a real Project."
+      href="/docs/getting-started/production-deployment/"
     />
   </CardGrid>
 </div>
+
+Unsure which path to choose? Read [Start using OpenRUM](/docs/getting-started/quickstart/). If an Instance is already running, [create your first project](/docs/getting-started/create-first-project/).
 
 ## By task
 
@@ -33,7 +34,7 @@ yourself, there are two separate jobs here, and most readers only have one of th
   <LinkCard
     title="Deploy to production"
     description="Topology, dependencies and the decisions that are hard to reverse later."
-    href="/docs/self-hosting/overview/"
+    href="/docs/getting-started/production-deployment/"
   />
   <LinkCard
     title="Instrument a server-rendered app"
@@ -74,7 +75,7 @@ yourself, there are two separate jobs here, and most readers only have one of th
 
 ## Before you expose an Instance
 
-OpenRUM is Alpha. Read the [threat model](/docs/self-hosting/security/threat-model/) and the
-[measured capacity limits](/docs/self-hosting/capacity/) first: the published benchmark is a
-local single-host rehearsal that OpenRUM did not pass at its target rate, and no production
-capacity claim is made from it.
+OpenRUM is Alpha. Read the [threat model](/docs/self-hosting/security/threat-model/) and
+[capacity planning](/docs/self-hosting/capacity/), and verify capacity with your actual workload. Published local single-host benchmarks are not production capacity guarantees.
+
+Documentation is available in English and Chinese. Use the language selector in the header to switch.

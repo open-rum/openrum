@@ -6,7 +6,6 @@ import { ConsolePage, ConsolePageHeader } from "@/components/layout/ConsolePage"
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { changePassword, sessionQueryOptions } from "@/lib/auth/session";
-import { AccountSettingsNav } from "./AccountSettingsNav";
 
 export function AccountPage() {
   const { data: user } = useSuspenseQuery(sessionQueryOptions());
@@ -23,7 +22,7 @@ export function AccountPage() {
   });
 
   return (
-    <ConsolePage width="narrow" rail={<AccountSettingsNav />} railLabel="账户设置">
+    <ConsolePage width="narrow">
       <ConsolePageHeader title="Account" description="查看个人信息并管理登录安全。" />
 
       <section

@@ -1,5 +1,7 @@
 # Prototype Instructions
 
+Local development data generation uses a fixed bottom-right, icon-only “造数据” quick entry and a shadcn Dialog, not a status bar or settings navigation item. Keep its accessible label and hover title. Default to the current Project, Environment and analysis range; automatically use the Project's default public DSN. Report Ingest acceptance separately from queryable sample verification. Keep both UI and API development-only. See `docs/dev-data.md` for the code map and troubleshooting.
+
 Run the local server yourself and open the preview in the browser available to this environment. Do not give the user server-start instructions when you can run it.
 
 Before making substantial visual changes, use the Product Design plugin's `get-context` skill when the visual source is unclear or no longer matches the current goal. When the user gives durable prototype-specific design feedback, preferences, or decisions, record them in `AGENTS.md`.
@@ -7,6 +9,20 @@ Before making substantial visual changes, use the Product Design plugin's `get-c
 When implementing from a selected generated mock, treat that image as the source of truth for layout, component anatomy, density, spacing, color, typography, visible content, and hierarchy.
 
 ## Active product direction
+
+- All Console Line/Area trends use `lib/charts/smoothCurve.ts`: smooth monotone-X
+  interpolation with round caps/joins in page charts, mini charts, previews and
+  enlarged details. Preserve measured values and null gaps; never average away
+  real peaks for visual smoothing. Dashboard dots mark only isolated samples.
+
+- Before implementing any Console time-series requirement, read `docs/agents/time-series.md`.
+  Line, Area, time-based Bar, Stat, previews and details share an approximately
+  30-point target, independent of width. Use `lib/charts/timeSeries.ts` and the
+  shared backend policy; do not import helpers from another feature or add a
+  page-specific interval table. Respect source resolution, preserve null gaps,
+  disclose the returned interval and keep 2–6 readable axis labels. Resizing
+  changes presentation only. The standard lists adopted and legacy consumers;
+  do not claim unmodified historical pages are already migrated.
 
 - Sessions keeps its high-density list full width and opens row previews in a
   right-side shadcn Drawer whose state is URL-backed. Full investigation lives
@@ -16,17 +32,41 @@ When implementing from a selected generated mock, treat that image as the source
   Session ends after 30 minutes idle or 24 hours continuous activity; it is not
   a user's lifecycle. Do not expose a replay control until real privacy-filtered
   replay data and a player exist.
-- Logs uses a full-width chart and list with its own query search and severity
-  selector. Do not render the shared dimension sidebar, its toolbar, or active
-  chips on this page. Keep global time/environment controls; express optional
-  country/device/route/browser/release constraints through visible query terms,
-  never hidden legacy sidebar URL parameters.
+- Sessions, Events, API, Logs, and Issues use the shared focus-expanding filter search:
+  `/` focuses it, selected conditions remain visible as removable tokens, and
+  each page supplies only the fields its API supports. Do not duplicate these
+  filters in a side rail or render a second search box. Logs keeps its full-width
+  chart and list; express optional country/device/route/browser/release constraints
+  through visible query terms, never hidden legacy sidebar URL parameters.
   In the Browser SDK, calling `logger.*` and configuring `captureConsole` are
   independent explicit opt-ins; never require `enableLogs`. Keep that option as
   a deprecated, ignored compatibility field until a future breaking release.
   Support explicit `user.id` query terms and show captured user/anonymous visitor
   IDs in log details, with same-user and same-visitor actions. Never infer a
   current user from a Session or fabricate profile fields not captured by the SDK.
+  Issues keeps its high-frequency status as a Select immediately left of the
+  shared search. Its search starts with Issue-specific title, error type, and Fingerprint fields,
+  followed by user.id, release, browser, device, country, Route, and sorting. Issue-title
+  search is server-side across the selected range, never scoped to the loaded page.
+  Shared search field discovery matches technical keys and common aliases, so
+  short input such as `u` can suggest a supported `user.id` field; never suggest
+  a field that the current page query API cannot execute.
+- Category Bar breakdowns use the `CategoryRanking` list: labels/metadata icons,
+  exact values and shares are always visible above thin horizontal bars; no
+  numeric axes or hover-only values. Rank by value and scale bars to the largest
+  returned group. Compact cards show Top 10, enlarged details retain all returned
+  groups, and shares use the full returned group sum, not Top 10 or a deduplicated
+  overall total. Disclose overlap/query limits and support keyboard scrolling.
+  Keep time-series Bar rendering unchanged.
+
+- Breakdown modules also support `donut`: a left ring and right ranked list of
+  labels, exact values and shares, stacked on narrow cards. Presets cover country,
+  device, browser and source, using the existing event queries and persisted
+  breakdown contract. Keep up to six slices; beyond six show the top five plus
+  Other (chart 10). Shares and the center total describe returned groups only;
+  disclose query limits and overlapping user/session counts. Preserve all groups
+  in enlarged details and support keyboard focus as well as pointer highlighting.
+
 - Country breakdown modules support a saved `map` view alongside Bar/Table.
   Render all returned country groups with the lazy bundled SVG map, semantic
   lime intensity and localized ISO labels. Never treat unreturned data as zero
@@ -35,17 +75,47 @@ When implementing from a selected generated mock, treat that image as the source
   changing dimension falls back to Bar. Country queries allow 250 groups while
   other dimension budgets remain 100. Reuse loaded data for map/table details.
 - Project overviews are personal, per-user/per-project dashboards. Keep normal
-  viewing uncluttered; reveal module controls only in edit mode. Modules support
+  viewing uncluttered; reveal a settings menu on card hover/focus (always accessible
+  on touch/narrow screens), without requiring edit mode first. Modules support
   adding, configuring, duplicating, removing, drag sorting and preset widths.
+  The module library and configuration Sheet use a 1040px desktop width, capped
+  at the viewport width on smaller screens; do not revert to a cramped 520px panel.
   Use the shared chart renderer, internal typed module registry and server-saved
   configuration; keep query logic in the console, not in the UI package.
+- Dashboard card menus label the investigation action **详细**, not 放大查看.
+  `ModuleDetailsDialog` is the dashboard-scoped detail shell: a wide chart/data-table
+  workspace with a statistics/context rail, stacked on narrow screens. Stat details
+  lead with current and previous values plus the semantic comparison. Keep exact
+  tables in a separate shadcn Tab, preserving explicitly configured Table views.
+  All dashboard details use the existing shadcn Dialog's default motion; do not
+  add source-card flip/expand or return animations.
+  Respect reduced motion, keep the close action visible and return keyboard focus
+  to the card menu. Reuse loaded buckets without requests, saves or denser reaggregation.
+  Mature the card components here before migrating other Console pages; do not
+  roll out this layout site-wide without a separate request.
 - Overview stat cards show the title, primary value, then a left-aligned
-  period-change badge with "较上一周期" beneath the number, followed by one short
-  metric description. Reserve the top-right for the details icon; do not put
+  period-change badge with "较上一周期" beneath the number, without a metric
+  description on the card. Keep explanations in configuration/details only.
+  Reserve the top-right for the settings menu icon; do not put
   comparisons beside it. Use positive/negative semantic colors based on the metric:
   rising PV/UV is positive, while rising errors, failures and vital timings is
   negative. Missing comparisons, rounded zero and insufficient samples stay neutral.
-  Reveal a details icon on hover/focus and keep it visible on touch/narrow screens.
+  Stat configuration includes optional `statAppearance`: plain (legacy default),
+  line-right or bar-right. Retired line-bottom/area-bottom values normalize to
+  line-right when read; do not offer or render bottom variants. Keep range-wide aggregates unchanged;
+  mini charts reuse the existing Overview/Events time buckets, preserve null gaps
+  and show an empty message rather than synthetic data. Use smooth monotone
+  curves for mini Line charts without changing samples or connecting gaps. Right-side
+  Bars keep the same buckets, with narrow rounded columns and visible gaps. Mini charts
+  remain display-only inside cards: no tooltip, active dot, pointer or keyboard
+  interaction. Both trend appearances sit to the right of the number/comparison.
+  Keep full-chart interaction and accessible tables inside enlarge/details.
+  Appearance changes must
+  not create extra data queries. Respect reduced motion and both themes. Update
+  the frontend schema and Go dashboard allowlist together for saved options.
+  Put enlarge/details inside that menu, not in a separate card button. The page
+  edit action is icon-only and has no adjacent refresh action. Card changes create
+  an unsaved draft with Save/Cancel; opening menus/details alone must not create one.
   Put sampling/approximation notes, receive timestamps, previous values and chart
   tables in an accessible Dialog using the same loaded data, never an inline
   "查看数据表" disclosure. Keep delayed-data dots visible and preserve explicitly
@@ -57,6 +127,12 @@ When implementing from a selected generated mock, treat that image as the source
   black/white contrast tokens and retain the compact theme toggle.
 - The accepted layout target is `../../output/imagegen/openrum-dashboard-stripe.png`.
 - Use the Citrus-adapted shadcn theme: neutral white/graphite surfaces, lime primary, teal secondary, comfortable commercial-reporting density, subtle radii and shadows. Keep red reserved for destructive and error semantics.
+- In light mode, keep canvas, cards, tables, text, and primary page actions neutral;
+  main actions stay black with white text. Use lemon green only for compact badges,
+  icons, focus rings, progress, and selected/effective form states. Selected options
+  use the shared selection tokens and a pale lime surface with a stronger lime
+  border; ordinary hover remains neutral. The Rate Limits page is the settings-form
+  reference. See `docs/design.md`, "Light-mode Citrus accent hierarchy".
 - The overview must treat country, device, browser, and custom dimensions/metrics as first-class analysis surfaces.
 - Use the typed Go query APIs for implemented product areas; keep deterministic frontend fixtures for unit tests and explicit demo states only.
 - Preserve the planned React + TypeScript + Vite stack and the `apps/web` project location.
@@ -68,6 +144,11 @@ When implementing from a selected generated mock, treat that image as the source
 - Use shadcn/ui (Radix Nova + Tailwind CSS v4) for reusable UI primitives. Keep
   component source local, use semantic tokens, and support light, dark, and
   system appearance without component-level theme colors.
+- Object storage settings are provider-first and page-managed by default. Let
+  administrators choose Alibaba OSS, Amazon S3, Cloudflare R2, MinIO, or another
+  S3-compatible service, then show only the relevant connection and credential
+  fields. Test write/read/delete before saving encrypted credentials; keep
+  RAM/IAM roles and deployment-managed Secrets as the advanced production path.
 - Every authenticated Console route uses the shared Console page components.
   Choose only `fluid`, `wide`, or `narrow`; render the desktop `ContextRail`
   only when the page supplies contextual navigation, and compose header,
@@ -81,6 +162,10 @@ When implementing from a selected generated mock, treat that image as the source
   appearance switcher (system/light/dark), then sign out. Personal,
   Organization, notification, and Instance destinations live in the Account
   settings rail; Instance settings are visible only to Instance Administrators.
+- Entering any settings route replaces the primary sidebar navigation with the
+  scoped settings navigation using a short horizontal slide. Keep the brand and
+  account areas stable, provide an explicit back row at the top, and never repeat
+  the same settings rail inside the page content.
 - On desktop, sidebar expand/collapse lives at the far-left edge of the sticky
   content status bar. The sidebar brand row uses that former action slot for a
   project-switch indicator; when collapsed, show only the mark and hide the
@@ -104,6 +189,16 @@ When implementing from a selected generated mock, treat that image as the source
   preserve both values across navigation, and keep page-specific dimensions in
   the page. Keep analysis overview, funnels, paths, and retention as separate
   routes grouped by page-level tabs; refresh remains a page-header action.
+- Treat ClickHouse storage pressure as a global Console state. At 90% used,
+  Browser SDK sampling is capped and every Console route shows a warning Banner;
+  at 95% used, Ingest deliberately drops new envelopes without retry and the
+  Banner becomes critical. Keep the hard stop latched until usage falls below
+  90%, then remove the Banner after the successful recovery observation. When
+  pressure is active, Instance Settings offers a separate guided recovery flow:
+  recommend Project/month partitions whose calendar month ended at least 24 hours earlier,
+  show predicted disk usage, require explicit phrase and Owner password
+  confirmation, and track one global background job. Do not expose SQL or reuse
+  ordinary retention mutations for this path.
 - Omit navigation breadcrumbs from Console page headers. The sidebar selection
   and page title carry location; keep event breadcrumbs only where they represent
   observed session or error context rather than navigation.
@@ -117,6 +212,9 @@ When implementing from a selected generated mock, treat that image as the source
   uses neutral text in both modes; underline prose links. Never use this token
   for logos or chart outlines. See `docs/design.md`,
   "Chart color contract", and the live `/design` workbench.
+- Keep primary header brand lockups on the shared 28px mark / 18px wordmark / 9px
+  gap ratio. Use the tighter favicon crop so the mark fills small browser icon slots;
+  do not reintroduce per-surface header logo sizing.
 - Charts animate by default. Recharts runs its transitions in JavaScript, so the
   global `prefers-reduced-motion` stylesheet cannot reach them; pass
   `isAnimationActive={useChartMotion()}` rather than hard-coding `false`.
@@ -158,6 +256,29 @@ When implementing from a selected generated mock, treat that image as the source
 - Treat each project card as an operational health summary. Lead with the last
   24 hours of PV, UV, error events, a real PV trend, and reporting freshness;
   keep sampling, retention, role, and other configuration details secondary.
+- Project settings exposes **常规、接入指引、数据管理、用量统计**. Group sampling,
+  rate limits, inbound filters, URL normalization and privacy scrubbing inside
+  **数据管理** using `ProjectDataSettingsShell` and the route-backed sections in
+  `projectDataSettings.ts`. Use shadcn Tabs with the **line** variant (underline,
+  no filled selection pills), retaining the section URLs and keyboard navigation.
+  Do not scatter these controls across sidebar subgroups
+  or hide sampling inside the usage report. Each section saves independently;
+  settings apply across all Project environments. Preserve existing rule/limit
+  URLs and keep 数据管理 selected for every section.
+- Sampling lives at `/settings/project/:projectId/sampling`; load Project configuration
+  independently from its seven-day, all-event usage estimate. An unavailable,
+  empty or capped estimate must not prevent configuring sampling. Distinguish
+  SDK sampling from request-rate overload protection.
+- Keep project-level reports under **项目设置 → 用量统计**, with
+  `/settings/project/:projectId/usage` as the canonical address. Preserve query
+  filters when redirecting legacy `/projects/:projectId/usage` links. Keep
+  cross-project ingestion usage in the organization-level `/usage` page
+  as the only organization-level sidebar item. The brand/Logo remains the sole
+  entry to the Project list; never duplicate Projects in navigation. Project
+  usage links preserve the selected range and event type. Statistics cover all project environments;
+  distinguish transfer bytes from stored bytes and usage share from quota usage.
+  Failed project queries must remain visibly unavailable, not zero; suppress
+  organization shares when coverage is incomplete and truncated trend charts.
 - Browser metadata uses the full-color `devicon:chrome` and `devicon:safari`
   artwork, bundled locally rather than loaded from a CDN. Keep browser names in
   accessible labels and hover tooltips; the dense Sessions table shows only the

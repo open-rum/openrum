@@ -2,6 +2,7 @@ import type { ComponentType } from "react";
 import {
   ActivityIcon,
   ChartColumnIcon,
+  ChartPieIcon,
   ChartNoAxesCombinedIcon,
   HashIcon,
   BugIcon,
@@ -35,6 +36,7 @@ export type ModuleDefinition = {
   icon: LucideIcon;
   sizes: readonly WidgetSize[];
   views: readonly WidgetView[];
+  previewView?: WidgetView;
   schema: typeof widgetSchema;
   create: () => Widget;
   adapt: (widget: Widget, data: DashboardData, filters: OverviewFilters) => AdaptedData;
@@ -80,10 +82,10 @@ export const moduleRegistry: Record<WidgetType, ModuleDefinition> = {
     version: 1,
     name: "维度分布",
     group: "分布",
-    description: "国家地图，或设备、浏览器与自定义属性的 Top 10",
+    description: "国家、设备、浏览器或自定义属性，支持圆环列表与地图",
     icon: ChartColumnIcon,
     sizes: ["half", "full"],
-    views: ["bar", "table", "map"],
+    views: ["bar", "donut", "table", "map"],
     schema: widgetSchema,
     create: () => createWidget("breakdown"),
     adapt: adaptPlot,
@@ -121,3 +123,23 @@ export const moduleRegistry: Record<WidgetType, ModuleDefinition> = {
     Editor: ModuleFields,
   },
 };
+
+// Presets reuse the same stored breakdown contract, not new module types.
+export const donutModules: ModuleDefinition[] = [
+  ["country", "国家"],
+  ["device", "设备"],
+  ["browser", "浏览器"],
+  ["source", "来源"],
+].map(([dimension, label]) => ({
+  ...moduleRegistry.breakdown,
+  name: `${label}圆环分布`,
+  description: `左侧圆环、右侧排行，查看${label}的数量和占比`,
+  icon: ChartPieIcon,
+  previewView: "donut",
+  create: () =>
+    createWidget("breakdown", {
+      title: `${label}分布`,
+      view: "donut",
+      data: { source: "events", metrics: ["estimated"], dimension },
+    }),
+}));

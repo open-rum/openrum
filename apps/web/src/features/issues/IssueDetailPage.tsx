@@ -45,6 +45,7 @@ import { EventContext } from "./EventContext";
 import { StackTrace } from "./StackTrace";
 import { useIssueFilters } from "./useIssueFilters";
 import { IssueTrend } from "./IssueTrend";
+import { TIME_SERIES_MAX_POINTS } from "@/lib/charts/timeSeries";
 import "./issues.css";
 
 export function IssueDetailPage() {
@@ -135,6 +136,7 @@ function IssueInvestigation({
     filters.deviceType,
     filters.country,
     filters.route,
+    TIME_SERIES_MAX_POINTS,
   ] as const;
   const detail = useQuery({
     queryKey: detailKey,
@@ -344,7 +346,7 @@ function IssueInvestigation({
         </section>
         <div className="issue-detail-grid">
           <section className="issue-main-column">
-            <IssueTrend trend={detail.data.trend} />
+            <IssueTrend trend={detail.data.trend} range={detail.data} />
             {event.isLoading ? <Skeleton className="h-96" /> : null}
             {event.error ? (
               <IssueDetailError

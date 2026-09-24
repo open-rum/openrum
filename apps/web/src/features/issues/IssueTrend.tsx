@@ -1,6 +1,15 @@
 import { CartesianGrid, Line, LineChart, XAxis, YAxis } from "recharts";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { useChartMotion } from "@/lib/charts/useChartMotion";
+import { smoothCurve } from "@/lib/charts/smoothCurve";
+import {
+  bucketRows,
+  chartTicks,
+  intervalLabel,
+  type TimeSeriesRange,
+} from "@/lib/charts/timeSeries";
+import { isolatedDot } from "@/lib/charts/isolatedDot";
+import { useChartWidth } from "@/lib/charts/useChartWidth";
 import type { IssueDetailResponse } from "@/lib/api/issues";
 import { formatIssueTrendTime, formatIssueTrendTooltip } from "./trendTime";
 
@@ -9,9 +18,16 @@ const config = {
   users: { label: "影响用户", color: "var(--ds-chart-2)" },
 };
 
-export function IssueTrend({ trend }: { trend: IssueDetailResponse["trend"] }) {
+export function IssueTrend({
+  trend,
+  range,
+}: {
+  trend: IssueDetailResponse["trend"];
+  range: TimeSeriesRange;
+}) {
   const animate = useChartMotion();
-  const data = trend.map((point) => ({ ...point, timestamp: new Date(point.bucket).getTime() }));
+  const data = bucketRows(trend, range);
+  const { ref, width } = useChartWidth(data.length > 0);
   return (
     <section className="issue-panel issue-trend" aria-labelledby="issue-trend-title">
       <div className="issue-panel__header">
@@ -19,6 +35,14 @@ export function IssueTrend({ trend }: { trend: IssueDetailResponse["trend"] }) {
           <h2 id="issue-trend-title">发生趋势</h2>
           <p>每个时间桶的错误事件与去重用户，帮助定位异常时段。</p>
         </div>
+        {range.intervalSeconds ? (
+          <span
+            className="text-xs text-muted-foreground"
+            data-chart-interval={range.intervalSeconds}
+          >
+            自动 · {intervalLabel(range.intervalSeconds)}
+          </span>
+        ) : null}
       </div>
       {data.length ? (
         <>
@@ -33,6 +57,7 @@ export function IssueTrend({ trend }: { trend: IssueDetailResponse["trend"] }) {
             </span>
           </div>
           <ChartContainer
+            ref={ref}
             config={config}
             className="h-60 w-full aspect-auto pr-4"
             aria-label="错误事件与影响用户趋势"
@@ -47,13 +72,7 @@ export function IssueTrend({ trend }: { trend: IssueDetailResponse["trend"] }) {
                 dataKey="timestamp"
                 type="number"
                 domain={["dataMin", "dataMax"]}
-                ticks={data
-                  .filter(
-                    (_, index) =>
-                      index % Math.max(1, Math.ceil(data.length / 6)) === 0 ||
-                      index === data.length - 1,
-                  )
-                  .map((point) => point.timestamp)}
+                ticks={chartTicks(data, width).map((label) => Date.parse(label))}
                 tickFormatter={formatIssueTrendTime}
                 minTickGap={48}
                 axisLine={false}
@@ -64,20 +83,22 @@ export function IssueTrend({ trend }: { trend: IssueDetailResponse["trend"] }) {
                 content={<ChartTooltipContent labelFormatter={formatIssueTrendTooltip} />}
               />
               <Line
-                type="linear"
+                {...smoothCurve}
                 dataKey="events"
                 stroke="var(--color-events)"
                 strokeWidth={2}
-                dot={data.length === 1}
+                connectNulls={false}
+                dot={isolatedDot({ rows: data }, "events", "var(--color-events)")}
                 isAnimationActive={animate}
               />
               <Line
-                type="linear"
+                {...smoothCurve}
                 dataKey="users"
                 stroke="var(--color-users)"
                 strokeWidth={2}
                 strokeDasharray="4 3"
-                dot={data.length === 1}
+                connectNulls={false}
+                dot={isolatedDot({ rows: data }, "users", "var(--color-users)")}
                 isAnimationActive={animate}
               />
             </LineChart>

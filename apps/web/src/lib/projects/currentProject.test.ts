@@ -37,6 +37,7 @@ describe("current project selection", () => {
 
   it("reads a project id only from a project-scoped route", () => {
     expect(projectIdFromPathname("/projects/project-b/issues")).toBe("project-b");
+    expect(projectIdFromPathname("/settings/project/project-b/usage")).toBe("project-b");
     expect(projectIdFromPathname("/issues")).toBeUndefined();
   });
 });

@@ -1,7 +1,7 @@
 ---
 title: Analytics
 description: The behavior event model, the dimensions and metrics every Analysis query is built from, and the budget that decides whether a query runs.
-appliesTo: Alpha / main
+appliesTo: Alpha
 ---
 
 Analysis answers what users did across a Project and Environment. It shares one dataset with

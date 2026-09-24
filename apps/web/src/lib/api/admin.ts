@@ -27,8 +27,16 @@ export const adminOverviewSchema = z.object({
     failedJobs: z.number().int().nonnegative().nullable(),
     capacity: z.object({
       status: z.enum(["available", "unknown"]),
+      mode: z.enum(["normal", "warning", "sampling", "blocked", "unknown"]),
+      pressure: z.enum(["normal", "warning", "critical", "unknown"]),
       usedBytes: z.number().nonnegative().nullable(),
+      freeBytes: z.number().nonnegative().nullable(),
       capacityBytes: z.number().nonnegative().nullable(),
+      usedPercent: z.number().nonnegative().max(100).nullable(),
+      automaticSamplingActive: z.boolean(),
+      automaticSamplingRate: z.number().min(0).max(1).nullable(),
+      ingestBlocked: z.boolean(),
+      observedAt: isoTime.nullable(),
       detail: z.string(),
     }),
   }),
@@ -247,6 +255,86 @@ export function maintenanceJobsQueryOptions() {
     refetchInterval: (query) =>
       query.state.data?.jobs.some((job) => ["queued", "running", "retry"].includes(job.status))
         ? 3_000
+        : false,
+  });
+}
+
+export const emergencyCleanupJobSchema = z.object({
+  id: z.string(),
+  status: z.enum(["queued", "running", "retry", "completed", "failed"]),
+  usedBytesBefore: z.number().int().nonnegative(),
+  capacityBytes: z.number().int().positive(),
+  estimatedReleaseBytes: z.number().int().nonnegative(),
+  targetUsedPercent: z.number().int().min(1).max(99),
+  protectedAfter: isoTime,
+  canReachTarget: z.boolean(),
+  totalSteps: z.number().int().positive(),
+  completedSteps: z.number().int().nonnegative(),
+  attempts: z.number().int().nonnegative(),
+  lastError: z.string().optional(),
+  createdAt: isoTime,
+  updatedAt: isoTime,
+  startedAt: isoTime.nullable(),
+  completedAt: isoTime.nullable(),
+});
+
+export const emergencyCleanupPreviewSchema = z.object({
+  previewToken: z.string(),
+  expiresAt: isoTime,
+  usedBytes: z.number().int().nonnegative(),
+  capacityBytes: z.number().int().positive(),
+  estimatedReleaseBytes: z.number().int().positive(),
+  projectedUsedBytes: z.number().int().nonnegative(),
+  targetUsedPercent: z.number().int().min(1).max(99),
+  protectedAfter: isoTime,
+  canReachTarget: z.boolean(),
+  groups: z.array(
+    z.object({
+      projectId: z.string(),
+      projectName: z.string(),
+      month: z.number().int(),
+      affectedRows: z.number().int().nonnegative(),
+      estimatedBytes: z.number().int().positive(),
+      oldestAt: isoTime,
+      newestAt: isoTime,
+    }),
+  ),
+});
+
+export type EmergencyCleanupJob = z.infer<typeof emergencyCleanupJobSchema>;
+export type EmergencyCleanupPreview = z.infer<typeof emergencyCleanupPreviewSchema>;
+
+export function previewEmergencyCleanup() {
+  return requestJSON(emergencyCleanupPreviewSchema, "/api/v1/admin/emergency-cleanup/preview", {
+    method: "POST",
+    headers: csrfHeaders(),
+  });
+}
+
+export function createEmergencyCleanupJob(input: {
+  previewToken: string;
+  confirmation: string;
+  currentPassword: string;
+}) {
+  return requestJSON(emergencyCleanupJobSchema, "/api/v1/admin/emergency-cleanup/jobs", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...csrfHeaders() },
+    body: JSON.stringify(input),
+  });
+}
+
+export function emergencyCleanupJobQueryOptions() {
+  return queryOptions({
+    queryKey: ["admin", "emergency-cleanup", "latest"] as const,
+    queryFn: ({ signal }) =>
+      requestJSON(
+        z.object({ job: emergencyCleanupJobSchema.nullable() }),
+        "/api/v1/admin/emergency-cleanup/jobs/latest",
+        { signal },
+      ),
+    refetchInterval: (query) =>
+      query.state.data?.job && ["queued", "running", "retry"].includes(query.state.data.job.status)
+        ? 2_000
         : false,
   });
 }

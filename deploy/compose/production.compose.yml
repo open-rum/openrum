@@ -1,0 +1,285 @@
+name: openrum-production
+
+x-log-config: &log-config
+  driver: json-file
+  options: { max-size: 10m, max-file: "5" }
+
+x-application-env: &application-env
+  APP_ENV: production
+  PUBLIC_BASE_URL: https://${OPENRUM_DOMAIN:?Set OPENRUM_DOMAIN in .env.production}
+  POSTGRES_DSN: postgres://openrum:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env.production}@postgres:5432/openrum?sslmode=disable
+  CLICKHOUSE_DSN: clickhouse://openrum:${CLICKHOUSE_PASSWORD:?Set CLICKHOUSE_PASSWORD in .env.production}@clickhouse:9000/openrum
+  KAFKA_BROKERS: kafka:19092
+  KAFKA_EVENT_TOPIC: rum-events-v1
+  OPENRUM_KAFKA_RETENTION_DURATION: ${OPENRUM_KAFKA_RETENTION_DURATION:-168h}
+  OPENRUM_CONSUMER_WORKERS: ${OPENRUM_CONSUMER_WORKERS:-4}
+  OPENRUM_CONSUMER_FLUSH_INTERVAL: ${OPENRUM_CONSUMER_FLUSH_INTERVAL:-10ms}
+  REDIS_ADDR: redis:6379
+  INGEST_TRUSTED_PROXIES: ${OPENRUM_EDGE_IP:-172.30.77.10}
+  INGEST_BASE_URL: http://ingest:8081/ingest
+  SHUTDOWN_TIMEOUT: 45s
+  OPENRUM_STORAGE_PRESSURE_GUARD_ENABLED: ${OPENRUM_STORAGE_PRESSURE_GUARD_ENABLED:-true}
+  OPENRUM_STORAGE_WARNING_FREE_RATIO: ${OPENRUM_STORAGE_WARNING_FREE_RATIO:-0.15}
+  OPENRUM_STORAGE_CRITICAL_FREE_RATIO: ${OPENRUM_STORAGE_CRITICAL_FREE_RATIO:-0.10}
+  OPENRUM_STORAGE_HARD_STOP_FREE_RATIO: ${OPENRUM_STORAGE_HARD_STOP_FREE_RATIO:-0.05}
+  OPENRUM_STORAGE_RECOVERY_FREE_RATIO: ${OPENRUM_STORAGE_RECOVERY_FREE_RATIO:-0.10}
+  OPENRUM_STORAGE_EMERGENCY_SAMPLE_RATE: ${OPENRUM_STORAGE_EMERGENCY_SAMPLE_RATE:-0.10}
+  OPENRUM_STORAGE_POLL_INTERVAL: ${OPENRUM_STORAGE_POLL_INTERVAL:-30s}
+  OBJECT_STORAGE_PROVIDER: ${OBJECT_STORAGE_PROVIDER:-}
+  OBJECT_STORAGE_ENDPOINT: ${OBJECT_STORAGE_ENDPOINT:-}
+  OBJECT_STORAGE_BUCKET: ${OBJECT_STORAGE_BUCKET:-}
+  OBJECT_STORAGE_REGION: ${OBJECT_STORAGE_REGION:-}
+  OBJECT_STORAGE_FORCE_PATH_STYLE: ${OBJECT_STORAGE_FORCE_PATH_STYLE:-}
+  OPENRUM_OBJECT_STORAGE_ENDPOINT_ALLOWLIST: ${OPENRUM_OBJECT_STORAGE_ENDPOINT_ALLOWLIST:-}
+  OSS_ACCESS_KEY_ID: ${OSS_ACCESS_KEY_ID:-}
+  OSS_ACCESS_KEY_SECRET: ${OSS_ACCESS_KEY_SECRET:-}
+  AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+  AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+  AWS_SESSION_TOKEN: ${AWS_SESSION_TOKEN:-}
+
+x-app-service: &app-service
+  image: ${OPENRUM_IMAGE:?Set OPENRUM_IMAGE in .env.production}
+  pull_policy: never
+  restart: unless-stopped
+  init: true
+  stop_grace_period: 1m
+  networks: [data]
+  logging: *log-config
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    stop_grace_period: 2m
+    logging: *log-config
+    environment:
+      POSTGRES_DB: openrum
+      POSTGRES_USER: openrum
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env.production}
+    volumes: [postgres-data:/var/lib/postgresql/data]
+    networks: [data]
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U openrum -d openrum"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:25.8
+    restart: unless-stopped
+    stop_grace_period: 2m
+    logging: *log-config
+    environment:
+      CLICKHOUSE_DB: openrum
+      CLICKHOUSE_USER: openrum
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:?Set CLICKHOUSE_PASSWORD in .env.production}
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
+    volumes:
+      - clickhouse-data:/var/lib/clickhouse
+      - clickhouse-logs:/var/log/clickhouse-server
+      - ./clickhouse/config.d/openrum-cluster.xml:/etc/clickhouse-server/config.d/openrum-cluster.xml:ro
+    networks: [data]
+    ulimits:
+      nofile: { soft: 262144, hard: 262144 }
+    healthcheck:
+      test:
+        [
+          CMD-SHELL,
+          'clickhouse-client --host 127.0.0.1 --user openrum --password "$${CLICKHOUSE_PASSWORD}" --query ''SELECT 1'' >/dev/null 2>&1',
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 15s
+
+  kafka:
+    image: apache/kafka:4.1.1
+    restart: unless-stopped
+    stop_grace_period: 2m
+    logging: *log-config
+    environment:
+      KAFKA_NODE_ID: "1"
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: CONTROLLER://:9093,PLAINTEXT://:19092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:19092
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: "1"
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: "1"
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: "1"
+      KAFKA_NUM_PARTITIONS: "12"
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+      KAFKA_MESSAGE_MAX_BYTES: "2097152"
+      KAFKA_REPLICA_FETCH_MAX_BYTES: "2097152"
+      KAFKA_LOG_RETENTION_HOURS: "168"
+    volumes: [kafka-data:/var/lib/kafka/data]
+    networks: [data]
+    healthcheck:
+      test:
+        [
+          CMD-SHELL,
+          "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server 127.0.0.1:19092 >/dev/null 2>&1",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+
+  kafka-init:
+    image: apache/kafka:4.1.1
+    restart: "no"
+    logging: *log-config
+    networks: [data]
+    depends_on:
+      kafka: { condition: service_healthy }
+    command:
+      - /bin/sh
+      - -ec
+      - >-
+        for topic in rum-events-v1 rum-events-v1.dlq; do
+          /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:19092 --create --if-not-exists --topic "$${topic}" --partitions 12 --replication-factor 1 --config min.insync.replicas=1;
+        done
+
+  redis:
+    image: redis:7.2-alpine
+    restart: unless-stopped
+    stop_grace_period: 2m
+    logging: *log-config
+    command: [redis-server, --appendonly, "yes", --maxmemory-policy, allkeys-lru]
+    volumes: [redis-data:/data]
+    networks: [data]
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  migrate:
+    <<: *app-service
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    restart: "no"
+    command: [/app/migrate, up, all]
+    environment:
+      POSTGRES_DSN: postgres://openrum:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env.production}@postgres:5432/openrum?sslmode=disable
+      CLICKHOUSE_DSN: clickhouse://openrum:${CLICKHOUSE_PASSWORD:?Set CLICKHOUSE_PASSWORD in .env.production}@clickhouse:9000/openrum
+    depends_on:
+      postgres: { condition: service_healthy }
+      clickhouse: { condition: service_healthy }
+
+  api:
+    <<: *app-service
+    command: [/app/api]
+    environment:
+      <<: *application-env
+      BOOTSTRAP_TOKEN: ${BOOTSTRAP_TOKEN:?Set BOOTSTRAP_TOKEN in .env.production}
+      OPENRUM_ALLOW_MANAGED_SECRETS: ${OPENRUM_ALLOW_MANAGED_SECRETS:-false}
+      OPENRUM_MASTER_KEY: ${OPENRUM_MASTER_KEY:-}
+      OPENRUM_MASTER_KEY_ID: ${OPENRUM_MASTER_KEY_ID:-v1}
+    networks: [edge, data]
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      kafka-init: { condition: service_completed_successfully }
+      redis: { condition: service_healthy }
+    healthcheck:
+      test: [CMD, wget, --spider, -q, http://127.0.0.1:8080/health/ready]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  ingest:
+    <<: *app-service
+    command: [/app/ingest]
+    environment: *application-env
+    networks: [edge, data]
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      kafka-init: { condition: service_completed_successfully }
+      redis: { condition: service_healthy }
+    healthcheck:
+      test: [CMD, wget, --spider, -q, http://127.0.0.1:8081/health/ready]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  consumer:
+    <<: *app-service
+    command: [/app/consumer]
+    environment: *application-env
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      kafka-init: { condition: service_completed_successfully }
+      redis: { condition: service_healthy }
+    healthcheck:
+      test: [CMD, wget, --spider, -q, http://127.0.0.1:8082/health/ready]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  worker:
+    <<: *app-service
+    command: [/app/worker]
+    environment: *application-env
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+    healthcheck:
+      test: [CMD, wget, --spider, -q, http://127.0.0.1:8083/health/ready]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  web:
+    <<: *app-service
+    command: [/app/web]
+    networks: [edge]
+    volumes: [./nginx.conf:/app/nginx.conf:ro]
+    depends_on:
+      api: { condition: service_healthy }
+      ingest: { condition: service_healthy }
+    healthcheck:
+      test: [CMD, wget, --spider, -q, http://127.0.0.1:8080/health/ready]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  edge:
+    image: caddy:2.11.4-alpine
+    restart: unless-stopped
+    logging: *log-config
+    environment:
+      OPENRUM_DOMAIN: ${OPENRUM_DOMAIN:?Set OPENRUM_DOMAIN in .env.production}
+    ports:
+      - 80:80
+      - 443:443
+      - 443:443/udp
+    volumes:
+      - ./production.Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    networks:
+      edge:
+        ipv4_address: ${OPENRUM_EDGE_IP:-172.30.77.10}
+    depends_on:
+      api: { condition: service_healthy }
+      ingest: { condition: service_healthy }
+      web: { condition: service_healthy }
+
+networks:
+  edge:
+    ipam:
+      config:
+        - subnet: ${OPENRUM_EDGE_SUBNET:-172.30.77.0/24}
+  data: {}
+
+volumes:
+  postgres-data:
+  clickhouse-data:
+  clickhouse-logs:
+  kafka-data:
+  redis-data:
+  caddy-data:
+  caddy-config:

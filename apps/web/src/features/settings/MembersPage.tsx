@@ -15,7 +15,6 @@ import {
   type OrganizationRole,
 } from "@/lib/api/projects";
 import { sessionQueryOptions } from "@/lib/auth/session";
-import { AccountSettingsNav } from "./AccountSettingsNav";
 
 const roleLabels: Record<OrganizationRole, string> = {
   owner: "Owner",
@@ -66,7 +65,7 @@ export function MembersPage() {
   const busy = addMutation.isPending || roleMutation.isPending || removeMutation.isPending;
 
   return (
-    <ConsolePage width="wide" rail={<AccountSettingsNav />} railLabel="账户设置">
+    <ConsolePage width="wide">
       <ConsolePageHeader
         title="成员与权限"
         description="角色权限在服务端逐 API 校验；组织始终必须保留至少一名 Owner。"

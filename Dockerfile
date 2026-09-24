@@ -12,10 +12,10 @@ COPY packages/protocol/package.json packages/protocol/package.json
 COPY packages/ui/package.json packages/ui/package.json
 COPY packages/vite-plugin/package.json packages/vite-plugin/package.json
 COPY examples/react-vite/package.json examples/react-vite/package.json
-RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile --no-runtime
 COPY apps/web apps/web
 COPY packages packages
-RUN pnpm --filter @openrum/web build
+RUN pnpm --filter @openrum/browser build && pnpm --filter @openrum/web build
 
 FROM golang:1.26.6-alpine AS go-build
 WORKDIR /src
@@ -37,10 +37,11 @@ FROM alpine:3.24
 LABEL org.opencontainers.image.title="OpenRUM" \
       org.opencontainers.image.description="Self-hosted real user monitoring services"
 RUN apk upgrade --no-cache && apk add --no-cache ca-certificates nginx tzdata && \
-    mkdir -p /app/public /tmp/nginx && \
+    mkdir -p /app/public /app/sdk /tmp/nginx && \
     chown -R 65532:65532 /app /tmp/nginx
 COPY --from=go-build --chown=65532:65532 /out/* /app/
 COPY --from=console-build --chown=65532:65532 /src/apps/web/dist/client/ /app/public/
+COPY --from=console-build --chown=65532:65532 /src/packages/browser-sdk/dist/index.iife.js /app/sdk/index.iife.js
 COPY --chown=65532:65532 deploy/images/nginx.conf /app/nginx.conf
 COPY --chown=65532:65532 --chmod=755 deploy/images/web /app/web
 USER 65532:65532

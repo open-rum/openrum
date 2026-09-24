@@ -34,6 +34,7 @@ type BehaviorFilters struct {
 	EventKind   string
 	EventName   string
 	Dimension   string
+	MaxPoints   int
 	// Measurement names a Custom Event measurement to break down by Dimension. Empty
 	// leaves the breakdown out; the per-key summary is returned either way.
 	Measurement string
@@ -134,7 +135,7 @@ func NormalizeBehaviorFilters(filters BehaviorFilters) (BehaviorFilters, error) 
 		filters.Dimension = "country"
 	}
 	if filters.ProjectID == uuid.Nil || filters.From.IsZero() || !filters.From.Before(filters.To) ||
-		filters.To.Sub(filters.From) > behaviorMaxRange ||
+		filters.To.Sub(filters.From) > behaviorMaxRange || !validSeriesPointBudget(filters.MaxPoints) ||
 		!boundedQueryDimension(filters.Environment, 64) || !boundedQueryDimension(filters.EventName, 80) ||
 		containsControl(filters.EventKind+filters.Dimension) || !validBehaviorKind(filters.EventKind) || !validBehaviorDimension(filters.Dimension) {
 		return BehaviorFilters{}, ErrInvalidBehaviorFilters
@@ -183,6 +184,9 @@ func (repository *BehaviorRepository) Get(ctx context.Context, requested Behavio
 		return BehaviorAnalytics{}, err
 	}
 	interval := performanceInterval(filters.To.Sub(filters.From))
+	if filters.MaxPoints > 0 {
+		interval = fmt.Sprintf("%d MINUTE", int(adaptiveSeriesInterval(filters.To.Sub(filters.From), filters.MaxPoints)/time.Minute))
+	}
 	totals, latest, err := repository.totals(ctx, filters)
 	if err != nil {
 		return BehaviorAnalytics{}, err

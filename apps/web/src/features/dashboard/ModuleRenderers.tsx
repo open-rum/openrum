@@ -1,4 +1,4 @@
-import { lazy, Suspense, useId } from "react";
+import { lazy, Suspense, useEffect, useId, useRef, useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { countryMapLabel } from "@/components/world-map/data";
 import {
@@ -29,14 +29,26 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useChartMotion } from "@/lib/charts/useChartMotion";
+import { smoothCurve } from "@/lib/charts/smoothCurve";
 import { TopIssuesContent } from "@/features/overview/TopIssues";
 import { SlowApisContent } from "@/features/overview/SlowApis";
-import { bucketFormatter } from "@/features/overview/format";
+import { chartTicks, intervalLabel, timeTickLabel } from "./chartDensity";
 import { formatMetric, formatDetailedMetric, type AdaptedData, type PlotData } from "./adapters";
-import { statDescription, type Widget } from "./model";
+import type { Widget } from "./model";
 import { ModuleComparison } from "./ModuleComparison";
+import { StatTrend } from "./StatTrend";
+import { isolatedDot } from "./isolatedDot";
+import { DonutDistribution } from "./DonutDistribution";
+import { CategoryRanking } from "./CategoryRanking";
 
-export type ModuleRenderProps = { widget: Widget; data: AdaptedData; detailed?: boolean };
+export type ModuleRenderProps = {
+  widget: Widget;
+  data: AdaptedData;
+  detailed?: boolean;
+  showTable?: boolean;
+  showNotes?: boolean;
+  showInterval?: boolean;
+};
 
 const WorldMap = lazy(() =>
   import("@/components/WorldMap").then((module) => ({ default: module.WorldMap })),
@@ -45,22 +57,47 @@ const formatCountryValue = (value: number) => formatDetailedMetric(value, "count
 
 export function StatRenderer({ widget, data }: ModuleRenderProps) {
   if (data.kind !== "scalar") return null;
-  return (
-    <div className="flex flex-col gap-3">
+  const summary = (
+    <div className="relative z-10 flex min-w-0 flex-col gap-3">
       <strong className="text-3xl font-semibold tracking-tight tabular-nums">
         {formatMetric(data.value, data.unit)}
       </strong>
       <ModuleComparison widget={widget} data={data} />
-      <p className="dashboard-stat-description text-xs text-muted-foreground">
-        {statDescription(widget)}
-      </p>
+    </div>
+  );
+  const appearance = widget.statAppearance ?? "plain";
+  if (appearance === "plain") return summary;
+  return (
+    <div
+      data-stat-appearance={appearance}
+      className="grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,0.8fr)] items-center gap-3"
+    >
+      {summary}
+      <StatTrend data={data.trend} appearance={appearance} />
     </div>
   );
 }
 
-export function PlotRenderer({ widget, data, detailed = false }: ModuleRenderProps) {
+export function PlotRenderer({
+  widget,
+  data,
+  detailed = false,
+  showTable = detailed,
+  showNotes = detailed,
+  showInterval = true,
+}: ModuleRenderProps) {
   const gradientId = `module-${useId().replace(/:/g, "")}`;
   const animate = useChartMotion();
+  const container = useRef<HTMLDivElement>(null);
+  const [width, setWidth] = useState(600);
+  const empty = "empty" in data && data.empty;
+  useEffect(() => {
+    const element = container.current;
+    if (!element) return;
+    const observer = new ResizeObserver(([entry]) => setWidth(entry.contentRect.width));
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [empty, widget.view]);
   if (data.kind !== "series" && data.kind !== "categories") return null;
   if (data.empty || !data.rows.length)
     return (
@@ -80,8 +117,27 @@ export function PlotRenderer({ widget, data, detailed = false }: ModuleRenderPro
     ]),
   );
   return (
-    <div className="flex flex-col gap-3">
-      {widget.view === "map" ? (
+    <div ref={container} className="flex min-w-0 flex-col gap-3">
+      {showInterval && !categories && data.intervalSeconds ? (
+        <p
+          className="text-right text-xs text-muted-foreground"
+          data-chart-interval={data.intervalSeconds}
+        >
+          自动 · {intervalLabel(data.intervalSeconds)}
+        </p>
+      ) : null}
+      {widget.view === "donut" ? (
+        <>
+          <DonutDistribution data={data} title={widget.title} />
+          {showTable ? (
+            <PlotTable
+              data={data}
+              title={widget.title}
+              countryLabels={data.distribution?.dimension === "country"}
+            />
+          ) : null}
+        </>
+      ) : widget.view === "map" ? (
         <>
           <Suspense fallback={<Skeleton className="h-64 w-full" aria-label="正在加载世界地图" />}>
             <WorldMap
@@ -94,15 +150,17 @@ export function PlotRenderer({ widget, data, detailed = false }: ModuleRenderPro
               }))}
             />
           </Suspense>
-          {detailed ? <PlotTable data={data} title={widget.title} countryLabels /> : null}
+          {showTable ? <PlotTable data={data} title={widget.title} countryLabels /> : null}
         </>
       ) : widget.view === "table" ? (
         <PlotTable data={data} title={widget.title} />
+      ) : categories && widget.view === "bar" ? (
+        <CategoryRanking data={data} title={widget.title} detailed={detailed} />
       ) : (
         <>
           <ChartContainer
             config={config}
-            className="h-64 w-full"
+            className={detailed ? "h-80 w-full sm:h-96" : "h-64 w-full"}
             initialDimension={{ width: 600, height: 256 }}
             aria-label={widget.title}
           >
@@ -110,6 +168,8 @@ export function PlotRenderer({ widget, data, detailed = false }: ModuleRenderPro
               data={data.rows}
               layout={categories ? "vertical" : "horizontal"}
               margin={{ top: 12, right: 12, left: 0, bottom: 0 }}
+              barCategoryGap="25%"
+              barGap={2}
               accessibilityLayer
             >
               <defs>
@@ -139,9 +199,13 @@ export function PlotRenderer({ widget, data, detailed = false }: ModuleRenderPro
                 axisLine={false}
                 tickLine={false}
                 minTickGap={40}
+                ticks={categories ? undefined : chartTicks(data.rows, width)}
+                interval={categories ? undefined : "preserveStartEnd"}
                 tickMargin={8}
                 tickFormatter={
-                  categories ? (value: number) => formatMetric(value, unit) : bucketFormatter
+                  categories
+                    ? (value: number) => formatMetric(value, unit)
+                    : (value: string) => timeTickLabel(value, data.rangeMs ?? 0)
                 }
               />
               <YAxis
@@ -150,6 +214,7 @@ export function PlotRenderer({ widget, data, detailed = false }: ModuleRenderPro
                 width={categories ? 94 : 60}
                 axisLine={false}
                 tickLine={false}
+                tickCount={5}
                 tickFormatter={
                   categories
                     ? (value: string) => (value.length > 12 ? `${value.slice(0, 12)}…` : value)
@@ -208,10 +273,10 @@ export function PlotRenderer({ widget, data, detailed = false }: ModuleRenderPro
                   <Line
                     key={series.key}
                     dataKey={series.key}
-                    type="monotone"
+                    {...smoothCurve}
                     stroke={series.ink}
                     strokeWidth={2}
-                    dot={false}
+                    dot={isolatedDot(data, series.key, series.ink)}
                     connectNulls={false}
                     isAnimationActive={animate}
                   />
@@ -219,10 +284,11 @@ export function PlotRenderer({ widget, data, detailed = false }: ModuleRenderPro
                   <Area
                     key={series.key}
                     dataKey={series.key}
-                    type="monotone"
+                    {...smoothCurve}
                     stroke={series.ink}
                     fill={`url(#${gradientId}-${index})`}
                     strokeWidth={1.5}
+                    dot={isolatedDot(data, series.key, series.ink)}
                     connectNulls={false}
                     isAnimationActive={animate}
                   />
@@ -231,10 +297,10 @@ export function PlotRenderer({ widget, data, detailed = false }: ModuleRenderPro
               {data.series.length > 1 ? <ChartLegend content={<ChartLegendContent />} /> : null}
             </ComposedChart>
           </ChartContainer>
-          {detailed ? <PlotTable data={data} title={widget.title} /> : null}
+          {showTable ? <PlotTable data={data} title={widget.title} /> : null}
         </>
       )}
-      {detailed ? (
+      {showNotes ? (
         <p className="text-xs text-muted-foreground">
           {data.note}
           {data.thresholds
@@ -246,7 +312,7 @@ export function PlotRenderer({ widget, data, detailed = false }: ModuleRenderPro
   );
 }
 
-function PlotTable({
+export function PlotTable({
   data,
   title,
   countryLabels = false,
@@ -257,7 +323,12 @@ function PlotTable({
 }) {
   const samples = data.rows.some((row) => row.samples !== undefined);
   return (
-    <div className="max-h-72 overflow-auto">
+    <div
+      className="dashboard-plot-table max-h-72 overflow-auto"
+      tabIndex={0}
+      role="region"
+      aria-label={`${title} 数据表滚动区域`}
+    >
       <Table aria-label={`${title} 数据表`}>
         <TableHeader>
           <TableRow>

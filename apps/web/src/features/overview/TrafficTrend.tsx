@@ -9,6 +9,7 @@ import {
   type ChartConfig,
 } from "@/components/ui/chart";
 import { useChartMotion } from "@/lib/charts/useChartMotion";
+import { smoothCurve } from "@/lib/charts/smoothCurve";
 import type { OverviewResponse } from "@/lib/api/client";
 import { bucketFormatter, compactCount } from "./format";
 
@@ -85,7 +86,7 @@ export function TrafficTrend({ series }: { series: OverviewResponse["series"] })
               />
               <Area
                 dataKey="pageViews"
-                type="natural"
+                {...smoothCurve}
                 stroke="var(--color-pageViews)"
                 strokeWidth={1.5}
                 fill="url(#overviewTraffic-pageViews)"
@@ -93,7 +94,7 @@ export function TrafficTrend({ series }: { series: OverviewResponse["series"] })
               />
               <Line
                 dataKey="uniqueUsers"
-                type="natural"
+                {...smoothCurve}
                 stroke="var(--color-uniqueUsers)"
                 strokeWidth={2}
                 dot={false}

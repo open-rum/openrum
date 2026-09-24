@@ -26,13 +26,14 @@ func main() {
 }
 
 func registerRoutes(ctx context.Context, _ *httpx.Router, configuration config.Config, logger zerolog.Logger, registry *observability.MetricsRegistry) (func() error, error) {
-	metrics, err := consumerservice.NewMetrics(registry)
+	metrics, err := consumerservice.NewMetrics(registry, configuration.KafkaRetention)
 	if err != nil {
 		return nil, err
 	}
 	connectCtx, cancelConnect := context.WithTimeout(ctx, 5*time.Second)
 	defer cancelConnect()
 	writerOptions := consumerservice.DefaultClickHouseWriterOptions()
+	writerOptions.FlushInterval = configuration.ConsumerFlushInterval
 	writerOptions.Observer = metrics
 	redisClient := redis.NewClient(&redis.Options{Addr: configuration.RedisAddress, ContextTimeoutEnabled: true})
 	writerOptions.ConnectionStatus = ingest.NewRedisConnectionStatus(redisClient)
@@ -60,7 +61,9 @@ func registerRoutes(ctx context.Context, _ *httpx.Router, configuration config.C
 	)
 	deadLetters := consumerservice.NewKafkaDeadLetterSink(configuration.KafkaBrokers, configuration.KafkaEventTopic+".dlq")
 	workerCtx, cancelWorkers := context.WithCancel(ctx)
-	const workerCount = 4
+	// More workers can fill shared ClickHouse batches across Kafka partitions.
+	// Keep the default conservative; size this against partition count and CPU.
+	workerCount := configuration.ConsumerWorkers
 	consumers := make([]*consumerservice.Consumer, 0, workerCount)
 	var workers sync.WaitGroup
 	for range workerCount {

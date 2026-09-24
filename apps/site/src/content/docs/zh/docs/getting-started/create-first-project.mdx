@@ -1,0 +1,67 @@
+---
+title: 创建第一个项目
+description: 创建 Project、安装 Browser SDK，并验证第一个 Event。
+---
+
+import { Steps } from "@astrojs/starlight/components";
+
+**适用于：** Alpha。
+
+请先完成[本地开发](/zh/docs/getting-started/local-development/)或[生产部署](/zh/docs/getting-started/production-deployment/)并登录。一个项目代表一个 Web 产品，可以包含多个环境。
+
+<Steps>
+
+1. ## 创建 Project
+   1. 打开自己的实例地址并登录，本地默认是 `http://127.0.0.1:4173`。
+   2. 通过左上角项目切换面板进入“所有项目”，点击“创建项目”。
+   3. 填写名称与 Slug，选择 React、Vue 或 JavaScript 等开发平台。
+   4. 填写被监控应用的 Origin，例如 `http://127.0.0.1:5173` 或 `https://shop.example.com`，不含路径和结尾斜杠。这里填应用地址，不是控制台地址。
+   5. 配置 `development`、`production` 等环境。创建后自动进入该平台的接入说明。
+   6. 在“项目设置 → 接入”复制默认 DSN。它包含公开 Ingest 地址和只写凭证，无需另外填写 write key。
+
+   **成功标志：** 项目已创建，接入页展示 DSN 和对应平台的安装步骤。
+
+1. ## 安装 Browser SDK
+
+   ```sh
+   pnpm add @openrum/browser
+   ```
+
+   ```ts title="src/monitoring.ts"
+   import { captureEvent, init } from "@openrum/browser";
+
+   init({
+     dsn: import.meta.env.VITE_OPENRUM_DSN,
+     environment: "development",
+     release: "storefront@0.1.0",
+   });
+
+   captureEvent("first_event", {
+     attributes: { source: "create-first-project" },
+   });
+   ```
+
+   上面的示例需在 Vite 应用的本地环境文件设置 `VITE_OPENRUM_DSN`，修改后重启开发服务器。正式应用使用 `production` 环境。初始化放在应用代码之前，不要放在 React 渲染函数中。
+
+   仓库自带可运行示例。复制 `examples/react-vite/.env.example` 为 `examples/react-vite/.env.local`，填入 DSN 后执行：
+
+   ```sh
+   pnpm --filter @openrum/browser build
+   pnpm --filter @openrum/example-react-vite dev --host 127.0.0.1
+   ```
+
+   更多内容见 [Browser SDK](/zh/docs/sdk/browser/)。
+
+1. ## 验证第一个 Event
+   1. 打开你的应用，触发页面访问或 `first_event` 自定义事件。仓库示例按钮发送的名称则是 `demo_checkout`。
+   2. 选择同一项目、环境和“最近 15 分钟”，打开“事件”，等待几秒完成接收与消费。
+   3. 打开 **会话**，确认同一 `session_id` 关联页面、API 与错误事件。
+   4. 若触发了错误，跟随到 **Issue** 并查看会话上下文。
+
+</Steps>
+
+## 故障排查
+
+- 事件缺失：检查 Ingest 健康、DSN、Origin 白名单，以及 Consumer / ClickHouse。
+- CORS 或网络失败：DSN 中的地址必须匹配公开 Ingest 地址与允许的 Origin。
+- Source Map 不可用：未配置对象存储时属预期；核心监控仍可用。

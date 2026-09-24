@@ -3,6 +3,7 @@ import type { BehaviorAnalyticsResponse } from "@/lib/api/analytics";
 import type { OverviewFilters } from "@/lib/filters/schema";
 import { metricLabel, type Widget } from "./model";
 import { effectiveOverviewFilters, type DashboardData } from "./queries";
+import { continuousRows, intervalSeconds } from "./chartDensity";
 
 type Unit = "count" | "percent" | "ms" | "score";
 export type ScalarData = {
@@ -12,6 +13,7 @@ export type ScalarData = {
   detail: string;
   comparison?: { change: number | null; unit: "percent" | "points"; previous: number | null };
   insufficient?: boolean;
+  trend?: PlotData;
 };
 export type SeriesDefinition = {
   key: string;
@@ -27,6 +29,14 @@ export type PlotData = {
   note: string;
   empty: boolean;
   thresholds?: { good: number; poor: number };
+  intervalSeconds?: number;
+  rangeMs?: number;
+  distribution?: {
+    dimension: string;
+    limitReached: boolean;
+    rowLimit: number;
+    nonAdditive: boolean;
+  };
 };
 export type AdaptedData =
   | ScalarData
@@ -100,10 +110,15 @@ function overviewValue(kpis: OverviewResponse["kpis"], metric: string): number |
 
 export function adaptStat(widget: Widget, data: DashboardData): ScalarData {
   const metric = widget.data.metrics[0];
+  const trend =
+    widget.statAppearance && widget.statAppearance !== "plain"
+      ? adaptPlot(widget, data)
+      : undefined;
   if (data.source === "events") {
     const { totals } = data.result;
     return {
       kind: "scalar",
+      trend,
       value: eventValue(totals, metric),
       unit: "count",
       detail: `${totals.events.toLocaleString()} 个采集样本${metric === "estimated" ? " · 采样估算" : totals.approximate ? " · 近似去重" : ""}`,
@@ -135,6 +150,7 @@ export function adaptStat(widget: Widget, data: DashboardData): ScalarData {
   }
   return {
     kind: "scalar",
+    trend,
     value: overviewValue(kpis, metric),
     unit: unitFor(metric),
     detail,
@@ -160,7 +176,7 @@ export function adaptPlot(widget: Widget, data: DashboardData): PlotData {
     if (widget.type === "breakdown") {
       const rows = [...data.result.breakdown]
         .sort((a, b) => eventValue(b.metric, metric) - eventValue(a.metric, metric))
-        .slice(0, widget.view === "map" ? undefined : 10)
+        .slice(0, widget.view === "table" ? 10 : undefined)
         .map((point) => ({
           label: point.value || "未知",
           [metric]: eventValue(point.metric, metric),
@@ -169,17 +185,31 @@ export function adaptPlot(widget: Widget, data: DashboardData): PlotData {
         kind: "categories",
         rows,
         series,
-        note: `${widget.view === "map" ? `全部 ${rows.length} 个国家/地区分组 · 查询上限 ${data.result.rowLimit} 组` : "Top 10"} · ${data.result.sampleCount.toLocaleString()} 个采集样本${data.result.totals.approximate ? " · 近似统计" : ""} · 用户与会话可能跨分组重复`,
+        note: `${widget.view === "map" ? `全部 ${rows.length} 个国家/地区分组 · 查询上限 ${data.result.rowLimit} 组` : widget.view === "donut" || widget.view === "bar" ? `已返回 ${rows.length} 个分组 · 查询上限 ${data.result.rowLimit} 组` : "Top 10"} · ${data.result.sampleCount.toLocaleString()} 个采集样本${data.result.totals.approximate ? " · 近似统计" : ""} · 用户与会话可能跨分组重复`,
         empty: rows.length === 0,
+        distribution: {
+          dimension: data.result.dimension,
+          limitReached: data.result.breakdown.length >= data.result.rowLimit,
+          rowLimit: data.result.rowLimit,
+          nonAdditive: metric !== "estimated",
+        },
       };
     }
     return {
       kind: "series",
       series,
-      rows: data.result.trend.map((point) => ({
-        label: point.bucket,
-        [metric]: eventValue(point.metric, metric),
-      })),
+      intervalSeconds: intervalSeconds(data.result.interval),
+      rangeMs: Date.parse(data.result.to) - Date.parse(data.result.from),
+      rows: continuousRows(
+        data.result.trend.map((point) => ({
+          label: point.bucket,
+          [metric]: eventValue(point.metric, metric),
+        })),
+        data.result.from,
+        data.result.to,
+        intervalSeconds(data.result.interval),
+        [metric],
+      ),
       note: `${data.result.sampleCount.toLocaleString()} 个采集样本 · ${metric === "estimated" ? "事件次数按采样率估算" : "各时间桶独立去重，不能相加作为总数"}`,
       empty: data.result.totals.events === 0,
     };
@@ -207,14 +237,22 @@ export function adaptPlot(widget: Widget, data: DashboardData): PlotData {
   return {
     kind: "series",
     series,
+    intervalSeconds: result.intervalSeconds,
+    rangeMs: Date.parse(result.to) - Date.parse(result.from),
     thresholds,
     empty,
-    rows: result.series.map((point) => {
-      const row: Record<string, string | number | null> = { label: point.bucket };
-      for (const metric of widget.data.metrics) row[metric] = overviewValue(point, metric);
-      if (vital) row.samples = point[key].samples;
-      return row;
-    }),
+    rows: continuousRows(
+      result.series.map((point) => {
+        const row: Record<string, string | number | null> = { label: point.bucket };
+        for (const metric of widget.data.metrics) row[metric] = overviewValue(point, metric);
+        if (vital) row.samples = point[key].samples;
+        return row;
+      }),
+      result.from,
+      result.to,
+      result.intervalSeconds,
+      widget.data.metrics,
+    ),
     note: vital
       ? `${result.kpis[key].samples.toLocaleString()} 个样本 · ${result.kpis[key].sufficient ? "每个时间桶独立计算 P75" : "样本不足，谨慎解读 P75"}`
       : key === "errorRate" || key === "apiFailureRate"

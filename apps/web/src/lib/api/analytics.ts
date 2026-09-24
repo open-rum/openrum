@@ -173,6 +173,7 @@ export type BehaviorFilters = {
   from: Date;
   to: Date;
   environment?: string;
+  maxPoints?: number;
   eventKind?: BehaviorKind;
   eventName?: string;
   dimension: BehaviorDimension;
@@ -205,6 +206,7 @@ export function serializeBehaviorFilters(filters: BehaviorFilters) {
     dimension: filters.dimension,
   });
   if (filters.environment) parameters.set("environment", filters.environment);
+  if (filters.maxPoints) parameters.set("maxPoints", String(filters.maxPoints));
   if (filters.eventKind) parameters.set("eventKind", filters.eventKind);
   if (filters.eventName) parameters.set("eventName", filters.eventName);
   // `BehaviorDimension` is always a real dimension, so a named measurement can always

@@ -45,7 +45,9 @@ test("quiet cards expose semantic comparisons and keyboard-accessible details wi
   });
   const requests = await setup(page);
   const card = page.locator('[data-module-title="PV"]');
-  const trigger = card.getByRole("button", { name: "PV 详情", exact: true });
+  const trigger = card.getByRole("button", { name: "PV 操作", exact: true });
+  await expect(page.getByRole("button", { name: "刷新数据", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "编辑概览", exact: true })).toHaveText("");
   await expect(card.locator('[data-slot="card-description"]')).toHaveCount(0);
   await expect(card).not.toContainText("采集样本");
   await expect(card).not.toContainText("最近接收");
@@ -56,12 +58,10 @@ test("quiet cards expose semantic comparisons and keyboard-accessible details wi
     "positive",
   );
   await expect(card.getByText("较上一周期", { exact: true })).toBeVisible();
-  await expect(card.getByText("页面浏览次数", { exact: true })).toBeVisible();
+  await expect(card.getByText("页面浏览次数", { exact: true })).toHaveCount(0);
   const valueBox = await card.locator("strong").boundingBox();
   const comparisonBox = await card.locator(".dashboard-comparison-row").boundingBox();
-  const descriptionBox = await card.locator(".dashboard-stat-description").boundingBox();
   expect(comparisonBox!.y).toBeGreaterThanOrEqual(valueBox!.y + valueBox!.height);
-  expect(descriptionBox!.y).toBeGreaterThanOrEqual(comparisonBox!.y + comparisonBox!.height);
   expect(Math.abs(comparisonBox!.x - valueBox!.x)).toBeLessThan(1);
   await expect(page.locator('[data-module-title="错误率"] .dashboard-comparison')).toHaveAttribute(
     "data-tone",
@@ -86,14 +86,23 @@ test("quiet cards expose semantic comparisons and keyboard-accessible details wi
   await expect(trigger).toHaveCSS("opacity", "1");
   const queryCount = requests.length;
   await page.keyboard.press("Enter");
+  await expect(page.getByRole("menuitem", { name: "配置模块", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "保存概览", exact: true })).toHaveCount(0);
+  await page.screenshot({ path: "/tmp/openrum-dashboard-hover-menu.png" });
+  await page.getByRole("menuitem", { name: "详细", exact: true }).press("Enter");
   const dialog = page.getByRole("dialog", { name: "PV 详情", exact: true });
   await expect(dialog).toBeVisible();
   await expect(dialog.getByRole("button", { name: "关闭详情" })).toBeFocused();
   await expect(dialog).toContainText("9,900 个采集样本");
   await expect(dialog).toContainText("数据延迟");
-  await expect(dialog.getByRole("table", { name: "PV 周期对比表" })).toContainText("4,950");
-  await expect(dialog.getByRole("table", { name: "PV 数据表" }).getByRole("row")).toHaveCount(7);
+  await expect(dialog.getByRole("region", { name: "周期对比" })).toContainText("4,950");
+  await expect(dialog).not.toHaveAttribute("data-card-motion");
   await expect(dialog.locator(".recharts-line-curve")).toHaveAttribute("d", /M/);
+  await dialog.getByRole("tab", { name: "数据表", exact: true }).click();
+  // The 24h / 5m fixture includes six populated buckets. Missing buckets now
+  // remain explicit gaps across the full range, including in the exact-value table.
+  await expect(dialog.getByRole("table", { name: "PV 数据表" }).getByRole("row")).toHaveCount(289);
+  await dialog.getByRole("tab", { name: "趋势", exact: true }).click();
   await page.screenshot({ path: "/tmp/openrum-dashboard-details-dialog.png" });
   expect(requests.length).toBe(queryCount);
   expect(requests.filter((request) => request.startsWith("PUT"))).toEqual([]);
@@ -113,8 +122,10 @@ test("trend cards put tables and threshold notes only inside the dialog", async 
   await expect(card.getByRole("table")).toHaveCount(0);
   await expect(card).not.toContainText("参考线");
   await card.hover();
-  await card.getByRole("button", { name: "LCP P75 趋势 详情", exact: true }).click();
+  await card.getByRole("button", { name: "LCP P75 趋势 操作", exact: true }).click();
+  await page.getByRole("menuitem", { name: "详细", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "LCP P75 趋势 详情", exact: true });
+  await dialog.getByRole("tab", { name: "数据表", exact: true }).click();
   await expect(dialog.getByRole("table", { name: "LCP P75 趋势 数据表" })).toContainText(
     "2,200 ms",
   );
@@ -126,9 +137,10 @@ test("trend cards put tables and threshold notes only inside the dialog", async 
 test("mobile retains the details entry and a bounded scrollable dialog", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await setup(page);
-  const trigger = page.getByRole("button", { name: "PV 详情", exact: true });
+  const trigger = page.getByRole("button", { name: "PV 操作", exact: true });
   await expect(trigger).toHaveCSS("opacity", "1");
   await trigger.click();
+  await page.getByRole("menuitem", { name: "详细", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "PV 详情", exact: true });
   await expect(dialog).toBeVisible();
   const bounds = await dialog.boundingBox();
@@ -136,6 +148,7 @@ test("mobile retains the details entry and a bounded scrollable dialog", async (
   expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(390);
   expect(bounds!.y).toBeGreaterThanOrEqual(0);
   expect(bounds!.y + bounds!.height).toBeLessThanOrEqual(844);
+  await dialog.getByRole("tab", { name: "数据表", exact: true }).click();
   await dialog.getByRole("table", { name: "PV 数据表" }).scrollIntoViewIfNeeded();
   await expect(dialog.getByRole("table", { name: "PV 数据表" })).toBeVisible();
   await page.screenshot({ path: "/tmp/openrum-dashboard-details-mobile.png" });
@@ -143,4 +156,41 @@ test("mobile retains the details entry and a bounded scrollable dialog", async (
   await dialog.getByRole("button", { name: "关闭详情" }).click();
   await expect(trigger).toBeFocused();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});
+
+test("dark cards expose the menu and cancelling configuration does not start a draft", async ({
+  page,
+}) => {
+  await setup(page);
+  await page.getByRole("button", { name: "切换至暗色模式", exact: true }).click();
+  const card = page.locator('[data-module-title="PV"]');
+  await card.hover();
+  await card.getByRole("button", { name: "PV 操作", exact: true }).click();
+  await expect(page.getByRole("menuitem", { name: "详细", exact: true })).toBeVisible();
+  await page.screenshot({ path: "/tmp/openrum-dashboard-hover-menu-dark.png" });
+  await page.getByRole("menuitem", { name: "配置模块", exact: true }).click();
+  const editor = page.getByRole("dialog", { name: "配置模块", exact: true });
+  await expect(editor.getByRole("textbox", { name: "标题", exact: true })).toHaveValue("PV");
+  await editor.getByRole("button", { name: "取消", exact: true }).click();
+  await expect(editor).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "保存概览", exact: true })).toHaveCount(0);
+});
+
+test("hover menu can edit a viewing dashboard without a prior edit-mode click", async ({
+  page,
+}) => {
+  const requests = await setup(page);
+  const trigger = page.getByRole("button", { name: "PV 操作", exact: true });
+  await trigger.click();
+  await page.getByRole("menuitem", { name: "复制模块", exact: true }).click();
+  await expect(page.locator('[data-module-title="PV 副本"]')).toBeVisible();
+  await expect(page.getByRole("button", { name: "保存概览", exact: true })).toBeEnabled();
+  expect(requests.filter((request) => request.startsWith("PUT"))).toEqual([]);
+  await page.getByRole("button", { name: "取消", exact: true }).click();
+  await page
+    .getByRole("alertdialog")
+    .getByRole("button", { name: "放弃修改", exact: true })
+    .click();
+  await expect(page.locator('[data-module-title="PV 副本"]')).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "编辑概览", exact: true })).toBeVisible();
 });

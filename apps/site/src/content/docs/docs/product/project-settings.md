@@ -3,7 +3,7 @@ title: Project settings
 description: Configure Environments, keys, Origins, sampling, retention and Releases.
 ---
 
-**Applies to:** Alpha / main. Status: Alpha implemented.
+**Applies to:** Alpha. Status: Alpha implemented.
 
 Project settings define how a monitored web product sends and retains telemetry.
 
@@ -17,16 +17,31 @@ Project settings define how a monitored web product sends and retains telemetry.
 
 ## Where to change them
 
-In the Console, open a project and go to **Settings**:
+In the Console, open **Settings** and use the **Project** scope. Every settings address
+names its scope in the path, so a link is unambiguous about which of account, organization,
+project or instance it belongs to:
 
-- **General** (`/projects/<id>/settings`) — name, slug, allowed Origins, environment, retention days, and a danger zone to disable or re-enable the project.
-- **Client DSN** (`/projects/<id>/settings/keys`) — copy or rotate the Project's automatic default connection string; additional DSNs are advanced configuration.
-- **Inbound filters** (`/projects/<id>/settings/filters`) — drop crawler, extension and localhost traffic, plus custom patterns.
-- **URL normalization** (`/projects/<id>/settings/url-rules`) — path templates that collapse one route into one row.
-- **Scrubbing** (`/projects/<id>/settings/scrubbing`) — regular expressions and attribute keys to redact on top of the built-in list.
-- **Quota** (`/projects/<id>/settings/quota`) — the project's own ingest rate limit and what happens above it.
-- **Usage and sampling** (`/projects/<id>/usage`) — sampling rates, alongside a preview of the resulting event volume.
-- **Alerts** (`/projects/<id>/alerts`) — alert rules for this project.
+- **General** (`/settings/project/<id>/general`) — name, slug, allowed Origins, environment, retention days, and a danger zone to disable or re-enable the project.
+- **Onboarding** (`/projects/<id>/onboarding`) — copy the Project's default DSN and platform-specific integration code.
+- **Data management** — one entry for sampling, rate limits, inbound filters, URL normalization and privacy scrubbing. Switch between the page's tabs; each setting saves independently and applies across the Project's environments.
+- **Usage statistics** (`/settings/project/<id>/usage`) — accepted volume, estimated source volume and processing outcomes, with CSV export. Sampling configuration is separate from this report.
+
+### Data management tabs
+
+| Tab | Purpose | Address |
+| --- | --- | --- |
+| Sampling | Configure the proportion retained by the SDK for Events, API Requests and errors before reporting. Preview the impact using the last seven days across all event types. | `/settings/project/<id>/sampling` |
+| Rate limits | Limit Ingest requests per second and choose the over-limit strategy; separate from routine SDK sampling. | `/settings/project/<id>/quota` |
+| Inbound filters | Exclude crawlers, extensions, localhost traffic and custom patterns. | `/settings/project/<id>/filters` |
+| URL normalization | Group dynamic addresses under stable route templates. | `/settings/project/<id>/url-rules` |
+| Privacy scrubbing | Add sensitive keys and patterns to the built-in redaction rules. | `/settings/project/<id>/scrubbing` |
+
+An unavailable, empty or query-capped usage estimate does not block sampling configuration.
+**Alerts** (`/projects/<id>/alerts`) remains a separate project navigation entry.
+
+The previous addresses under `/projects/<id>/settings/…` still work and redirect to the
+scoped ones, so existing bookmarks and links do not break. Old `/projects/<id>/usage`
+links redirect to Usage statistics while preserving their time and event-type filters.
 
 Two of these settings stop ingestion the moment you save them, and the Console can only
 show you the result as an absence of data:
@@ -38,6 +53,24 @@ show you the result as an absence of data:
 
 Disabling a project rejects all of its reports but leaves client DSNs intact, so it is the
 reversible way to stop a noisy project before deciding whether to delete it.
+
+## Delete all Project data
+
+The General page also provides **Delete all Project data** for resetting collected data without
+recreating the SDK integration. It permanently removes Events, Sessions, errors, logs, API and
+performance data, usage aggregates, alert evaluation history, Releases and Source Maps. The
+Project itself, environments, client DSNs, Origins, sampling and retention settings, alert rules
+and audit history remain.
+
+This operation is deliberately separate from Project deletion and has three safeguards:
+
+1. An Organization Owner must disable the Project first, which stops new reports.
+2. The Owner must type the exact Project name before the Console submits the request.
+3. The Project cannot be re-enabled while deletion is queued, running, retrying or verifying.
+
+Deletion runs asynchronously. After the analytics store is empty, OpenRUM waits for one minute
+and checks it again so reports already moving through the pipeline cannot silently reappear.
+The Project stays disabled after the job completes; review the result before enabling it again.
 
 ## Rewriting rules
 
@@ -58,7 +91,7 @@ A URL rule's pattern is also its result: a path that matches `/orders/:orderId` 
 as `/orders/:orderId`. Rules are tried top to bottom and the first match wins, so put the
 specific template above the broad one.
 
-## Quota
+## Rate limits
 
 A project's rate limit is counted in requests per second, not events — one request carries
 up to 100 events. Leaving it unset uses the instance default.
@@ -73,6 +106,8 @@ The over-limit behaviour is a choice between two ways of losing data:
   exchange, bounded at twice the limit within one window.
 
 Both answer `429`. The difference is which reports are lost, not whether any are.
+
+For the IP guard, Redis fallback, response headers, sizing formula and troubleshooting workflow, read [Rate limits](/docs/product/rate-limits/).
 
 ## Operator guidance
 

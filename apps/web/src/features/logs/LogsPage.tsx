@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useParams } from "@tanstack/react-router";
-import { DownloadIcon, FileTextIcon, RefreshCwIcon, SearchIcon } from "lucide-react";
+import { DownloadIcon, FileTextIcon, RefreshCwIcon } from "lucide-react";
 import {
+  ConsoleFilterBar,
   ConsolePage,
   ConsolePageContent,
   ConsolePageHeader,
@@ -11,16 +12,6 @@ import { AsyncError } from "@/components/ui/AsyncState";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
@@ -31,8 +22,9 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useAnalysisContext } from "@/features/filters/AnalysisContextBar";
-import { getLogs, logLevels, logSearchTerm, type LogEntry, type LogFilters } from "@/lib/api/logs";
+import { getLogs, logSearchTerm, type LogEntry, type LogFilters } from "@/lib/api/logs";
 import { LogDetails, LogLevelBadge } from "./LogDetails";
+import { LogFilterComposer } from "./LogFilterComposer";
 import { LogTrend } from "./LogTrend";
 import "./logs.css";
 
@@ -79,10 +71,11 @@ export function LogsPage() {
     window.history.pushState({}, "", `${window.location.pathname}?${next}`);
     window.dispatchEvent(new Event("openrum:urlchange"));
   };
-  // A context change closes the old log detail and resets drafts without effects.
+  // A global context change closes an old detail. Query-token changes keep the
+  // shared composer mounted so several conditions can be added in sequence.
   return (
     <LogWorkspace
-      key={JSON.stringify(filters)}
+      key={`${filters.projectId}:${filters.from}:${filters.to}:${filters.environment ?? "all"}`}
       filters={filters}
       update={update}
       ready={Boolean(context)}
@@ -99,7 +92,6 @@ function LogWorkspace({
   update: (patch: Partial<LogFilters>) => void;
   ready: boolean;
 }) {
-  const [search, setSearch] = useState(filters.q ?? "");
   const [selected, setSelected] = useState<LogEntry | null>(null);
   const query = useQuery({
     queryKey: ["logs", filters],
@@ -107,8 +99,10 @@ function LogWorkspace({
     enabled: ready,
   });
   const data = query.data;
-  const addFilter = (key: string, value: string) =>
+  const addFilter = (key: string, value: string) => {
     update({ q: [filters.q, logSearchTerm(key, value)].filter(Boolean).join(" ") });
+    setSelected(null);
+  };
   const exportPage = () => {
     if (!data) return;
     const url = URL.createObjectURL(
@@ -138,52 +132,10 @@ function LogWorkspace({
           </Button>
         }
       />
+      <ConsoleFilterBar
+        primary={<LogFilterComposer filters={filters} items={data?.items} onChange={update} />}
+      />
       <ConsolePageContent className="grid gap-4">
-        <form
-          aria-label="日志搜索"
-          className="logs-search"
-          onSubmit={(event) => {
-            event.preventDefault();
-            update({ q: search.trim() || undefined });
-          }}
-        >
-          <FieldGroup className="flex-1">
-            <Field>
-              <FieldLabel htmlFor="log-query" className="sr-only">
-                搜索日志
-              </FieldLabel>
-              <Input
-                id="log-query"
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder="搜索消息、用户或属性，例如 user.id:123 severity:error"
-                maxLength={1024}
-              />
-            </Field>
-          </FieldGroup>
-          <Select
-            value={filters.level || "all"}
-            onValueChange={(value) => update({ level: value === "all" ? undefined : value })}
-          >
-            <SelectTrigger aria-label="日志级别" className="w-36">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectGroup>
-                <SelectItem value="all">全部级别</SelectItem>
-                {logLevels.map((level) => (
-                  <SelectItem key={level} value={level}>
-                    {level.toUpperCase()}
-                  </SelectItem>
-                ))}
-              </SelectGroup>
-            </SelectContent>
-          </Select>
-          <Button type="submit" variant="outline">
-            <SearchIcon data-icon="inline-start" />
-            搜索
-          </Button>
-        </form>
         <details className="logs-search-help">
           <summary>搜索语法</summary>
           <p>

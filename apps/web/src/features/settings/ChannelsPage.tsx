@@ -5,7 +5,6 @@ import { ConsolePage, ConsolePageHeader } from "@/components/layout/ConsolePage"
 import { Button } from "@/components/ui/button";
 import { createWebhookChannel, getChannels } from "@/lib/api/alerts";
 import { listOrganizations } from "@/lib/api/projects";
-import { AccountSettingsNav } from "./AccountSettingsNav";
 
 export function ChannelsPage() {
   const queryClient = useQueryClient();
@@ -26,7 +25,7 @@ export function ChannelsPage() {
     },
   });
   return (
-    <ConsolePage width="narrow" rail={<AccountSettingsNav />} railLabel="账户设置">
+    <ConsolePage width="narrow">
       <ConsolePageHeader
         title="通知渠道"
         description="Webhook 密钥加密保存，发送时签名；目标地址会执行 SSRF 防护。"

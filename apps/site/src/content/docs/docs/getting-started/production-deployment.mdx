@@ -1,0 +1,84 @@
+---
+title: Deployment preparation
+description: Understand the architecture and prepare the cluster, databases and Kafka before installation.
+appliesTo: Alpha
+---
+
+import { Steps, Aside, LinkCard } from "@astrojs/starlight/components";
+
+This guide deploys a shared OpenRUM Instance with Kubernetes and Helm, the recommended production path. You need access to the cluster, domain and data services. If you have one Linux server instead, follow the separate [single-host Docker production guide](/docs/self-hosting/docker-production/). For an initial local experience, use [Local development](/docs/getting-started/local-development/).
+
+<Aside type="caution" title="Before accepting production traffic">
+  OpenRUM is currently Alpha. Complete this procedure in staging before accepting real traffic.
+  Replace every example domain, password and registry before running commands.
+</Aside>
+
+<Steps>
+
+1. ## Understand the deployment
+
+   ```text
+   Monitored browser → HTTPS /ingest → Ingest → Kafka → Consumer → ClickHouse
+   Operator browser  → HTTPS /       → Console
+   Console           → HTTPS /api    → API → PostgreSQL / ClickHouse / Redis
+   Worker            → Background jobs, alerts, optional Source Map object storage
+   ```
+
+   The Helm Chart deploys five application services and a migration job. Prepare databases, Kafka, Redis, TLS certificates and the runtime Secret separately; the Chart does not create them.
+
+   **Success:** You know who maintains the cluster and each data service, and which public domain the Instance will use.
+
+1. ## Prepare infrastructure and access
+   - **Kubernetes:** 1.28 or later; permission to create Namespaces, Deployments, Services and Jobs
+   - **Helm and kubectl:** Installed locally and connected to the target cluster
+   - **Image registry:** Build machine can push; cluster can pull
+   - **Domain and HTTPS:** For example, `rum.example.com` points to the Ingress and has a matching certificate
+   - **Data services:** PostgreSQL, ClickHouse, Kafka and Redis reachable from OpenRUM Pods
+   - **Capacity and persistence:** Persistent storage, backups and capacity alerts sized for expected traffic
+
+   ```sh
+   kubectl version
+   helm version
+   kubectl get nodes
+   kubectl create namespace openrum
+   ```
+
+   Skip the last command if the Namespace exists. Prefer managed or highly available services your team already operates. Verify ports, authentication and protocol compatibility with current OpenRUM configuration before choosing a provider.
+
+   **Success:** Nodes are visible, the Namespace exists and all four dependencies are reachable from the cluster. See the [configuration reference](/docs/reference/configuration/) for connection options.
+
+1. ## Prepare databases and Kafka topics
+
+   Ask the database owner to create separate OpenRUM databases and accounts. PostgreSQL and ClickHouse accounts must be able to execute initial and subsequent schema migrations.
+
+   <Aside type="caution" title="ClickHouse">
+     **Check ClickHouse compatibility:** Current migrations use `ON CLUSTER openrum_cluster` and
+     replicated tables. Provide that cluster definition, Keeper/ZooKeeper and shard/replica macros.
+     Creating a database alone is insufficient. The repository's
+     `deploy/compose/clickhouse/config.d/openrum-cluster.xml` illustrates the configuration shape;
+     the database owner must configure the production topology.
+   </Aside>
+
+   Automatic Kafka topic creation is disabled. Create both `rum-events-v1` and `rum-events-v1.dlq`. This example requires at least three Brokers; size partition counts for your workload:
+
+   ```sh
+   kafka-topics.sh --bootstrap-server kafka-0:9092 --create --if-not-exists \
+     --topic rum-events-v1 --partitions 12 --replication-factor 3 \
+     --config min.insync.replicas=2 --config retention.ms=604800000
+   kafka-topics.sh --bootstrap-server kafka-0:9092 --create --if-not-exists \
+     --topic rum-events-v1.dlq --partitions 12 --replication-factor 3 \
+     --config min.insync.replicas=2 --config retention.ms=604800000
+   kafka-topics.sh --bootstrap-server kafka-0:9092 --topic rum-events-v1 --describe
+   ```
+
+   Run these where Kafka administration tools and Broker access are available. Replace the address and supply any required administrative authentication configuration. This example retains seven days; the later `kafkaRetentionDuration` must match actual retention. Check existing topics explicitly: `--if-not-exists` does not update their configuration.
+
+   **Success:** Both databases accept connections, the ClickHouse cluster definition works, and both Kafka topics have healthy replicas.
+
+</Steps>
+
+<LinkCard
+  title="Next: Install services"
+  href="/docs/getting-started/production-deployment/install/"
+  description="Build the image, configure credentials and HTTPS, then install with Helm."
+/>

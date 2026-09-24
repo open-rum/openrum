@@ -9,8 +9,11 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground hover:bg-primary/80",
-        contrast:
+        // The primary action is the theme's contrast colour — near-black on light, white
+        // on dark — not the brand lime. A page full of lime buttons spends the accent on
+        // whatever happens to be a button; keeping it for small marks (badges, switches,
+        // the active indicator, charts) is what lets it still mean something.
+        default:
           "bg-(--ds-action-contrast) text-(--ds-action-contrast-foreground) hover:bg-[color-mix(in_srgb,var(--ds-action-contrast),var(--ds-action-contrast-foreground)_12%)]",
         outline:
           "border-border bg-background hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground",

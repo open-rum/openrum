@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { ChartContainer, ChartTooltip, type ChartConfig } from "@/components/ui/chart";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useChartMotion } from "@/lib/charts/useChartMotion";
+import { smoothCurve } from "@/lib/charts/smoothCurve";
 import {
   formatPerformanceMetric,
   type PerformancePercentile,
@@ -121,7 +122,7 @@ export function CombinedVitalTrend({
                 <Line
                   key={key}
                   yAxisId={key === "cls" ? "cls" : "time"}
-                  type="linear"
+                  {...smoothCurve}
                   dataKey={key}
                   stroke={`var(--color-${key})`}
                   strokeDasharray={dash}

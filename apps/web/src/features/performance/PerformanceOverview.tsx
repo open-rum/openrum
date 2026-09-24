@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/card";
 import { ChartContainer, ChartTooltip, type ChartConfig } from "@/components/ui/chart";
 import { useChartMotion } from "@/lib/charts/useChartMotion";
+import { smoothCurve } from "@/lib/charts/smoothCurve";
 import {
   Table,
   TableBody,
@@ -280,7 +281,7 @@ export function VitalTrendChart({
           }}
         />
         <Line
-          type="monotone"
+          {...smoothCurve}
           dataKey="value"
           stroke="var(--color-value)"
           strokeWidth={2}

@@ -1,0 +1,72 @@
+---
+title: 单机 Docker 生产部署
+description: 使用独立的生产 Compose 配置和 HTTPS，在一台 Linux 服务器上运行 OpenRUM。
+appliesTo: Alpha
+---
+
+import { Aside, LinkCard, Steps } from "@astrojs/starlight/components";
+
+这条路径在**一台 Linux 服务器**上运行 OpenRUM 和四个数据服务。它与[本地评估配置](/zh/docs/self-hosting/compose/)分离：不生成演示数据，使用 `APP_ENV=production`，强制设置私有凭据，不开放数据库端口，并由 Caddy 自动配置 HTTPS。需要多节点应用服务或计划扩容时，[Kubernetes/Helm](/zh/docs/self-hosting/kubernetes/)仍是推荐路径。
+
+<Aside type="caution" title="单一故障点，不是高可用">
+  Docker
+  可以重启故障容器，但不能修复整机或磁盘故障。备份、异机副本、容量告警、升级与恢复演练由你负责。完成[运维清单](/zh/docs/self-hosting/docker-operations/)前不要接入真实流量。此
+  Alpha 路径不提供可用性或容量保证。
+</Aside>
+
+<Steps>
+
+1. ## 准备服务器和域名
+
+   在 Linux 服务器安装 Docker Engine 和 Compose v2，并按预期事件量和保留期准备 CPU、内存、SSD；请先做[容量规划](/zh/docs/self-hosting/capacity/)，不要把某台示例机器的规格当成保证。将公网域名解析到服务器，开放入站 TCP `80`/`443` 与 UDP `443`。Caddy 会申请和续期证书，不需要安装 Traefik。限制 SSH 访问，并准备加密的异机备份位置。
+
+   **完成标志：** `docker info`、`docker compose version` 和域名解析正常；`80`、`443` 没被占用。证书签发需要公网可达，详见 Caddy 的 [HTTPS 前提](https://caddyserver.com/docs/quick-starts/https)。
+
+1. ## 固定代码版本并设置密钥
+
+   获取仓库，切换到经过检查的发行标签或提交，不要直接部署随时变化的分支。进入仓库根目录后执行：
+
+   ```sh
+   cp deploy/compose/.env.production.example deploy/compose/.env.production
+   chmod 600 deploy/compose/.env.production
+   openssl rand -hex 24
+   ```
+
+   最后一条命令**分别执行三次**，将三个独立结果填入 `.env.production` 的 `POSTGRES_PASSWORD`、`CLICKHOUSE_PASSWORD` 和 `BOOTSTRAP_TOKEN`。将 `OPENRUM_DOMAIN` 填为公网域名，`OPENRUM_IMAGE` 设为标识当前代码版本的标签，例如 `openrum-production:0.1.0`。密码采用十六进制，避免放入内部数据库 DSN 时产生 URL 编码问题。不要提交或发送此文件；把它的加密副本与 Docker 卷分开保存。
+
+   如果 `172.30.77.0/24` 与宿主机网络冲突，需同时修改 `OPENRUM_EDGE_SUBNET` 和其中的 `OPENRUM_EDGE_IP`。Ingest 只信任这个 Caddy 地址提供的客户端 IP，用于限流。
+
+1. ## 构建并检查配置
+
+   ```sh
+   docker compose --env-file deploy/compose/.env.production \
+     -f deploy/compose/production.compose.yml config --quiet
+   docker compose --env-file deploy/compose/.env.production \
+     -f deploy/compose/production.compose.yml build migrate
+   ```
+
+   构建结果是供 API、Ingest、Consumer、Worker、Web 和迁移程序共用的镜像；其他服务不会隐式拉取未知的应用镜像。构建前检查可用磁盘空间。若由镜像仓库交付，先把经过检查的镜像以 `OPENRUM_IMAGE` 指定的精确标签加载到本机。
+
+1. ## 启动并验证
+
+   ```sh
+   docker compose --env-file deploy/compose/.env.production \
+     -f deploy/compose/production.compose.yml up -d --wait
+   curl --fail https://rum.example.com/health/ready
+   ```
+
+   将示例域名换成自己的。一次性的 `migrate`、`kafka-init` 应成功结束；应用与四个数据服务应处于健康状态。宿主机只有 Caddy 开放端口。TLS 检查失败时先看 `edge` 日志、DNS 和 `80`/`443`，不要绕过浏览器证书警告。
+
+1. ## 创建管理员并验证真实事件
+
+   打开 `https://<你的域名>/setup`，填写组织、管理员信息和私有环境文件中的 `BOOTSTRAP_TOKEN`。创建首位用户后，初始化入口会关闭。随后创建项目、放行应用 Origin、使用 DSN 接入 SDK，并在 Console 确认一条测试事件。生产配置**没有**演示账号或自动生成的测试数据。
+
+   接入真实流量前，请在替换服务器上完成[备份与恢复演练](/zh/docs/self-hosting/docker-operations/)，并监控磁盘压力和 Kafka 积压。
+
+</Steps>
+
+<LinkCard
+  title="下一步：单机实例运维"
+  href="/zh/docs/self-hosting/docker-operations/"
+  description="备份、恢复、监控和升级这套 Compose 部署。"
+/>

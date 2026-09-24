@@ -16,14 +16,14 @@ import {
   type InboundFilters,
 } from "@/lib/api/filters";
 import { canManageProjects, getProject } from "@/lib/api/projects";
-import { ProjectSettingsLayout } from "./ProjectSettingsLayout";
+import { ProjectDataSettingsShell } from "./ProjectDataSettingsShell";
 
 const modes: FilterMode[] = ["off", "dry_run", "enforced"];
 const kinds = Object.keys(filterKindLabels) as FilterKind[];
 const maxRules = 50;
 
 export function ProjectFiltersRoute() {
-  const { projectId } = useParams({ from: "/protected/projects/$projectId/settings/filters" });
+  const { projectId } = useParams({ from: "/protected/settings/project/$projectId/filters" });
   const project = useQuery({
     queryKey: ["project", projectId],
     queryFn: ({ signal }) => getProject(projectId, signal),
@@ -33,12 +33,7 @@ export function ProjectFiltersRoute() {
     queryFn: ({ signal }) => getInboundFilters(projectId, signal),
   });
   return (
-    <ProjectSettingsLayout
-      projectId={projectId}
-      titleId="project-filters-title"
-      title="入站过滤"
-      description="决定哪些上报不进入你的数据。规则由 Consumer 权威执行；浏览器 SDK 会提前丢弃其中一部分，那只是省带宽。"
-    >
+    <ProjectDataSettingsShell projectId={projectId} section="filters">
       {filters.isLoading ? (
         <AsyncLoading label="正在加载过滤设置…" />
       ) : filters.error ? (
@@ -56,7 +51,7 @@ export function ProjectFiltersRoute() {
           role={project.data?.role}
         />
       ) : null}
-    </ProjectSettingsLayout>
+    </ProjectDataSettingsShell>
   );
 }
 

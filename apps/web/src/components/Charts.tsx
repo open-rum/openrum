@@ -11,6 +11,7 @@ import {
 } from "recharts";
 import type { TooltipContentProps, TooltipValueType } from "recharts";
 import { trendData } from "../data/mock";
+import { smoothCurve } from "@/lib/charts/smoothCurve";
 
 type SparklineProps = {
   values: number[];
@@ -34,7 +35,7 @@ export function Sparkline({ values, tone = "bad" }: SparklineProps) {
         margin={{ top: 2, right: 1, bottom: 2, left: 1 }}
       >
         <Line
-          type="monotone"
+          {...smoothCurve}
           dataKey="value"
           stroke={sparkColors[tone]}
           strokeWidth={1.5}
@@ -140,7 +141,7 @@ export function QualityTrend({ compare }: { compare: boolean }) {
           {compare && (
             <Area
               yAxisId="traffic"
-              type="monotone"
+              {...smoothCurve}
               dataKey="pv"
               name="较昨日 PV"
               stroke="transparent"
@@ -150,7 +151,7 @@ export function QualityTrend({ compare }: { compare: boolean }) {
           )}
           <Line
             yAxisId="traffic"
-            type="monotone"
+            {...smoothCurve}
             dataKey="pv"
             name="PV"
             stroke="var(--ds-chart-1)"
@@ -161,7 +162,7 @@ export function QualityTrend({ compare }: { compare: boolean }) {
           />
           <Line
             yAxisId="traffic"
-            type="monotone"
+            {...smoothCurve}
             dataKey="uv"
             name="UV"
             stroke="var(--ds-info)"
@@ -171,7 +172,7 @@ export function QualityTrend({ compare }: { compare: boolean }) {
           />
           <Line
             yAxisId="rate"
-            type="monotone"
+            {...smoothCurve}
             dataKey="errorRate"
             name="错误率"
             stroke="var(--ds-danger)"

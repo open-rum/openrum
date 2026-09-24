@@ -118,6 +118,11 @@ func (consumer *Consumer) Run(ctx context.Context) error {
 		fetchBackoff = 100 * time.Millisecond
 		backoff := 100 * time.Millisecond
 		for {
+			if consumer.metrics != nil {
+				// Keep lag and retention headroom moving while one uncommitted
+				// message is blocked on ClickHouse rather than only when fetched.
+				consumer.metrics.observeFetched(message.Time)
+			}
 			err = consumer.processMessage(ctx, message)
 			if err == nil {
 				break

@@ -120,6 +120,10 @@ func (handler *OverviewHandler) queryableVersion(ctx context.Context, projectID 
 
 func parseOverviewFilters(request *http.Request, projectID uuid.UUID) (query.OverviewFilters, error) {
 	values := request.URL.Query()
+	maxPoints, err := parseSeriesPointBudget(values.Get("maxPoints"))
+	if err != nil {
+		return query.OverviewFilters{}, err
+	}
 	from, err := time.Parse(time.RFC3339Nano, values.Get("from"))
 	if err != nil {
 		return query.OverviewFilters{}, err
@@ -129,9 +133,20 @@ func parseOverviewFilters(request *http.Request, projectID uuid.UUID) (query.Ove
 		return query.OverviewFilters{}, err
 	}
 	return query.NormalizeOverviewFilters(query.OverviewFilters{
-		ProjectID: projectID, From: from, To: to,
+		ProjectID: projectID, From: from, To: to, MaxPoints: maxPoints,
 		Environment: values.Get("environment"), Release: values.Get("release"), Route: values.Get("route"),
 	})
+}
+
+func parseSeriesPointBudget(value string) (int, error) {
+	if value == "" {
+		return 0, nil
+	}
+	points, err := strconv.Atoi(value)
+	if err != nil || points < 24 || points > 240 {
+		return 0, query.ErrInvalidOverviewFilters
+	}
+	return points, nil
 }
 
 func writeOverviewHeaders(writer http.ResponseWriter, result query.Overview, started time.Time, cache string) {

@@ -48,14 +48,14 @@ describe("dashboard map contract", () => {
     }
     expect(withBreakdownDimension(widget, "country").view).toBe("map");
   });
-  it("keeps all countries and unknowns for maps while preserving existing Top 10 views", () => {
+  it("keeps all countries for maps and rankings while preserving the Top 10 table", () => {
     const widget = createWidget("breakdown", { view: "map" });
     const plot = adaptPlot(widget, data);
     expect(plot.rows).toHaveLength(12);
     expect(plot.rows.at(-1)).toEqual({ label: "ZZ", estimated: 18 });
     expect(plot.note).toContain("全部 12");
     expect(plot.note).not.toContain("Top 10");
-    expect(adaptPlot({ ...widget, view: "bar" }, data).rows).toHaveLength(10);
+    expect(adaptPlot({ ...widget, view: "bar" }, data).rows).toHaveLength(12);
     expect(adaptPlot({ ...widget, view: "table" }, data).rows).toHaveLength(10);
   });
   it("uses the selected event metric and preserves empty responses", () => {

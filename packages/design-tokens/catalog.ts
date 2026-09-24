@@ -17,7 +17,9 @@ export const colorGroups = [
     description: "Logo 与主系列保持柠檬绿；普通文字、导航和控件使用中性色。",
     tokens: [
       ["--ds-logo", "Logo", "所有模式的品牌标记"],
-      ["--ds-primary", "Primary", "主操作填充，配黑色文字"],
+      ["--ds-primary", "Primary", "主题强调与小面积高亮，配黑色文字"],
+      ["--ds-selection", "Selection", "表单选中面的浅柠檬绿背景"],
+      ["--ds-selection-border", "Selection border", "选中控件边界与状态线"],
       ["--ds-brand", "Link ink", "中性文字色，正文链接用下划线区分"],
       ["--ds-secondary", "Secondary", "蓝绿色辅助系列"],
       ["--ds-action-contrast", "Action", "主要操作，随主题反转"],
@@ -49,6 +51,22 @@ export const colorGroups = [
       ["--ds-info", "Info", "信息提示"],
       ["--ds-chart-success", "Good chart", "达标评分柱、仪表盘填充"],
       ["--ds-chart-warning", "Warning chart", "待优化评分柱、仪表盘填充"],
+    ],
+  },
+  {
+    title: "数据分类色",
+    description: "固定顺序的十色分类色板；同一图表按顺序取色，超过十类时合并低频项为其他。",
+    tokens: [
+      ["--ds-chart-1", "Lemon", "品牌主系列与第一分类"],
+      ["--ds-chart-2", "Blue", "第二分类"],
+      ["--ds-chart-3", "Orange", "第三分类"],
+      ["--ds-chart-4", "Violet", "第四分类"],
+      ["--ds-chart-5", "Teal", "第五分类"],
+      ["--ds-chart-6", "Coral", "第六分类"],
+      ["--ds-chart-7", "Cyan", "第七分类"],
+      ["--ds-chart-8", "Magenta", "第八分类"],
+      ["--ds-chart-9", "Gold", "第九分类"],
+      ["--ds-chart-10", "Slate", "第十分类或其他"],
     ],
   },
 ] as const;
