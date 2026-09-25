@@ -49,6 +49,10 @@ export default defineConfig({
     // The topology is read by whoever is deploying the Instance, not only by
     // contributors, so it sits with the deployment guides.
     "/docs/contributing/architecture": "/docs/self-hosting/architecture",
+
+    // Withdrawn roadmap pages redirect to the current contributor guide.
+    "/docs/contributing/roadmap": "/docs/contributing",
+    "/zh/docs/contributing/roadmap": "/zh/docs/contributing",
   },
   integrations: [
     react(),
@@ -230,7 +234,6 @@ export default defineConfig({
             { slug: "docs/contributing" },
             { slug: "docs/contributing/local-development" },
             { slug: "docs/getting-started/demo-data" },
-            { slug: "docs/contributing/roadmap" },
           ],
         },
       ],

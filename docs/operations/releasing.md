@@ -1,10 +1,10 @@
 # Publishing an OpenRUM release
 
-This is the product release path, not an automatic deployment to a customer's Kubernetes cluster or to `openrum.dev`. The tagged release publishes an application image, an OCI Helm Chart, a versioned static documentation archive, and finally a GitHub Release. The operator decides when to install the Chart; the static-site hosting/CD integration is not configured yet.
+This is the product release path, not an automatic deployment to a customer's Kubernetes cluster or to `openrum.dev`. The tagged release publishes an application image, an OCI Helm Chart, a versioned static documentation archive, and finally a GitHub Release. The operator decides when to install the Chart. The documentation website is deployed separately from the connected `main` branch by Netlify; the release workflow does not deploy the versioned archive.
 
 ## Private package test before the official repository is available
 
-The private `eijil/openrum` repository has a separate **Publish private package test** manual workflow. It runs formatting, basic lint, type checks, unit tests, builds, and site checks before building an amd64 application image and a copy of the Helm Chart whose defaults point to that private test image. The unique `0.1.0-test.<run>.<attempt>` version appears in both packages under `ghcr.io/eijil`; inspect the workflow run for the exact version. The public-site workflow retains a separate static build artifact. The private test does not create a Git tag or GitHub Release, make packages public, deploy the site, or install anything in Kubernetes. This smoke gate is deliberately separate from full CI: a successful private package test is not a claim that Go lint, integration tests, or browser E2E pass. Official tagged releases still build both amd64 and arm64 images.
+The private `eijil/openrum` repository has a separate **Publish private package test** manual workflow. It runs formatting, basic lint, type checks, unit tests, builds, and site checks before building an amd64 application image and a copy of the Helm Chart whose defaults point to that private test image. The unique `0.1.0-test.<run>.<attempt>` version appears in both packages under `ghcr.io/eijil`; inspect the workflow run for the exact version. The public-site workflow validates the static build but does not retain or deploy its output. The private test does not create a Git tag or GitHub Release, make packages public, deploy the site, or install anything in Kubernetes. This smoke gate is deliberately separate from full CI: a successful private package test is not a claim that Go lint, integration tests, or browser E2E pass. Official tagged releases still build both amd64 and arm64 images.
 
 Architecture diagrams are committed SVG assets. When changing a source under `docs/diagrams/`, run `pnpm docs:generate` locally and commit the updated SVG. Preview and release workflows build from the committed asset; they do not start a headless browser, rerender the diagram, or compare SVG bytes. Browser E2E remains an opt-in job in the standalone CI workflow, not a release gate.
 
@@ -16,7 +16,7 @@ The official Chart and release workflow remain pinned to `ghcr.io/openrum`. Test
 2. Grant Actions package write access, and make the `ghcr.io/openrum/openrum` and `ghcr.io/openrum/charts/openrum` packages public before telling readers that they can install anonymously.
 3. Configure the `public-release` GitHub Environment with required reviewers. The workflow names this environment, but GitHub will not require approval unless the repository configures protection rules.
 4. Protect `v*` tags against updates and deletion in repository rulesets; a published tag must keep naming the same commit.
-5. Choose a static-site host and connect it to the built `apps/site/dist` artifact or the versioned documentation archive. Building the site alone does not update `openrum.dev`; configure the host to cache hashed assets immutably and HTML briefly.
+5. The current test documentation site is built by Netlify from `main` at `openrum.netlify.app`. Before an official launch, connect the official repository, set the intended canonical domain and verify a production deployment. The tagged documentation archive is release evidence, not a Netlify deployment input; building it alone does not update `openrum.dev`.
 
 ## Prepare a version
 
@@ -39,7 +39,7 @@ git push origin v0.1.0
 
 1. Build and publish `ghcr.io/openrum/openrum:0.1.0` for amd64 and arm64, then inspect the published image.
 2. Push `openrum-0.1.0.tgz` to `oci://ghcr.io/openrum/charts`, then pull its metadata back.
-3. Attach the static docs archive built from the same commit to the GitHub Release; deploy its contents to the chosen static-site host separately.
+3. Attach the static docs archive built from the same commit to the GitHub Release. The current Netlify site deploys from its connected branch, not from this archive.
 4. Create the GitHub pre-release with generated notes only after the artifacts have been published.
 
 Do not move or republish a public version tag. If publication fails partway through, inspect which versioned artifacts exist before retrying; use a new patch/prerelease version when their contents might differ. Publishing does not run `helm upgrade` against any cluster.
@@ -58,4 +58,4 @@ helm upgrade --install openrum oci://ghcr.io/openrum/charts/openrum \
   --wait --timeout 15m
 ```
 
-Before production use, follow the [upgrade](upgrades.md), [backup and restore](backup-restore.md), and public [Kubernetes installation](/docs/self-hosting/kubernetes/) guides. The migration Job runs before application Pods roll, so publishing a package and deploying it are deliberately separate decisions. The documentation archive likewise needs an external static-host deployment action to update `openrum.dev`.
+Before production use, follow the [upgrade](upgrades.md), [backup and restore](backup-restore.md), and public [Kubernetes installation](/docs/self-hosting/kubernetes/) guides. The migration Job runs before application Pods roll, so publishing a package and deploying it are deliberately separate decisions. Publishing a tagged documentation archive does not update the Netlify site or `openrum.dev`; those follow the static site's own deployment configuration.

@@ -25,6 +25,6 @@ export default defineConfig({
 });
 ```
 
-The Alpha plugin creates a Release, requests a short-lived upload grant, verifies Artifact metadata, and removes `.map` files from the public build before making a network request. Keep the Console session and CSRF values in CI secrets. A dedicated upload token is planned and is not documented as shipped.
+The Alpha plugin creates a Release, requests a short-lived upload grant, verifies Artifact metadata, and removes `.map` files from the public build before making a network request. Keep the Console session and CSRF values in CI secrets. A dedicated upload token is not supported in this version.
 
 To verify, trigger a known minified error for the same Release and use the Issue detail Source Map diagnostic. A successful mapping preserves the raw frame and adds the original source path, line and column.

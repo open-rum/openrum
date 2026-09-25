@@ -264,8 +264,8 @@ privacy boundaries.
 
 ## Support matrix
 
-Stated against `@openrum/browser 0.1.0`. "Planned" means the work is scheduled and not yet
-written; nothing in this table is inferred from the fact that a framework is popular.
+Stated against `@openrum/browser 0.1.0`. The table describes current behavior, not inferred
+support based on a framework's popularity.
 
 | Target                                                    | State                       | What that means                                                                              |
 | --------------------------------------------------------- | --------------------------- | -------------------------------------------------------------------------------------------- |
@@ -294,8 +294,7 @@ in Analysis.
 `getClient()?.startPage({ route: "/orders/:orderId" })` does set the Route, but the
 automatic Page View for that navigation has already been sent with the resolved path, and
 `startPage` begins a new Page — so the Page View and the Events after it land on different
-`page_id` values. Recording route patterns correctly needs an SDK change, tracked as Phase
-10 in `docs/product-roadmap.md`.
+`page_id` values. The current SDK cannot record route patterns correctly for automatic Page Views.
 
 ### A rejected DSN disables the page
 

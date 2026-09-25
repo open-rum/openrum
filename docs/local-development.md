@@ -153,7 +153,10 @@ The public site and documentation in `apps/site` are not part of the runtime sta
 
 ```sh
 pnpm site:dev
+pnpm site:check
 ```
+
+Run `site:check` before requesting review for public-site or documentation changes. It checks generated references, spelling, Demo evidence, the static build, links and the site performance budget. English and Simplified Chinese pages must exist at matching paths.
 
 ## Troubleshooting
 

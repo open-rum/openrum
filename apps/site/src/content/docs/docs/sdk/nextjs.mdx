@@ -101,8 +101,8 @@ export default function App({ Component, pageProps }: AppProps) {
 Both routers change the URL through `history.pushState`, so client-side navigations produce
 Page Views with no router hook. The recorded Route is the resolved pathname, which means a
 dynamic segment such as `app/orders/[id]` is stored as `/orders/8fc1`, not `/orders/[id]`.
-See [Route patterns](/docs/sdk/browser/#route-patterns-are-not-recorded-yet) for why that
-matters in Analysis and what is planned.
+See [Route patterns](/docs/sdk/browser/#route-patterns-are-not-recorded-yet) for how this
+affects Analysis.
 
 ## What is not covered
 

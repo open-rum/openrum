@@ -27,7 +27,7 @@ export default defineConfig({
 
 Alpha 插件会创建 Release、申请短期上传授权、校验 Artifact 元数据，并在发起网络请求前
 从公开构建产物中删除 `.map` 文件。Console Session 和 CSRF 值必须保存在 CI Secret 中。
-专用上传 Token 尚在规划中，不能按已交付能力使用。
+此版本不支持专用上传 Token。
 
 验证时，在相同 Release 中触发一个已知的压缩代码错误，并查看 Issue 详情中的 Source Map
 诊断。成功映射会保留原始栈帧，同时补充源文件路径、行和列。
