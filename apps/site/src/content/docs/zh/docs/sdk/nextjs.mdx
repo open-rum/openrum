@@ -98,7 +98,7 @@ export default function App({ Component, pageProps }: AppProps) {
 
 两种 Router 都通过 `history.pushState` 改变 URL，因此客户端导航无需路由钩子就会产生 Page View。
 记录下来的 Route 是解析后的 pathname，也就是说 `app/orders/[id]` 这样的动态段会被存成
-`/orders/8fc1`，而不是 `/orders/[id]`。它为什么会影响 Analysis、以及后续计划，见
+`/orders/8fc1`，而不是 `/orders/[id]`。这对 Analysis 的影响见
 [路由模式](/zh/docs/sdk/browser/#路由模式暂未被记录)。
 
 ## 不在覆盖范围内

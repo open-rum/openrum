@@ -1,5 +1,5 @@
 ---
-import { GitBranch, Github, HeartHandshake, Map, ShieldAlert } from "lucide-astro";
+import { GitBranch, Github, HeartHandshake, ShieldAlert } from "lucide-astro";
 import PublicLayout from "../layouts/PublicLayout.astro";
 const { lang = "en" } = Astro.props;
 const zh = lang === "zh";
@@ -8,9 +8,9 @@ const cards = zh
   ? [
       [
         "参与开发",
-        "从本地开发、测试和领域文档开始；深层贡献指南会明确回退英文原文。",
+        "了解问题讨论、提交规范和评审流程，再从本地开发指南开始验证改动。",
         GitBranch,
-        "/docs/contributing/local-development/",
+        "/zh/docs/contributing/",
       ],
       [
         "报告问题",
@@ -24,19 +24,13 @@ const cards = zh
         ShieldAlert,
         `${repository}/security`,
       ],
-      [
-        "查看路线图",
-        "已实现、计划中和需要外部验证的任务都在仓库路线图中明确标记。",
-        Map,
-        `${repository}/blob/main/docs/product-roadmap.md`,
-      ],
     ]
   : [
       [
         "Contribute",
-        "Start with local development, tests and domain docs; send a small, verifiable pull request.",
+        "Learn the Issue, pull request and review process, then validate a focused change locally.",
         GitBranch,
-        "/docs/contributing/local-development/",
+        "/docs/contributing/",
       ],
       [
         "Report an issue",
@@ -49,12 +43,6 @@ const cards = zh
         "Do not publish credentials or an unpatched vulnerability; use the repository security policy.",
         ShieldAlert,
         `${repository}/security`,
-      ],
-      [
-        "Read the roadmap",
-        "Implemented, planned and externally verified work is explicitly marked in the repository roadmap.",
-        Map,
-        `${repository}/blob/main/docs/product-roadmap.md`,
       ],
     ];
 ---

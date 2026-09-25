@@ -44,7 +44,7 @@ The included Compose topology is for local Alpha evaluation, not production high
 
 ## Develop
 
-Read the [local development guide](docs/local-development.md), [contributor guide](docs/contributing.md), [release process](docs/operations/releasing.md), [demo data guide](docs/demo-data.md), [system administration plan](docs/system-administration.md), and [product roadmap](docs/product-roadmap.md). The runnable SDK example lives in [examples/react-vite](examples/react-vite).
+Read the [local development guide](docs/local-development.md), [contributor guide](CONTRIBUTING.md), [release process](docs/operations/releasing.md), [demo data guide](docs/demo-data.md), and [system administration plan](docs/system-administration.md). The runnable SDK example lives in [examples/react-vite](examples/react-vite).
 
 OpenRUM is under active Alpha development. Expect schema and API changes before the first stable release.
 

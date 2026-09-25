@@ -6,8 +6,7 @@
     "apps/site/dist/**",
     "apps/site/src/content/docs/docs/reference/**",
     "apps/site/src/content/docs/docs/repository/**",
-    "apps/site/src/content/docs/zh/**",
-    "docs/product-roadmap.md"
+    "apps/site/src/content/docs/zh/**"
   ],
   "words": [
     "ACKs",

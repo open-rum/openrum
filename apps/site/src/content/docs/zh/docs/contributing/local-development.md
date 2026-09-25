@@ -96,9 +96,10 @@ pnpm openrum logs ingest consumer worker
 
 ```sh
 pnpm site:dev
+pnpm site:check
 ```
 
-公开文档必须同时维护 `docs/` 英文页和 `zh/docs/` 同路径中文页，内容测试会检查两种语言的页面集合。
+公开站点或文档改动在请求评审前运行 `site:check`，它会检查生成的参考内容、拼写、Demo 证据、静态构建、链接和站点性能预算。公开文档必须同时维护 `docs/` 英文页和 `zh/docs/` 同路径中文页。
 
 ## 常见问题
 

@@ -1,54 +1,55 @@
 ---
 title: 参与贡献
-description: 开发、测试并向 OpenRUM 提交改动。
+description: 如何提出、验证、评审和交付 OpenRUM 的改动。
 ---
 
-OpenRUM 欢迎聚焦于 Alpha 产品、文档和运维安全的改进。
+你可以通过报告问题、完善文档、补充测试或编写代码参与贡献。好的起点是一个具体问题和一项可验证的小改动。本页说明协作与评审规范；工具安装、服务启动和命令集中放在[本地开发](/zh/docs/contributing/local-development/)文档。
 
-## 工具链
+## 动手之前
 
-- Node.js 24、Corepack、pnpm 11
-- `go.mod` 指定的 Go 版本
-- Docker 与 Compose v2
+1. 先搜索已有的 GitHub Issue 和未合并的 Pull Request，避免重复工作。行为变更应先创建或参与 Issue；简单的错别字、失效链接修复可以直接提交 Pull Request。
+2. 新功能、公开 API 或 SDK 契约、事件 Schema、存储行为和部署方式的改动，应先在 Issue 中讨论。说明用户问题、预期行为、备选方案，以及兼容和上线风险。不要等到写完代码才发现需求不在项目范围内。
+3. 修改共享术语或架构前，阅读[领域模型](/zh/docs/getting-started/domain-model/)、仓库根目录的 `CONTEXT.md` 和相关 `docs/adr/` 决策。若方案与已有决策冲突，在 Issue 中明确说明。
+4. 疑似安全漏洞请按[漏洞报告指南](/zh/docs/self-hosting/security/vulnerability-reporting/)私下报告。不要在公开 Issue 或 Pull Request 中附上可利用细节、凭证或客户数据。
 
-```sh
-corepack enable
-pnpm install --frozen-lockfile
-```
+报告 Bug 时，请提供受影响的版本或 Commit、运行环境、最小复现步骤、预期与实际结果，以及已脱敏的日志或截图。如有 Request ID，也请附上。提出新功能时，先描述使用场景和验收标准，不要只给出 UI 或实现方案。
 
-依赖启动、Vite 代理和常用命令见[本地开发](/zh/docs/contributing/local-development/)，测试数据见[确定性 Demo 数据](/zh/docs/getting-started/demo-data/)。
+## 保持改动聚焦
 
-## 仓库结构
+- 一个 Pull Request 解决一个问题。除非确有必要，不夹带无关重构、生成文件变化或发布版本调整。
+- 行为变化要更新完整契约：数据生产和消费两端、Schema 或类型、测试、用户可见文案与文档。不要只做出看似可用的控制台入口，却遗漏 API 或 SDK 行为。
+- 为新行为和回归问题补充聚焦测试。数据库 Migration 必须向前演进、顺序明确，并兼容已有数据；不要直接修改已经应用的 Migration。在 Pull Request 中说明兼容性和回滚边界。
+- 守住隐私和查询边界。不采集表单原值、密码、Authorization Header 或 Cookie；持久化前归一化 Route 和 API URL。使用合成或脱敏数据测试，不使用生产遥测数据。
+- UI 改动要检查键盘操作、可见焦点、窄屏和明暗主题；外观变化请提供前后截图。
+- 公开文档的英文和简体中文页面必须在同一 Pull Request 中按相同路径更新。只描述已交付行为，适当使用 Astro/Starlight 原生组件，并验证两种语言的链接。
 
-| 路径 | 用途 |
-| --- | --- |
-| `apps/web` | React Console |
-| `apps/site` | 官网和文档 |
-| `packages/browser-sdk` | 带隐私边界的 Browser SDK |
-| `packages/protocol` | Event 协议 |
-| `packages/vite-plugin` | Source Map 上传 |
-| `services` | Go API、Ingest、Consumer、Worker |
-| `internal` | 共享领域与基础设施代码 |
-| `migrations` | PostgreSQL 与 ClickHouse 迁移 |
-| `tests/e2e` | Playwright 产品流程 |
+## 请求评审前验证
 
-## 提交改动前
+环境准备、命令和完整校验方法见[本地开发](/zh/docs/contributing/local-development/)。Pull Request 中请列出**实际运行的命令和结果**；相关检查未运行时说明原因。按改动类型提供证据：
 
-```sh
-pnpm run check
-pnpm exec playwright test
-docker compose --env-file deploy/compose/.env.example -f deploy/compose/docker-compose.yml config --quiet
-```
+| 改动范围                      | 需要的证据                                                                        |
+| ----------------------------- | --------------------------------------------------------------------------------- |
+| 控制台或 SDK                  | 聚焦的单元测试和类型检查；受影响行为的浏览器或示例应用验证；视觉改动附截图。      |
+| API、Ingest、数据或 Migration | 聚焦的 Go 测试；涉及依赖时运行集成测试；修改 Schema 时验证全新数据库的迁移。      |
+| 官网或文档                    | 中英文页面、通过的站点检查、可直达的链接，以及桌面和窄屏下可读的页面。            |
+| Helm、发布或 CI               | 与改动对应的模板渲染、Lint 或工作流检查；说明上线和回滚方式，不拿生产环境做测试。 |
 
-为变更行为增加聚焦的 Go/React 测试，跨页面产品流程放在 Playwright。迁移必须向前兼容并遵守数据保留策略。
+GitHub CI 默认不运行浏览器 E2E。跨页面流程的改动可能仍需要它；没有运行的测试不能写成“已通过”。
 
-## 产品与隐私约束
+## 提交 Pull Request
 
-- 不采集表单原值、密码、Authorization Header、Cookie 或无限基数 URL。
-- 持久化前归一化 Route 和 API URL。
-- 术语与[领域模型](/zh/docs/getting-started/domain-model/)及根目录 `CONTEXT.md` 一致。
-- 洞察必须能跳转到可检查的证据。
-- 保持键盘导航、可见焦点、响应式布局和明暗主题。
-- 所有公开文档改动必须同时更新同路径的英文与简体中文页面。
+使用清晰的分支名称和仓库的 Pull Request 模板，关联对应 Issue，并说明：
 
-Pull Request 应说明动机、Schema/API 变化、UI 截图、隐私影响和准确的验证命令。
+- 问题是什么，用户最终会看到什么变化；
+- 主要实现及 API、SDK、Schema 或配置变化；
+- 实际运行的测试、结果和未验证的部分；
+- UI 改动的截图或录屏；
+- 隐私、数据迁移、兼容性、上线和回滚影响，或说明为何不涉及。
+
+让改动保持容易评审，并用具体修改或理由回应意见。维护者可能要求缩小范围，或先回到 Issue 讨论。构建通过本身不代表一定会合并。
+
+## 合并之后会发生什么
+
+合并到 `main` 会触发仓库 CI。涉及公开站点的改动还会运行独立的站点检查；文档网站由 Netlify 从其连接的分支另行构建和发布。这些系统彼此独立，站点部署成功不代表仓库全部检查通过。
+
+合并代码**不会**自动发布新的应用镜像或 Helm Chart、创建产品 Release，也不会升级任何人的 OpenRUM 实例。维护者通过带版本标签的发布工作流准备正式版本；运维人员在确认备份和 Migration 兼容后，自行决定何时安装或升级 Chart。普通 Pull Request 不应推送发布标签、发布包或部署到共享环境。
