@@ -74,6 +74,43 @@ func TestInstanceMemberRepositoryEnforcesOwnerBoundary(t *testing.T) {
 	}
 }
 
+func TestInstanceAdminRequiresPasswordBeforeApproval(t *testing.T) {
+	database := openIntegrationDatabase(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	ownerID, pendingID := uuid.New(), uuid.New()
+	for _, user := range []struct {
+		id                      uuid.UUID
+		email, source, password string
+	}{
+		{ownerID, "owner-" + ownerID.String() + "@example.test", "local", "hash"},
+		{pendingID, "pending-" + pendingID.String() + "@example.test", "oidc", ""},
+	} {
+		var hash any = user.password
+		if hash == "" {
+			hash = nil
+		}
+		mustExecDatabase(t, ctx, database, "INSERT INTO users(id,email,display_name,password_hash,auth_source,access_status) VALUES($1,$2,'User',$3,$4,$5)",
+			user.id, user.email, hash, user.source, map[bool]string{true: "pending", false: "approved"}[user.id == pendingID])
+	}
+	t.Cleanup(func() {
+		_, _ = database.ExecContext(context.Background(), "DELETE FROM users WHERE id=ANY($1)", []uuid.UUID{ownerID, pendingID})
+	})
+	mustExecDatabase(t, ctx, database, "INSERT INTO instance_members(user_id,role,created_by) VALUES($1,'instance_owner',$1)", ownerID)
+	repository := NewInstanceMemberRepository(database)
+	if err := repository.Add(ctx, ownerID, pendingID, InstanceRoleAdmin); !errors.Is(err, ErrInstancePasswordRequired) {
+		t.Fatalf("passwordless administrator was accepted: %v", err)
+	}
+	mustExecDatabase(t, ctx, database, "UPDATE users SET password_hash='hash' WHERE id=$1", pendingID)
+	if err := repository.Add(ctx, ownerID, pendingID, InstanceRoleAdmin); err != nil {
+		t.Fatal(err)
+	}
+	var status string
+	if err := database.QueryRowContext(ctx, "SELECT access_status FROM users WHERE id=$1", pendingID).Scan(&status); err != nil || status != "approved" {
+		t.Fatalf("status=%q err=%v", status, err)
+	}
+}
+
 func mustExecDatabase(t *testing.T, ctx context.Context, database interface {
 	ExecContext(context.Context, string, ...any) (sql.Result, error)
 }, query string, arguments ...any) {

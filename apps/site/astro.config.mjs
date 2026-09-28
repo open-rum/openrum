@@ -156,6 +156,7 @@ export default defineConfig({
           items: [
             { slug: "docs/self-hosting/overview" },
             { slug: "docs/self-hosting/kubernetes" },
+            { slug: "docs/self-hosting/authentication" },
             {
               label: "Docker",
               translations: { zh: "Docker", "zh-CN": "Docker" },
