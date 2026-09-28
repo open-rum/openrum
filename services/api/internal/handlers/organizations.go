@@ -128,6 +128,8 @@ func writeControlPlaneError(writer http.ResponseWriter, request *http.Request, l
 		httpx.WriteError(writer, request, http.StatusConflict, "LAST_OWNER_REQUIRED", "The organization must retain at least one owner.")
 	case errors.Is(err, metadata.ErrLastInstanceOwner):
 		httpx.WriteError(writer, request, http.StatusConflict, "LAST_INSTANCE_OWNER_REQUIRED", "The instance must retain at least one owner.")
+	case errors.Is(err, metadata.ErrInstancePasswordRequired):
+		httpx.WriteError(writer, request, http.StatusConflict, "PASSWORD_REQUIRED", "The account must set an OpenRUM password before receiving an Instance role.")
 	case errors.Is(err, metadata.ErrInvalidAlertConfig):
 		httpx.WriteError(writer, request, http.StatusBadRequest, "VALIDATION_ERROR", "Alert settings are invalid.")
 	case errors.Is(err, metadata.ErrSecretsUnavailable):

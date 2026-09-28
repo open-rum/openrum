@@ -31,6 +31,10 @@ func RequireSession(authenticator SessionAuthenticator) func(http.Handler) http.
 				WriteError(writer, request, http.StatusInternalServerError, "INTERNAL_ERROR", "An internal error occurred.")
 				return
 			}
+			if principal.AccessStatus == "pending" && request.URL.Path != "/api/v1/auth/me" && request.URL.Path != "/api/v1/auth/logout" {
+				WriteError(writer, request, http.StatusForbidden, "ACCESS_PENDING", "Organization access is pending approval.")
+				return
+			}
 			ctx := context.WithValue(request.Context(), principalContextKey{}, principal)
 			next.ServeHTTP(writer, request.WithContext(ctx))
 		})

@@ -219,6 +219,38 @@ test("docs language switch is site-wide and does not mix navigation locales", as
   await expect(page.locator(".docs-sidebar-topic")).toHaveText("开始");
 });
 
+test("authentication guide works in both languages and a narrow dark viewport", async ({
+  page,
+  context,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.addInitScript(() => localStorage.setItem("starlight-theme", "dark"));
+  await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+  await page.goto("/docs/self-hosting/authentication/");
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+  await expect(page.locator("h1")).toHaveText("Console authentication");
+  await expect(page.locator(".sl-steps > li")).toHaveCount(4);
+  await expect(page.locator("#starlight__sidebar a[aria-current='page']")).toHaveAttribute(
+    "href",
+    "/docs/self-hosting/authentication/",
+  );
+  await page.locator(".expressive-code").first().getByRole("button").click();
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(
+    "https://rum.example.com/api/v1/auth/providers/<provider-id>/callback",
+  );
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth - innerWidth),
+  ).toBeLessThanOrEqual(1);
+  await page.locator("starlight-lang-select select").first().selectOption({ label: "简体中文" });
+  await expect(page).toHaveURL(/\/zh\/docs\/self-hosting\/authentication\/?$/);
+  await expect(page.locator("h1")).toHaveText("控制台认证");
+  await expect(page.locator(".sl-steps > li")).toHaveCount(4);
+  await expect(page.locator("#starlight__sidebar a[aria-current='page']")).toHaveAttribute(
+    "href",
+    "/zh/docs/self-hosting/authentication/",
+  );
+});
+
 test("the sidebar carries one section and the page says where it sits", async ({ page }) => {
   await page.goto("/docs/self-hosting/clickhouse/");
   const sidebar = page.locator("#starlight__sidebar");
