@@ -19,7 +19,7 @@ export function PlannedPage({ description, icon: Icon, title }: PlannedPageProps
         <h1>{title}</h1>
         <p>{description}</p>
         <Button variant="outline" asChild>
-          <Link to="/">返回数据大盘</Link>
+          <Link to="/">返回仪表盘</Link>
         </Button>
       </section>
     </ConsolePage>

@@ -67,13 +67,10 @@ When implementing from a selected generated mock, treat that image as the source
   disclose query limits and overlapping user/session counts. Preserve all groups
   in enlarged details and support keyboard focus as well as pointer highlighting.
 
-- Country breakdown modules support a saved `map` view alongside Bar/Table.
-  Render all returned country groups with the lazy bundled SVG map, semantic
-  lime intensity and localized ISO labels. Never treat unreturned data as zero
-  or silently drop unknown/unmapped countries; retain them in the details table.
-  Keep map selection country-only in the editor and frontend/backend validation;
-  changing dimension falls back to Bar. Country queries allow 250 groups while
-  other dimension budgets remain 100. Reuse loaded data for map/table details.
+- The world map view was removed at the user's request (2026-09-28). Do not
+  reintroduce map charts or geo dependencies. A saved `map` view reads as ranked
+  bars in the Console and is rejected by the backend on save; country data uses
+  Bar, Table or donut like every other dimension.
 - Project overviews are personal, per-user/per-project dashboards. Keep normal
   viewing uncluttered; reveal a settings menu on card hover/focus (always accessible
   on touch/narrow screens), without requiring edit mode first. Modules support
@@ -82,6 +79,43 @@ When implementing from a selected generated mock, treat that image as the source
   at the viewport width on smaller screens; do not revert to a cramped 520px panel.
   Use the shared chart renderer, internal typed module registry and server-saved
   configuration; keep query logic in the console, not in the UI package.
+- The feature is called **仪表盘** in the Console and public docs (never 数据大盘 or
+  看板). Every Project has a built-in **默认仪表盘** defined in `builtIn.ts` and never
+  stored; it is always first in the switcher, cannot be renamed or deleted, and its
+  address is `/projects/:projectId/overview/default`. Editing it is allowed, but saving
+  creates a new personal dashboard (「我的仪表盘」, numbered if taken) and opens it; the
+  default itself never changes for anyone. The default must show every module kind at
+  least once (all three stat styles; line with previous period, area, bar, stacked-bar
+  and stacked-area trends; breakdown bar, table and donut; ranked table, metric table
+  and the Top Issues list), with half-width modules in pairs; `builtIn.test.ts`
+  enforces this.
+- Each person keeps up to 20 personal dashboards per Project (the default does not
+  count). The page title is the dashboard name and opens the switcher (create from
+  blank/default layout/template or copy, rename, reorder, delete); list actions are
+  disabled while a draft is unsaved. Personal dashboards use
+  `/projects/:projectId/overview/:dashboardId`; the bare overview address opens the
+  last-used one on this device (else the first personal one, else the default) and
+  never redirects. Duplicate on the server so unknown modules survive.
+- The module library is organized by data domain: 推荐 / 流量与会话 / 性能 / API /
+  错误 / 业务指标 / 用户行为, with blank module types under 自定义. Each concrete module
+  appears once, in one domain (`library.ts`); "推荐" filters flagged entries and search
+  spans every domain. Dimensions such as country, device or browser are choices inside a
+  module, never library cards of their own. New modules read the metric catalog
+  (behavior events included); the classic overview and events sources stay only for
+  modules that already use them.
+- Modules can read the backend metric catalog (`version: 2`, `source: "catalog"`).
+  Offer metrics grouped by family, disable incompatible picks and views with the
+  validator's own reason, and strip settings a change made invalid rather than
+  failing the save. Keep one unit per chart and never mix sample-rate-weighted and
+  unweighted counts; only metrics that add up get "Other", shares, donuts or stacks.
+  The previous period is a dashed `--ds-chart-comparison` line behind the current
+  series. Ranked and metric tables open in 详细 with every returned row; drill-down
+  links exist only where the destination page reads the value from its URL.
+  Update `catalogRules.ts` and `internal/catalog` together; the shared case matrix
+  must pass on both sides. Behavior events are a catalog source too: split
+  `behavior.events` by 事件名称 and pin the events to compare (`groups`, drawn in the
+  picked order, at most nine lines) to put payment started/succeeded/failed on one
+  chart. Pinned groups replace the top-N limit and never produce "Other".
 - Dashboard card menus label the investigation action **详细**, not 放大查看.
   `ModuleDetailsDialog` is the dashboard-scoped detail shell: a wide chart/data-table
   workspace with a statistics/context rail, stacked on narrow screens. Stat details
@@ -113,8 +147,10 @@ When implementing from a selected generated mock, treat that image as the source
   Appearance changes must
   not create extra data queries. Respect reduced motion and both themes. Update
   the frontend schema and Go dashboard allowlist together for saved options.
-  Put enlarge/details inside that menu, not in a separate card button. The page
-  edit action is icon-only and has no adjacent refresh action. Card changes create
+  Put enlarge/details inside that menu, not in a separate card button. Outside
+  edit mode the page header shows a gear that reveals **编辑** and **添加模块** on hover
+  or keyboard focus (always visible on touch and narrow screens); adding from there
+  starts a draft directly. There is no adjacent refresh action. Card changes create
   an unsaved draft with Save/Cancel; opening menus/details alone must not create one.
   Put sampling/approximation notes, receive timestamps, previous values and chart
   tables in an accessible Dialog using the same loaded data, never an inline

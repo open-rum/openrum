@@ -1,0 +1,60 @@
+---
+import { Languages } from "lucide-astro";
+
+const zh = Astro.url.pathname.startsWith("/zh/");
+const currentPath = Astro.url.pathname;
+const englishPath = zh ? currentPath.replace(/^\/zh(?=\/)/, "") : currentPath;
+const chinesePath = zh ? currentPath : `/zh${currentPath}`;
+const suffix = `${Astro.url.search}${Astro.url.hash}`;
+const label = zh ? "选择语言" : "Select language";
+---
+
+<details class="docs-icon-menu">
+  <summary class="docs-icon-action" aria-label={label} title={label}>
+    <Languages size={17} aria-hidden="true" />
+  </summary>
+  <div class="docs-icon-panel" role="menu" aria-label={label}>
+    <a href={`${englishPath}${suffix}`} role="menuitemradio" aria-checked={zh ? "false" : "true"}>English</a>
+    <a href={`${chinesePath}${suffix}`} role="menuitemradio" aria-checked={zh ? "true" : "false"}>简体中文</a>
+  </div>
+</details>
+
+<style>
+  .docs-icon-menu { position: relative; }
+  .docs-icon-action {
+    display: grid;
+    width: 1.75rem;
+    height: 1.75rem;
+    place-items: center;
+    border-radius: var(--radius-md);
+    color: var(--ds-text-muted);
+    cursor: pointer;
+    list-style: none;
+  }
+  .docs-icon-action:hover, .docs-icon-menu[open] .docs-icon-action { color: var(--ds-text); background: var(--ds-surface-subtle); }
+  .docs-icon-action::marker, .docs-icon-action::-webkit-details-marker { display: none; }
+  .docs-icon-panel {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    z-index: 30;
+    display: none;
+    min-width: 8.5rem;
+    margin-top: 0.35rem;
+    padding: 0.35rem;
+    border: 1px solid var(--ds-border);
+    border-radius: var(--radius-lg);
+    background: var(--ds-surface);
+    box-shadow: var(--shadow-flyout);
+  }
+  .docs-icon-menu[open] .docs-icon-panel, .docs-icon-menu:focus-within .docs-icon-panel { display: grid; }
+  @media (hover: hover) { .docs-icon-menu:hover .docs-icon-panel { display: grid; } }
+  .docs-icon-panel a {
+    padding: 0.5rem 0.65rem;
+    border-radius: var(--radius-md);
+    color: var(--ds-text-muted);
+    text-decoration: none;
+    font-size: 0.875rem;
+  }
+  .docs-icon-panel a:hover, .docs-icon-panel a[aria-checked="true"] { color: var(--ds-text); background: var(--ds-surface-subtle); }
+</style>

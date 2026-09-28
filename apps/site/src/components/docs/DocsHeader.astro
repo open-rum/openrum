@@ -1,33 +1,16 @@
 ---
-import LanguageSelect from "@astrojs/starlight/components/LanguageSelect.astro";
 import Search from "@astrojs/starlight/components/Search.astro";
 import SocialIcons from "@astrojs/starlight/components/SocialIcons.astro";
-import ThemeSelect from "@astrojs/starlight/components/ThemeSelect.astro";
-import { ChevronDown } from "lucide-astro";
 import BrandMark from "../BrandMark.astro";
 import { topics } from "../../lib/docsTopics";
+import DocsLanguageMenu from "./DocsLanguageMenu.astro";
+import DocsThemeMenu from "./DocsThemeMenu.astro";
 
 const route = Astro.locals.starlightRoute;
 const zh = Astro.url.pathname.startsWith("/zh/");
 const prefix = zh ? "/zh" : "";
 const tabs = topics(route.sidebar);
 
-// The marketing sections do not belong in the primary row — inside /docs the primary
-// row carries the documentation taxonomy. They stay reachable through this menu so
-// leaving the docs is not a trip through the home page.
-const product = zh
-  ? [
-      ["产品", "/zh/product"],
-      ["自部署", "/zh/self-host"],
-      ["基准", "/zh/benchmarks"],
-      ["社区", "/zh/community"],
-    ]
-  : [
-      ["Product", "/product"],
-      ["Self-host", "/self-host"],
-      ["Benchmarks", "/benchmarks"],
-      ["Community", "/community"],
-    ];
 ---
 
 <div class="docs-header">
@@ -49,15 +32,9 @@ const product = zh
   <div class="docs-header-search print:hidden"><Search /></div>
 
   <div class="docs-header-actions print:hidden">
-    <details class="docs-product-menu">
-      <summary>{zh ? "产品" : "Product"}<ChevronDown size={14} /></summary>
-      <div class="docs-product-panel">
-        {product.map(([label, href]) => <a href={href}>{label}</a>)}
-      </div>
-    </details>
     <div class="docs-header-icons sl-flex"><SocialIcons /></div>
-    <ThemeSelect />
-    <LanguageSelect />
+    <DocsThemeMenu />
+    <DocsLanguageMenu />
   </div>
 </div>
 
@@ -81,7 +58,7 @@ const product = zh
     letter-spacing: -0.025em;
   }
 
-  /* Six tabs fit at desktop widths; below that the row scrolls rather than wrapping,
+  /* Five tabs fit at desktop widths; below that the row scrolls rather than wrapping,
      which would change the header height and cost layout stability. */
   .docs-tabs {
     display: flex;
@@ -134,56 +111,10 @@ const product = zh
     gap: 0.5rem;
   }
 
-  .docs-product-menu {
-    position: relative;
-  }
-  .docs-product-menu summary {
-    display: flex;
-    align-items: center;
-    gap: 0.25rem;
-    color: var(--ds-text-muted);
-    font-size: 0.875rem;
-    font-weight: 550;
-    cursor: pointer;
-    list-style: none;
-  }
-  .docs-product-menu summary::marker,
-  .docs-product-menu summary::-webkit-details-marker {
-    display: none;
-  }
-  .docs-product-menu summary:hover {
-    color: var(--ds-text);
-  }
-  .docs-product-panel {
-    position: absolute;
-    top: calc(100% + 0.6rem);
-    inset-inline-end: 0;
-    z-index: 30;
-    display: grid;
-    min-width: 11rem;
-    padding: 0.35rem;
-    border: 1px solid var(--ds-border);
-    border-radius: var(--radius-lg);
-    background: var(--ds-surface);
-    box-shadow: var(--shadow-flyout);
-  }
-  .docs-product-panel a {
-    padding: 0.5rem 0.65rem;
-    border-radius: var(--radius-md);
-    color: var(--ds-text-muted);
-    text-decoration: none;
-    font-size: 0.875rem;
-  }
-  .docs-product-panel a:hover {
-    color: var(--ds-text);
-    background: var(--ds-surface-subtle);
-  }
-
   /* Starlight owns the mobile menu below this width and the tabs would crowd out the
      search field, so they move into the sidebar drawer instead. */
   @media (max-width: 72rem) {
-    .docs-tabs,
-    .docs-product-menu {
+    .docs-tabs {
       display: none;
     }
   }

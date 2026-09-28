@@ -24,16 +24,18 @@ import { Input } from "@/components/ui/input";
 import { Empty, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import type { OverviewFilters } from "@/lib/filters/schema";
-import { moduleRegistry, donutModules } from "./registry";
+import { moduleRegistry } from "./registry";
 import { ModuleContent } from "./ModuleContent";
-import { useModulePreview } from "./queries";
+import { useMetricCatalog, useModulePreview } from "./queries";
+import { validateCatalogWidget } from "./catalogRules";
 import {
-  widgetSchema,
-  widgetDescription,
-  type Widget,
-  type WidgetType,
-  type WidgetView,
-} from "./model";
+  availableEntries,
+  libraryDomains,
+  type LibraryDomain,
+  type LibraryEntry,
+  type LibraryPreview,
+} from "./library";
+import { widgetSchema, widgetDescription, type Widget } from "./model";
 
 export default function ModuleEditor({
   initial,
@@ -51,16 +53,32 @@ export default function ModuleEditor({
   const [widget, setWidget] = useState<Widget | null>(initial ?? null);
   const [discard, setDiscard] = useState(false);
   const [search, setSearch] = useState("");
-  const [group, setGroup] = useState("全部");
+  const [domain, setDomain] = useState<LibraryDomain | "recommended">("recommended");
+  const catalogQuery = useMetricCatalog(filters.projectId, userId);
+  const catalog = catalogQuery.data;
   const dirty = widget !== null && JSON.stringify(widget) !== JSON.stringify(initial ?? null);
   const parsed = widget ? widgetSchema.safeParse(widget) : undefined;
+  // Structure first, then the catalog's own rules — the same order the API checks them in.
+  const catalogReason =
+    parsed?.success && parsed.data.data.source === "catalog"
+      ? catalog
+        ? validateCatalogWidget(parsed.data, catalog)
+        : "正在加载指标目录…"
+      : null;
+  const ready = Boolean(parsed?.success) && catalogReason === null;
   const definition = widget ? moduleRegistry[widget.type] : undefined;
   const Editor = definition?.Editor;
-  const modules = [...Object.values(moduleRegistry), ...donutModules].filter(
-    (module) =>
-      (group === "全部" || module.group === group) &&
-      `${module.name}${module.description}`.toLowerCase().includes(search.toLowerCase()),
+  const query = search.trim().toLowerCase();
+  // A search looks across every domain; otherwise the selected domain decides.
+  const entries = availableEntries(catalog).filter((entry) =>
+    query
+      ? `${entry.name}${entry.description}`.toLowerCase().includes(query)
+      : domain === "recommended"
+        ? entry.recommended
+        : entry.domain === domain,
   );
+  const domainLabel = (id: LibraryDomain) =>
+    libraryDomains.find((entry) => entry.id === id)?.label ?? id;
   const close = () => (dirty ? setDiscard(true) : onClose());
   return (
     <>
@@ -75,67 +93,84 @@ export default function ModuleEditor({
             <SheetTitle>{widget ? (initial ? "配置模块" : "添加模块") : "模块库"}</SheetTitle>
             <SheetDescription>
               {widget
-                ? "配置数据与展示，预览后添加到概览草稿。"
-                : "选择你关心的数据，组合自己的项目概览。"}
+                ? "配置数据与展示，预览后添加到仪表盘草稿。"
+                : "选择你关心的数据，组合自己的仪表盘。"}
             </SheetDescription>
           </SheetHeader>
           <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto px-4 pb-4">
             {!widget ? (
-              <>
-                <Input
-                  aria-label="搜索模块"
-                  placeholder="搜索指标、趋势、分布…"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                />
+              <div className="dashboard-library grid min-h-0 gap-4 sm:grid-cols-[10rem_minmax(0,1fr)]">
                 <ToggleGroup
                   type="single"
-                  value={group}
+                  orientation="vertical"
+                  className="dashboard-library-domains flex h-fit w-full flex-row items-stretch overflow-x-auto sm:flex-col sm:overflow-visible"
+                  value={query ? "" : domain}
                   onValueChange={(value) => {
-                    if (value) setGroup(value);
+                    if (!value) return;
+                    setDomain(value as LibraryDomain | "recommended");
+                    setSearch("");
                   }}
                   aria-label="模块分类"
                 >
-                  {["全部", "指标", "趋势", "分布", "列表"].map((value) => (
-                    <ToggleGroupItem key={value} value={value}>
-                      {value}
+                  {libraryDomains.map((entry) => (
+                    <ToggleGroupItem
+                      key={entry.id}
+                      value={entry.id}
+                      className={`justify-start whitespace-nowrap${entry.id === "custom" ? " dashboard-library-custom" : ""}`}
+                    >
+                      {entry.label}
                     </ToggleGroupItem>
                   ))}
                 </ToggleGroup>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  {modules.map((module) => (
-                    <button
-                      key={`${module.type}-${module.name}`}
-                      type="button"
-                      onClick={() => setWidget(module.create())}
-                      className="dashboard-catalog-item text-left"
-                      aria-label={`添加${module.name}`}
-                    >
-                      <Card className="h-full">
-                        <CardHeader>
-                          <CardTitle>
-                            <span className="flex items-center gap-2">
-                              <module.icon className="size-4 text-muted-foreground" />
-                              {module.name}
-                            </span>
-                          </CardTitle>
-                          <CardDescription>{module.description}</CardDescription>
-                        </CardHeader>
-                        <CardContent className="mt-auto">
-                          <ModuleMiniature type={module.type} view={module.previewView} />
-                        </CardContent>
-                      </Card>
-                    </button>
-                  ))}
+                <div className="flex min-w-0 flex-col gap-4">
+                  <Input
+                    aria-label="搜索模块"
+                    placeholder="搜索会话、慢 API、错误类型…"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                  />
+                  {!catalog ? (
+                    <p role="status" className="text-sm text-muted-foreground">
+                      {catalogQuery.isError ? (
+                        <>
+                          暂时无法加载指标目录，部分模块稍后可用。
+                          <Button
+                            variant="link"
+                            size="sm"
+                            onClick={() => void catalogQuery.refetch()}
+                          >
+                            重试
+                          </Button>
+                        </>
+                      ) : (
+                        "正在加载指标目录…"
+                      )}
+                    </p>
+                  ) : null}
+                  {domain === "custom" && !query ? (
+                    <p className="text-sm text-muted-foreground">
+                      从空白模块开始，自己选择指标、维度和展示方式。
+                    </p>
+                  ) : null}
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {entries.map((entry) => (
+                      <LibraryCard
+                        key={entry.id}
+                        entry={entry}
+                        domainLabel={query ? domainLabel(entry.domain) : undefined}
+                        onPick={() => setWidget(entry.create())}
+                      />
+                    ))}
+                  </div>
+                  {!entries.length && (catalog || query) ? (
+                    <Empty>
+                      <EmptyHeader>
+                        <EmptyTitle>没有匹配的模块</EmptyTitle>
+                      </EmptyHeader>
+                    </Empty>
+                  ) : null}
                 </div>
-                {!modules.length ? (
-                  <Empty>
-                    <EmptyHeader>
-                      <EmptyTitle>没有匹配的模块</EmptyTitle>
-                    </EmptyHeader>
-                  </Empty>
-                ) : null}
-              </>
+              </div>
             ) : (
               <>
                 {!initial ? (
@@ -159,13 +194,13 @@ export default function ModuleEditor({
                     views={definition.views}
                   />
                 ) : null}
-                {parsed?.success ? (
+                {parsed?.success && catalogReason === null ? (
                   <Preview widget={parsed.data} filters={filters} userId={userId} />
                 ) : (
                   <p role="status" className="text-sm text-destructive">
                     {parsed && !parsed.success
                       ? parsed.error.issues[0]?.message
-                      : "请完成模块配置。"}
+                      : (catalogReason ?? "请完成模块配置。")}
                   </p>
                 )}
               </>
@@ -174,13 +209,13 @@ export default function ModuleEditor({
           <SheetFooter className="shrink-0 border-t">
             {widget ? (
               <Button
-                disabled={!parsed?.success}
+                disabled={!ready}
                 onClick={() => {
-                  if (parsed?.success) onApply(parsed.data);
+                  if (parsed?.success && ready) onApply(parsed.data);
                 }}
               >
                 <PlusIcon data-icon="inline-start" />
-                {initial ? "应用修改" : "添加到概览"}
+                {initial ? "应用修改" : "添加到仪表盘"}
               </Button>
             ) : null}
             <Button variant="outline" onClick={close}>
@@ -193,7 +228,7 @@ export default function ModuleEditor({
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>放弃这个模块的修改？</AlertDialogTitle>
-            <AlertDialogDescription>尚未应用到概览的模块配置将被丢弃。</AlertDialogDescription>
+            <AlertDialogDescription>尚未应用到仪表盘的模块配置将被丢弃。</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>继续配置</AlertDialogCancel>
@@ -237,10 +272,45 @@ function Preview({
   );
 }
 
-function ModuleMiniature({ type, view }: { type: WidgetType; view?: WidgetView }) {
+function LibraryCard({
+  entry,
+  domainLabel,
+  onPick,
+}: {
+  entry: LibraryEntry;
+  domainLabel?: string;
+  onPick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onPick}
+      className="dashboard-catalog-item text-left"
+      aria-label={`添加${entry.name}`}
+      data-library-entry={entry.id}
+    >
+      <Card className="h-full">
+        <CardHeader>
+          <CardTitle className="flex items-center justify-between gap-2">
+            <span>{entry.name}</span>
+            {domainLabel ? (
+              <span className="text-xs font-normal text-muted-foreground">{domainLabel}</span>
+            ) : null}
+          </CardTitle>
+          <CardDescription>{entry.description}</CardDescription>
+        </CardHeader>
+        <CardContent className="mt-auto">
+          <ModuleMiniature preview={entry.preview} />
+        </CardContent>
+      </Card>
+    </button>
+  );
+}
+
+function ModuleMiniature({ preview }: { preview: LibraryPreview }) {
   return (
     <svg viewBox="0 0 180 64" className="h-16 w-full text-primary" aria-hidden="true">
-      {view === "donut" ? (
+      {preview === "donut" ? (
         <>
           <circle
             cx="34"
@@ -275,13 +345,19 @@ function ModuleMiniature({ type, view }: { type: WidgetType; view?: WidgetView }
             </g>
           ))}
         </>
-      ) : type === "stat" ? (
+      ) : preview === "stat" ? (
         <>
           <rect x="0" y="8" width="84" height="24" rx="4" fill="currentColor" opacity="0.6" />
           <rect x="0" y="44" width="44" height="6" rx="3" fill="currentColor" opacity="0.2" />
-          <rect x="52" y="44" width="62" height="6" rx="3" fill="currentColor" opacity="0.12" />
+          <path
+            d="M112 40L126 30L140 34L154 20L168 24L180 12"
+            stroke="currentColor"
+            strokeWidth="2"
+            fill="none"
+            opacity="0.5"
+          />
         </>
-      ) : type === "timeseries" ? (
+      ) : preview === "line" ? (
         <>
           <path
             d="M0 52L20 39L40 44L60 25L80 31L100 14L120 22L140 6L160 13L180 2V64H0Z"
@@ -295,7 +371,25 @@ function ModuleMiniature({ type, view }: { type: WidgetType; view?: WidgetView }
             strokeWidth="2"
           />
         </>
-      ) : type === "breakdown" ? (
+      ) : preview === "stacked" ? (
+        <>
+          <path
+            d="M0 64L0 44L30 40L60 42L90 34L120 36L150 28L180 30V64Z"
+            fill="currentColor"
+            opacity="0.55"
+          />
+          <path
+            d="M0 44L30 40L60 42L90 34L120 36L150 28L180 30L180 18L150 16L120 24L90 20L60 26L30 22L0 28Z"
+            fill="currentColor"
+            opacity="0.3"
+          />
+          <path
+            d="M0 28L30 22L60 26L90 20L120 24L150 16L180 18L180 8L150 6L120 12L90 8L60 14L30 10L0 16Z"
+            fill="currentColor"
+            opacity="0.14"
+          />
+        </>
+      ) : preview === "bars" ? (
         [150, 110, 78, 42].map((width, index) => (
           <rect
             key={index}
@@ -307,6 +401,45 @@ function ModuleMiniature({ type, view }: { type: WidgetType; view?: WidgetView }
             fill="currentColor"
             opacity={0.65 - index * 0.12}
           />
+        ))
+      ) : preview === "matrix" ? (
+        [0, 1, 2, 3].map((row) => (
+          <g key={row} opacity={0.65 - row * 0.12}>
+            <rect x="0" y={row * 16 + 2} width="46" height="7" rx="3" fill="currentColor" />
+            {[70, 110, 150].map((x) => (
+              <rect
+                key={x}
+                x={x}
+                y={row * 16 + 2}
+                width="28"
+                height="7"
+                rx="3"
+                fill="currentColor"
+                opacity="0.5"
+              />
+            ))}
+          </g>
+        ))
+      ) : preview === "ranked" ? (
+        [0, 1, 2].map((row) => (
+          <g key={row} opacity={0.65 - row * 0.15}>
+            <rect x="0" y={row * 22 + 5} width="64" height="7" rx="3" fill="currentColor" />
+            <rect
+              x="76"
+              y={row * 22 + 5}
+              width="28"
+              height="7"
+              rx="3"
+              fill="currentColor"
+              opacity="0.5"
+            />
+            <path
+              d={`M120 ${row * 22 + 12}L132 ${row * 22 + 6}L144 ${row * 22 + 10}L156 ${row * 22 + 3}L168 ${row * 22 + 8}L180 ${row * 22 + 2}`}
+              stroke="currentColor"
+              strokeWidth="1.5"
+              fill="none"
+            />
+          </g>
         ))
       ) : (
         [0, 1, 2].map((index) => (

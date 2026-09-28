@@ -58,12 +58,14 @@
 
 | 职责 | 入口 |
 | --- | --- |
-| 后端 30 点目标、允许间隔、数据源下限 | `internal/query/time_series.go`：`ConsoleSeriesMaxPoints`、`ConsoleSeriesInterval`、`adaptiveSeriesInterval` |
+| 后端 30 点目标、允许间隔、数据源下限 | `internal/query/time_series.go`：`ConsoleSeriesMaxPoints`、`ConsoleSeriesInterval`、`adaptiveSeriesInterval`、`seriesBuckets`（与 `toStartOfInterval` 对齐的稠密桶网格） |
 | 前端目标、补空桶、间隔文案、时间标签 | `apps/web/src/lib/charts/timeSeries.ts` |
 | 响应式轴标签宽度、孤立点 | `apps/web/src/lib/charts/useChartWidth.ts`、`isolatedDot.tsx` |
-| 大盘查询与数据适配 | `apps/web/src/features/dashboard/queries.ts`、`adapters.ts` |
-| 大盘兼容导出和 Context | `apps/web/src/features/dashboard/chartDensity.ts`、`DashboardDensity.tsx` |
-| 大盘后端 | `internal/query/overview.go`、`analytics.go`；显式 `maxPoints` 分支 |
+| 仪表盘查询与数据适配 | `apps/web/src/features/dashboard/queries.ts`、`adapters.ts`、`adaptCatalog.ts` |
+| 指标目录查询（仪表盘 v2 模块） | `internal/catalog`（指标定义与校验）；`internal/query/metrics_query*.go`：按数据源分辨率取间隔，缺失桶为 `null`，上一周期按 `addSeconds(bucket, D)` 对齐到当前网格；`GET /api/v1/projects/{id}/metrics/query` |
+| 类别配色、上一周期虚线、表格迷你趋势 | `apps/web/src/lib/charts/palette.ts`、`comparison.ts`、`Sparkline.tsx` |
+| 仪表盘兼容导出和 Context | `apps/web/src/features/dashboard/chartDensity.ts`、`DashboardDensity.tsx` |
+| 仪表盘后端 | `internal/query/overview.go`、`analytics.go`；显式 `maxPoints` 分支 |
 | 错误概览和详情后端 | `internal/query/issues.go`：`Overview`、`Trend`；`services/api/internal/handlers/issues.go` |
 | 错误前端响应与图表 | `apps/web/src/lib/api/issues.ts`；`features/issues/IssueOverviewCharts.tsx`、`IssueTrend.tsx` |
 
@@ -72,7 +74,8 @@
 
 ## 已接入范围与遗留入口
 
-已接入：大盘的时间序列/Stat/预览/详情，以及错误概览和错误详情。
+已接入：仪表盘的时间序列/Stat/预览/详情（含指标目录模块的堆叠、上一周期对比与表格迷你趋势），以及错误概览和错误详情。
+错误类指标来自 `issue_metrics_5m`，指标目录会把它们的间隔下限保持在 5 分钟。
 
 这次不宣称所有历史图表均已迁移。后续修改以下趋势需求时，先按本文接入，
 同时核对底层汇总表的分辨率，不能只改变前端显示标签：

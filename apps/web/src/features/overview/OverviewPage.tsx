@@ -13,12 +13,14 @@ import {
 } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getProject, listOrganizations, listProjects } from "@/lib/api/projects";
-import { MetricCards } from "./MetricCards";
 
 const ProjectDashboard = lazy(() => import("@/features/dashboard/ProjectDashboard"));
 
 export function OverviewPage() {
-  const { projectId: routeProjectId } = useParams({ strict: false }) as { projectId?: string };
+  const { projectId: routeProjectId, dashboardId } = useParams({ strict: false }) as {
+    projectId?: string;
+    dashboardId?: string;
+  };
   const directProject = useQuery({
     queryKey: ["project", routeProjectId],
     queryFn: ({ signal }) => getProject(routeProjectId!, signal),
@@ -58,7 +60,7 @@ export function OverviewPage() {
   if (!project) return <NoProject />;
   return (
     <Suspense fallback={<OverviewShellSkeleton />}>
-      <ProjectDashboard project={project} />
+      <ProjectDashboard project={project} dashboardId={dashboardId} />
     </Suspense>
   );
 }
@@ -83,9 +85,13 @@ function NoProject() {
 
 function OverviewShellSkeleton() {
   return (
-    <ConsolePage width="fluid" aria-label="正在加载数据大盘">
+    <ConsolePage width="fluid" aria-label="正在加载仪表盘">
       <Skeleton className="h-24" />
-      <MetricCards loading />
+      <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+        {Array.from({ length: 4 }, (_, index) => (
+          <Skeleton key={index} className="h-40" />
+        ))}
+      </div>
       <Skeleton className="h-80" />
     </ConsolePage>
   );

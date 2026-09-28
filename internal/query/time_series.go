@@ -30,3 +30,20 @@ func adaptiveSeriesInterval(window time.Duration, points int) time.Duration {
 	}
 	return 48 * time.Hour
 }
+
+// seriesBuckets returns the dense, ascending bucket grid a series is laid on. It floors to
+// the epoch like ClickHouse's toStartOfInterval does in UTC, so a range that does not
+// start on a boundary gains one partial leading bucket rather than being stretched.
+func seriesBuckets(from, to time.Time, interval time.Duration) []time.Time {
+	step := int64(interval / time.Second)
+	if step <= 0 || !to.After(from) {
+		return nil
+	}
+	start := from.UTC().Unix() / step * step
+	end := to.UTC().Unix()
+	buckets := make([]time.Time, 0, (end-start)/step+1)
+	for current := start; current < end; current += step {
+		buckets = append(buckets, time.Unix(current, 0).UTC())
+	}
+	return buckets
+}

@@ -6,7 +6,7 @@ appliesTo: Alpha
 
 import { Aside, LinkCard, Steps } from "@astrojs/starlight/components";
 
-This path runs OpenRUM and its four data services on **one Linux host**. It uses a separate Compose file from the [local evaluation stack](/docs/self-hosting/compose/): no Demo seeding, `APP_ENV=production`, required private credentials, no published database ports, and Caddy for automatic HTTPS. Kubernetes/Helm remains the [recommended path](/docs/self-hosting/kubernetes/) when you need multiple application nodes or planned scaling.
+This path runs OpenRUM and its four data services on **one Linux host**. It uses a separate Compose file from the [local evaluation stack](/docs/self-hosting/compose/): no Demo seeding, `APP_ENV=production`, required private credentials, no published database ports, and Caddy for automatic HTTPS. Kubernetes/Helm remains the [recommended path](/docs/getting-started/production-deployment/) when you need multiple application nodes or planned scaling.
 
 <Aside type="caution" title="A single failure domain, not high availability">
   Docker will restart a failed container, but it cannot recover from a lost host or disk. Backups,

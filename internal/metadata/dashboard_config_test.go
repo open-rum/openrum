@@ -6,12 +6,12 @@ import (
 	"testing"
 )
 
-func TestDashboardCountryMapValidation(t *testing.T) {
+func TestDashboardDistributionViewValidation(t *testing.T) {
 	for _, tc := range []struct {
 		name, moduleType, source, dimension, view string
 		valid                                     bool
 	}{
-		{"country map", "breakdown", "events", "country", "map", true},
+		{"retired country map", "breakdown", "events", "country", "map", false},
 		{"country bars", "breakdown", "events", "country", "bar", true},
 		{"country table", "breakdown", "events", "country", "table", true},
 		{"country donut", "breakdown", "events", "country", "donut", true},
@@ -63,5 +63,14 @@ func TestDashboardStatAppearanceValidation(t *testing.T) {
 				t.Fatalf("valid=%v error=%v", tc.valid, err)
 			}
 		})
+	}
+}
+
+func TestCatalogBreakdownRejectsTheRetiredMapView(t *testing.T) {
+	for view, valid := range map[string]bool{"bar": true, "table": true, "donut": true, "map": false} {
+		raw := json.RawMessage(fmt.Sprintf(`{"schemaVersion":1,"widgets":[{"id":"countries","type":"breakdown","version":2,"title":"各国 PV","size":"half","view":%q,"data":{"source":"catalog","metrics":["traffic.pageViews"],"dimension":"country","filters":{}}}]}`, view))
+		if err := ValidateDashboardConfig(raw, nil); (err == nil) != valid {
+			t.Fatalf("%s: valid=%v error=%v", view, valid, err)
+		}
 	}
 }

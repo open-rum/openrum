@@ -22,14 +22,15 @@ import {
   sizeLabels,
   statAppearanceLabels,
   type StatAppearance,
-  supportsWorldMap,
   withBreakdownDimension,
   viewLabels,
   type Widget,
   type WidgetSize,
   type WidgetView,
 } from "./model";
-import { useModulePreview } from "./queries";
+import { useMetricCatalog, useModulePreview } from "./queries";
+import { CatalogFields } from "./CatalogFields";
+import { coerceCatalogWidget, validateCatalogWidget } from "./catalogRules";
 
 export type ModuleFieldsProps = {
   widget: Widget;
@@ -49,10 +50,31 @@ export function ModuleFields({
   views,
 }: ModuleFieldsProps) {
   const id = useId();
-  const list = widget.type === "top-issues" || widget.type === "slow-apis";
+  const list = widget.type === "top-issues";
+  const catalogSource = widget.data.source === "catalog";
+  const catalogOnly = widget.type === "ranked-table" || widget.type === "metric-table";
+  const catalogQuery = useMetricCatalog(filters.projectId, userId);
+  const catalog = catalogQuery.data;
   function changeSource(value: string) {
+    if (value === "catalog") {
+      const next: Widget = {
+        ...widget,
+        version: 2,
+        statAppearance: widget.type === "stat" ? widget.statAppearance : undefined,
+        data: { source: "catalog", metrics: ["traffic.pageViews"], filters: {} },
+      };
+      onChange(catalog ? coerceCatalogWidget(next, catalog).widget : next);
+      return;
+    }
     onChange({
       ...widget,
+      version: 1,
+      view:
+        widget.view === "stacked-area"
+          ? "area"
+          : widget.view === "stacked-bar"
+            ? "bar"
+            : widget.view,
       data:
         value === "events"
           ? { source: "events", metrics: ["estimated"], dimension: "country", eventKind: "custom" }
@@ -60,6 +82,28 @@ export function ModuleFields({
     });
   }
   function changeType(value: string) {
+    if (widget.data.source === "catalog") {
+      const type = value as Widget["type"];
+      if (type === "top-issues") return;
+      const single = type === "stat" || type === "ranked-table";
+      const table = type === "ranked-table" || type === "metric-table";
+      const next: Widget = {
+        ...widget,
+        type,
+        version: 2,
+        size: type === "stat" ? "compact" : widget.size === "compact" ? "half" : widget.size,
+        view: type === "stat" ? "number" : table ? "table" : type === "breakdown" ? "bar" : "line",
+        statAppearance: type === "stat" ? widget.statAppearance : undefined,
+        data: {
+          ...widget.data,
+          metrics: single ? widget.data.metrics.slice(0, 1) : widget.data.metrics,
+          dimension: type === "stat" ? undefined : widget.data.dimension,
+          sparkline: undefined,
+        },
+      };
+      onChange(catalog ? coerceCatalogWidget(next, catalog).widget : next);
+      return;
+    }
     if (value !== "stat" && value !== "timeseries" && value !== "breakdown") return;
     const data =
       value === "stat" ? { ...widget.data, metrics: widget.data.metrics.slice(0, 1) } : widget.data;
@@ -84,43 +128,65 @@ export function ModuleFields({
         <>
           <Field>
             <FieldLabel htmlFor={`${id}-source`}>数据来源</FieldLabel>
-            <Select
-              value={widget.data.source}
-              onValueChange={changeSource}
-              disabled={widget.type === "breakdown"}
-            >
+            <Select value={widget.data.source} onValueChange={changeSource} disabled={catalogOnly}>
               <SelectTrigger id={`${id}-source`} className="w-full">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 <SelectGroup>
-                  <SelectItem value="overview">项目概览指标</SelectItem>
+                  <SelectItem value="catalog">指标目录</SelectItem>
+                  {widget.data.source === "overview" ? (
+                    <SelectItem value="overview">项目概览（经典）</SelectItem>
+                  ) : null}
                   <SelectItem value="events">行为与自定义事件</SelectItem>
                 </SelectGroup>
               </SelectContent>
             </Select>
+            {widget.data.source === "overview" ? (
+              <FieldDescription>
+                经典来源只为已有模块保留；切换到指标目录后不能再切回。
+              </FieldDescription>
+            ) : null}
           </Field>
           {widget.data.source === "events" ? (
             <EventFields widget={widget} onChange={onChange} filters={filters} userId={userId} />
           ) : null}
-          <Field>
-            <FieldLabel htmlFor={`${id}-metric`}>统计指标</FieldLabel>
-            <Select
-              value={widget.data.metrics.join(",")}
-              onValueChange={(value) =>
-                onChange({
-                  ...widget,
-                  data: { ...widget.data, metrics: value.split(",") },
-                } as Widget)
-              }
-            >
-              <SelectTrigger id={`${id}-metric`} className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  {(widget.data.source === "overview" ? overviewMetricNames : eventMetricNames).map(
-                    (metric) => (
+          {catalogSource ? (
+            catalog ? (
+              <CatalogFields
+                widget={widget}
+                onChange={onChange}
+                catalog={catalog}
+                filters={filters}
+                userId={userId}
+              />
+            ) : (
+              <p role="status" className="text-sm text-muted-foreground">
+                {catalogQuery.isError ? "暂时无法加载指标目录，请稍后重试。" : "正在加载指标目录…"}
+              </p>
+            )
+          ) : null}
+          {!catalogSource ? (
+            <Field>
+              <FieldLabel htmlFor={`${id}-metric`}>统计指标</FieldLabel>
+              <Select
+                value={widget.data.metrics.join(",")}
+                onValueChange={(value) =>
+                  onChange({
+                    ...widget,
+                    data: { ...widget.data, metrics: value.split(",") },
+                  } as Widget)
+                }
+              >
+                <SelectTrigger id={`${id}-metric`} className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    {(widget.data.source === "overview"
+                      ? overviewMetricNames
+                      : eventMetricNames
+                    ).map((metric) => (
                       <SelectItem key={metric} value={metric}>
                         {
                           (widget.data.source === "overview"
@@ -128,25 +194,27 @@ export function ModuleFields({
                             : eventMetricLabels)[metric]
                         }
                       </SelectItem>
-                    ),
-                  )}
-                  {widget.type === "timeseries" && widget.data.source === "overview" ? (
-                    <>
-                      <SelectItem value="pageViews,uniqueUsers">PV + UV</SelectItem>
-                      <SelectItem value="errorRate,apiFailureRate">错误率 + API 失败率</SelectItem>
-                    </>
-                  ) : null}
-                </SelectGroup>
-              </SelectContent>
-            </Select>
-            <FieldDescription>
-              {widget.type === "stat"
-                ? "取整个时间范围的聚合值。"
-                : widget.type === "breakdown"
-                  ? "按所选维度统计当前时间范围；用户和会话可能跨分组重复。"
-                  : "时间桶由服务端决定，跟随全局时间范围。"}
-            </FieldDescription>
-          </Field>
+                    ))}
+                    {widget.type === "timeseries" && widget.data.source === "overview" ? (
+                      <>
+                        <SelectItem value="pageViews,uniqueUsers">PV + UV</SelectItem>
+                        <SelectItem value="errorRate,apiFailureRate">
+                          错误率 + API 失败率
+                        </SelectItem>
+                      </>
+                    ) : null}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+              <FieldDescription>
+                {widget.type === "stat"
+                  ? "取整个时间范围的聚合值。"
+                  : widget.type === "breakdown"
+                    ? "按所选维度统计当前时间范围；用户和会话可能跨分组重复。"
+                    : "时间桶由服务端决定，跟随全局时间范围。"}
+              </FieldDescription>
+            </Field>
+          ) : null}
         </>
       ) : null}
       {widget.data.source === "overview" ? (
@@ -199,16 +267,24 @@ export function ModuleFields({
               <SelectGroup>
                 <SelectItem value="stat">指标卡</SelectItem>
                 <SelectItem value="timeseries">时间趋势</SelectItem>
-                <SelectItem value="breakdown" disabled={widget.data.source !== "events"}>
+                <SelectItem value="breakdown" disabled={widget.data.source === "overview"}>
                   维度分布
+                </SelectItem>
+                <SelectItem value="ranked-table" disabled={!catalogSource}>
+                  排行表
+                </SelectItem>
+                <SelectItem value="metric-table" disabled={!catalogSource}>
+                  指标表
                 </SelectItem>
               </SelectGroup>
             </SelectContent>
           </Select>
           <FieldDescription>
-            {widget.data.source === "overview"
-              ? "概览指标支持指标卡和趋势；维度分布需要事件数据。"
-              : "同一事件可展示为聚合指标、时间趋势或维度分布。"}
+            {catalogSource
+              ? "同一组指标可展示为指标卡、趋势、分布或表格。"
+              : widget.data.source === "overview"
+                ? "概览指标支持指标卡和趋势；维度分布需要事件或指标目录数据。"
+                : "同一事件可展示为聚合指标、时间趋势或维度分布。"}
           </FieldDescription>
         </Field>
       ) : null}
@@ -248,18 +324,27 @@ export function ModuleFields({
             aria-label="展示方式"
           >
             {views
-              .filter((view) => view !== "map" || supportsWorldMap(widget))
-              .map((view) => (
-                <ToggleGroupItem key={view} value={view}>
-                  {viewLabels[view]}
-                </ToggleGroupItem>
-              ))}
+              .filter(
+                (view) => catalogSource || (view !== "stacked-area" && view !== "stacked-bar"),
+              )
+              .map((view) => {
+                // Ask the validator itself, so the editor can never disagree with a save.
+                const reason =
+                  catalogSource && catalog
+                    ? validateCatalogWidget({ ...widget, view }, catalog)
+                    : null;
+                return (
+                  <ToggleGroupItem
+                    key={view}
+                    value={view}
+                    disabled={Boolean(reason) && widget.view !== view}
+                    title={reason ?? undefined}
+                  >
+                    {viewLabels[view]}
+                  </ToggleGroupItem>
+                );
+              })}
           </ToggleGroup>
-          {widget.view === "map" ? (
-            <FieldDescription>
-              展示全部返回国家，颜色越深数量越多；悬停或点按查看数值。
-            </FieldDescription>
-          ) : null}
           {widget.view === "donut" ? (
             <FieldDescription>
               左侧圆环、右侧排行；超过 6 类时保留前 5 类，其余合并为“其他”。占比基于已返回分组。

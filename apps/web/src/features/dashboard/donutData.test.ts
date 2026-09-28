@@ -40,7 +40,7 @@ describe("donut distributions", () => {
       expect(next.view).toBe("donut");
       expect(widgetSchema.safeParse(next).success).toBe(true);
     }
-    for (const type of ["stat", "timeseries", "top-issues", "slow-apis"]) {
+    for (const type of ["stat", "timeseries", "top-issues"]) {
       expect(widgetSchema.safeParse({ ...widget, type }).success).toBe(false);
     }
     expect(

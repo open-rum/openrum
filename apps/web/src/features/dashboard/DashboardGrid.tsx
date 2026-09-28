@@ -28,6 +28,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { catalogFilterLabels } from "./catalogRules";
 import {
   Card,
   CardAction,
@@ -52,6 +53,7 @@ import {
   readWidget,
   sizeLabels,
   widgetDescription,
+  type CatalogFilterKey,
   type StoredWidget,
   type Widget,
 } from "./model";
@@ -115,7 +117,7 @@ export function DashboardGrid({
             over
               ? `移动到第 ${widgets.findIndex((w) => w.id === over.id) + 1} 个位置。`
               : "移出可放置区域。",
-          onDragEnd: ({ over }) => (over ? "已放下模块。请保存概览。" : "已取消移动。"),
+          onDragEnd: ({ over }) => (over ? "已放下模块。请保存仪表盘。" : "已取消移动。"),
           onDragCancel: () => "已取消移动。",
         },
       }}
@@ -350,7 +352,19 @@ export function ModuleCard({
             {actions(() => setDetailsOpen(true))}
           </CardAction>
         </CardHeader>
-        {effective?.release || effective?.route ? (
+        {widget?.data.source === "catalog" && Object.values(widget.data.filters).some(Boolean) ? (
+          // A filtered catalog module says so on the card, one badge per filter.
+          <div className="flex flex-wrap gap-1 px-4">
+            {(Object.entries(widget.data.filters) as Array<[CatalogFilterKey, string | undefined]>)
+              .filter(([, value]) => Boolean(value))
+              .map(([key, value]) => (
+                <Badge key={key} variant="outline">
+                  {catalogFilterLabels[key]} {value}
+                </Badge>
+              ))}
+            {filters.release || filters.route ? <Badge variant="secondary">链接筛选</Badge> : null}
+          </div>
+        ) : effective?.release || effective?.route ? (
           <div className="flex flex-wrap gap-1 px-4">
             {effective.release ? <Badge variant="outline">版本 {effective.release}</Badge> : null}
             {effective.route ? <Badge variant="outline">路由 {effective.route}</Badge> : null}

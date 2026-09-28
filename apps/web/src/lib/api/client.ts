@@ -81,16 +81,6 @@ export const overviewResponseSchema = z.object({
       lastSeenAt: isoTimeSchema.nullable(),
     }),
   ),
-  slowApis: z.array(
-    z.object({
-      method: z.string(),
-      url: z.string(),
-      requests: z.number().int().nonnegative(),
-      failures: z.number().int().nonnegative(),
-      failureRate: z.number().nullable(),
-      durationP95: z.number().nullable(),
-    }),
-  ),
   freshness: z.object({
     latestReceivedAt: isoTimeSchema.nullable(),
     ageSeconds: z.number().nonnegative().nullable(),

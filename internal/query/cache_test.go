@@ -26,7 +26,7 @@ func TestOverviewCacheKeysFiltersAndInvalidatesOnQueryableVersion(t *testing.T) 
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = client.Del(context.Background(), key).Err() })
-	want := Overview{From: filters.From, To: filters.To, IntervalSeconds: 60, Series: []OverviewPoint{}, TopIssues: []OverviewIssue{}, SlowAPIs: []OverviewAPI{}}
+	want := Overview{From: filters.From, To: filters.To, IntervalSeconds: 60, Series: []OverviewPoint{}, TopIssues: []OverviewIssue{}}
 	if err := cache.Set(context.Background(), filters, version, want); err != nil {
 		t.Fatal(err)
 	}
