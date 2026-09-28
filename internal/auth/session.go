@@ -38,6 +38,8 @@ type Principal struct {
 	Email        string
 	DisplayName  string
 	InstanceRole string
+	AccessStatus string
+	HasPassword  bool
 }
 
 type SessionManager struct {
@@ -93,14 +95,16 @@ func (manager *SessionManager) Authenticate(ctx context.Context, token string) (
 	tokenHash := sha256.Sum256([]byte(token))
 	var principal Principal
 	err := manager.database.QueryRowContext(ctx,
-		`SELECT sessions.id, users.id, users.email, users.display_name, COALESCE(instance_members.role, '')
+		`SELECT sessions.id, users.id, users.email, users.display_name, COALESCE(instance_members.role, ''),
+		        users.access_status, users.password_hash IS NOT NULL
 		 FROM sessions JOIN users ON users.id = sessions.user_id
 		 LEFT JOIN instance_members ON instance_members.user_id = users.id
 		 WHERE sessions.token_hash=$1 AND sessions.revoked_at IS NULL
 		   AND sessions.expires_at > now() AND sessions.idle_expires_at > now()
 		   AND users.status='active'`,
 		tokenHash[:],
-	).Scan(&principal.SessionID, &principal.UserID, &principal.Email, &principal.DisplayName, &principal.InstanceRole)
+	).Scan(&principal.SessionID, &principal.UserID, &principal.Email, &principal.DisplayName, &principal.InstanceRole,
+		&principal.AccessStatus, &principal.HasPassword)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Principal{}, ErrUnauthenticated
 	}
@@ -129,7 +133,7 @@ func (manager *SessionManager) Reauthenticate(ctx context.Context, userID uuid.U
 	}
 	var currentHash string
 	if err := manager.database.QueryRowContext(ctx,
-		"SELECT password_hash FROM users WHERE id=$1 AND auth_source='local' AND status='active'",
+		"SELECT password_hash FROM users WHERE id=$1 AND password_hash IS NOT NULL AND status='active'",
 		userID).Scan(&currentHash); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return ErrInvalidCredentials
@@ -188,7 +192,7 @@ func (manager *SessionManager) ChangePassword(ctx context.Context, principal Pri
 	}
 	var currentHash string
 	if err := manager.database.QueryRowContext(ctx,
-		"SELECT password_hash FROM users WHERE id=$1 AND auth_source='local' AND status='active'",
+		"SELECT password_hash FROM users WHERE id=$1 AND password_hash IS NOT NULL AND status='active'",
 		principal.UserID).Scan(&currentHash); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return ErrInvalidCredentials
@@ -230,6 +234,41 @@ func (manager *SessionManager) ChangePassword(ctx context.Context, principal Pri
 		return err
 	}
 	return transaction.Commit()
+}
+
+// SetInitialPassword permits an approved external account to enroll a local
+// credential only shortly after completing a new login.
+func (manager *SessionManager) SetInitialPassword(ctx context.Context, principal Principal, password string) error {
+	if err := ValidatePassword(password); err != nil {
+		return err
+	}
+	hash, err := HashPassword(password)
+	if err != nil {
+		return err
+	}
+	tx, err := manager.database.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+	result, err := tx.ExecContext(ctx, `UPDATE users SET password_hash=$1, updated_at=now()
+		WHERE id=$2 AND status='active' AND access_status='approved' AND password_hash IS NULL
+		  AND EXISTS (SELECT 1 FROM sessions WHERE id=$3 AND user_id=$2 AND revoked_at IS NULL
+		    AND created_at > now() - interval '5 minutes')`, hash, principal.UserID, principal.SessionID)
+	if err != nil {
+		return err
+	}
+	count, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if count != 1 {
+		return ErrReauthenticationRequired
+	}
+	if _, err := tx.ExecContext(ctx, "UPDATE sessions SET revoked_at=now() WHERE user_id=$1 AND id<>$2 AND revoked_at IS NULL", principal.UserID, principal.SessionID); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 func newSessionCredentials(now time.Time) (SessionCredentials, [32]byte, error) {

@@ -348,6 +348,7 @@ export function App() {
                     organizationName={organization?.name}
                     project={project}
                     showInstance={Boolean(user.instanceRole)}
+                    instanceOwner={user.instanceRole === "instance_owner"}
                   />
                 </div>
               </div>

@@ -162,6 +162,7 @@ export default defineConfig({
                   translations: { zh: "安全", "zh-CN": "安全" },
                   collapsed: true,
                   items: [
+                    { slug: "docs/self-hosting/authentication" },
                     { slug: "docs/self-hosting/security/privacy" },
                     { slug: "docs/self-hosting/security/threat-model" },
                     { slug: "docs/self-hosting/security/vulnerability-reporting" },

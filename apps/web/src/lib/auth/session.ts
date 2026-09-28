@@ -5,6 +5,8 @@ export type SessionUser = {
   email: string;
   displayName: string;
   instanceRole?: "instance_owner" | "instance_admin";
+  accessStatus?: "approved" | "pending";
+  hasPassword?: boolean;
 };
 
 export type SetupStatus = { initialized: boolean };
@@ -137,7 +139,12 @@ export function safeReturnTo(value: string | null | undefined, fallback = "/") {
   try {
     const target = new URL(value, window.location.origin);
     if (target.origin !== window.location.origin) return fallback;
-    if (target.pathname === "/login" || target.pathname === "/setup") return fallback;
+    if (
+      target.pathname === "/login" ||
+      target.pathname === "/setup" ||
+      target.pathname === "/awaiting-access"
+    )
+      return fallback;
     return `${target.pathname}${target.search}${target.hash}`;
   } catch {
     return fallback;

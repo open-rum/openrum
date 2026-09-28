@@ -85,7 +85,8 @@ func registerRoutes(ctx context.Context, router *httpx.Router, configuration con
 	secureCookie := configuration.PublicBaseURL.Scheme == "https"
 	setupHandler := handlers.NewSetupHandler(auth.NewBootstrapper(database, configuration.BootstrapToken), logger, secureCookie)
 	redisClient := redis.NewClient(&redis.Options{Addr: configuration.RedisAddress, ContextTimeoutEnabled: true})
-	loginManager, err := auth.NewLoginManager(database, auth.NewRedisFailureLimiter(redisClient))
+	failureLimiter := auth.NewRedisFailureLimiter(redisClient)
+	loginManager, err := auth.NewLoginManager(database, failureLimiter)
 	if err != nil {
 		_ = database.Close()
 		_ = clickHouse.Close()
@@ -176,6 +177,7 @@ func registerRoutes(ctx context.Context, router *httpx.Router, configuration con
 		return nil, storageErr
 	}
 	var instanceSecretRepository *metadata.InstanceSecretRepository
+	var authKeyring *openrumcrypto.Keyring
 	var storageSwitcher *sourcemap.SwitchableStorage
 	// Nil until managed secrets are configured. Alert rules work regardless;
 	// only notification channels need to seal a webhook secret at rest.
@@ -185,6 +187,7 @@ func registerRoutes(ctx context.Context, router *httpx.Router, configuration con
 		if keyErr != nil {
 			return nil, keyErr
 		}
+		authKeyring = keyring
 		channelCodec = keyring
 		instanceSecretRepository = metadata.NewInstanceSecretRepository(database, keyring)
 		managed, _, managedErr := instanceSecretRepository.GetObjectStorage(connectCtx)
@@ -207,6 +210,8 @@ func registerRoutes(ctx context.Context, router *httpx.Router, configuration con
 		return nil, storageErr
 	}
 	adminStorageHandler := handlers.NewAdminStorageHandler(instanceMemberRepository, sessionManager, storageProber, configuration, logger)
+	externalAuthHandler := handlers.NewExternalAuthHandler(auth.NewExternalStore(database, authKeyring), sessionManager,
+		redisClient, failureLimiter, instanceMemberRepository, configuration.PublicBaseURL, secureCookie, logger)
 	if instanceSecretRepository != nil {
 		adminStorageHandler.EnableManagedSecrets(instanceSecretRepository, storageSwitcher)
 	}
@@ -222,6 +227,10 @@ func registerRoutes(ctx context.Context, router *httpx.Router, configuration con
 	router.HandleFunc("GET /api/v1/setup/status", setupHandler.Status)
 	router.HandleFunc("POST /api/v1/setup/bootstrap", setupHandler.Bootstrap)
 	router.HandleFunc("POST /api/v1/auth/login", authHandler.Login)
+	router.HandleFunc("GET /api/v1/auth/methods", externalAuthHandler.Methods)
+	router.HandleFunc("POST /api/v1/auth/providers/{providerId}/start", externalAuthHandler.StartLogin)
+	router.HandleFunc("GET /api/v1/auth/providers/{providerId}/callback", externalAuthHandler.Callback)
+	router.HandleFunc("POST /api/v1/auth/providers/{providerId}/ldap/login", externalAuthHandler.LDAPLogin)
 	router.Handle("GET "+handlers.BrowserSDKPublicPath, browserSDKHandler)
 	router.Handle("GET "+handlers.BrowserSDKLegacyPublicPath, browserSDKHandler)
 	router.HandleFunc("GET /api/v1/sdk/config", sdkConfigHandler.Get)
@@ -232,7 +241,12 @@ func registerRoutes(ctx context.Context, router *httpx.Router, configuration con
 	router.Handle("GET /api/v1/storage-pressure", requireSession(http.HandlerFunc(storagePressureHandler.Get)))
 	router.Handle("POST /api/v1/auth/logout", requireSession(requireCSRF(http.HandlerFunc(authHandler.Logout))))
 	router.Handle("POST /api/v1/auth/password", requireSession(requireCSRF(http.HandlerFunc(authHandler.ChangePassword))))
+	router.Handle("POST /api/v1/auth/password/set", requireSession(requireCSRF(http.HandlerFunc(authHandler.SetInitialPassword))))
 	router.Handle("POST /api/v1/auth/reauthenticate", requireSession(requireCSRF(http.HandlerFunc(authHandler.Reauthenticate))))
+	router.Handle("GET /api/v1/auth/identities", requireSession(http.HandlerFunc(externalAuthHandler.Identities)))
+	router.Handle("DELETE /api/v1/auth/identities/{identityId}", requireSession(requireCSRF(http.HandlerFunc(externalAuthHandler.Unlink))))
+	router.Handle("POST /api/v1/auth/providers/{providerId}/link", requireSession(requireCSRF(http.HandlerFunc(externalAuthHandler.StartLink))))
+	router.Handle("POST /api/v1/auth/providers/{providerId}/ldap/link", requireSession(requireCSRF(http.HandlerFunc(externalAuthHandler.LDAPLink))))
 	router.Handle("GET /api/v1/organizations", requireSession(http.HandlerFunc(organizationHandler.List)))
 	router.Handle("POST /api/v1/organizations", requireSession(requireCSRF(http.HandlerFunc(organizationHandler.Create))))
 	router.Handle("GET /api/v1/organizations/{orgId}/members", requireSession(http.HandlerFunc(memberHandler.List)))
@@ -244,6 +258,10 @@ func registerRoutes(ctx context.Context, router *httpx.Router, configuration con
 	router.Handle("PATCH /api/v1/admin/members/{userId}", requireSession(adminMutationAudit(requireCSRF(http.HandlerFunc(adminMemberHandler.Update)))))
 	router.Handle("DELETE /api/v1/admin/members/{userId}", requireSession(adminMutationAudit(requireCSRF(http.HandlerFunc(adminMemberHandler.Remove)))))
 	router.Handle("GET /api/v1/admin/configuration", requireSession(http.HandlerFunc(adminConfigurationHandler.Get)))
+	router.Handle("GET /api/v1/admin/authentication", requireSession(http.HandlerFunc(externalAuthHandler.AdminGet)))
+	router.Handle("PUT /api/v1/admin/authentication/providers/{providerId}", requireSession(adminMutationAudit(requireCSRF(http.HandlerFunc(externalAuthHandler.AdminPut)))))
+	router.Handle("DELETE /api/v1/admin/authentication/providers/{providerId}", requireSession(adminMutationAudit(requireCSRF(http.HandlerFunc(externalAuthHandler.AdminDisable)))))
+	router.Handle("POST /api/v1/admin/authentication/providers/{providerId}/test", requireSession(adminMutationAudit(requireCSRF(http.HandlerFunc(externalAuthHandler.AdminTest)))))
 	router.Handle("PATCH /api/v1/admin/configuration", requireSession(adminMutationAudit(requireCSRF(http.HandlerFunc(adminConfigurationHandler.Patch)))))
 	router.Handle("POST /api/v1/admin/retention-policy/preview", requireSession(requireCSRF(http.HandlerFunc(adminRetentionHandler.Preview))))
 	router.Handle("POST /api/v1/admin/retention-jobs", requireSession(adminMutationAudit(requireCSRF(http.HandlerFunc(adminRetentionHandler.CreateJob)))))

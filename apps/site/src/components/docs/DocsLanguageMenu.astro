@@ -5,6 +5,8 @@ const zh = Astro.url.pathname.startsWith("/zh/");
 const currentPath = Astro.url.pathname;
 const englishPath = zh ? currentPath.replace(/^\/zh(?=\/)/, "") : currentPath;
 const chinesePath = zh ? currentPath : `/zh${currentPath}`;
+// Astro emits the root not-found page as 404.html, unlike localized pages.
+const englishHref = englishPath === "/404/" ? "/404.html" : englishPath;
 const suffix = `${Astro.url.search}${Astro.url.hash}`;
 const label = zh ? "选择语言" : "Select language";
 ---
@@ -14,7 +16,7 @@ const label = zh ? "选择语言" : "Select language";
     <Languages size={17} aria-hidden="true" />
   </summary>
   <div class="docs-icon-panel" role="menu" aria-label={label}>
-    <a href={`${englishPath}${suffix}`} role="menuitemradio" aria-checked={zh ? "false" : "true"}>English</a>
+    <a href={`${englishHref}${suffix}`} role="menuitemradio" aria-checked={zh ? "false" : "true"}>English</a>
     <a href={`${chinesePath}${suffix}`} role="menuitemradio" aria-checked={zh ? "true" : "false"}>简体中文</a>
   </div>
 </details>
