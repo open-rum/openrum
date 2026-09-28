@@ -75,19 +75,8 @@ test("published local benchmark gates agree with retained k6 evidence", async ()
   assert.ok(evidence.attempts.some((attempt) => attempt.query.failurePercent > 1));
 });
 
-const pages = [
-  "index.astro",
-  "product.astro",
-  "self-host.astro",
-  "community.astro",
-  "benchmarks.astro",
-];
-test("public pages keep Quickstart/GitHub adoption and avoid SaaS funnel claims", async () => {
-  const source = (
-    await Promise.all(
-      pages.map((page) => readFile(new URL(`../src/pages/${page}`, import.meta.url), "utf8")),
-    )
-  ).join("\n");
+test("public landing page keeps Quickstart/GitHub adoption and avoids SaaS funnel claims", async () => {
+  const source = await readFile(new URL("../src/pages/index.astro", import.meta.url), "utf8");
   assert.doesNotMatch(source, /pricing|start free trial|hosted demo/i);
   const landing = await readFile(
     new URL("../src/components/landing/LandingPage.astro", import.meta.url),
@@ -102,11 +91,18 @@ test("docs header uses compact public labels", async () => {
     new URL("../src/components/docs/DocsHeader.astro", import.meta.url),
     "utf8",
   );
+  const sidebar = await readFile(
+    new URL("../src/components/docs/DocsSidebar.astro", import.meta.url),
+    "utf8",
+  );
   const config = await readFile(new URL("../astro.config.mjs", import.meta.url), "utf8");
   assert.match(header, /<span class="docs-wordmark">Docs<\/span>/);
   assert.doesNotMatch(header, /BrandWordmark|OpenRUM 文档/);
+  assert.match(header, /DocsThemeMenu|DocsLanguageMenu/);
+  assert.doesNotMatch(sidebar, /docs-sidebar-topic/);
   assert.match(config, /label: "Start"/);
   assert.match(config, /translations: \{ zh: "开始", "zh-CN": "开始" \}/);
+  assert.match(config, /label: "Deploy production"/);
 });
 
 test("robots and Open Graph asset are static and privacy-safe", async () => {

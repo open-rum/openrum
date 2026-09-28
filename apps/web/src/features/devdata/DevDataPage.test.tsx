@@ -99,7 +99,7 @@ describe("development generator", () => {
     );
     expect(vi.mocked(generateDevData).mock.calls[0][1]).not.toHaveProperty("dsn");
     expect(view.client.getQueryState(["overview", "p1"])?.isInvalidated).toBe(true);
-    expect(view.getByRole("link", { name: "按生成范围查看大盘" }).getAttribute("href")).toContain(
+    expect(view.getByRole("link", { name: "按生成范围查看仪表盘" }).getAttribute("href")).toContain(
       "environment=test",
     );
     expect(getSessionTimelinePage).toHaveBeenCalledWith(

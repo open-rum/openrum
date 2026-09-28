@@ -42,7 +42,7 @@ export function ConnectionStatus({ status, loading, hasInstallDSN }: ConnectionS
     },
     {
       title: "4. 数据可查询",
-      description: "Consumer 已写入 ClickHouse，可进入数据大盘",
+      description: "Consumer 已写入 ClickHouse，可进入仪表盘",
       complete: Boolean(status?.lastEventQueryableAt),
       active: Boolean(status?.lastEventReceivedAt) && !status?.lastEventQueryableAt,
       time: status?.lastEventQueryableAt,

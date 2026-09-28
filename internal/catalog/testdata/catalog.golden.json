@@ -1,0 +1,1611 @@
+{
+  "version": 2,
+  "families": [
+    {
+      "id": "traffic",
+      "label": "流量与会话"
+    },
+    {
+      "id": "vitals",
+      "label": "Web Vitals"
+    },
+    {
+      "id": "api",
+      "label": "API"
+    },
+    {
+      "id": "issues",
+      "label": "错误"
+    },
+    {
+      "id": "measurement",
+      "label": "业务指标"
+    },
+    {
+      "id": "behavior",
+      "label": "用户行为"
+    }
+  ],
+  "metrics": [
+    {
+      "id": "traffic.pageViews",
+      "family": "traffic",
+      "label": "PV",
+      "description": "页面浏览次数（按采样率还原）",
+      "source": "project",
+      "unit": "count",
+      "weighting": "estimated",
+      "kind": "count",
+      "direction": "up",
+      "shapes": [
+        "total",
+        "series",
+        "breakdown",
+        "seriesByDimension",
+        "table"
+      ],
+      "dimensions": [
+        "route",
+        "release",
+        "country",
+        "browser",
+        "device"
+      ],
+      "propertyDimensions": false,
+      "additiveDimensions": [
+        "route",
+        "release",
+        "country",
+        "browser",
+        "device"
+      ],
+      "filters": [
+        "browser",
+        "country",
+        "device",
+        "release",
+        "route"
+      ],
+      "compare": true,
+      "additiveOverTime": true,
+      "minIntervalSeconds": 60,
+      "requiresMeasurementKey": false,
+      "approximate": false
+    },
+    {
+      "id": "traffic.uniqueUsers",
+      "family": "traffic",
+      "label": "UV",
+      "description": "访问过站点的独立用户（近似）",
+      "source": "project",
+      "unit": "count",
+      "weighting": "sampled",
+      "kind": "distinct",
+      "direction": "up",
+      "shapes": [
+        "total",
+        "series",
+        "breakdown",
+        "seriesByDimension",
+        "table"
+      ],
+      "dimensions": [
+        "route",
+        "release",
+        "country",
+        "browser",
+        "device"
+      ],
+      "propertyDimensions": false,
+      "additiveDimensions": [],
+      "filters": [
+        "browser",
+        "country",
+        "device",
+        "release",
+        "route"
+      ],
+      "compare": true,
+      "additiveOverTime": false,
+      "minIntervalSeconds": 60,
+      "requiresMeasurementKey": false,
+      "approximate": true
+    },
+    {
+      "id": "traffic.sessions",
+      "family": "traffic",
+      "label": "会话数",
+      "description": "发生过页面浏览的会话（近似）",
+      "source": "project",
+      "unit": "count",
+      "weighting": "sampled",
+      "kind": "distinct",
+      "direction": "up",
+      "shapes": [
+        "total",
+        "series",
+        "breakdown",
+        "seriesByDimension",
+        "table"
+      ],
+      "dimensions": [
+        "route",
+        "release",
+        "country",
+        "browser",
+        "device"
+      ],
+      "propertyDimensions": false,
+      "additiveDimensions": [],
+      "filters": [
+        "browser",
+        "country",
+        "device",
+        "release",
+        "route"
+      ],
+      "compare": true,
+      "additiveOverTime": false,
+      "minIntervalSeconds": 60,
+      "requiresMeasurementKey": false,
+      "approximate": true
+    },
+    {
+      "id": "traffic.errors",
+      "family": "traffic",
+      "label": "错误数",
+      "description": "全部错误事件（按采样率还原）",
+      "source": "project",
+      "unit": "count",
+      "weighting": "estimated",
+      "kind": "count",
+      "direction": "down",
+      "semantic": "danger",
+      "shapes": [
+        "total",
+        "series",
+        "breakdown",
+        "seriesByDimension",
+        "table"
+      ],
+      "dimensions": [
+        "route",
+        "release",
+        "country",
+        "browser",
+        "device"
+      ],
+      "propertyDimensions": false,
+      "additiveDimensions": [
+        "route",
+        "release",
+        "country",
+        "browser",
+        "device"
+      ],
+      "filters": [
+        "browser",
+        "country",
+        "device",
+        "release",
+        "route"
+      ],
+      "compare": true,
+      "additiveOverTime": true,
+      "minIntervalSeconds": 60,
+      "requiresMeasurementKey": false,
+      "approximate": false
+    },
+    {
+      "id": "traffic.apiRequests",
+      "family": "traffic",
+      "label": "API 请求数",
+      "description": "全部 API 请求（按采样率还原）",
+      "source": "project",
+      "unit": "count",
+      "weighting": "estimated",
+      "kind": "count",
+      "direction": "neutral",
+      "shapes": [
+        "total",
+        "series",
+        "breakdown",
+        "seriesByDimension",
+        "table"
+      ],
+      "dimensions": [
+        "route",
+        "release",
+        "country",
+        "browser",
+        "device"
+      ],
+      "propertyDimensions": false,
+      "additiveDimensions": [
+        "route",
+        "release",
+        "country",
+        "browser",
+        "device"
+      ],
+      "filters": [
+        "browser",
+        "country",
+        "device",
+        "release",
+        "route"
+      ],
+      "compare": true,
+      "additiveOverTime": true,
+      "minIntervalSeconds": 60,
+      "requiresMeasurementKey": false,
+      "approximate": false
+    },
+    {
+      "id": "traffic.errorRate",
+      "family": "traffic",
+      "label": "错误率",
+      "description": "错误事件数占页面浏览量的比例",
+      "source": "project",
+      "unit": "ratio",
+      "weighting": "estimated",
+      "kind": "rate",
+      "direction": "down",
+      "semantic": "danger",
+      "shapes": [
+        "total",
+        "series",
+        "breakdown",
+        "seriesByDimension",
+        "table"
+      ],
+      "dimensions": [
+        "route",
+        "release",
+        "country",
+        "browser",
+        "device"
+      ],
+      "propertyDimensions": false,
+      "additiveDimensions": [],
+      "filters": [
+        "browser",
+        "country",
+        "device",
+        "release",
+        "route"
+      ],
+      "compare": true,
+      "additiveOverTime": false,
+      "minIntervalSeconds": 60,
+      "requiresMeasurementKey": false,
+      "approximate": false
+    },
+    {
+      "id": "traffic.apiFailureRate",
+      "family": "traffic",
+      "label": "API 失败率",
+      "description": "失败请求占全部 API 请求的比例",
+      "source": "project",
+      "unit": "ratio",
+      "weighting": "sampled",
+      "kind": "rate",
+      "direction": "down",
+      "semantic": "warning",
+      "shapes": [
+        "total",
+        "series",
+        "breakdown",
+        "seriesByDimension",
+        "table"
+      ],
+      "dimensions": [
+        "route",
+        "release",
+        "country",
+        "browser",
+        "device"
+      ],
+      "propertyDimensions": false,
+      "additiveDimensions": [],
+      "filters": [
+        "browser",
+        "country",
+        "device",
+        "release",
+        "route"
+      ],
+      "compare": true,
+      "additiveOverTime": false,
+      "minIntervalSeconds": 60,
+      "requiresMeasurementKey": false,
+      "approximate": false
+    },
+    {
+      "id": "vitals.lcpP75",
+      "family": "vitals",
+      "label": "LCP P75",
+      "description": "主要内容加载耗时 · P75",
+      "source": "project",
+      "unit": "ms",
+      "weighting": "none",
+      "kind": "quantile",
+      "direction": "down",
+      "shapes": [
+        "total",
+        "series",
+        "breakdown",
+        "seriesByDimension",
+        "table"
+      ],
+      "dimensions": [
+        "route",
+        "release",
+        "country",
+        "browser",
+        "device"
+      ],
+      "propertyDimensions": false,
+      "additiveDimensions": [],
+      "filters": [
+        "browser",
+        "country",
+        "device",
+        "release",
+        "route"
+      ],
+      "compare": true,
+      "additiveOverTime": false,
+      "minSamples": 50,
+      "minIntervalSeconds": 60,
+      "requiresMeasurementKey": false,
+      "approximate": false,
+      "thresholds": {
+        "good": 2500,
+        "poor": 4000
+      }
+    },
+    {
+      "id": "vitals.inpP75",
+      "family": "vitals",
+      "label": "INP P75",
+      "description": "交互响应耗时 · P75",
+      "source": "project",
+      "unit": "ms",
+      "weighting": "none",
+      "kind": "quantile",
+      "direction": "down",
+      "shapes": [
+        "total",
+        "series",
+        "breakdown",
+        "seriesByDimension",
+        "table"
+      ],
+      "dimensions": [
+        "route",
+        "release",
+        "country",
+        "browser",
+        "device"
+      ],
+      "propertyDimensions": false,
+      "additiveDimensions": [],
+      "filters": [
+        "browser",
+        "country",
+        "device",
+        "release",
+        "route"
+      ],
+      "compare": true,
+      "additiveOverTime": false,
+      "minSamples": 50,
+      "minIntervalSeconds": 60,
+      "requiresMeasurementKey": false,
+      "approximate": false,
+      "thresholds": {
+        "good": 200,
+        "poor": 500
+      }
+    },
+    {
+      "id": "vitals.clsP75",
+      "family": "vitals",
+      "label": "CLS P75",
+      "description": "页面布局偏移 · P75",
+      "source": "project",
+      "unit": "score",
+      "weighting": "none",
+      "kind": "quantile",
+      "direction": "down",
+      "shapes": [
+        "total",
+        "series",
+        "breakdown",
+        "seriesByDimension",
+        "table"
+      ],
+      "dimensions": [
+        "route",
+        "release",
+        "country",
+        "browser",
+        "device"
+      ],
+      "propertyDimensions": false,
+      "additiveDimensions": [],
+      "filters": [
+        "browser",
+        "country",
+        "device",
+        "release",
+        "route"
+      ],
+      "compare": true,
+      "additiveOverTime": false,
+      "minSamples": 50,
+      "minIntervalSeconds": 60,
+      "requiresMeasurementKey": false,
+      "approximate": false,
+      "thresholds": {
+        "good": 0.1,
+        "poor": 0.25
+      }
+    },
+    {
+      "id": "api.requests",
+      "family": "api",
+      "label": "请求数",
+      "description": "API 请求（按采样率还原）",
+      "source": "api",
+      "unit": "count",
+      "weighting": "estimated",
+      "kind": "count",
+      "direction": "neutral",
+      "shapes": [
+        "total",
+        "series",
+        "breakdown",
+        "seriesByDimension",
+        "table"
+      ],
+      "dimensions": [
+        "route",
+        "release",
+        "api",
+        "apiMethod"
+      ],
+      "propertyDimensions": false,
+      "additiveDimensions": [
+        "route",
+        "release",
+        "api",
+        "apiMethod"
+      ],
+      "filters": [
+        "apiMethod",
+        "apiUrl",
+        "release",
+        "route"
+      ],
+      "compare": true,
+      "additiveOverTime": true,
+      "minIntervalSeconds": 60,
+      "requiresMeasurementKey": false,
+      "approximate": false
+    },
+    {
+      "id": "api.failures",
+      "family": "api",
+      "label": "失败请求数",
+      "description": "网络失败或 5xx 响应（不含 4xx）",
+      "source": "api",
+      "unit": "count",
+      "weighting": "sampled",
+      "kind": "count",
+      "direction": "down",
+      "shapes": [
+        "total",
+        "series",
+        "breakdown",
+        "seriesByDimension",
+        "table"
+      ],
+      "dimensions": [
+        "route",
+        "release",
+        "api",
+        "apiMethod"
+      ],
+      "propertyDimensions": false,
+      "additiveDimensions": [
+        "route",
+        "release",
+        "api",
+        "apiMethod"
+      ],
+      "filters": [
+        "apiMethod",
+        "apiUrl",
+        "release",
+        "route"
+      ],
+      "compare": true,
+      "additiveOverTime": true,
+      "minIntervalSeconds": 60,
+      "requiresMeasurementKey": false,
+      "approximate": false
+    },
+    {
+      "id": "api.clientErrors",
+      "family": "api",
+      "label": "4xx 数",
+      "description": "4xx 响应（不计入失败）",
+      "source": "api",
+      "unit": "count",
+      "weighting": "sampled",
+      "kind": "count",
+      "direction": "down",
+      "shapes": [
+        "total",
+        "series",
+        "breakdown",
+        "seriesByDimension",
+        "table"
+      ],
+      "dimensions": [
+        "route",
+        "release",
+        "api",
+        "apiMethod"
+      ],
+      "propertyDimensions": false,
+      "additiveDimensions": [
+        "route",
+        "release",
+        "api",
+        "apiMethod"
+      ],
+      "filters": [
+        "apiMethod",
+        "apiUrl",
+        "release",
+        "route"
+      ],
+      "compare": true,
+      "compositionGroup": "api.outcomeCount",
+      "additiveOverTime": true,
+      "minIntervalSeconds": 60,
+      "requiresMeasurementKey": false,
+      "approximate": false
+    },
+    {
+      "id": "api.serverErrors",
+      "family": "api",
+      "label": "5xx 数",
+      "description": "5xx 响应",
+      "source": "api",
+      "unit": "count",
+      "weighting": "sampled",
+      "kind": "count",
+      "direction": "down",
+      "shapes": [
+        "total",
+        "series",
+        "breakdown",
+        "seriesByDimension",
+        "table"
+      ],
+      "dimensions": [
+        "route",
+        "release",
+        "api",
+        "apiMethod"
+      ],
+      "propertyDimensions": false,
+      "additiveDimensions": [
+        "route",
+        "release",
+        "api",
+        "apiMethod"
+      ],
+      "filters": [
+        "apiMethod",
+        "apiUrl",
+        "release",
+        "route"
+      ],
+      "compare": true,
+      "compositionGroup": "api.outcomeCount",
+      "additiveOverTime": true,
+      "minIntervalSeconds": 60,
+      "requiresMeasurementKey": false,
+      "approximate": false
+    },
+    {
+      "id": "api.networkErrors",
+      "family": "api",
+      "label": "网络错误 数",
+      "description": "网络中断、超时或被取消",
+      "source": "api",
+      "unit": "count",
+      "weighting": "sampled",
+      "kind": "count",
+      "direction": "down",
+      "shapes": [
+        "total",
+        "series",
+        "breakdown",
+        "seriesByDimension",
+        "table"
+      ],
+      "dimensions": [
+        "route",
+        "release",
+        "api",
+        "apiMethod"
+      ],
+      "propertyDimensions": false,
+      "additiveDimensions": [
+        "route",
+        "release",
+        "api",
+        "apiMethod"
+      ],
+      "filters": [
+        "apiMethod",
+        "apiUrl",
+        "release",
+        "route"
+      ],
+      "compare": true,
+      "compositionGroup": "api.outcomeCount",
+      "additiveOverTime": true,
+      "minIntervalSeconds": 60,
+      "requiresMeasurementKey": false,
+      "approximate": false
+    },
+    {
+      "id": "api.failureRate",
+      "family": "api",
+      "label": "失败率",
+      "description": "失败请求占全部请求的比例",
+      "source": "api",
+      "unit": "ratio",
+      "weighting": "sampled",
+      "kind": "rate",
+      "direction": "down",
+      "semantic": "warning",
+      "shapes": [
+        "total",
+        "series",
+        "breakdown",
+        "seriesByDimension",
+        "table"
+      ],
+      "dimensions": [
+        "route",
+        "release",
+        "api",
+        "apiMethod"
+      ],
+      "propertyDimensions": false,
+      "additiveDimensions": [],
+      "filters": [
+        "apiMethod",
+        "apiUrl",
+        "release",
+        "route"
+      ],
+      "compare": true,
+      "additiveOverTime": false,
+      "minIntervalSeconds": 60,
+      "requiresMeasurementKey": false,
+      "approximate": false
+    },
+    {
+      "id": "api.clientErrorRate",
+      "family": "api",
+      "label": "4xx 占比",
+      "description": "4xx 响应（不计入失败）占全部请求的比例",
+      "source": "api",
+      "unit": "ratio",
+      "weighting": "sampled",
+      "kind": "rate",
+      "direction": "down",
+      "shapes": [
+        "total",
+        "series",
+        "breakdown",
+        "seriesByDimension",
+        "table"
+      ],
+      "dimensions": [
+        "route",
+        "release",
+        "api",
+        "apiMethod"
+      ],
+      "propertyDimensions": false,
+      "additiveDimensions": [],
+      "filters": [
+        "apiMethod",
+        "apiUrl",
+        "release",
+        "route"
+      ],
+      "compare": true,
+      "compositionGroup": "api.outcomeRate",
+      "additiveOverTime": false,
+      "minIntervalSeconds": 60,
+      "requiresMeasurementKey": false,
+      "approximate": false
+    },
+    {
+      "id": "api.serverErrorRate",
+      "family": "api",
+      "label": "5xx 占比",
+      "description": "5xx 响应占全部请求的比例",
+      "source": "api",
+      "unit": "ratio",
+      "weighting": "sampled",
+      "kind": "rate",
+      "direction": "down",
+      "shapes": [
+        "total",
+        "series",
+        "breakdown",
+        "seriesByDimension",
+        "table"
+      ],
+      "dimensions": [
+        "route",
+        "release",
+        "api",
+        "apiMethod"
+      ],
+      "propertyDimensions": false,
+      "additiveDimensions": [],
+      "filters": [
+        "apiMethod",
+        "apiUrl",
+        "release",
+        "route"
+      ],
+      "compare": true,
+      "compositionGroup": "api.outcomeRate",
+      "additiveOverTime": false,
+      "minIntervalSeconds": 60,
+      "requiresMeasurementKey": false,
+      "approximate": false
+    },
+    {
+      "id": "api.networkErrorRate",
+      "family": "api",
+      "label": "网络错误 占比",
+      "description": "网络中断、超时或被取消占全部请求的比例",
+      "source": "api",
+      "unit": "ratio",
+      "weighting": "sampled",
+      "kind": "rate",
+      "direction": "down",
+      "shapes": [
+        "total",
+        "series",
+        "breakdown",
+        "seriesByDimension",
+        "table"
+      ],
+      "dimensions": [
+        "route",
+        "release",
+        "api",
+        "apiMethod"
+      ],
+      "propertyDimensions": false,
+      "additiveDimensions": [],
+      "filters": [
+        "apiMethod",
+        "apiUrl",
+        "release",
+        "route"
+      ],
+      "compare": true,
+      "compositionGroup": "api.outcomeRate",
+      "additiveOverTime": false,
+      "minIntervalSeconds": 60,
+      "requiresMeasurementKey": false,
+      "approximate": false
+    },
+    {
+      "id": "api.durationP50",
+      "family": "api",
+      "label": "延迟 P50",
+      "description": "API 请求耗时分位数",
+      "source": "api",
+      "unit": "ms",
+      "weighting": "none",
+      "kind": "quantile",
+      "direction": "down",
+      "shapes": [
+        "total",
+        "series",
+        "breakdown",
+        "seriesByDimension",
+        "table"
+      ],
+      "dimensions": [
+        "route",
+        "release",
+        "api",
+        "apiMethod"
+      ],
+      "propertyDimensions": false,
+      "additiveDimensions": [],
+      "filters": [
+        "apiMethod",
+        "apiUrl",
+        "release",
+        "route"
+      ],
+      "compare": true,
+      "additiveOverTime": false,
+      "minSamples": 75,
+      "minIntervalSeconds": 60,
+      "requiresMeasurementKey": false,
+      "approximate": false
+    },
+    {
+      "id": "api.durationP75",
+      "family": "api",
+      "label": "延迟 P75",
+      "description": "API 请求耗时分位数",
+      "source": "api",
+      "unit": "ms",
+      "weighting": "none",
+      "kind": "quantile",
+      "direction": "down",
+      "shapes": [
+        "total",
+        "series",
+        "breakdown",
+        "seriesByDimension",
+        "table"
+      ],
+      "dimensions": [
+        "route",
+        "release",
+        "api",
+        "apiMethod"
+      ],
+      "propertyDimensions": false,
+      "additiveDimensions": [],
+      "filters": [
+        "apiMethod",
+        "apiUrl",
+        "release",
+        "route"
+      ],
+      "compare": true,
+      "additiveOverTime": false,
+      "minSamples": 75,
+      "minIntervalSeconds": 60,
+      "requiresMeasurementKey": false,
+      "approximate": false
+    },
+    {
+      "id": "api.durationP95",
+      "family": "api",
+      "label": "延迟 P95",
+      "description": "API 请求耗时分位数",
+      "source": "api",
+      "unit": "ms",
+      "weighting": "none",
+      "kind": "quantile",
+      "direction": "down",
+      "shapes": [
+        "total",
+        "series",
+        "breakdown",
+        "seriesByDimension",
+        "table"
+      ],
+      "dimensions": [
+        "route",
+        "release",
+        "api",
+        "apiMethod"
+      ],
+      "propertyDimensions": false,
+      "additiveDimensions": [],
+      "filters": [
+        "apiMethod",
+        "apiUrl",
+        "release",
+        "route"
+      ],
+      "compare": true,
+      "additiveOverTime": false,
+      "minSamples": 75,
+      "minIntervalSeconds": 60,
+      "requiresMeasurementKey": false,
+      "approximate": false
+    },
+    {
+      "id": "issues.events",
+      "family": "issues",
+      "label": "错误事件数",
+      "description": "归入 Issue 的错误事件（未按采样率还原）",
+      "source": "issue",
+      "unit": "count",
+      "weighting": "sampled",
+      "kind": "count",
+      "direction": "down",
+      "semantic": "danger",
+      "shapes": [
+        "total",
+        "series",
+        "breakdown",
+        "seriesByDimension",
+        "table"
+      ],
+      "dimensions": [
+        "route",
+        "release",
+        "country",
+        "browser",
+        "device",
+        "errorType"
+      ],
+      "propertyDimensions": false,
+      "additiveDimensions": [
+        "route",
+        "release",
+        "country",
+        "browser",
+        "device",
+        "errorType"
+      ],
+      "filters": [
+        "browser",
+        "country",
+        "device",
+        "release",
+        "route"
+      ],
+      "compare": true,
+      "additiveOverTime": true,
+      "minIntervalSeconds": 300,
+      "requiresMeasurementKey": false,
+      "approximate": false
+    },
+    {
+      "id": "issues.users",
+      "family": "issues",
+      "label": "受影响用户",
+      "description": "遇到过错误的独立用户（近似）",
+      "source": "issue",
+      "unit": "count",
+      "weighting": "sampled",
+      "kind": "distinct",
+      "direction": "down",
+      "shapes": [
+        "total",
+        "series",
+        "breakdown",
+        "seriesByDimension",
+        "table"
+      ],
+      "dimensions": [
+        "route",
+        "release",
+        "country",
+        "browser",
+        "device",
+        "errorType"
+      ],
+      "propertyDimensions": false,
+      "additiveDimensions": [],
+      "filters": [
+        "browser",
+        "country",
+        "device",
+        "release",
+        "route"
+      ],
+      "compare": true,
+      "additiveOverTime": false,
+      "minIntervalSeconds": 300,
+      "requiresMeasurementKey": false,
+      "approximate": true
+    },
+    {
+      "id": "issues.sessions",
+      "family": "issues",
+      "label": "受影响会话",
+      "description": "发生过错误的会话（近似）",
+      "source": "issue",
+      "unit": "count",
+      "weighting": "sampled",
+      "kind": "distinct",
+      "direction": "down",
+      "shapes": [
+        "total",
+        "series",
+        "breakdown",
+        "seriesByDimension",
+        "table"
+      ],
+      "dimensions": [
+        "route",
+        "release",
+        "country",
+        "browser",
+        "device",
+        "errorType"
+      ],
+      "propertyDimensions": false,
+      "additiveDimensions": [],
+      "filters": [
+        "browser",
+        "country",
+        "device",
+        "release",
+        "route"
+      ],
+      "compare": true,
+      "additiveOverTime": false,
+      "minIntervalSeconds": 300,
+      "requiresMeasurementKey": false,
+      "approximate": true
+    },
+    {
+      "id": "issues.activeIssues",
+      "family": "issues",
+      "label": "活跃 Issue",
+      "description": "时间范围内出现过的 Issue 数",
+      "source": "issue",
+      "unit": "count",
+      "weighting": "none",
+      "kind": "distinct",
+      "direction": "down",
+      "shapes": [
+        "total",
+        "series",
+        "breakdown",
+        "seriesByDimension",
+        "table"
+      ],
+      "dimensions": [
+        "route",
+        "release",
+        "country",
+        "browser",
+        "device",
+        "errorType"
+      ],
+      "propertyDimensions": false,
+      "additiveDimensions": [
+        "errorType"
+      ],
+      "filters": [
+        "browser",
+        "country",
+        "device",
+        "release",
+        "route"
+      ],
+      "compare": true,
+      "additiveOverTime": false,
+      "minIntervalSeconds": 300,
+      "requiresMeasurementKey": false,
+      "approximate": false
+    },
+    {
+      "id": "issues.newIssues",
+      "family": "issues",
+      "label": "新增 Issue",
+      "description": "时间范围内首次出现、或沉寂 30 天后复发的 Issue",
+      "source": "issue",
+      "unit": "count",
+      "weighting": "none",
+      "kind": "newIssues",
+      "direction": "down",
+      "shapes": [
+        "total",
+        "series",
+        "breakdown",
+        "seriesByDimension",
+        "table"
+      ],
+      "dimensions": [
+        "errorType"
+      ],
+      "propertyDimensions": false,
+      "additiveDimensions": [
+        "errorType"
+      ],
+      "filters": [
+        "browser",
+        "country",
+        "device",
+        "release",
+        "route"
+      ],
+      "compare": true,
+      "additiveOverTime": true,
+      "minIntervalSeconds": 300,
+      "requiresMeasurementKey": false,
+      "approximate": false
+    },
+    {
+      "id": "measurement.estimated",
+      "family": "measurement",
+      "label": "估算总和",
+      "description": "按采样率还原后的总和",
+      "source": "measurement",
+      "unit": "number",
+      "weighting": "estimated",
+      "kind": "count",
+      "direction": "neutral",
+      "shapes": [
+        "total",
+        "series",
+        "breakdown",
+        "seriesByDimension",
+        "table"
+      ],
+      "dimensions": [
+        "country",
+        "device",
+        "browser",
+        "source"
+      ],
+      "propertyDimensions": true,
+      "additiveDimensions": [
+        "country",
+        "device",
+        "browser",
+        "source"
+      ],
+      "filters": [
+        "eventName"
+      ],
+      "compare": true,
+      "additiveOverTime": true,
+      "minIntervalSeconds": 60,
+      "requiresMeasurementKey": true,
+      "approximate": false
+    },
+    {
+      "id": "measurement.sum",
+      "family": "measurement",
+      "label": "总和",
+      "description": "已入库数值的总和（未还原采样）",
+      "source": "measurement",
+      "unit": "number",
+      "weighting": "none",
+      "kind": "count",
+      "direction": "neutral",
+      "shapes": [
+        "total",
+        "series",
+        "breakdown",
+        "seriesByDimension",
+        "table"
+      ],
+      "dimensions": [
+        "country",
+        "device",
+        "browser",
+        "source"
+      ],
+      "propertyDimensions": true,
+      "additiveDimensions": [
+        "country",
+        "device",
+        "browser",
+        "source"
+      ],
+      "filters": [
+        "eventName"
+      ],
+      "compare": true,
+      "additiveOverTime": true,
+      "minIntervalSeconds": 60,
+      "requiresMeasurementKey": true,
+      "approximate": false
+    },
+    {
+      "id": "measurement.samples",
+      "family": "measurement",
+      "label": "样本数",
+      "description": "带有该数值的事件数",
+      "source": "measurement",
+      "unit": "count",
+      "weighting": "sampled",
+      "kind": "count",
+      "direction": "neutral",
+      "shapes": [
+        "total",
+        "series",
+        "breakdown",
+        "seriesByDimension",
+        "table"
+      ],
+      "dimensions": [
+        "country",
+        "device",
+        "browser",
+        "source"
+      ],
+      "propertyDimensions": true,
+      "additiveDimensions": [
+        "country",
+        "device",
+        "browser",
+        "source"
+      ],
+      "filters": [
+        "eventName"
+      ],
+      "compare": true,
+      "additiveOverTime": true,
+      "minIntervalSeconds": 60,
+      "requiresMeasurementKey": true,
+      "approximate": false
+    },
+    {
+      "id": "measurement.avg",
+      "family": "measurement",
+      "label": "平均值",
+      "description": "总和除以样本数",
+      "source": "measurement",
+      "unit": "number",
+      "weighting": "none",
+      "kind": "mean",
+      "direction": "neutral",
+      "shapes": [
+        "total",
+        "series",
+        "breakdown",
+        "seriesByDimension",
+        "table"
+      ],
+      "dimensions": [
+        "country",
+        "device",
+        "browser",
+        "source"
+      ],
+      "propertyDimensions": true,
+      "additiveDimensions": [],
+      "filters": [
+        "eventName"
+      ],
+      "compare": true,
+      "additiveOverTime": false,
+      "minIntervalSeconds": 60,
+      "requiresMeasurementKey": true,
+      "approximate": false
+    },
+    {
+      "id": "measurement.min",
+      "family": "measurement",
+      "label": "最小值",
+      "description": "时间范围内的最小值",
+      "source": "measurement",
+      "unit": "number",
+      "weighting": "none",
+      "kind": "extremum",
+      "direction": "neutral",
+      "shapes": [
+        "total",
+        "series",
+        "breakdown",
+        "seriesByDimension",
+        "table"
+      ],
+      "dimensions": [
+        "country",
+        "device",
+        "browser",
+        "source"
+      ],
+      "propertyDimensions": true,
+      "additiveDimensions": [],
+      "filters": [
+        "eventName"
+      ],
+      "compare": true,
+      "additiveOverTime": false,
+      "minIntervalSeconds": 60,
+      "requiresMeasurementKey": true,
+      "approximate": false
+    },
+    {
+      "id": "measurement.max",
+      "family": "measurement",
+      "label": "最大值",
+      "description": "时间范围内的最大值",
+      "source": "measurement",
+      "unit": "number",
+      "weighting": "none",
+      "kind": "extremum",
+      "direction": "neutral",
+      "shapes": [
+        "total",
+        "series",
+        "breakdown",
+        "seriesByDimension",
+        "table"
+      ],
+      "dimensions": [
+        "country",
+        "device",
+        "browser",
+        "source"
+      ],
+      "propertyDimensions": true,
+      "additiveDimensions": [],
+      "filters": [
+        "eventName"
+      ],
+      "compare": true,
+      "additiveOverTime": false,
+      "minIntervalSeconds": 60,
+      "requiresMeasurementKey": true,
+      "approximate": false
+    },
+    {
+      "id": "measurement.p50",
+      "family": "measurement",
+      "label": "中位数 P50",
+      "description": "数值分位数（单精度近似）",
+      "source": "measurement",
+      "unit": "number",
+      "weighting": "none",
+      "kind": "quantile",
+      "direction": "neutral",
+      "shapes": [
+        "total",
+        "series",
+        "breakdown",
+        "seriesByDimension",
+        "table"
+      ],
+      "dimensions": [
+        "country",
+        "device",
+        "browser",
+        "source"
+      ],
+      "propertyDimensions": true,
+      "additiveDimensions": [],
+      "filters": [
+        "eventName"
+      ],
+      "compare": true,
+      "additiveOverTime": false,
+      "minSamples": 50,
+      "minIntervalSeconds": 60,
+      "requiresMeasurementKey": true,
+      "approximate": true
+    },
+    {
+      "id": "measurement.p90",
+      "family": "measurement",
+      "label": "P90",
+      "description": "数值分位数（单精度近似）",
+      "source": "measurement",
+      "unit": "number",
+      "weighting": "none",
+      "kind": "quantile",
+      "direction": "neutral",
+      "shapes": [
+        "total",
+        "series",
+        "breakdown",
+        "seriesByDimension",
+        "table"
+      ],
+      "dimensions": [
+        "country",
+        "device",
+        "browser",
+        "source"
+      ],
+      "propertyDimensions": true,
+      "additiveDimensions": [],
+      "filters": [
+        "eventName"
+      ],
+      "compare": true,
+      "additiveOverTime": false,
+      "minSamples": 50,
+      "minIntervalSeconds": 60,
+      "requiresMeasurementKey": true,
+      "approximate": true
+    },
+    {
+      "id": "behavior.events",
+      "family": "behavior",
+      "label": "事件次数",
+      "description": "行为事件发生次数（按采样率还原）",
+      "source": "behavior",
+      "unit": "count",
+      "weighting": "estimated",
+      "kind": "count",
+      "direction": "neutral",
+      "shapes": [
+        "total",
+        "series",
+        "breakdown",
+        "seriesByDimension",
+        "table"
+      ],
+      "dimensions": [
+        "eventName",
+        "country",
+        "device",
+        "browser",
+        "source"
+      ],
+      "propertyDimensions": true,
+      "additiveDimensions": [
+        "eventName",
+        "country",
+        "device",
+        "browser",
+        "source"
+      ],
+      "filters": [
+        "eventKind",
+        "eventName"
+      ],
+      "compare": true,
+      "additiveOverTime": true,
+      "minIntervalSeconds": 60,
+      "requiresMeasurementKey": false,
+      "approximate": false
+    },
+    {
+      "id": "behavior.users",
+      "family": "behavior",
+      "label": "触发用户数",
+      "description": "触发过事件的独立用户（近似）",
+      "source": "behavior",
+      "unit": "count",
+      "weighting": "sampled",
+      "kind": "distinct",
+      "direction": "neutral",
+      "shapes": [
+        "total",
+        "series",
+        "breakdown",
+        "seriesByDimension",
+        "table"
+      ],
+      "dimensions": [
+        "eventName",
+        "country",
+        "device",
+        "browser",
+        "source"
+      ],
+      "propertyDimensions": true,
+      "additiveDimensions": [],
+      "filters": [
+        "eventKind",
+        "eventName"
+      ],
+      "compare": true,
+      "additiveOverTime": false,
+      "minIntervalSeconds": 60,
+      "requiresMeasurementKey": false,
+      "approximate": true
+    },
+    {
+      "id": "behavior.sessions",
+      "family": "behavior",
+      "label": "触发会话数",
+      "description": "触发过事件的会话（近似）",
+      "source": "behavior",
+      "unit": "count",
+      "weighting": "sampled",
+      "kind": "distinct",
+      "direction": "neutral",
+      "shapes": [
+        "total",
+        "series",
+        "breakdown",
+        "seriesByDimension",
+        "table"
+      ],
+      "dimensions": [
+        "eventName",
+        "country",
+        "device",
+        "browser",
+        "source"
+      ],
+      "propertyDimensions": true,
+      "additiveDimensions": [],
+      "filters": [
+        "eventKind",
+        "eventName"
+      ],
+      "compare": true,
+      "additiveOverTime": false,
+      "minIntervalSeconds": 60,
+      "requiresMeasurementKey": false,
+      "approximate": true
+    }
+  ],
+  "dimensions": [
+    {
+      "id": "eventName",
+      "label": "事件名称"
+    },
+    {
+      "id": "route",
+      "label": "页面路由"
+    },
+    {
+      "id": "release",
+      "label": "版本"
+    },
+    {
+      "id": "country",
+      "label": "国家/地区"
+    },
+    {
+      "id": "browser",
+      "label": "浏览器"
+    },
+    {
+      "id": "device",
+      "label": "设备类型"
+    },
+    {
+      "id": "api",
+      "label": "API"
+    },
+    {
+      "id": "apiMethod",
+      "label": "请求方法"
+    },
+    {
+      "id": "errorType",
+      "label": "错误类型"
+    },
+    {
+      "id": "source",
+      "label": "来源"
+    }
+  ],
+  "filters": [
+    "release",
+    "route",
+    "country",
+    "browser",
+    "device",
+    "apiMethod",
+    "apiUrl",
+    "eventKind",
+    "eventName"
+  ],
+  "limits": {
+    "maxMetrics": {
+      "breakdown": 1,
+      "series": 4,
+      "seriesByDimension": 1,
+      "table": 6,
+      "total": 4
+    },
+    "maxBreakdownTopN": 50,
+    "maxDimensionTopN": 9,
+    "maxTableTopN": 50
+  }
+}

@@ -499,7 +499,7 @@ function DevDataOutcome({
           {!queryable && !pending && result.accepted > 0
             ? " 尚未确认样本可查询：请检查 Consumer、项目入站过滤和数据保留期限，不要反复追加数据。"
             : null}
-          {queryable ? " 样本检查不代表每条事件均已入库或每项大盘指标都有数据。" : null}
+          {queryable ? " 样本检查不代表每条事件均已入库或每项仪表盘指标都有数据。" : null}
         </AlertDescription>
       </Alert>
       <div className="flex flex-wrap gap-2">
@@ -521,7 +521,7 @@ function DevDataOutcome({
       </p>
       <div className="flex flex-wrap gap-2">
         <Button asChild variant="outline">
-          <a href={`/projects/${projectId}/overview?${search}`}>按生成范围查看大盘</a>
+          <a href={`/projects/${projectId}/overview?${search}`}>按生成范围查看仪表盘</a>
         </Button>
         <Button variant="ghost" disabled={!result.probeEventId} onClick={onRefresh}>
           检查入库并刷新

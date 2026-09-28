@@ -1331,61 +1331,6 @@ select {
 .subheading span {
   color: var(--ds-text-muted);
 }
-.dashboard-world-map-canvas {
-  display: block;
-  width: 100%;
-  height: auto;
-  max-height: 256px;
-  aspect-ratio: 2;
-}
-.dashboard-map-country {
-  stroke: var(--ds-border);
-  stroke-width: 0.45;
-}
-.dashboard-map-country[data-has-value] {
-  cursor: pointer;
-  transition: opacity 150ms ease;
-}
-.dashboard-map-country[data-has-value]:is(
-    :hover,
-    :focus-visible,
-    [data-state="instant-open"],
-    [data-state="delayed-open"]
-  ) {
-  stroke: var(--ds-text);
-  stroke-width: 1.4;
-  outline: none;
-}
-.dashboard-map-legend {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: center;
-  gap: 8px 16px;
-}
-.dashboard-map-scale {
-  width: 72px;
-  height: 6px;
-  border-radius: 4px;
-  background: linear-gradient(
-    to right,
-    color-mix(in srgb, var(--ds-chart-1) 20%, var(--ds-surface)),
-    var(--ds-chart-1)
-  );
-}
-.dashboard-map-no-data {
-  width: 8px;
-  height: 8px;
-  border: 1px solid var(--ds-border);
-  border-radius: 2px;
-  background: var(--ds-surface-subtle);
-}
-.world-map {
-  width: 100%;
-  height: 155px;
-  display: block;
-  margin-top: 3px;
-}
 .rank-list {
   padding-left: 8px;
   padding-right: 8px;
@@ -1864,9 +1809,6 @@ body {
 .subheading {
   font-size: var(--text-caption);
 }
-.world-map {
-  height: 182px;
-}
 .rank-list__head {
   height: 31px;
   font-size: var(--text-caption);
@@ -2156,13 +2098,9 @@ body {
     grid-template-columns: 1fr;
     overflow: auto;
   }
-  .map-block,
   .rank-list {
     border-right: 0;
     border-bottom: 1px solid var(--border-soft);
-  }
-  .world-map {
-    height: 160px;
   }
   .custom-panel {
     height: 330px;
@@ -6161,6 +6099,120 @@ body {
 .dashboard-catalog-item:focus-visible {
   outline: 2px solid var(--ds-ring);
   outline-offset: 3px;
+}
+/* Catalog metric and template choices: neutral hover, selection tokens once chosen. */
+.dashboard-metric-option,
+.dashboard-template-option {
+  background: var(--ds-surface);
+  transition:
+    background-color var(--motion-fast) var(--ease-standard),
+    border-color var(--motion-fast) var(--ease-standard);
+}
+.dashboard-metric-option:hover:not(:disabled),
+.dashboard-template-option:hover {
+  background: var(--ds-surface-hover);
+}
+.dashboard-metric-option[aria-pressed="true"],
+.dashboard-template-option[aria-checked="true"] {
+  background: var(--ds-selection);
+  border-color: var(--ds-selection-border);
+  color: var(--ds-selection-foreground);
+}
+.dashboard-metric-option:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+.dashboard-metric-option:focus-visible,
+.dashboard-template-option:focus-visible,
+.dashboard-switcher:focus-visible {
+  outline: 2px solid var(--ds-ring);
+  outline-offset: 2px;
+}
+.dashboard-metric-picker ul {
+  max-height: 22rem;
+  overflow-y: auto;
+}
+/* Page header: the gear reveals Edit and Add on hover or focus. The buttons stay in the
+   DOM, so tabbing to them reveals them as well. */
+.dashboard-page-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.dashboard-page-actions-reveal {
+  display: inline-flex;
+  gap: var(--space-2);
+  max-width: 0;
+  opacity: 0;
+  overflow: hidden;
+  transition:
+    max-width var(--motion-normal) var(--ease-standard),
+    opacity var(--motion-fast) var(--ease-standard);
+}
+.dashboard-page-actions:hover .dashboard-page-actions-reveal,
+.dashboard-page-actions:focus-within .dashboard-page-actions-reveal {
+  max-width: 20rem;
+  opacity: 1;
+  /* Room for the focus ring, which overflow would otherwise clip. */
+  padding: 3px;
+  margin: -3px;
+}
+.dashboard-page-actions-trigger {
+  cursor: default;
+}
+/* No hover on touch, and little room on narrow screens: show the actions outright. */
+@media (hover: none), (max-width: 767px) {
+  .dashboard-page-actions-reveal {
+    max-width: none;
+    opacity: 1;
+    overflow: visible;
+  }
+  .dashboard-page-actions-trigger {
+    display: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dashboard-page-actions-reveal {
+    transition: none;
+  }
+}
+/* Module library: domains down the side, blank modules set apart at the end. */
+.dashboard-library-domains {
+  scrollbar-width: none;
+}
+.dashboard-library-custom {
+  margin-top: var(--space-2);
+  border-top: 1px solid var(--ds-border);
+  padding-top: var(--space-2);
+}
+@media (max-width: 639px) {
+  .dashboard-library-custom {
+    margin-top: 0;
+    border-top: 0;
+    padding-top: 0;
+    margin-left: var(--space-2);
+    border-left: 1px solid var(--ds-border);
+    padding-left: var(--space-2);
+  }
+}
+/* The page title doubles as the dashboard switcher. */
+.dashboard-switcher {
+  font: inherit;
+  color: inherit;
+  border: 0;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+}
+/* Ranked and metric tables drop their secondary columns on narrow cards. */
+.dashboard-catalog-table {
+  container-type: inline-size;
+}
+@container (max-width: 520px) {
+  .dashboard-catalog-trend,
+  .dashboard-catalog-share {
+    display: none;
+  }
 }
 @media (min-width: 768px) {
   .dashboard-grid {

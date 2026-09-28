@@ -1,10 +1,10 @@
 ---
-title: Kubernetes 与 Helm
-description: 使用 Helm Chart 把 OpenRUM 部署到生产环境，从前置准备到首次登录。
+title: Kubernetes 与 Helm 参考
+description: 生产 Kubernetes 部署的 Chart 资源、路由、扩缩容、安全与升级参考。
 appliesTo: Alpha
 ---
 
-`deploy/helm/openrum` 下的 Chart 会部署 OpenRUM 的五个工作负载——`api`、`ingest`、`consumer`、`worker` 和 `web`——并带上滚动更新、健康探针、自动扩缩容和一个数据库迁移 Hook。
+`deploy/helm/openrum` 下的 Chart 会部署 OpenRUM 的五个工作负载——`api`、`ingest`、`consumer`、`worker` 和 `web`——并带上滚动更新、健康探针、自动扩缩容和一个数据库迁移 Hook。新建 Kubernetes 实例时，请先完成三步[部署生产](/zh/docs/getting-started/production-deployment/)教程；本页只作为配置、安全和日常运营细节的 Chart 参考。
 
 它**不会**帮你创建 PostgreSQL、ClickHouse、Kafka 或 Redis，不会创建 Kafka 主题，不会签发 TLS 证书，也不会创建它要读取的 Secret。这些都是前置条件。漏掉 Secret 或两个数据库会让安装直接失败；而漏掉 Kafka 主题则会安装成功、运行时才丢事件，这一种更难被发现。
 

@@ -1,0 +1,129 @@
+---
+import { Laptop, Moon, Sun } from "lucide-astro";
+
+const zh = Astro.url.pathname.startsWith("/zh/");
+const label = zh ? "选择主题" : "Select theme";
+const options = [
+  { value: "light", label: zh ? "浅色" : "Light", Icon: Sun },
+  { value: "dark", label: zh ? "深色" : "Dark", Icon: Moon },
+  { value: "auto", label: zh ? "跟随系统" : "System", Icon: Laptop },
+];
+---
+
+<docs-theme-menu data-theme-preference="auto">
+  <details class="docs-icon-menu">
+    <summary class="docs-icon-action" aria-label={label} title={label}>
+      <Sun class="theme-icon-light" size={17} aria-hidden="true" />
+      <Moon class="theme-icon-dark" size={17} aria-hidden="true" />
+      <Laptop class="theme-icon-auto" size={17} aria-hidden="true" />
+    </summary>
+    <div class="docs-icon-panel" role="menu" aria-label={label}>
+      {
+        options.map(({ value, label, Icon }) => (
+          <button type="button" role="menuitemradio" aria-checked="false" data-theme-option={value}>
+            <Icon size={16} aria-hidden="true" />
+            <span>{label}</span>
+          </button>
+        ))
+      }
+    </div>
+  </details>
+</docs-theme-menu>
+
+<script>
+  type Theme = "auto" | "dark" | "light";
+  const storageKey = "starlight-theme";
+  const parseTheme = (theme: unknown): Theme =>
+    theme === "dark" || theme === "light" || theme === "auto" ? theme : "auto";
+  const preferredTheme = (): Exclude<Theme, "auto"> =>
+    matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+
+  class DocsThemeMenu extends HTMLElement {
+    private preference: Theme = "auto";
+
+    constructor() {
+      super();
+      this.preference = parseTheme(localStorage.getItem(storageKey));
+      this.apply(this.preference);
+      this.querySelectorAll<HTMLButtonElement>("[data-theme-option]").forEach((button) => {
+        button.addEventListener("click", () => {
+          this.preference = parseTheme(button.dataset.themeOption);
+          this.apply(this.preference);
+          this.querySelector("details")?.removeAttribute("open");
+        });
+      });
+      matchMedia("(prefers-color-scheme: light)").addEventListener("change", () => {
+        if (this.preference === "auto") this.apply("auto");
+      });
+    }
+
+    private apply(theme: Theme) {
+      const effectiveTheme = theme === "auto" ? preferredTheme() : theme;
+      this.dataset.themePreference = theme;
+      document.documentElement.dataset.theme = effectiveTheme;
+      localStorage.setItem(storageKey, theme === "auto" ? "" : theme);
+      this.querySelectorAll<HTMLButtonElement>("[data-theme-option]").forEach((button) => {
+        button.setAttribute("aria-checked", String(button.dataset.themeOption === theme));
+      });
+      const provider = (window as Window & {
+        StarlightThemeProvider?: { updatePickers: (value: Theme) => void };
+      }).StarlightThemeProvider;
+      provider?.updatePickers(theme);
+    }
+  }
+
+  if (!customElements.get("docs-theme-menu")) customElements.define("docs-theme-menu", DocsThemeMenu);
+</script>
+
+<style>
+  docs-theme-menu { position: relative; display: block; }
+  .docs-icon-menu { position: relative; }
+  .docs-icon-action {
+    display: grid;
+    width: 1.75rem;
+    height: 1.75rem;
+    place-items: center;
+    border-radius: var(--radius-md);
+    color: var(--ds-text-muted);
+    cursor: pointer;
+    list-style: none;
+  }
+  .docs-icon-action:hover, .docs-icon-menu[open] .docs-icon-action { color: var(--ds-text); background: var(--ds-surface-subtle); }
+  .docs-icon-action::marker, .docs-icon-action::-webkit-details-marker { display: none; }
+  .docs-icon-action :global(svg) { display: none; }
+  :global(docs-theme-menu[data-theme-preference="light"] .theme-icon-light),
+  :global(docs-theme-menu[data-theme-preference="dark"] .theme-icon-dark),
+  :global(docs-theme-menu[data-theme-preference="auto"] .theme-icon-auto) { display: block; }
+  .docs-icon-panel {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    z-index: 30;
+    display: none;
+    min-width: 8.5rem;
+    margin-top: 0.35rem;
+    padding: 0.35rem;
+    border: 1px solid var(--ds-border);
+    border-radius: var(--radius-lg);
+    background: var(--ds-surface);
+    box-shadow: var(--shadow-flyout);
+  }
+  .docs-icon-menu[open] .docs-icon-panel, .docs-icon-menu:focus-within .docs-icon-panel { display: grid; }
+  @media (hover: hover) { .docs-icon-menu:hover .docs-icon-panel { display: grid; } }
+  .docs-icon-panel button {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+    padding: 0.5rem 0.65rem;
+    border: 0;
+    border-radius: var(--radius-md);
+    color: var(--ds-text-muted);
+    background: transparent;
+    font: inherit;
+    font-size: 0.875rem;
+    text-align: left;
+    cursor: pointer;
+  }
+  .docs-icon-panel button:hover, .docs-icon-panel button[aria-checked="true"] { color: var(--ds-text); background: var(--ds-surface-subtle); }
+</style>

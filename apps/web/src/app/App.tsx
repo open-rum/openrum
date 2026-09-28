@@ -65,7 +65,7 @@ function formatEnvironmentLabel(value?: string) {
 
 const primaryNavigation = [
   {
-    label: "数据大盘",
+    label: "仪表盘",
     icon: SquaresFour,
     to: "/projects/$projectId/overview",
     preserveAnalysisContext: true,

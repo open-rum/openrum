@@ -64,7 +64,7 @@ const AnalysisContext = createContext<AnalysisContextValue | null>(null);
 
 export function isAnalysisRoute(pathname: string) {
   return (
-    /^\/projects\/[^/]+\/(?:analytics(?:\/(?:funnels|paths|retention))?|overview|issues(?:\/[^/]+)?|performance|events|logs|apis|sessions)\/?$/.test(
+    /^\/projects\/[^/]+\/(?:analytics(?:\/(?:funnels|paths|retention))?|overview(?:\/[^/]+)?|issues(?:\/[^/]+)?|performance|events|logs|apis|sessions)\/?$/.test(
       pathname,
     ) || /^\/(?:funnels|paths|retention|sessions|events|issues|performance|apis)\/?$/.test(pathname)
   );

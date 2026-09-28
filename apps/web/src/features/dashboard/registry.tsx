@@ -1,16 +1,17 @@
 import type { ComponentType } from "react";
 import {
-  ActivityIcon,
   ChartColumnIcon,
-  ChartPieIcon,
   ChartNoAxesCombinedIcon,
   HashIcon,
   BugIcon,
+  ListOrderedIcon,
+  TableIcon,
   type LucideIcon,
 } from "lucide-react";
 import type { OverviewFilters } from "@/lib/filters/schema";
-import { adaptStat, adaptPlot, adaptList, type AdaptedData } from "./adapters";
+import { adaptStat, adaptPlot, adaptList, adaptTable, type AdaptedData } from "./adapters";
 import {
+  createCatalogWidget,
   createWidget,
   widgetSchema,
   type Widget,
@@ -22,6 +23,7 @@ import {
   StatRenderer,
   PlotRenderer,
   ListRenderer,
+  TableRenderer,
   type ModuleRenderProps,
 } from "./ModuleRenderers";
 import { ModuleFields, type ModuleFieldsProps } from "./ModuleFields";
@@ -29,7 +31,7 @@ import type { DashboardData } from "./queries";
 
 export type ModuleDefinition = {
   type: WidgetType;
-  version: 1;
+  version: 1 | 2;
   name: string;
   group: "指标" | "趋势" | "分布" | "列表";
   description: string;
@@ -42,6 +44,8 @@ export type ModuleDefinition = {
   adapt: (widget: Widget, data: DashboardData, filters: OverviewFilters) => AdaptedData;
   Render: ComponentType<ModuleRenderProps>;
   Editor: ComponentType<ModuleFieldsProps>;
+  /** Only offered once the metric catalog has loaded. */
+  requiresCatalog?: boolean;
 };
 
 // Bundled, typed modules only. New business modules register here and implement
@@ -57,7 +61,7 @@ export const moduleRegistry: Record<WidgetType, ModuleDefinition> = {
     sizes: ["compact", "half"],
     views: ["number"],
     schema: widgetSchema,
-    create: () => createWidget("stat"),
+    create: () => createCatalogWidget("stat", { metrics: ["traffic.pageViews"] }, { title: "PV" }),
     adapt: adaptStat,
     Render: StatRenderer,
     Editor: ModuleFields,
@@ -70,9 +74,14 @@ export const moduleRegistry: Record<WidgetType, ModuleDefinition> = {
     description: "用 Area、Line 或 Bar 观察指标变化",
     icon: ChartNoAxesCombinedIcon,
     sizes: ["half", "full"],
-    views: ["area", "line", "bar"],
+    views: ["area", "line", "bar", "stacked-area", "stacked-bar"],
     schema: widgetSchema,
-    create: () => createWidget("timeseries"),
+    create: () =>
+      createCatalogWidget(
+        "timeseries",
+        { metrics: ["traffic.pageViews"] },
+        { title: "PV 趋势", view: "line" },
+      ),
     adapt: adaptPlot,
     Render: PlotRenderer,
     Editor: ModuleFields,
@@ -82,12 +91,17 @@ export const moduleRegistry: Record<WidgetType, ModuleDefinition> = {
     version: 1,
     name: "维度分布",
     group: "分布",
-    description: "国家、设备、浏览器或自定义属性，支持圆环列表与地图",
+    description: "国家、设备、浏览器或自定义属性，支持排行条、表格与圆环列表",
     icon: ChartColumnIcon,
     sizes: ["half", "full"],
-    views: ["bar", "donut", "table", "map"],
+    views: ["bar", "donut", "table"],
     schema: widgetSchema,
-    create: () => createWidget("breakdown"),
+    create: () =>
+      createCatalogWidget(
+        "breakdown",
+        { metrics: ["traffic.pageViews"], dimension: "country" },
+        { title: "PV 分布", view: "bar" },
+      ),
     adapt: adaptPlot,
     Render: PlotRenderer,
     Editor: ModuleFields,
@@ -107,39 +121,36 @@ export const moduleRegistry: Record<WidgetType, ModuleDefinition> = {
     Render: ListRenderer,
     Editor: ModuleFields,
   },
-  "slow-apis": {
-    type: "slow-apis",
-    version: 1,
-    name: "慢 API",
+  "ranked-table": {
+    type: "ranked-table",
+    version: 2,
+    name: "排行表",
     group: "列表",
-    description: "按 P95 耗时定位慢请求",
-    icon: ActivityIcon,
+    description: "一个指标按分组排行，带变化和迷你趋势",
+    icon: ListOrderedIcon,
     sizes: ["half", "full"],
     views: ["table"],
     schema: widgetSchema,
-    create: () => createWidget("slow-apis"),
-    adapt: adaptList,
-    Render: ListRenderer,
+    create: () => createWidget("ranked-table"),
+    adapt: adaptTable,
+    Render: TableRenderer,
     Editor: ModuleFields,
+    requiresCatalog: true,
+  },
+  "metric-table": {
+    type: "metric-table",
+    version: 2,
+    name: "指标表",
+    group: "列表",
+    description: "多个指标按分组并排，可按任一列排序",
+    icon: TableIcon,
+    sizes: ["half", "full"],
+    views: ["table"],
+    schema: widgetSchema,
+    create: () => createWidget("metric-table"),
+    adapt: adaptTable,
+    Render: TableRenderer,
+    Editor: ModuleFields,
+    requiresCatalog: true,
   },
 };
-
-// Presets reuse the same stored breakdown contract, not new module types.
-export const donutModules: ModuleDefinition[] = [
-  ["country", "国家"],
-  ["device", "设备"],
-  ["browser", "浏览器"],
-  ["source", "来源"],
-].map(([dimension, label]) => ({
-  ...moduleRegistry.breakdown,
-  name: `${label}圆环分布`,
-  description: `左侧圆环、右侧排行，查看${label}的数量和占比`,
-  icon: ChartPieIcon,
-  previewView: "donut",
-  create: () =>
-    createWidget("breakdown", {
-      title: `${label}分布`,
-      view: "donut",
-      data: { source: "events", metrics: ["estimated"], dimension },
-    }),
-}));

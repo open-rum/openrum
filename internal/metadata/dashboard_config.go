@@ -3,6 +3,7 @@ package metadata
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"reflect"
@@ -10,6 +11,8 @@ import (
 	"slices"
 	"strings"
 	"unicode/utf8"
+
+	"openrum/internal/catalog"
 )
 
 const MaxDashboardWidgets = 24
@@ -61,21 +64,157 @@ func ValidateDashboardConfig(raw, previous json.RawMessage) error {
 			return fmt.Errorf("module IDs must be valid and unique")
 		}
 		seen[identity.ID] = true
-		if identity.Version != 1 || !slices.Contains([]string{"stat", "timeseries", "breakdown", "top-issues", "slow-apis"}, identity.Type) {
+		switch {
+		case identity.Version == 1 && slices.Contains(classicWidgetTypes, identity.Type):
+			var widget dashboardWidget
+			if strictDashboardJSON(rawWidget, &widget) != nil {
+				return fmt.Errorf("invalid module configuration")
+			}
+			if err := validateDashboardWidget(widget); err != nil {
+				return err
+			}
+		case identity.Version == 2 && slices.Contains(catalogWidgetTypes, identity.Type):
+			var widget catalogWidget
+			if strictDashboardJSON(rawWidget, &widget) != nil {
+				return fmt.Errorf("invalid module configuration")
+			}
+			if err := validateCatalogWidget(widget); err != nil {
+				return err
+			}
+		default:
 			if !unchangedDashboardWidget(rawWidget, old.Widgets) {
 				return fmt.Errorf("unsupported module type or version")
 			}
-			continue
-		}
-		var widget dashboardWidget
-		if strictDashboardJSON(rawWidget, &widget) != nil {
-			return fmt.Errorf("invalid module configuration")
-		}
-		if err := validateDashboardWidget(widget); err != nil {
-			return err
 		}
 	}
 	return nil
+}
+
+var classicWidgetTypes = []string{"stat", "timeseries", "breakdown", "top-issues"}
+
+// Catalog modules are version 2 so a rolling deploy stays safe in both directions: an
+// older API pod treats them as an unknown version and keeps them verbatim instead of
+// rejecting the whole save, and an older Console hides them without dropping them.
+var catalogWidgetTypes = []string{"stat", "timeseries", "breakdown", "ranked-table", "metric-table"}
+
+type catalogWidget struct {
+	ID             string          `json:"id"`
+	Type           string          `json:"type"`
+	Version        int             `json:"version"`
+	Title          string          `json:"title"`
+	Size           string          `json:"size"`
+	View           string          `json:"view"`
+	StatAppearance json.RawMessage `json:"statAppearance,omitempty"`
+	Data           struct {
+		Source      string   `json:"source"`
+		Metrics     []string `json:"metrics"`
+		Dimension   string   `json:"dimension,omitempty"`
+		Measurement string   `json:"measurement,omitempty"`
+		Filters     struct {
+			Release   string `json:"release,omitempty"`
+			Route     string `json:"route,omitempty"`
+			Country   string `json:"country,omitempty"`
+			Browser   string `json:"browser,omitempty"`
+			Device    string `json:"device,omitempty"`
+			APIMethod string `json:"apiMethod,omitempty"`
+			APIURL    string `json:"apiUrl,omitempty"`
+			EventKind string `json:"eventKind,omitempty"`
+			EventName string `json:"eventName,omitempty"`
+		} `json:"filters"`
+		Groups    []string `json:"groups,omitempty"`
+		Compare   string   `json:"compare,omitempty"`
+		TopN      int      `json:"topN,omitempty"`
+		Sort      string   `json:"sort,omitempty"`
+		Order     string   `json:"order,omitempty"`
+		Sparkline bool     `json:"sparkline,omitempty"`
+	} `json:"data"`
+}
+
+var catalogViews = map[string][]string{
+	"stat":         {"number"},
+	"timeseries":   {"area", "line", "bar", "stacked-area", "stacked-bar"},
+	"breakdown":    {"bar", "table", "donut"},
+	"ranked-table": {"table"},
+	"metric-table": {"table"},
+}
+
+// validateCatalogWidget checks layout rules here and hands the data question to the same
+// catalog.Validate the query endpoint uses, so a module that saves is a module that runs.
+func validateCatalogWidget(w catalogWidget) error {
+	if !dashboardText(w.Title, 80) || strings.TrimSpace(w.Title) == "" || !slices.Contains([]string{"compact", "half", "full"}, w.Size) {
+		return fmt.Errorf("module title or size is invalid")
+	}
+	if !slices.Contains(catalogViews[w.Type], w.View) {
+		return fmt.Errorf("this view is not available for the module type")
+	}
+	if w.Type == "stat" {
+		if w.Size == "full" {
+			return fmt.Errorf("stat modules require a compact or half-width number view")
+		}
+	} else if w.Size == "compact" {
+		return fmt.Errorf("chart and table modules require half or full width")
+	}
+	if len(w.StatAppearance) > 0 {
+		var appearance string
+		if w.Type != "stat" || json.Unmarshal(w.StatAppearance, &appearance) != nil || !slices.Contains([]string{"plain", "line-right", "bar-right"}, appearance) {
+			return fmt.Errorf("invalid stat card appearance")
+		}
+	}
+	d := w.Data
+	if d.Source != "catalog" {
+		return fmt.Errorf("version 2 modules read the metric catalog")
+	}
+	if d.Compare != "" && d.Compare != "previous" {
+		return fmt.Errorf("compare must be previous or empty")
+	}
+	switch w.Type {
+	case "stat", "ranked-table":
+		if len(d.Metrics) != 1 {
+			return fmt.Errorf("this module shows exactly one metric")
+		}
+	}
+	shape, stack, err := catalog.ShapeForWidget(w.Type, w.View, d.Dimension)
+	if err != nil {
+		return catalogReason(err)
+	}
+	spec := catalog.Spec{
+		Metrics: d.Metrics, Shape: shape, Dimension: d.Dimension, Measurement: d.Measurement,
+		Filters: map[string]string{
+			"release": d.Filters.Release, "route": d.Filters.Route, "country": d.Filters.Country,
+			"browser": d.Filters.Browser, "device": d.Filters.Device, "apiMethod": d.Filters.APIMethod,
+			"apiUrl": d.Filters.APIURL, "eventKind": d.Filters.EventKind, "eventName": d.Filters.EventName,
+		},
+		Groups:  d.Groups,
+		Compare: d.Compare == "previous", TopN: d.TopN, Sort: d.Sort, Order: d.Order,
+		Sparkline: d.Sparkline, Stack: stack,
+	}
+	// Validate the query the Console will actually send: a stat always carries its
+	// comparison, and a ranked table always carries its change and sparkline.
+	switch w.Type {
+	case "stat":
+		spec.Compare = true
+	case "ranked-table":
+		spec.Compare, spec.Sparkline = true, true
+	}
+	validated, err := catalog.Validate(spec)
+	if err != nil {
+		return catalogReason(err)
+	}
+	// A donut draws parts of a whole; rates, percentiles and distinct counts are not.
+	if w.View == "donut" {
+		metric, _ := catalog.Lookup(validated.Metrics[0])
+		if !metric.AdditiveOver(validated.Dimension) {
+			return fmt.Errorf("a donut needs a metric that adds up across the dimension")
+		}
+	}
+	return nil
+}
+
+func catalogReason(err error) error {
+	if errors.Is(err, catalog.ErrInvalidSpec) {
+		return errors.New(strings.TrimPrefix(err.Error(), catalog.ErrInvalidSpec.Error()+": "))
+	}
+	return err
 }
 
 func validateDashboardWidget(w dashboardWidget) error {
@@ -102,13 +241,11 @@ func validateDashboardWidget(w dashboardWidget) error {
 			return fmt.Errorf("invalid time-series view")
 		}
 	case "breakdown":
-		if w.Data.Source != "events" || !slices.Contains([]string{"bar", "table", "map", "donut"}, w.View) {
-			return fmt.Errorf("distributions require event data and a bar, table, donut or country map view")
+		// The world map view was retired; the Console reads a saved one as ranked bars.
+		if w.Data.Source != "events" || !slices.Contains([]string{"bar", "table", "donut"}, w.View) {
+			return fmt.Errorf("distributions require event data and a bar, table or donut view")
 		}
-		if w.View == "map" && w.Data.Dimension != "country" {
-			return fmt.Errorf("map views require the country dimension")
-		}
-	case "top-issues", "slow-apis":
+	case "top-issues":
 		if w.Data.Source != "overview" || w.View != "table" || len(w.Data.Metrics) != 0 {
 			return fmt.Errorf("invalid list configuration")
 		}
@@ -137,7 +274,7 @@ func validateDashboardWidget(w dashboardWidget) error {
 	} else {
 		return fmt.Errorf("unsupported data source")
 	}
-	if w.Type == "top-issues" || w.Type == "slow-apis" {
+	if w.Type == "top-issues" {
 		return nil
 	}
 	if len(d.Metrics) < 1 || len(d.Metrics) > 2 || ((w.Type == "stat" || w.Type == "breakdown") && len(d.Metrics) != 1) {

@@ -1,10 +1,10 @@
 ---
-title: Kubernetes and Helm
-description: Deploy OpenRUM to production with the Helm chart, from prerequisites to first login.
+title: Kubernetes and Helm reference
+description: Chart resource, routing, scaling, security and upgrade reference for a production Kubernetes deployment.
 appliesTo: Alpha
 ---
 
-The chart under `deploy/helm/openrum` deploys the five OpenRUM workloads — `api`, `ingest`, `consumer`, `worker` and `web` — with rolling updates, health probes, autoscaling and a schema migration hook.
+The chart under `deploy/helm/openrum` deploys the five OpenRUM workloads — `api`, `ingest`, `consumer`, `worker` and `web` — with rolling updates, health probes, autoscaling and a schema migration hook. For a new Kubernetes Instance, follow the three-step [production deployment](/docs/getting-started/production-deployment/) tutorial first. This page is the Chart reference for configuration, security and operation details.
 
 It does **not** provision PostgreSQL, ClickHouse, Kafka or Redis, create the Kafka topic, issue TLS certificates or create the Secret it reads. Those are prerequisites. Missing the Secret or the two databases fails the install outright; a missing Kafka topic installs cleanly and then drops events at runtime, which is the harder one to notice.
 

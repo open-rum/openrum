@@ -142,7 +142,7 @@ const rootRoute = createRootRouteWithContext<RouterContext>()({
   notFoundComponent: () => (
     <PlannedPage
       title="页面不存在"
-      description="当前地址没有对应页面，请返回数据大盘继续浏览。"
+      description="当前地址没有对应页面，请返回仪表盘继续浏览。"
       icon={WarningCircle}
     />
   ),
@@ -336,6 +336,14 @@ const projectOnboardingRoute = createRoute({
 const projectOverviewRoute = createRoute({
   getParentRoute: () => protectedRoute,
   path: "/projects/$projectId/overview",
+  component: OverviewPage,
+});
+
+// A named dashboard. The bare overview address above keeps working and opens the one this
+// device last used, so the sidebar link and existing bookmarks never break.
+const projectDashboardRoute = createRoute({
+  getParentRoute: () => protectedRoute,
+  path: "/projects/$projectId/overview/$dashboardId",
   component: OverviewPage,
 });
 
@@ -713,6 +721,7 @@ const routeTree = rootRoute.addChildren([
     onboardingRoute,
     projectOnboardingRoute,
     projectOverviewRoute,
+    projectDashboardRoute,
     issuesRoute,
     projectIssuesRoute,
     issueDetailRoute,

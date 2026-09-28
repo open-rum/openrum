@@ -253,11 +253,11 @@ function ProjectOnboarding({
           {status?.lastEventQueryableAt ? (
             <Button asChild>
               <Link to="/projects/$projectId/overview" params={{ projectId: project.id }}>
-                进入数据大盘
+                进入仪表盘
               </Link>
             </Button>
           ) : (
-            <Button disabled>进入数据大盘</Button>
+            <Button disabled>进入仪表盘</Button>
           )}
         </div>
       </div>

@@ -2,12 +2,19 @@ import { ChartNoAxesCombinedIcon, Table2Icon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { OverviewFilters } from "@/lib/filters/schema";
-import { adaptList, adaptPlot, adaptStat, formatDetailedMetric, type ScalarData } from "./adapters";
+import {
+  adaptList,
+  adaptPlot,
+  adaptStat,
+  adaptTable,
+  formatDetailedMetric,
+  type ScalarData,
+} from "./adapters";
 import { intervalLabel } from "./chartDensity";
 import { describeComparison } from "./comparison";
 import { eventKindLabels, metricLabel, widgetDescription, type Widget } from "./model";
 import { ModuleComparison } from "./ModuleComparison";
-import { PlotRenderer, ListRenderer, PlotTable } from "./ModuleRenderers";
+import { PlotRenderer, ListRenderer, PlotTable, TableRenderer } from "./ModuleRenderers";
 import { effectiveOverviewFilters, type DashboardData } from "./queries";
 
 function dateLabel(value: string | Date | null | undefined) {
@@ -26,8 +33,10 @@ export function ModuleDetailContent({
   filters: OverviewFilters;
 }) {
   const scalar = widget.type === "stat" ? adaptStat(widget, data) : undefined;
-  const list = widget.type === "top-issues" || widget.type === "slow-apis";
-  const plot = list ? undefined : adaptPlot(widget, data);
+  const list = widget.type === "top-issues";
+  // Tables open as the full table — every returned row — not as a chart of one column.
+  const table = widget.type === "ranked-table" || widget.type === "metric-table";
+  const plot = list || table ? undefined : adaptPlot(widget, data);
   const effective =
     widget.data.source === "overview" ? effectiveOverviewFilters(widget, filters) : undefined;
   const freshness = data.result.freshness;
@@ -43,6 +52,10 @@ export function ModuleDetailContent({
         {list ? (
           <section aria-label="详细列表" className="min-w-0">
             <ListRenderer widget={widget} data={adaptList(widget, data, filters)} />
+          </section>
+        ) : table ? (
+          <section aria-label="详细表格" className="min-w-0">
+            <TableRenderer widget={widget} data={adaptTable(widget, data, filters)} detailed />
           </section>
         ) : plot ? (
           <Tabs defaultValue={widget.view === "table" ? "table" : "chart"} className="gap-5">

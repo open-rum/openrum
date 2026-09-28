@@ -14,11 +14,11 @@ import BrandMark from "../BrandMark.astro";
 import TechStack from "./TechStack.astro";
 import Reliability from "./Reliability.astro";
 import FeatureBento from "./FeatureBento.astro";
+import Dashboards from "./Dashboards.astro";
 import PublicLayout from "../../layouts/PublicLayout.astro";
 import "../../styles/landing.css";
 const { lang = "en" } = Astro.props;
 const zh = lang === "zh";
-const prefix = zh ? "/zh" : "";
 const repository = import.meta.env.PUBLIC_REPOSITORY_URL || "https://github.com/openrum/openrum";
 const docs = zh ? "/zh/docs" : "/docs";
 const copy = zh
@@ -264,7 +264,7 @@ const pageTitle = zh
           <h2>{copy.analyticsTitle}</h2>
           <p>{copy.analyticsLead}</p>
           <blockquote class="lp-quote">{copy.analyticsQuote}</blockquote>
-          <a class="lp-tile-link" href={`${prefix}/product`}>{copy.analyticsLink} →</a>
+          <a class="lp-tile-link" href={`${docs}/product/analytics/`}>{copy.analyticsLink} →</a>
         </div>
         <div class="lp-app">
           <div class="lp-app-bar">
@@ -312,6 +312,8 @@ const pageTitle = zh
         </div>
       </div>
     </section>
+
+    <Dashboards lang={lang} />
 
     <section class="lp-section lp-rule">
       <div class="site-container">

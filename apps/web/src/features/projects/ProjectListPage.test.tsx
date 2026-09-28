@@ -92,7 +92,6 @@ describe("project display modes", () => {
           kpis,
           series: [],
           topIssues: [],
-          slowApis: [],
           freshness: { latestReceivedAt: null, ageSeconds: null, stale: false },
           comparison: {
             from: "2026-09-19T00:00:00Z",

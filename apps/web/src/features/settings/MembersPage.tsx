@@ -253,7 +253,7 @@ export function MembersPage() {
               <RoleDescription role="Owner" text="全部权限；可配置 OIDC 和管理其他 Owner。" />
               <RoleDescription role="Admin" text="管理项目、Key、采样、成员和通知渠道。" />
               <RoleDescription role="Member" text="诊断问题与管理告警，不能修改项目权限。" />
-              <RoleDescription role="Viewer" text="只读查看大盘、事件与分析结果。" />
+              <RoleDescription role="Viewer" text="只读查看仪表盘、事件与分析结果。" />
             </dl>
           </div>
           <div className="border border-border bg-card p-5">
