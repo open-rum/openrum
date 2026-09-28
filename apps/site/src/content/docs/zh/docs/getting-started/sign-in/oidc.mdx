@@ -1,0 +1,42 @@
+---
+title: 使用 OpenID Connect 登录
+description: 将一个或多个企业 OIDC 提供者连接到 OpenRUM。
+appliesTo: Alpha
+---
+
+import { Aside, Steps, LinkCard } from "@astrojs/starlight/components";
+
+企业身份平台支持 OIDC 发现与授权码登录时，可以使用通用 OpenID Connect（OIDC）。OpenRUM 可配置多个提供者，每个提供者有独立 ID 和登录按钮。OpenRUM 会校验已签名 ID Token 的签发者、受众、有效期、nonce 和已验证邮箱。
+
+开始前，请使用规范 HTTPS `PUBLIC_BASE_URL` 部署 OpenRUM，以 Instance Owner 身份登录，并[启用密钥加密托管](/zh/docs/self-hosting/authentication/)。API 服务还须能够访问提供者的 HTTPS 发现端点和令牌端点。
+
+<Steps>
+
+1. ## 注册 OIDC 客户端
+
+   在企业身份平台创建用于授权码流程的机密 Web 客户端。允许 `openid`、`profile`、`email` 范围，并确保获准用户的 ID Token 包含 `sub`、`email` 和 `email_verified: true`。选择如 `company-sso` 的提供者 ID，再注册以下精确回调地址：
+
+   ```text
+   https://rum.example.com/api/v1/auth/providers/company-sso/callback
+   ```
+
+   将域名替换为 `PUBLIC_BASE_URL` 的域名，路径中的 `company-sso` 换成实际提供者 ID。复制 Client ID 和 Client Secret。通过提供者的 OIDC 发现文档取得精确 HTTPS **Issuer URL**；填写 Issuer，而不是发现文档本身的 URL。
+
+1. ## 配置并测试 OpenRUM
+
+   打开**系统设置 → 认证与访问**，选择**通用 OIDC**，填写唯一提供者 ID、显示名称、Client ID、Issuer URL 和 Client Secret。先不要勾选**启用并在登录页展示**；保存时重新输入 Owner 的 OpenRUM 密码，再点击**测试连接**并完成企业提供者授权。测试会返回设置页，不创建账号。
+
+1. ## 启用并登录
+
+   勾选**启用并在登录页展示**并保存。在独立浏览器会话的登录页，选择对应显示名称。新外部账号需要组织角色；已有账号的用户应先在 [Account 连接此提供者](/zh/docs/getting-started/sign-in/)，然后使用它登录。
+
+</Steps>
+
+<Aside type="caution" title="保持提供者身份稳定">
+  提供者 ID 不能用于指向另一身份目录。更换 Issuer URL 或 Client ID 时，创建新提供者 ID，并让用户从
+  **Account** 绑定新身份。停用提供者后，历史身份关联仍会保留。
+</Aside>
+
+[OpenID Connect Discovery 规范](https://openid.net/specs/openid-connect-discovery-1_0.html)说明了 Issuer 元数据与发现要求。
+
+<LinkCard title="其他登录方式" href="/zh/docs/getting-started/sign-in/" />

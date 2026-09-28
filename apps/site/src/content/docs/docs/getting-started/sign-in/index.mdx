@@ -1,0 +1,51 @@
+---
+title: Sign in to OpenRUM
+description: Choose a Console sign-in method and learn how accounts gain access.
+appliesTo: Alpha
+---
+
+import { CardGrid, LinkCard, Aside } from "@astrojs/starlight/components";
+
+OpenRUM always offers email and OpenRUM password sign-in. An Instance Owner can also enable Google, GitHub, LDAP, and multiple OpenID Connect (OIDC) providers. The login page displays an external method only after it is fully configured and enabled.
+
+## Choose a method
+
+<CardGrid>
+  <LinkCard
+    title="Email and password"
+    description="Use a local account or recover access with the setup Owner."
+    href="/docs/getting-started/sign-in/email-password/"
+  />
+  <LinkCard
+    title="Google"
+    description="Connect a Google OAuth web application for Google accounts or Workspace."
+    href="/docs/getting-started/sign-in/google/"
+  />
+  <LinkCard
+    title="GitHub"
+    description="Connect a GitHub OAuth App and a verified primary email address."
+    href="/docs/getting-started/sign-in/github/"
+  />
+  <LinkCard
+    title="OpenID Connect"
+    description="Connect an enterprise identity provider through its OIDC issuer."
+    href="/docs/getting-started/sign-in/oidc/"
+  />
+  <LinkCard
+    title="LDAP"
+    description="Sign in directly against a directory over LDAPS or StartTLS."
+    href="/docs/getting-started/sign-in/ldap/"
+  />
+</CardGrid>
+
+## What happens after external sign-in
+
+A first-time external user gets a **pending** account. They can view access status and sign out; an Organization administrator must add their email through the existing member flow and assign a role before they can use the Console. A user who needs an Instance administrator role must also set an independent OpenRUM password in **Account**.
+
+**Matching email addresses do not merge accounts.** If you already have an OpenRUM account, sign in with your current method, open **Account → Connected sign-in methods**, and connect the new identity there before using its login button. You can disconnect an identity while another working sign-in method remains.
+
+<Aside type="note" title="For Instance Owners">
+  External methods require encrypted secret storage and provider-specific configuration. Keep the
+  local Owner password available for recovery. See the [Console authentication deployment
+  guide](/docs/self-hosting/authentication/) for the shared prerequisites.
+</Aside>

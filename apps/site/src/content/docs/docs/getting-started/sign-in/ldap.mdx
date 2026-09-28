@@ -1,0 +1,87 @@
+---
+title: Sign in with LDAP
+description: Learn what LDAP is, what to request from your directory administrator, and how to configure and test it in OpenRUM.
+appliesTo: Alpha
+---
+
+import { Aside, Steps, LinkCard } from "@astrojs/starlight/components";
+
+If other systems at your company already use LDAP, OpenRUM can usually connect to the same employee directory. You do not need to create a new LDAP server, but you do need connection details and a read-only search account from the team that manages it.
+
+## What is LDAP?
+
+LDAP (Lightweight Directory Access Protocol) is a standard way to query a company directory. A directory commonly holds employee accounts, email addresses, and names. Think of it as a centrally maintained account directory that applications can search under controlled permissions. **LDAP is the protocol used to reach that directory; it is not a separate set of OpenRUM passwords.** Directory products such as Active Directory may expose LDAP. Your company decides which attributes and username format it uses.
+
+Each directory entry has a **Distinguished Name (DN)**: its full location in the directory tree. For example, `uid=alice,ou=People,dc=example,dc=com` is a user's DN. A **Base DN** such as `dc=example,dc=com` is the starting point for a search. On the login page, users normally enter a short directory username such as `alice`, not their full DN.
+
+### What happens when someone signs in?
+
+<Steps>
+
+1. The user selects LDAP on the OpenRUM login page and enters a directory username and password.
+2. The OpenRUM API connects to the company directory over TLS. A read-only search account and a user filter locate **exactly one** matching user entry.
+3. OpenRUM binds as that user's DN with the submitted password to verify it. It then creates an OpenRUM session and does not store the user's LDAP password.
+
+</Steps>
+
+Unlike Google, GitHub, or OIDC sign-in, this does not redirect the browser to an external consent page. LDAP **does not need an OAuth callback URL**. Production users should also reach the OpenRUM login page over HTTPS.
+
+<Aside type="note" title="Directory identity is not Console access">
+  LDAP verifies who owns a directory account. OpenRUM does not automatically map LDAP groups to
+  Organization roles. A first-time user gets a pending account until an Organization administrator
+  assigns a role through the existing member flow.
+</Aside>
+
+## What should you ask your IT team for?
+
+Send this checklist to the team that manages your existing LDAP integration. The values below are examples; use the real values for your company. Exchange the search account password through an approved secure channel.
+
+- **LDAP URL:** The directory address and port reached by the API, such as `ldaps://ldap.example.com:636` or `ldap://ldap.example.com:389` with StartTLS. Can the API host reach it?
+- **Base DN:** The starting point for user searches, such as `dc=example,dc=com` or a narrower employee organizational unit.
+- **Search account DN and password:** These let OpenRUM look up users; this is not an employee's login password. The DN might look like `cn=openrum-reader,ou=Service Accounts,dc=example,dc=com`. The account needs read access to user DNs, stable IDs, email, and optionally names.
+- **User search filter:** This finds a user from the name typed at login. OpenLDAP often uses `(uid={username})`; Active Directory might use `(sAMAccountName={username})`. Should employees type a short name or an email address?
+- **Stable ID attribute:** This identifies the same person over time, even if a name changes. Often `entryUUID` for OpenLDAP or `objectGUID` for Active Directory. It must be unique and stable.
+- **Email and display-name attributes:** OpenRUM uses these to create an account and show a name. Email is often `mail`; name can be `displayName`. Confirm user entries have email values.
+- **CA certificate, if needed:** Ask for the CA certificate in PEM format if the API host does not already trust it. This verifies the directory server's TLS certificate; do not request its private key.
+- **Test user:** Ask for an ordinary test account, or have an employee enter their own password during acceptance testing. This checks a real user search and password bind.
+
+## Configure LDAP in OpenRUM
+
+<Steps>
+
+1. ## Prepare a secure connection
+
+   Sign in as Instance Owner and [enable encrypted secret storage](/docs/self-hosting/authentication/). The API must reach the LDAP port. `ldaps://` uses TLS from the start; with `ldap://`, OpenRUM upgrades to StartTLS before sending any credentials. The API host must trust the directory certificate, or you must paste a PEM CA certificate into the provider form. OpenRUM does not offer an option to disable certificate validation.
+
+1. ## Fill in the LDAP card
+
+   Open **System Settings → Authentication** and select **LDAP**. Enter a provider ID (default `ldap`), display name, LDAP URL, Base DN, search account DN, user filter, attributes, optional CA certificate, and **search account password** from the checklist. Leave **Enable and show on login** unchecked at first. Confirm that the filter contains the literal `{username}`, select **Save configuration**, and reverify with the Owner's OpenRUM password.
+
+1. ## Test the connection, then enable it
+
+   Select **Test connection**. This checks TLS, the search-account bind, and whether the Base DN exists. **A passing connection test does not verify employee usernames, the user filter, or employee passwords.** After it passes, check **Enable and show on login** and save again. The LDAP button will then appear on the login page.
+
+1. ## Accept with a real user
+
+   In a separate browser session, select LDAP on the login page and enter the test user's directory username and password. This verifies the filter, unique search result, required attributes, and user bind. A new external user can only see pending status until an Organization administrator grants a role. If the person already has an OpenRUM account, they should sign in with their current method first and connect LDAP under **Account → Connected sign-in methods** to avoid a same-email conflict.
+
+</Steps>
+
+## Troubleshooting
+
+- **The LDAP card is visible but cannot be saved:** Confirm Instance Owner access and that the API has `OPENRUM_ALLOW_MANAGED_SECRETS` plus a valid `OPENRUM_MASTER_KEY`.
+- **Test connection fails:** Check network access and port, LDAPS/StartTLS, certificate hostname and CA, search account DN and password, and Base DN.
+- **Connection test passes but an employee cannot sign in:** Check the expected username format, whether the filter finds exactly one user, whether the search account can read the stable ID and email, and the user's password. The connection test does not cover these.
+- **Sign-in succeeds but the Console is unavailable:** Check pending status and ask an Organization administrator to assign a role. LDAP groups do not automatically become OpenRUM roles.
+- **No LDAP button appears on the login page:** Confirm the provider was saved and enabled, and that the encryption key remains available.
+- **Certificate validation fails:** Ask IT to fix the server certificate hostname, validity, or CA chain; do not bypass validation.
+
+<Aside type="caution" title="Changing directories">
+  Keep a provider ID tied to the same directory. If its LDAP URL, Base DN, or stable ID attribute
+  changes, create a new provider ID and have users link the new identity. Disabling the old provider
+  retains historical identity links.
+</Aside>
+
+For protocol background, see [OpenLDAP's introduction](https://www.openldap.org/doc/admin26/intro.html) and [RFC 4513](https://www.rfc-editor.org/rfc/rfc4513.html) on secure LDAP authentication.
+
+<LinkCard title="Other sign-in methods" href="/docs/getting-started/sign-in/" />
