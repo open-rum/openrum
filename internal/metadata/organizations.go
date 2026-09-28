@@ -11,11 +11,12 @@ import (
 )
 
 var (
-	ErrNotFound          = errors.New("resource not found")
-	ErrLastOwner         = errors.New("organization must retain an owner")
-	ErrLastInstanceOwner = errors.New("instance must retain an owner")
-	ErrForbidden         = errors.New("operation is forbidden")
-	ErrConflict          = errors.New("resource already exists")
+	ErrNotFound                 = errors.New("resource not found")
+	ErrLastOwner                = errors.New("organization must retain an owner")
+	ErrLastInstanceOwner        = errors.New("instance must retain an owner")
+	ErrInstancePasswordRequired = errors.New("instance administrator must have an OpenRUM password")
+	ErrForbidden                = errors.New("operation is forbidden")
+	ErrConflict                 = errors.New("resource already exists")
 )
 
 type OrganizationAccess struct {
@@ -187,6 +188,9 @@ func (repository *OrganizationRepository) AddMember(ctx context.Context, actorID
 		"INSERT INTO organization_members (organization_id, user_id, role) VALUES ($1, $2, $3)",
 		organizationID, userID, role); err != nil {
 		return translateConstraintError(err)
+	}
+	if _, err := transaction.ExecContext(ctx, "UPDATE users SET access_status='approved', updated_at=now() WHERE id=$1 AND access_status='pending'", userID); err != nil {
+		return err
 	}
 	if err := insertAudit(ctx, transaction, organizationID, actorID, "member.added", "user", userID); err != nil {
 		return err

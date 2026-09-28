@@ -33,10 +33,12 @@ export function SettingsNav({
   organizationName,
   project,
   showInstance,
+  instanceOwner,
 }: {
   organizationName?: string;
   project?: Project;
   showInstance: boolean;
+  instanceOwner: boolean;
 }) {
   const pathname = useRouterState({ select: (state) => state.location.pathname });
   return (
@@ -107,7 +109,7 @@ export function SettingsNav({
       {/* Mirrors the condition the instance routes enforce: without an instance role the
           whole scope is absent rather than present and rejecting. */}
       {showInstance ? (
-        <Scope label="实例" badge="仅 Owner">
+        <Scope label="实例" badge={instanceOwner ? "Owner" : "Admin"}>
           <NavItem to="/settings/instance" icon={<ServerCogIcon />} exact>
             实例概览
           </NavItem>
@@ -117,6 +119,11 @@ export function SettingsNav({
           <NavItem to="/settings/instance/object-storage" icon={<HardDriveIcon />}>
             对象存储
           </NavItem>
+          {instanceOwner ? (
+            <NavItem to="/settings/instance/authentication" icon={<ServerCogIcon />}>
+              认证与访问
+            </NavItem>
+          ) : null}
           <NavItem to="/settings/instance/audit" icon={<ClipboardListIcon />}>
             维护与审计
           </NavItem>

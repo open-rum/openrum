@@ -92,6 +92,10 @@ func (handler *AdminMemberHandler) Add(writer http.ResponseWriter, request *http
 		writeControlPlaneError(writer, request, handler.logger, err)
 		return
 	}
+	if user.PasswordHash == nil {
+		httpx.WriteError(writer, request, http.StatusConflict, "PASSWORD_REQUIRED", "The account must set an OpenRUM password before receiving an Instance role.")
+		return
+	}
 	if err := handler.members.Add(request.Context(), principal.UserID, user.ID, payload.Role); err != nil {
 		writeControlPlaneError(writer, request, handler.logger, err)
 		return

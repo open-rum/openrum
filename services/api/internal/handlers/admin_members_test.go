@@ -147,7 +147,8 @@ func TestAdminMemberMutationRejectsExpiredElevation(t *testing.T) {
 func newFakeInstanceMembers(ownerID, adminID uuid.UUID) *fakeInstanceMembers {
 	now := time.Now().UTC()
 	newAdminID := uuid.New()
-	newAdmin := metadata.User{ID: newAdminID, Email: "new-admin@example.com", DisplayName: "New Admin"}
+	passwordHash := "existing-local-password-hash"
+	newAdmin := metadata.User{ID: newAdminID, Email: "new-admin@example.com", DisplayName: "New Admin", PasswordHash: &passwordHash}
 	return &fakeInstanceMembers{
 		roles: map[uuid.UUID]metadata.InstanceRole{ownerID: metadata.InstanceRoleOwner, adminID: metadata.InstanceRoleAdmin},
 		users: map[string]metadata.User{newAdmin.Email: newAdmin},

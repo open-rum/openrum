@@ -104,10 +104,16 @@ func (repository *InstanceMemberRepository) Add(ctx context.Context, actorID, us
 	if err := requireInstanceOwner(ctx, transaction, actorID); err != nil {
 		return err
 	}
+	if err := requireInstancePassword(ctx, transaction, userID); err != nil {
+		return err
+	}
 	if _, err := transaction.ExecContext(ctx,
 		"INSERT INTO instance_members (user_id, role, created_by) VALUES ($1, $2, $3)",
 		userID, role, actorID); err != nil {
 		return translateConstraintError(err)
+	}
+	if _, err := transaction.ExecContext(ctx, "UPDATE users SET access_status='approved', updated_at=now() WHERE id=$1 AND access_status='pending'", userID); err != nil {
+		return err
 	}
 	return transaction.Commit()
 }
@@ -122,6 +128,9 @@ func (repository *InstanceMemberRepository) UpdateRole(ctx context.Context, acto
 		return err
 	}
 	if err := requireInstanceOwner(ctx, transaction, actorID); err != nil {
+		return err
+	}
+	if err := requireInstancePassword(ctx, transaction, userID); err != nil {
 		return err
 	}
 	currentRole, err := instanceRoleForUpdate(ctx, transaction, userID)
@@ -142,6 +151,22 @@ func (repository *InstanceMemberRepository) UpdateRole(ctx context.Context, acto
 		return err
 	}
 	return transaction.Commit()
+}
+
+func requireInstancePassword(ctx context.Context, transaction *sql.Tx, userID uuid.UUID) error {
+	var hasPassword bool
+	err := transaction.QueryRowContext(ctx,
+		"SELECT password_hash IS NOT NULL FROM users WHERE id=$1 AND status='active' FOR UPDATE", userID).Scan(&hasPassword)
+	if errors.Is(err, sql.ErrNoRows) {
+		return ErrNotFound
+	}
+	if err != nil {
+		return err
+	}
+	if !hasPassword {
+		return ErrInstancePasswordRequired
+	}
+	return nil
 }
 
 func (repository *InstanceMemberRepository) Remove(ctx context.Context, actorID, userID uuid.UUID) error {

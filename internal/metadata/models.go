@@ -18,8 +18,11 @@ const (
 	UserStatusActive   UserStatus = "active"
 	UserStatusDisabled UserStatus = "disabled"
 
-	AuthSourceLocal AuthSource = "local"
-	AuthSourceOIDC  AuthSource = "oidc"
+	AuthSourceLocal  AuthSource = "local"
+	AuthSourceOIDC   AuthSource = "oidc"
+	AuthSourceGoogle AuthSource = "google"
+	AuthSourceGitHub AuthSource = "github"
+	AuthSourceLDAP   AuthSource = "ldap"
 
 	RoleOwner  OrganizationRole = "owner"
 	RoleAdmin  OrganizationRole = "admin"
