@@ -88,19 +88,6 @@ export default defineConfig({
           items: [
             { slug: "docs/getting-started/quickstart" },
             {
-              label: "Sign-in methods",
-              translations: { zh: "登录方式", "zh-CN": "登录方式" },
-              collapsed: true,
-              items: [
-                { slug: "docs/getting-started/sign-in" },
-                { slug: "docs/getting-started/sign-in/email-password" },
-                { slug: "docs/getting-started/sign-in/google" },
-                { slug: "docs/getting-started/sign-in/github" },
-                { slug: "docs/getting-started/sign-in/oidc" },
-                { slug: "docs/getting-started/sign-in/ldap" },
-              ],
-            },
-            {
               label: "Local development",
               translations: { zh: "本地开发", "zh-CN": "本地开发" },
               collapsed: true,
@@ -184,6 +171,19 @@ export default defineConfig({
               ],
             },
             { slug: "docs/getting-started/create-first-project" },
+            {
+              label: "Sign-in guide",
+              translations: { zh: "登录指南", "zh-CN": "登录指南" },
+              collapsed: true,
+              items: [
+                { slug: "docs/getting-started/sign-in" },
+                { slug: "docs/getting-started/sign-in/email-password" },
+                { slug: "docs/getting-started/sign-in/google" },
+                { slug: "docs/getting-started/sign-in/github" },
+                { slug: "docs/getting-started/sign-in/oidc" },
+                { slug: "docs/getting-started/sign-in/ldap" },
+              ],
+            },
           ],
         },
         {
