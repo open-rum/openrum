@@ -8,11 +8,13 @@ import { Aside, Steps } from "@astrojs/starlight/components";
 
 Email and OpenRUM password sign-in remain available. An Instance Owner can add Google, GitHub, multiple OpenID Connect (OIDC) providers, and direct LDAP sign-in. The login page shows only enabled and fully configured providers.
 
+For provider-specific setup and user sign-in steps, see [Sign-in methods](/docs/getting-started/sign-in/).
+
 <Steps>
 
 1. ## Keep a local Owner account
 
-   Complete `/setup` with an OpenRUM password and store the local Owner credentials in your normal recovery vault. Test local sign-in before enabling external methods. If an identity provider is unavailable, use this local Owner account to sign in and disable or repair it under **Instance Settings → Authentication**. Removing the encryption key also hides external login methods until the key is restored.
+   Complete `/setup` with an OpenRUM password and store the local Owner credentials in your normal recovery vault. Test local sign-in before enabling external methods. If an identity provider is unavailable, use this local Owner account to sign in and disable or repair it under **System Settings → Authentication**. Removing the encryption key also hides external login methods until the key is restored.
 
 1. ## Enable encrypted secrets
 
@@ -30,11 +32,13 @@ Email and OpenRUM password sign-in remain available. An Instance Owner can add G
 
 1. ## Save, test and enable
 
-   Sign in as Instance Owner and open **Instance Settings → Authentication**. Enter the provider ID, display name, Client ID, Client Secret and any provider-specific settings. Saving, testing and disabling require the Owner's OpenRUM password to have been reverified within five minutes. Provider secrets are encrypted in PostgreSQL and never returned by the settings API. For Google, GitHub and OIDC, **Test connection** completes a real authorization and callback without creating an account. For LDAP, it checks TLS, the search-account bind and Base DN. Enable the provider, then test the normal login and account access in a separate browser session.
+   Sign in as Instance Owner and open **System Settings → Authentication**. Enter the provider ID, display name, Client ID, Client Secret and any provider-specific settings. Saving, testing and disabling require the Owner's OpenRUM password to have been reverified within five minutes. Provider secrets are encrypted in PostgreSQL and never returned by the settings API. For Google, GitHub and OIDC, **Test connection** completes a real authorization and callback without creating an account. For LDAP, it checks TLS, the search-account bind and Base DN. Enable the provider, then test the normal login and account access in a separate browser session.
 
 </Steps>
 
 ## LDAP directory settings
+
+New to LDAP? Start with [Sign in with LDAP](/docs/getting-started/sign-in/ldap/) for the terminology, IT checklist, and step-by-step acceptance test.
 
 LDAP uses `ldaps://host:636` or `ldap://host:389` with StartTLS before any bind. Provide a trusted certificate chain through the host trust store or paste a PEM CA certificate in the provider settings. Certificate verification cannot be disabled. The API service must reach the directory over the configured port.
 

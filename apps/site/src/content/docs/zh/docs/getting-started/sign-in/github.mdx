@@ -1,0 +1,42 @@
+---
+title: 使用 GitHub 登录
+description: 创建 GitHub OAuth App，并通过已验证的主邮箱登录控制台。
+appliesTo: Alpha
+---
+
+import { Aside, Steps, LinkCard } from "@astrojs/starlight/components";
+
+GitHub 登录使用 OAuth App。OpenRUM 使用 GitHub 稳定的数字用户 ID 识别账号，并要求**主邮箱**已验证。修改 GitHub 用户名不会改变已绑定的身份。
+
+开始前，请使用规范 HTTPS `PUBLIC_BASE_URL` 部署 OpenRUM，以 Instance Owner 身份登录，并[启用密钥加密托管](/zh/docs/self-hosting/authentication/)。
+
+<Steps>
+
+1. ## 创建 GitHub OAuth App
+
+   在 [GitHub OAuth App 设置](https://github.com/settings/developers)注册新应用。Homepage URL 填写 OpenRUM 的访问域名；默认提供者 ID 为 `github`，Authorization callback URL 填写以下精确地址：
+
+   ```text
+   https://rum.example.com/api/v1/auth/providers/github/callback
+   ```
+
+   将域名替换为 `PUBLIC_BASE_URL` 的域名；使用其他提供者 ID 时还要替换路径中的 `github`。复制 Client ID 并创建 Client Secret。OpenRUM 请求 `read:user` 和 `user:email` 范围；测试账号须在 GitHub 设置已验证的主邮箱。
+
+1. ## 配置并测试 OpenRUM
+
+   打开**系统设置 → 认证与访问**，选择 **GitHub** 卡片，填写提供者 ID、显示名称、Client ID 和 Client Secret。先不要勾选**启用并在登录页展示**，保存时输入 Owner 的 OpenRUM 密码，然后点击**测试连接**并授权 GitHub 应用。测试完成后会返回设置页，不会创建用户账号。
+
+1. ## 启用并登录
+
+   勾选**启用并在登录页展示**并保存。在独立浏览器会话的登录页选择**使用 GitHub 登录**。新外部账号须由组织管理员授予访问权限；已有账号应先到 [Account 连接 GitHub](/zh/docs/getting-started/sign-in/)，再使用该按钮登录。
+
+</Steps>
+
+<Aside type="tip" title="登录失败时">
+  核对 OAuth App 的回调地址、Client
+  ID、授权状态，以及账号的主邮箱是否已验证。仅验证辅助邮箱还不够。启用前可重试**测试连接**。
+</Aside>
+
+GitHub 的 [OAuth App 创建指南](https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/creating-an-oauth-app)说明了注册和回调设置。
+
+<LinkCard title="其他登录方式" href="/zh/docs/getting-started/sign-in/" />
