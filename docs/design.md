@@ -35,7 +35,7 @@ Shared foundations remain in `packages/design-tokens`:
 
 - `tokens.css`: canonical Citrus roles and design scales.
 - `catalog.ts`: Citrus display metadata and the semantic-token catalogue.
-- `brand.ts`: the two paths of the document's rounded, split-ring SVG mark.
+- `brand.ts`: the two paths of the Console's rounded, split-ring SVG mark.
 
 The site, documentation, and console apply `data-palette="citrus"` to the
 root. Citrus is the only supported palette; legacy `openrum-palette` storage
@@ -43,16 +43,14 @@ and `?palette=` values are ignored and cleaned up during bootstrap. Preview
 links carry only `?theme=dark|light`. Theme storage remains per origin, so site
 and console ports can still have independent light/dark preferences.
 
-The brand mark is reconstructed from the document's raster reference. It uses
-shared SVG geometry in Astro and React, with a monochrome wordmark. `/design/`
-provides lemon-green SVG downloads and light/dark surface previews. Every mark
-uses `--ds-logo` (`#b8e954`) in both modes; wordmarks use neutral text. The favicon is a static copy of
-that geometry; update both apps' favicons when changing the shared mark.
+The public website and docs use a site-local 24×24 pixel signal mascot defined in
+`apps/site/src/lib/siteBrand.ts`. Its body follows `--ds-logo`; its two eyes stay dark.
+The site favicon is a static Citrus-coloured copy, and `/design/` provides SVG downloads
+and light/dark previews. The Console keeps the rounded, split-ring mark from `brand.ts`
+and its own favicon. Wordmarks use neutral text.
 
-Header brand lockups use one shared proportion: a 28px mark, an 18px wordmark,
-and a 9px gap. The mark and outlined wordmark use optically cropped view boxes so
-their visible shapes align instead of aligning their source-canvas whitespace.
-Favicons use a tighter crop because they do not include a neighboring wordmark.
+Header brand lockups pair the mascot with the existing wordmark. The public mark
+uses a 24×24 pixel grid; keep its rendering on whole-pixel sizes where space allows.
 
 ## Visual language
 

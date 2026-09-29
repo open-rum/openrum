@@ -1,5 +1,5 @@
 ---
-import { brandMarkPath, brandMarkViewBox } from "@openrum/design-tokens/brand";
+import { signalScoutBodyPath, signalScoutEyePath } from "../lib/siteBrand";
 const { size = 28 } = Astro.props;
 ---
 
@@ -7,11 +7,12 @@ const { size = 28 } = Astro.props;
   style="color:var(--ds-logo)"
   width={size}
   height={size}
-  viewBox={brandMarkViewBox}
-  fill="currentColor"
+  viewBox="0 0 24 24"
+  fill="none"
+  shape-rendering="crispEdges"
   aria-hidden="true"
   focusable="false"
 >
-  <path d={brandMarkPath}></path>
-  <path d={brandMarkPath} transform="rotate(180 20 20)"></path>
+  <path d={signalScoutBodyPath} fill="currentColor"></path>
+  <path d={signalScoutEyePath} fill="#262723"></path>
 </svg>
