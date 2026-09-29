@@ -1,1 +1,32 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" role="img" aria-labelledby="title desc"><title id="title">OpenRUM</title><desc id="desc">Open-source, self-hosted frontend monitoring platform.</desc><rect width="1200" height="630" fill="#171717"/><circle cx="980" cy="70" r="330" fill="#b8e954" opacity=".14"/><rect x="90" y="92" width="62" height="62" rx="14" fill="#b8e954"/><path d="M108 132h10l8-24 10 37 8-22h10" fill="none" stroke="#111" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/><text x="176" y="140" fill="#fff" font-family="Inter,Arial" font-size="58" font-weight="700">OpenRUM</text><text x="90" y="300" fill="#fff" font-family="Inter,Arial" font-size="58" font-weight="700">Understand your users.</text><text x="90" y="382" fill="#b8e954" font-family="Inter,Arial" font-size="58" font-weight="700">Resolve production issues fast.</text><text x="90" y="505" fill="#aaa" font-family="Inter,Arial" font-size="32">Open source · Self-hosted · Alpha</text></svg>
+<svg
+  xmlns="http://www.w3.org/2000/svg"
+  width="1200"
+  height="630"
+  viewBox="0 0 1200 630"
+  role="img"
+  aria-labelledby="title desc"
+>
+  <title id="title">OpenRUM</title>
+  <desc id="desc">Open-source, self-hosted frontend monitoring platform.</desc>
+  <rect width="1200" height="630" fill="#171717" />
+  <circle cx="980" cy="70" r="330" fill="#b8e954" opacity=".14" />
+  <g transform="translate(90 92) scale(2.6)" shape-rendering="crispEdges">
+    <path
+      fill="#b8e954"
+      d="M12 2h2v1h-2zM19 2h1v1h-1zM12 3h2v1h-2zM16 3h1v1h-1zM19 3h1v1h-1zM12 4h1v1h-1zM16 4h1v1h-1zM19 4h1v1h-1zM12 5h1v1h-1zM19 5h1v1h-1zM8 6h8v1h-8zM8 7h8v1h-8zM3 8h2v1h-2zM6 8h12v1h-12zM3 9h2v1h-2zM6 9h12v1h-12zM3 10h6v1h-6zM10 10h4v1h-4zM15 10h3v1h-3zM3 11h18v1h-18zM6 12h15v1h-15zM6 13h12v1h-12zM6 14h12v1h-12zM6 15h12v1h-12zM6 16h12v1h-12zM7 17h3v1h-3zM14 17h3v1h-3zM7 18h3v1h-3zM14 18h3v1h-3zM7 19h3v1h-3zM14 19h3v1h-3z"
+    />
+    <path fill="#262723" d="M9 10h1v1h-1zM14 10h1v1h-1z" />
+  </g>
+  <text x="176" y="140" fill="#fff" font-family="Inter,Arial" font-size="58" font-weight="700">
+    OpenRUM
+  </text>
+  <text x="90" y="300" fill="#fff" font-family="Inter,Arial" font-size="58" font-weight="700">
+    Understand your users.
+  </text>
+  <text x="90" y="382" fill="#b8e954" font-family="Inter,Arial" font-size="58" font-weight="700">
+    Resolve production issues fast.
+  </text>
+  <text x="90" y="505" fill="#aaa" font-family="Inter,Arial" font-size="32">
+    Open source · Self-hosted · Alpha
+  </text>
+</svg>

@@ -89,18 +89,19 @@ document.querySelectorAll<HTMLButtonElement>("[data-download-logo]").forEach((bu
     svg.setAttribute("xmlns", "http://www.w3.org/2000/svg");
     svg.setAttribute("width", "512");
     svg.setAttribute("height", "512");
-    svg.setAttribute("fill", getComputedStyle(original).color);
+    svg.setAttribute("color", getComputedStyle(original).color);
     svg.removeAttribute("style");
     svg.removeAttribute("aria-hidden");
+    svg.removeAttribute("focusable");
     const url = URL.createObjectURL(
       new Blob([new XMLSerializer().serializeToString(svg)], { type: "image/svg+xml" }),
     );
     const link = document.createElement("a");
     link.href = url;
-    link.download = `openrum-mark-citrus-${state().theme}.svg`;
+    link.download = `openrum-signal-scout-citrus-${state().theme}.svg`;
     link.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
-    announce("已下载柠檬绿 SVG 标记");
+    announce("已下载信号小怪 SVG");
   });
 });
 const resizeFrame = (host: HTMLElement) => {
