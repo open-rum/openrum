@@ -182,7 +182,7 @@ export function CatalogFields({
             ))}
           </div>
         ) : null}
-        <div className="dashboard-metric-picker grid gap-3 rounded-lg border p-3 sm:grid-cols-[10rem_minmax(0,1fr)]">
+        <div className="dashboard-metric-picker grid gap-3 rounded-2xl border p-3 sm:grid-cols-[10rem_minmax(0,1fr)]">
           <ToggleGroup
             type="single"
             orientation="vertical"
@@ -213,7 +213,7 @@ export function CatalogFields({
                       disabled={Boolean(reason)}
                       title={reason ?? metric.description}
                       onClick={() => pick(metric)}
-                      className="dashboard-metric-option flex w-full items-start justify-between gap-3 rounded-md border px-3 py-2 text-left text-sm"
+                      className="dashboard-metric-option flex w-full items-start justify-between gap-3 rounded-xl border px-3 py-2 text-left text-sm"
                     >
                       <span className="flex min-w-0 flex-col gap-0.5">
                         <span className="font-medium">{metric.label}</span>

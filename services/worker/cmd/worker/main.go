@@ -6,14 +6,17 @@ import (
 	"log"
 	"time"
 
+	"github.com/redis/go-redis/v9"
 	"github.com/rs/zerolog"
 
 	"openrum/internal/config"
+	openrumcrypto "openrum/internal/crypto"
 	"openrum/internal/httpx"
 	"openrum/internal/metadata"
 	"openrum/internal/migrate"
 	"openrum/internal/observability"
 	"openrum/internal/service"
+	"openrum/internal/servicehealth"
 	"openrum/internal/sourcemap"
 	worker "openrum/services/worker/internal"
 )
@@ -60,20 +63,69 @@ func registerWorker(ctx context.Context, _ *httpx.Router, configuration config.C
 	go runProjectDataPurgeWorker(ctx, dataPurgeJob, logger)
 	go runRetentionWorker(ctx, retentionJob, logger)
 	go runEmergencyCleanupWorker(ctx, emergencyCleanupJob, logger)
-	// The dispatcher is nil until a delivery implementation exists: breaches are
-	// recorded in alert_evaluations and shown in the console, but nothing is
-	// sent to notification channels yet.
+	// Channel configs are sealed with the Instance master key. Without it, breaches
+	// are still recorded and shown in the Console, and each delivery is logged as
+	// secrets_unavailable so the Console can say why nothing arrived.
+	var channelOpener worker.ChannelOpener
+	if configuration.AllowManagedSecrets {
+		keyring, keyErr := openrumcrypto.NewKeyring(configuration.ManagedSecretsKeyID, openrumcrypto.Key{
+			ID: configuration.ManagedSecretsKeyID, Material: configuration.ManagedSecretsMasterKey,
+		})
+		if keyErr != nil {
+			_ = database.Close()
+			_ = clickHouse.Close()
+			return nil, keyErr
+		}
+		channelOpener = keyring
+	}
+	var heartbeatRedis *redis.Client
+	if configuration.RedisAddress != "" {
+		heartbeatRedis = redis.NewClient(&redis.Options{Addr: configuration.RedisAddress, ContextTimeoutEnabled: true})
+		go runWorkerHeartbeat(ctx, heartbeatRedis, servicehealth.WorkerHeartbeatKey(configuration.PublicBaseURL.String()), logger)
+	} else {
+		logger.Warn().Msg("REDIS_ADDR is missing; worker heartbeat is unavailable")
+	}
+	alertStore := worker.NewPostgresAlertStore(database)
 	alertScheduler := worker.NewAlertScheduler(
 		worker.NewPostgresAlertLeader(database),
 		worker.NewAlertEvaluator(
-			worker.NewPostgresAlertStore(database),
+			alertStore,
 			worker.NewClickHouseAlertMetrics(clickHouse),
-			worker.NewPostgresAlertStore(database),
-			nil,
+			alertStore,
+			worker.NewChannelDispatcher(alertStore, channelOpener, configuration.PublicBaseURL, func(message string) {
+				logger.Warn().Msg(message)
+			}),
 		),
 	)
 	go runAlertScheduler(ctx, alertScheduler, logger)
-	return func() error { return errors.Join(database.Close(), clickHouse.Close()) }, nil
+	return func() error {
+		if heartbeatRedis != nil {
+			return errors.Join(database.Close(), clickHouse.Close(), heartbeatRedis.Close())
+		}
+		return errors.Join(database.Close(), clickHouse.Close())
+	}, nil
+}
+
+func runWorkerHeartbeat(ctx context.Context, client servicehealth.WorkerHeartbeatWriter, key string, logger zerolog.Logger) {
+	ticker := time.NewTicker(servicehealth.WorkerHeartbeatInterval)
+	defer ticker.Stop()
+	previouslyFailed := false
+	for {
+		pulseCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
+		err := servicehealth.WriteWorkerHeartbeat(pulseCtx, client, key)
+		cancel()
+		if err != nil && !errors.Is(err, context.Canceled) && !previouslyFailed {
+			logger.Warn().Err(err).Msg("worker heartbeat unavailable")
+		} else if err == nil && previouslyFailed {
+			logger.Info().Msg("worker heartbeat restored")
+		}
+		previouslyFailed = err != nil
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+		}
+	}
 }
 
 func runEmergencyCleanupWorker(ctx context.Context, job *worker.EmergencyCleanupJob, logger zerolog.Logger) {

@@ -192,6 +192,9 @@ export async function mockOpenRUM(
       return json(route, dataPurge);
     }
     if (path === `/api/v1/projects/${projectId}`) {
+      if (request.method() === "DELETE") {
+        return json(route, { status: "deleting", deadlineHours: 24 }, 202);
+      }
       if (request.method() === "PATCH") {
         if (options.failProjectPatch)
           return json(route, { error: { code: "QUERY_UNAVAILABLE", requestId: "e2e" } }, 503);
@@ -309,11 +312,18 @@ export async function mockOpenRUM(
     if (path === `/api/v1/projects/${projectId}/alerts`) {
       if (request.method() === "POST") {
         const payload = request.postDataJSON() as Record<string, unknown>;
-        const rule = { id: `rule-${alertRules.length + 1}`, projectId, ...payload };
+        const rule = {
+          id: `rule-${alertRules.length + 1}`,
+          projectId,
+          channelIds: [],
+          lastStatus: "",
+          ...payload,
+        };
         alertRules.push(rule);
         return json(route, rule, 201);
       }
       return json(route, {
+        canManage: true,
         rules: alertRules,
         notifications: alertRules.length
           ? [
@@ -321,15 +331,38 @@ export async function mockOpenRUM(
                 id: "notification-1",
                 ruleId: alertRules[0].id,
                 title: alertRules[0].name,
+                metric: alertRules[0].metric,
+                comparator: alertRules[0].comparator,
+                environment: "production",
                 value: 3.4,
                 threshold: alertRules[0].threshold,
                 occurredAt: now,
-                deepLink: `/issues?project=${projectId}&environment=production&from=2026-09-02T23%3A55%3A00.000Z&to=2026-09-03T00%3A00%3A00.000Z`,
-                status: "sent",
+                deepLink: `/projects/${projectId}/issues?environment=production&from=2026-09-02T23%3A55%3A00Z&to=2026-09-03T00%3A00%3A00Z`,
+                status: "breached",
+                delivery: channels.length ? "delivered" : "no_channels",
+                deliveries: channels.slice(0, 1).map((channel) => ({
+                  channelId: channel.id,
+                  channelName: channel.name,
+                  channelKind: channel.kind,
+                  status: "sent",
+                  attempts: 1,
+                  at: now,
+                })),
               },
             ]
           : [],
       });
+    }
+    const ruleMatch = path.match(new RegExp(`^/api/v1/projects/${projectId}/alerts/([^/]+)$`));
+    if (ruleMatch) {
+      const index = alertRules.findIndex((rule) => rule.id === ruleMatch[1]);
+      if (request.method() === "DELETE") {
+        if (index >= 0) alertRules.splice(index, 1);
+        return route.fulfill({ status: 204, body: "" });
+      }
+      const payload = request.postDataJSON() as Record<string, unknown>;
+      alertRules[index] = { ...alertRules[index], ...payload };
+      return json(route, alertRules[index]);
     }
     if (path === `/api/v1/organizations/${organizationId}/channels`) {
       if (request.method() === "POST") {
@@ -340,12 +373,31 @@ export async function mockOpenRUM(
           name: payload.name,
           kind: payload.kind,
           enabled: true,
+          ruleCount: 0,
           createdAt: now,
         };
         channels.push(channel);
         return json(route, channel, 201);
       }
-      return json(route, { channels });
+      return json(route, { channels, canManage: true });
+    }
+    const channelMatch = path.match(
+      new RegExp(`^/api/v1/organizations/${organizationId}/channels/([^/]+)(/test)?$`),
+    );
+    if (channelMatch) {
+      const index = channels.findIndex((channel) => channel.id === channelMatch[1]);
+      if (channelMatch[2]) return json(route, { delivered: true });
+      if (request.method() === "DELETE") {
+        if (index >= 0) channels.splice(index, 1);
+        return route.fulfill({ status: 204, body: "" });
+      }
+      const payload = request.postDataJSON() as Record<string, unknown>;
+      channels[index] = {
+        ...channels[index],
+        ...(payload.name ? { name: payload.name } : {}),
+        ...(typeof payload.enabled === "boolean" ? { enabled: payload.enabled } : {}),
+      };
+      return json(route, channels[index]);
     }
     if (path === `/api/v1/projects/${projectId}/issues`) {
       const response = issues();
@@ -1011,6 +1063,7 @@ type MutableProject = {
   sdkPlatform: "javascript" | "react" | "vue" | "nextjs" | "nuxt" | "angular" | "svelte";
   allowedOrigins: string[];
   environment: string;
+  environments: string[];
   retentionDays: number;
   eventSampleRate: number;
   apiSampleRate: number;
@@ -1038,6 +1091,7 @@ const defaultProjectSettings: MutableProject = {
   sdkPlatform: "react",
   allowedOrigins: ["http://127.0.0.1:4174"],
   environment: "production",
+  environments: ["production", "staging"],
   retentionDays: 14,
   eventSampleRate: 1,
   apiSampleRate: 0.2,

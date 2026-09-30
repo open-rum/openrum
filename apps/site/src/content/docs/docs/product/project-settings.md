@@ -9,7 +9,7 @@ Project settings define how a monitored web product sends and retains telemetry.
 
 ## Common settings
 
-- **Environments** such as development, staging and production
+- **Environments**: every Project accepts the four fixed ones — `development`, `test`, `staging` and `production`
 - **Client DSNs** with Origin allowlists, rotation and revocation
 - **Sampling** for Events, API Requests and errors
 - **Retention** for raw and aggregate data
@@ -21,7 +21,7 @@ In the Console, open **Settings** and use the **Project** scope. Every settings 
 names its scope in the path, so a link is unambiguous about which of account, organization,
 project or instance it belongs to:
 
-- **General** (`/settings/project/<id>/general`) — name, slug, allowed Origins, environment, retention days, and a danger zone to disable or re-enable the project.
+- **General** (`/settings/project/<id>/general`) — name, SDK platform, allowed Origins, retention days, and a danger zone to disable, re-enable or delete the project.
 - **Onboarding** (`/projects/<id>/onboarding`) — copy the Project's default DSN and platform-specific integration code.
 - **Data management** — one entry for sampling, rate limits, inbound filters, URL normalization and privacy scrubbing. Switch between the page's tabs; each setting saves independently and applies across the Project's environments.
 - **Usage statistics** (`/settings/project/<id>/usage`) — accepted volume, estimated source volume and processing outcomes, with CSV export. Sampling configuration is separate from this report.
@@ -48,29 +48,29 @@ show you the result as an absence of data:
 
 - Removing an Origin makes Ingest reject reports from that site, because it compares the
   `Origin` request header against the allowlist on every request.
-- The environment name must match the `environment` passed to the SDK's `init()`. Changing
-  it here without shipping a matching SDK release means every report is rejected.
+- Every Project accepts reports from the four fixed environments: `development`, `test`,
+  `staging` and `production`; there is nothing to enable. The SDK's `environment` option
+  picks one, and any other name is rejected. The environment switcher lists the
+  environments that have reported data, and analysis starts on all environments.
 
 Disabling a project rejects all of its reports but leaves client DSNs intact, so it is the
 reversible way to stop a noisy project before deciding whether to delete it.
 
-## Delete all Project data
+## Delete a Project
 
-The General page also provides **Delete all Project data** for resetting collected data without
-recreating the SDK integration. It permanently removes Events, Sessions, errors, logs, API and
-performance data, usage aggregates, alert evaluation history, Releases and Source Maps. The
-Project itself, environments, client DSNs, Origins, sampling and retention settings, alert rules
-and audit history remain.
+**Delete project** on the General page permanently removes the Project and all of its data.
+Only an Organization Owner can do it, and the button must be **held for two seconds**;
+releasing early deletes nothing.
 
-This operation is deliberately separate from Project deletion and has three safeguards:
+- Every client DSN is revoked at once, so Ingest rejects the Project's reports, and the
+  Project disappears from the list and the switcher.
+- A background job then deletes Events, Sessions, errors, logs, API and performance data,
+  usage aggregates, alert rules and history, Releases and Source Maps. After the analytics
+  store is empty it waits one minute and checks again so nothing in flight reappears.
+- The Project row stays in the database marked as deleting (a soft delete) and audit history
+  is kept, but the Project cannot be restored.
 
-1. An Organization Owner must disable the Project first, which stops new reports.
-2. The Owner must type the exact Project name before the Console submits the request.
-3. The Project cannot be re-enabled while deletion is queued, running, retrying or verifying.
-
-Deletion runs asynchronously. After the analytics store is empty, OpenRUM waits for one minute
-and checks it again so reports already moving through the pipeline cannot silently reappear.
-The Project stays disabled after the job completes; review the result before enabling it again.
+To pause reporting reversibly, disable the Project instead.
 
 ## Rewriting rules
 

@@ -1,6 +1,7 @@
-import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
+import { Bar, BarChart, BarStack, CartesianGrid, XAxis, YAxis } from "recharts";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
+  BAR_RADIUS_TOP,
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
@@ -67,16 +68,17 @@ export function LogTrend({ data, from, to }: { data: LogPage; from: string; to: 
                 />
               }
             />
-            {logLevels.map((level) => (
-              <Bar
-                key={level}
-                dataKey={level}
-                stackId="logs"
-                fill={`var(--color-${level})`}
-                isAnimationActive={animate}
-                maxBarSize={24}
-              />
-            ))}
+            <BarStack stackId="logs" radius={BAR_RADIUS_TOP}>
+              {logLevels.map((level) => (
+                <Bar
+                  key={level}
+                  dataKey={level}
+                  fill={`var(--color-${level})`}
+                  isAnimationActive={animate}
+                  maxBarSize={24}
+                />
+              ))}
+            </BarStack>
           </BarChart>
         </ChartContainer>
         <div className="logs-legend">

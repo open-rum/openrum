@@ -3,6 +3,7 @@ import "../styles/global.css";
 import "../styles/design/workbench.css";
 import "../styles/design/landing-01.css";
 import PaletteBootstrap from "../components/PaletteBootstrap.astro";
+import SitePaletteBootstrap from "../components/SitePaletteBootstrap.astro";
 import AppearanceControls from "../components/design/AppearanceControls.astro";
 const canonical = new URL(Astro.url.pathname, Astro.site);
 const release = import.meta.env.PUBLIC_OPENRUM_RELEASE || "Alpha";
@@ -20,7 +21,7 @@ const commit = import.meta.env.PUBLIC_COMMIT_SHA || "local";
     /><link rel="canonical" href={canonical} /><link
       rel="icon"
       href="/favicon.svg"
-    /><PaletteBootstrap manageTheme /></head
+    /><PaletteBootstrap manageTheme /><SitePaletteBootstrap /></head
   ><body>
     <div class="p1-preview-tools">
       <a href="/design/landing/" data-preview-link="/design/landing/">← 方案对比</a><span

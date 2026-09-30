@@ -157,18 +157,34 @@ When implementing from a selected generated mock, treat that image as the source
   "查看数据表" disclosure. Keep delayed-data dots visible and preserve explicitly
   configured Table views and edit-mode controls. Opening details must not save
   configuration or request the same module again.
+- The Alerts page (`/projects/:projectId/alerts`) has two URL-backed line tabs, 规则 and
+  通知记录. Rules are a table with a one-line condition, channel chips, last status,
+  an enable switch and a row menu (编辑/复制/删除); an empty project shows rule templates
+  that prefill the editor instead of creating rules. The rule editor is a right Sheet
+  (560px) that ends with a one-sentence summary of the rule. 通知记录 shows each breach's
+  delivery state and per-channel result, with failure reasons in plain words. The
+  Notification channels page lists channel kinds as cards (飞书 and Webhook available;
+  钉钉、企业微信、Slack、邮件 disabled with 即将支持), then configured channels with enable,
+  test send, edit and delete. Secrets are write-only in every form. Brand channels use
+  lettermark tiles on `--ds-channel-*` tokens, not copied logos. See
+  `docs/agents/alerts.md`.
 - Authentication pages use a simple, centered single column: shared brand mark,
   concise copy, and a narrow form on a plain theme-aware background. Avoid split
   screens, promotional side panels, and decorative glows. Login actions use
   black/white contrast tokens and retain the compact theme toggle.
 - The accepted layout target is `../../output/imagegen/openrum-dashboard-stripe.png`.
-- Use the Citrus-adapted shadcn theme: neutral white/graphite surfaces, lime primary, teal secondary, comfortable commercial-reporting density, subtle radii and shadows. Keep red reserved for destructive and error semantics.
+- Use the shadcn theme on the shared four-color card: neutral white/graphite surfaces,
+  amber primary by default (lime and magenta are user-selectable palettes), lime, sky
+  and magenta accents, subtle radii and shadows. Keep red reserved for destructive and
+  error semantics. Read `--ds-primary*`, `--ds-accent-*` and `--ds-{hue}-*` tokens; never
+  hard-code a hue or assume which palette is active.
 - In light mode, keep canvas, cards, tables, text, and primary page actions neutral;
-  main actions stay black with white text. Use lemon green only for compact badges,
+  main actions stay black with white text. Use the primary only for compact badges,
   icons, focus rings, progress, and selected/effective form states. Selected options
-  use the shared selection tokens and a pale lime surface with a stronger lime
-  border; ordinary hover remains neutral. The Rate Limits page is the settings-form
-  reference. See `docs/design.md`, "Light-mode Citrus accent hierarchy".
+  use the shared selection tokens (soft primary surface, stronger primary border);
+  ordinary hover remains neutral. Use the `amber`/`lime`/`sky`/`magenta` Badge variants
+  for categories and `brand` for the current primary. The Rate Limits page is the
+  settings-form reference. See `docs/design.md`, "Brand accent hierarchy".
 - The overview must treat country, device, browser, and custom dimensions/metrics as first-class analysis surfaces.
 - Use the typed Go query APIs for implemented product areas; keep deterministic frontend fixtures for unit tests and explicit demo states only.
 - Preserve the planned React + TypeScript + Vite stack and the `apps/web` project location.
@@ -177,9 +193,48 @@ When implementing from a selected generated mock, treat that image as the source
   controls are 40px high and table rows are at least 44px. Compact variants are
   opt-in for secondary inline actions, toolbars, and icon rails; never use them
   for a page's primary form or main action without a documented reason.
-- Use shadcn/ui (Radix Nova + Tailwind CSS v4) for reusable UI primitives. Keep
+- Users choose palette (amber/lime/magenta) and density (comfortable/compact) in the
+  account menu's Appearance group; `ThemeProvider` stores them and sets
+  `html[data-palette]` and `html[data-density]`, and `index.html` applies both before
+  first paint. Compact density only rewrites size tokens, so read heights, paddings
+  and gaps from tokens (`--control-*`, `--table-*`, `--nav-item-height`,
+  `--page-padding-*`, `--page-gap`) rather than fixed pixels. Pages never force compact.
+- The user selected Maia (`b1skV8ORc`, 2026-09-30) for the whole site. Buttons,
+  single-line inputs, Select triggers, badges and segmented controls use full pill
+  rounding at every size. Multiline fields use `--radius-field`, cards and menus
+  use `--radius-surface`, and dialogs use `--radius-overlay`. Shared tokens own the
+  radius scale. Keep the existing palette and density choices; wrapping filter
+  composers cap their corner radius at half one control row. Preserve line-style
+  navigation tabs, contiguous group joins, focus rings and disabled states.
+- Maia-style Console chart columns use 6px top corners and a square baseline.
+  Round only the outer contour of stacked columns with Recharts `BarStack`;
+  compact Stat bars use 4px top corners and horizontal bars use 6px trailing
+  corners. Keep chart data, buckets, axes, legends and tooltips intact.
+- Shared Select menus open below the trigger with their left edges aligned.
+  Preserve a usable scrollable list for long option sets and let collision
+  handling reposition a menu at the viewport edge.
+- Relative analysis time presets remain semantic in URL and local storage. Roll
+  their absolute query bounds forward on minute boundaries with history replace,
+  including after reload or returning to the tab; custom date ranges stay fixed.
+  Carry the selected preset across analysis routes and never label an old fixed
+  interval as a live relative range.
+- Settings navigation follows Maia's heading hierarchy: scope headings are
+  muted caption text, while destination labels use darker, medium-weight body
+  text. Keep long organization or project names truncated so scope names stay
+  on one line, and preserve the existing active background and route groups.
+- Confirm completed actions that navigate away or finish off-screen (such as deleting a
+  project) with `toast.success()` / `toast.error()` from `sonner`; the shadcn `<Toaster />`
+  (`components/ui/sonner.tsx`, top centre) is mounted once in `main.tsx`. Keep inline status text for results the user is still looking at, and never
+  use a toast as the only place an error appears.
+- Use shadcn/ui (Radix Maia + Tailwind CSS v4) for reusable UI primitives. Keep
   component source local, use semantic tokens, and support light, dark, and
   system appearance without component-level theme colors.
+- Leave a small top gap between the Console project switcher and the first
+  primary navigation item in both expanded and collapsed sidebars.
+- Show Google's standard full-color G for Google authentication in provider
+  settings and on the login page; do not use a monochrome Google glyph. Provider
+  selection cards use a transparent icon without a white tile and keep all four
+  provider icons at 24px; login buttons keep their icons at 16px.
 - Object storage settings are provider-first and page-managed by default. Let
   administrators choose Alibaba OSS, Amazon S3, Cloudflare R2, MinIO, or another
   S3-compatible service, then show only the relevant connection and credential
@@ -191,13 +246,16 @@ When implementing from a selected generated mock, treat that image as the source
   optional description, tabs, filter bar, and content through their named
   slots. A page owns its filter controls, while the filter bar owns placement
   and responsive behavior. See ADR 0004.
-- The main sidebar exposes one **项目设置** entry. 接入、发布、用量, data
+- The main sidebar exposes separate **项目设置** and **系统设置** entries. The
+  latter is visible only to Instance Administrators and opens a dedicated
+  settings rail with instance pages; those pages are absent from the Project
+  settings rail. 接入、发布、用量, data
   governance, quota, and development data generation live
   in that page's contextual navigation. Keep the account popover concise:
   unchanged user identity, one Account entry, one horizontal three-icon
   appearance switcher (system/light/dark), then sign out. Personal,
-  Organization, notification, and Instance destinations live in the Account
-  settings rail; Instance settings are visible only to Instance Administrators.
+  Organization, and notification destinations live in the Account and Project
+  settings rail.
 - Entering any settings route replaces the primary sidebar navigation with the
   scoped settings navigation using a short horizontal slide. Keep the brand and
   account areas stable, provide an explicit back row at the top, and never repeat
@@ -238,19 +296,24 @@ When implementing from a selected generated mock, treat that image as the source
 - Omit navigation breadcrumbs from Console page headers. The sidebar selection
   and page title carry location; keep event breadcrumbs only where they represent
   observed session or error context rather than navigation.
-- The color reference is the user's Citrus dashboard9 screenshot (2026-09-12).
-  All logos and favicons stay lemon green (`--ds-logo`) in both modes. Headings,
+- The layout reference is the user's dashboard9 screenshot (2026-09-12); colors come
+  from the amber four-color card (ADR 0010). Logos follow the palette primary
+  (`--ds-logo`, eyes are mask cut-outs); favicons are static amber. Headings,
   KPI values, labels and navigation use neutral text; selected navigation uses
   the neutral sidebar accent. Chart strokes and fills share chart-series tokens:
-  chart 1 lemon green, chart 2 teal, prior periods pale yellow plus dashes.
+  chart 1 the palette primary, charts 2–4 its accents, prior periods neutral gray
+  plus dashes.
   Axes and annotations use muted text; grids and cursors use borders. Reserve
   success/warning/danger for actual statuses and thresholds. Link ink (`--ds-brand`)
   uses neutral text in both modes; underline prose links. Never use this token
   for logos or chart outlines. See `docs/design.md`,
   "Chart color contract", and the live `/design` workbench.
-- Keep primary header brand lockups on the shared 28px mark / 18px wordmark / 9px
-  gap ratio. Use the tighter favicon crop so the mark fills small browser icon slots;
-  do not reintroduce per-surface header logo sizing.
+- Keep primary header brand lockups on the shared 36px mark / 18px wordmark / 9px
+  gap ratio, including the collapsed sidebar. Console, public site and docs share
+  the pixel signal scout in `@openrum/design-tokens/brand`. Use its tight 20-unit
+  crop and shared finite greeting/hover/focus gestures (wave, blink, signal, hop).
+  Honor reduced motion; keep favicons and downloads static. Do not reintroduce
+  per-surface header logo sizing or the old split-ring mark.
 - Charts animate by default. Recharts runs its transitions in JavaScript, so the
   global `prefers-reduced-motion` stylesheet cannot reach them; pass
   `isAnimationActive={useChartMotion()}` rather than hard-coding `false`.
@@ -264,7 +327,7 @@ When implementing from a selected generated mock, treat that image as the source
   using the same weight definition as the total. Center SVG score text with
   `text-anchor="middle"` and `dominant-baseline="central"`, not the x-height-based
   `middle` baseline. Use neutral unearned-score tracks,
-  and retain the Citrus series colors; use INP, not the reference's legacy FID.
+  and retain the shared series colors; use INP, not the reference's legacy FID.
   Do not add concentric rings or a separate legend below the ring.
   Place it beside one real-value trend chart, with five compact
   metric cards (LCP, INP, CLS, FCP, TTFB) below. Do not normalize to threshold

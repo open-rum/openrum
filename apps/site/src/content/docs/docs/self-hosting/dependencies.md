@@ -29,7 +29,7 @@ Accepts envelopes only after durable acknowledgement. Consumer failure delays vi
 
 ## Redis
 
-Supports limits and ephemeral coordination. Treat Redis loss as degraded rate limiting and state, not as the only durable telemetry store. See [Redis operations](/docs/self-hosting/redis/).
+Supports limits and ephemeral coordination. Treat Redis loss as degraded rate limiting and state, not as the only durable telemetry store. API and Ingest report not ready while it is unreachable. The Helm Chart can run a single Redis for you or use your own; see [Redis: bundled or external](/docs/self-hosting/kubernetes/#redis-bundled-or-external) and [Redis operations](/docs/self-hosting/redis/).
 
 ## Object storage
 

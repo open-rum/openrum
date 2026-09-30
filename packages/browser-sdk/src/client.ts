@@ -23,10 +23,14 @@ import { compileFilters, type CompiledFilters, type FilterSettings } from "./fil
 import { runSafely, runSafelyAsync, type Diagnostics } from "./safety.ts";
 import { createUUID, SessionManager, type SessionDependencies } from "./session.ts";
 
+/** The environments a Project can enable: 开发, 测试, 灰度 and 生产. */
+export type Environment = "development" | "test" | "staging" | "production";
+
 export interface ClientOptions {
   /** Public connection string copied from the Project's onboarding page. */
   dsn: string;
-  environment?: string;
+  /** One of the Project's enabled environments. Defaults to "production". */
+  environment?: Environment;
   release?: string;
   dist?: string;
   eventSampleRate?: number;

@@ -65,35 +65,54 @@ const options = [
       this.querySelectorAll<HTMLButtonElement>("[data-theme-option]").forEach((button) => {
         button.setAttribute("aria-checked", String(button.dataset.themeOption === theme));
       });
-      const provider = (window as Window & {
-        StarlightThemeProvider?: { updatePickers: (value: Theme) => void };
-      }).StarlightThemeProvider;
+      const provider = (
+        window as Window & {
+          StarlightThemeProvider?: { updatePickers: (value: Theme) => void };
+        }
+      ).StarlightThemeProvider;
       provider?.updatePickers(theme);
     }
   }
 
-  if (!customElements.get("docs-theme-menu")) customElements.define("docs-theme-menu", DocsThemeMenu);
+  if (!customElements.get("docs-theme-menu"))
+    customElements.define("docs-theme-menu", DocsThemeMenu);
 </script>
 
 <style>
-  docs-theme-menu { position: relative; display: block; }
-  .docs-icon-menu { position: relative; }
+  docs-theme-menu {
+    position: relative;
+    display: block;
+  }
+  .docs-icon-menu {
+    position: relative;
+  }
   .docs-icon-action {
     display: grid;
     width: 1.75rem;
     height: 1.75rem;
     place-items: center;
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-control);
     color: var(--ds-text-muted);
     cursor: pointer;
     list-style: none;
   }
-  .docs-icon-action:hover, .docs-icon-menu[open] .docs-icon-action { color: var(--ds-text); background: var(--ds-surface-subtle); }
-  .docs-icon-action::marker, .docs-icon-action::-webkit-details-marker { display: none; }
-  .docs-icon-action :global(svg) { display: none; }
+  .docs-icon-action:hover,
+  .docs-icon-menu[open] .docs-icon-action {
+    color: var(--ds-text);
+    background: var(--ds-surface-subtle);
+  }
+  .docs-icon-action::marker,
+  .docs-icon-action::-webkit-details-marker {
+    display: none;
+  }
+  .docs-icon-action :global(svg) {
+    display: none;
+  }
   :global(docs-theme-menu[data-theme-preference="light"] .theme-icon-light),
   :global(docs-theme-menu[data-theme-preference="dark"] .theme-icon-dark),
-  :global(docs-theme-menu[data-theme-preference="auto"] .theme-icon-auto) { display: block; }
+  :global(docs-theme-menu[data-theme-preference="auto"] .theme-icon-auto) {
+    display: block;
+  }
   .docs-icon-panel {
     position: absolute;
     top: 100%;
@@ -104,12 +123,19 @@ const options = [
     margin-top: 0.35rem;
     padding: 0.35rem;
     border: 1px solid var(--ds-border);
-    border-radius: var(--radius-lg);
+    border-radius: var(--radius-surface);
     background: var(--ds-surface);
     box-shadow: var(--shadow-flyout);
   }
-  .docs-icon-menu[open] .docs-icon-panel, .docs-icon-menu:focus-within .docs-icon-panel { display: grid; }
-  @media (hover: hover) { .docs-icon-menu:hover .docs-icon-panel { display: grid; } }
+  .docs-icon-menu[open] .docs-icon-panel,
+  .docs-icon-menu:focus-within .docs-icon-panel {
+    display: grid;
+  }
+  @media (hover: hover) {
+    .docs-icon-menu:hover .docs-icon-panel {
+      display: grid;
+    }
+  }
   .docs-icon-panel button {
     display: flex;
     align-items: center;
@@ -117,7 +143,7 @@ const options = [
     width: 100%;
     padding: 0.5rem 0.65rem;
     border: 0;
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-field);
     color: var(--ds-text-muted);
     background: transparent;
     font: inherit;
@@ -125,5 +151,9 @@ const options = [
     text-align: left;
     cursor: pointer;
   }
-  .docs-icon-panel button:hover, .docs-icon-panel button[aria-checked="true"] { color: var(--ds-text); background: var(--ds-surface-subtle); }
+  .docs-icon-panel button:hover,
+  .docs-icon-panel button[aria-checked="true"] {
+    color: var(--ds-text);
+    background: var(--ds-surface-subtle);
+  }
 </style>

@@ -178,7 +178,7 @@ a:not(.ui-button) {
   height: 36px;
   place-items: center;
   border: 1px solid var(--ds-border);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-control);
   color: var(--ds-text);
   background: var(--ds-surface);
   cursor: pointer;
@@ -200,13 +200,13 @@ a:not(.ui-button) {
   min-width: 190px;
   padding: 8px;
   border: 1px solid var(--ds-border);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-surface);
   background: var(--ds-surface);
   box-shadow: var(--shadow-flyout);
 }
 .mobile-nav-panel a {
   padding: 10px 12px;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-field);
   color: var(--ds-text-muted);
   text-decoration: none;
 }
@@ -258,7 +258,7 @@ a:not(.ui-button) {
   width: 38px;
   height: 38px;
   place-items: center;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-field);
   color: var(--ds-brand);
   background: var(--ds-brand-soft);
 }
@@ -355,7 +355,7 @@ a:not(.ui-button) {
   overflow-x: auto;
   padding: 18px;
   border: 1px solid var(--ds-border);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-field);
   color: var(--ds-text);
   background: var(--ds-surface-subtle);
   font: 0.82rem/1.7 var(--font-mono);

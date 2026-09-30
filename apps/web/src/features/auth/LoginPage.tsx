@@ -2,7 +2,8 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSearch } from "@tanstack/react-router";
 import { Building2Icon, ShieldCheckIcon } from "lucide-react";
-import { SiGithub, SiGoogle } from "@icons-pack/react-simple-icons";
+import { SiGithub } from "@icons-pack/react-simple-icons";
+import { GoogleIcon } from "@/components/icons/GoogleIcon";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { FieldGroup } from "@/components/ui/field";
@@ -115,7 +116,7 @@ export function LoginPage({ returnTo, expired, externalError }: LoginPageProps) 
           ))}
           {ldapMethod ? (
             <form
-              className="mt-4 space-y-3 rounded-lg border border-border bg-card p-4"
+              className="mt-4 space-y-3 rounded-2xl border border-border bg-card p-4"
               aria-label={`${ldapMethod.label} 登录`}
               onSubmit={(event) => {
                 event.preventDefault();
@@ -228,10 +229,10 @@ export function LoginPage({ returnTo, expired, externalError }: LoginPageProps) 
 }
 
 function ProviderIcon({ kind }: { kind: AuthMethod["kind"] }) {
-  if (kind === "google") return <SiGoogle aria-hidden="true" />;
-  if (kind === "github") return <SiGithub aria-hidden="true" />;
-  if (kind === "ldap") return <Building2Icon aria-hidden="true" />;
-  return <ShieldCheckIcon aria-hidden="true" />;
+  if (kind === "google") return <GoogleIcon className="rounded-[2px] bg-white" />;
+  if (kind === "github") return <SiGithub className="size-4" aria-hidden="true" />;
+  if (kind === "ldap") return <Building2Icon className="size-4" aria-hidden="true" />;
+  return <ShieldCheckIcon className="size-4" aria-hidden="true" />;
 }
 
 function loginErrorMessage(error: Error, directory = false) {

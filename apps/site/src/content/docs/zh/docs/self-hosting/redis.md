@@ -14,7 +14,7 @@ Ingest 限流、大盘缓存和连接进度；缓存失效可能提高 ClickHous
 
 1. 记录拓扑、切换状态、内存/驱逐、延迟、阻塞客户端、连接数和网络错误。
 2. 缓存丢失增加 ClickHouse 压力时降低查询并发或采样，并确认登录和 Ingest 的保守降级行为。
-3. 通过 Redis 负责人或供应商切换，必要时更新端点/Secret；先滚动一个 API 与 Ingest 副本验证。
+3. 通过 Redis 负责人或供应商切换，必要时更新端点/Secret；先滚动一个 API 与 Ingest 副本验证。使用 Helm Chart 自带的 Redis 时，用 `kubectl get pods -l app.kubernetes.io/component=redis` 查看状态；未开启持久化时重启后数据为空，这是安全的。
 4. 事故期间不得 Flush 数据库、关闭认证/TLS、修改驱逐策略，也不得把连接状态 Key 当作耐久证据。
 
 ## 恢复与验证

@@ -371,6 +371,7 @@ function PersonalDashboard({
   return (
     <ConsolePage width="fluid" className="dashboard-page">
       <ConsolePageHeader
+        documentTitle="仪表盘"
         title={
           <DashboardSwitcher
             projectId={project.id}
@@ -383,19 +384,7 @@ function PersonalDashboard({
             onNavigate={onNavigate}
           />
         }
-        description={`${
-          !filters.environment
-            ? "全部环境"
-            : filters.environment === "production"
-              ? "生产环境"
-              : `${filters.environment} 环境`
-        } · ${
-          builtIn
-            ? "内置默认仪表盘，跟随当前时间与环境。修改后会另存为你的个人仪表盘。"
-            : editing
-              ? "组合你关心的数据，按自己的方式查看项目。"
-              : "你的个人仪表盘，跟随当前时间与环境。"
-        }`}
+        description={builtIn ? "内置默认仪表盘，修改后另存为你的专属仪表盘" : "定制你的专属仪表盘"}
         actions={
           <>
             {!editing ? (
@@ -524,7 +513,7 @@ function PersonalDashboard({
                 <span className="text-sm text-muted-foreground">
                   {full
                     ? `你已有 ${MAX_DASHBOARDS} 个仪表盘，删除一个后才能另存。`
-                    : "默认仪表盘不会被修改，保存后另存为你的个人仪表盘。"}
+                    : "默认仪表盘不会被修改，保存后另存为你的专属仪表盘。"}
                 </span>
               ) : null}
             </div>

@@ -114,7 +114,7 @@ export function DashboardSwitcher({
         <DropdownMenuTrigger asChild>
           <button
             type="button"
-            className="dashboard-switcher inline-flex max-w-full items-center gap-1.5 rounded-md text-left"
+            className="dashboard-switcher inline-flex max-w-full items-center gap-1.5 rounded-full text-left"
             aria-label={`切换仪表盘，当前为 ${activeName}`}
           >
             <span className="truncate">{activeName}</span>
@@ -322,7 +322,7 @@ function CreateDashboardDialog({
                       ),
                     );
                   }}
-                  className="dashboard-template-option flex flex-col gap-0.5 rounded-md border px-3 py-2 text-left"
+                  className="dashboard-template-option flex flex-col gap-0.5 rounded-xl border px-3 py-2 text-left"
                 >
                   <span className="text-sm font-medium">{option.name}</span>
                   <span className="text-xs text-muted-foreground">{option.description}</span>

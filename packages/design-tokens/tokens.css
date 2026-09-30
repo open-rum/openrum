@@ -7,23 +7,60 @@
   --space-12: 48px;
   --space-16: 64px;
   --space-24: 96px;
-  --ds-chart-1: oklch(0.8719 0.1829 125.59);
-  --ds-chart-2: oklch(0.64 0.15 250);
-  --ds-chart-3: oklch(0.74 0.17 55);
-  --ds-chart-4: oklch(0.65 0.18 305);
-  --ds-chart-5: oklch(0.62 0.12 185);
-  --ds-chart-6: oklch(0.69 0.18 25);
-  --ds-chart-7: oklch(0.72 0.13 215);
-  --ds-chart-8: oklch(0.67 0.18 345);
-  --ds-chart-9: oklch(0.79 0.16 85);
-  --ds-chart-10: oklch(0.62 0.08 270);
+  /*
+   * Four-colour card. Amber is the brand; lime, sky and magenta are accents. Each hue
+   * has a solid fill with a dark label, a soft tint, readable ink and a border. The
+   * palette blocks below decide which hue is primary; charts 1-4 follow them.
+   */
+  --ds-amber-solid: #ffb020;
+  --ds-amber-foreground: #241800;
+  --ds-amber-soft: #fff1d6;
+  --ds-amber-ink: #7a4d00;
+  --ds-amber-border: #e59a00;
+  --ds-amber-action: #ffb020;
+  --ds-amber-on-action: #241800;
+  --ds-lime-solid: #b8e954;
+  --ds-lime-foreground: #172100;
+  --ds-lime-soft: #eef9d4;
+  --ds-lime-ink: #3f5a00;
+  --ds-lime-border: #8cc21f;
+  --ds-lime-action: #b8e954;
+  --ds-lime-on-action: #172100;
+  --ds-sky-solid: #38bdf8;
+  --ds-sky-foreground: #04253a;
+  --ds-sky-soft: #e0f4fe;
+  --ds-sky-ink: #03608f;
+  --ds-sky-border: #56c6f5;
+  --ds-sky-action: #38bdf8;
+  --ds-sky-on-action: #04253a;
+  --ds-magenta-solid: #ff2e88;
+  --ds-magenta-foreground: #2b0014;
+  --ds-magenta-soft: #ffe3f0;
+  --ds-magenta-ink: #a3004a;
+  --ds-magenta-border: #ff5fa2;
+  /* White labels need a deeper fill than the bright magenta can give. */
+  --ds-magenta-action: #d6006f;
+  --ds-magenta-on-action: #ffffff;
+  /* Series 5-10 stay clear of the card's hues so any palette keeps ten distinct lines. */
+  --ds-chart-5: oklch(0.6 0.17 300);
+  --ds-chart-6: oklch(0.6 0.1 185);
+  --ds-chart-7: oklch(0.68 0.17 30);
+  --ds-chart-8: oklch(0.55 0.15 265);
+  --ds-chart-9: oklch(0.6 0.08 60);
+  --ds-chart-10: oklch(0.6 0.03 250);
   --ds-chart-area: var(--ds-primary);
-  /* dashboard9 comparison accent; not a warning/status color. */
-  --ds-chart-comparison: oklch(0.9002 0.137175 94.1925);
-  --ds-chart-success: var(--ds-primary);
-  --ds-chart-warning: oklch(0.85 0.16 85);
-  --ds-logo: #b8e954;
-  --brand-lockup-mark-size: 28px;
+  /* The previous period is a neutral dashed line so it never reads as the brand series. */
+  --ds-chart-comparison: oklch(0.68 0 0);
+  --ds-chart-success: var(--ds-success);
+  --ds-chart-warning: var(--ds-warning);
+  /* The dark detail inside the brand mark. */
+  /* Notification channel identity tiles; the same in both themes. */
+  --ds-channel-feishu: #3370ff;
+  --ds-channel-dingtalk: #0089ff;
+  --ds-channel-wecom: #0082ef;
+  --ds-channel-slack: #4a154b;
+  --ds-channel-foreground: #ffffff;
+  --brand-lockup-mark-size: 36px;
   --brand-lockup-name-size: 18px;
   --brand-lockup-gap: 9px;
   --font-product-sans:
@@ -52,20 +89,14 @@
   --ds-border: oklch(0.922 0 0);
   --ds-border-soft: oklch(0.95 0 0);
   --ds-input: oklch(0.87 0 0);
-  --ds-primary: oklch(0.8719 0.1829 125.59);
   --ds-light-ray-color: var(--ds-primary);
-  --ds-primary-foreground: oklch(0 0 0);
-  --ds-selection: oklch(0.955 0.055 125.59);
   --ds-selection-foreground: var(--ds-text);
-  --ds-selection-border: oklch(0.78 0.18 125.59);
-  --ds-ring: var(--ds-primary);
   --ds-action-contrast: oklch(0 0 0);
   --ds-action-contrast-foreground: oklch(1 0 0);
   --ds-action-neutral: oklch(1 0 0);
   --ds-action-neutral-foreground: oklch(0 0 0);
   --ds-brand: var(--ds-text);
   --ds-brand-foreground: oklch(1 0 0);
-  --ds-brand-soft: oklch(0.955 0.055 125.59);
   --ds-secondary: oklch(0.5591 0.0631 185.87);
   --ds-secondary-foreground: oklch(1 0 0);
   --ds-accent: oklch(0.97 0 0);
@@ -80,8 +111,9 @@
   --ds-danger: oklch(0.56 0.2 25.33);
   --ds-danger-soft: oklch(0.96 0.035 25.33);
   --ds-danger-foreground: oklch(1 0 0);
-  --ds-warning: oklch(0.62 0.14 70);
-  --ds-warning-soft: oklch(0.965 0.045 85);
+  /* Orange rather than yellow, so a warning never reads as the amber brand. */
+  --ds-warning: oklch(0.6 0.15 50);
+  --ds-warning-soft: oklch(0.965 0.04 55);
   --ds-info: var(--ds-secondary);
   --space-1: 4px;
   --space-2: 8px;
@@ -89,15 +121,31 @@
   --space-4: 16px;
   --space-5: 20px;
   --space-6: 24px;
-  --radius-sm: 5px;
-  --radius-md: 7px;
-  --radius-lg: 9px;
+  /* Maia: pill controls, softly rounded fields and surfaces. */
+  --radius-base: 0.625rem;
+  --radius-sm: calc(var(--radius-base) * 0.6);
+  --radius-md: calc(var(--radius-base) * 0.8);
+  --radius-lg: var(--radius-base);
+  --radius-xl: calc(var(--radius-base) * 1.4);
+  --radius-2xl: calc(var(--radius-base) * 1.8);
+  --radius-3xl: calc(var(--radius-base) * 2.2);
+  --radius-4xl: calc(var(--radius-base) * 2.6);
+  --radius-control: 9999px;
+  --radius-field: var(--radius-xl);
+  --radius-surface: var(--radius-2xl);
+  --radius-overlay: var(--radius-4xl);
+  --card-padding: 24px;
   --control-height-xs: 28px;
   --control-height-sm: 32px;
   --control-height: 40px;
   --control-height-lg: 44px;
   --table-header-height: 40px;
   --table-row-height: 44px;
+  --nav-item-height: 40px;
+  --settings-nav-item-height: 36px;
+  --page-padding-x: 32px;
+  --page-padding-y: 32px;
+  --page-gap: 24px;
   --shadow-control: 0 1px 2px rgb(27 24 55 / 5%);
   --shadow-elevated: 0 14px 40px rgb(35 30 76 / 12%);
   --shadow-flyout: 0 16px 40px rgb(20 20 20 / 14%);
@@ -148,15 +196,22 @@
   --ds-border: oklch(0.269 0 0);
   --ds-border-soft: oklch(0.235 0 0);
   --ds-input: oklch(0.371 0 0);
-  --ds-primary: oklch(0.8719 0.1829 125.59);
-  --ds-primary-foreground: oklch(0 0 0);
-  --ds-selection: oklch(0.28 0.045 125.59);
   --ds-selection-foreground: var(--ds-text);
-  --ds-selection-border: oklch(0.55 0.13 125.59);
-  --ds-ring: var(--ds-primary);
   --ds-brand: var(--ds-text);
   --ds-brand-foreground: oklch(0 0 0);
-  --ds-brand-soft: oklch(0.28 0.045 125.59);
+  --ds-amber-soft: #3a2a0a;
+  --ds-amber-ink: #ffc55c;
+  --ds-amber-border: #b37700;
+  --ds-lime-soft: #26330d;
+  --ds-lime-ink: #cdf27a;
+  --ds-lime-border: #6f9a1c;
+  --ds-sky-soft: #0b2a3d;
+  --ds-sky-ink: #7dd3fc;
+  --ds-sky-border: #1f7fae;
+  --ds-magenta-soft: #3d0f25;
+  --ds-magenta-ink: #ff8cbf;
+  --ds-magenta-border: #a3165a;
+  --ds-chart-comparison: oklch(0.55 0 0);
   --ds-secondary: oklch(0.5591 0.0631 185.87);
   --ds-secondary-foreground: oklch(1 0 0);
   --ds-accent: oklch(0.269 0 0);
@@ -164,16 +219,6 @@
   --ds-destructive: oklch(0.64 0.21 25.33);
   --ds-sidebar-accent: oklch(0.269 0 0);
   --ds-sidebar-accent-foreground: oklch(0.922 0 0);
-  --ds-chart-1: oklch(0.8719 0.1829 125.59);
-  --ds-chart-2: oklch(0.64 0.15 250);
-  --ds-chart-3: oklch(0.74 0.17 55);
-  --ds-chart-4: oklch(0.65 0.18 305);
-  --ds-chart-5: oklch(0.62 0.12 185);
-  --ds-chart-6: oklch(0.69 0.18 25);
-  --ds-chart-7: oklch(0.72 0.13 215);
-  --ds-chart-8: oklch(0.67 0.18 345);
-  --ds-chart-9: oklch(0.79 0.16 85);
-  --ds-chart-10: oklch(0.62 0.08 270);
   --ds-hero-surface: oklch(0.12 0 0);
   --ds-hero-foreground: oklch(0.9851 0 0);
   --ds-success: oklch(0.72 0.16 145);
@@ -181,8 +226,119 @@
   --ds-danger: oklch(0.64 0.21 25.33);
   --ds-danger-soft: oklch(0.25 0.06 25.33);
   --ds-danger-foreground: oklch(1 0 0);
-  --ds-warning: oklch(0.78 0.15 75);
-  --ds-warning-soft: oklch(0.27 0.055 75);
+  --ds-warning: oklch(0.74 0.15 55);
+  --ds-warning-soft: oklch(0.27 0.055 55);
   --ds-info: var(--ds-secondary);
   color-scheme: dark;
+}
+
+/*
+ * Palettes. Each one makes a hue of the card the primary colour and orders the other
+ * three as accents; charts 1-4 follow. Only var() references live here, so dark mode
+ * comes from the card itself. `:root` carries the default, amber. To retire a palette,
+ * delete its block and its entry in catalog.ts.
+ */
+:root,
+[data-palette="amber"] {
+  --ds-primary: var(--ds-amber-solid);
+  --ds-primary-foreground: var(--ds-amber-foreground);
+  --ds-primary-soft: var(--ds-amber-soft);
+  --ds-primary-ink: var(--ds-amber-ink);
+  --ds-primary-border: var(--ds-amber-border);
+  --ds-primary-action: var(--ds-amber-action);
+  --ds-primary-on-action: var(--ds-amber-on-action);
+  --ds-accent-1: var(--ds-lime-solid);
+  --ds-accent-1-foreground: var(--ds-lime-foreground);
+  --ds-accent-2: var(--ds-sky-solid);
+  --ds-accent-3: var(--ds-magenta-solid);
+}
+[data-palette="lime"] {
+  --ds-primary: var(--ds-lime-solid);
+  --ds-primary-foreground: var(--ds-lime-foreground);
+  --ds-primary-soft: var(--ds-lime-soft);
+  --ds-primary-ink: var(--ds-lime-ink);
+  --ds-primary-border: var(--ds-lime-border);
+  --ds-primary-action: var(--ds-lime-action);
+  --ds-primary-on-action: var(--ds-lime-on-action);
+  --ds-accent-1: var(--ds-amber-solid);
+  --ds-accent-1-foreground: var(--ds-amber-foreground);
+  --ds-accent-2: var(--ds-sky-solid);
+  --ds-accent-3: var(--ds-magenta-solid);
+}
+[data-palette="magenta"] {
+  --ds-primary: var(--ds-magenta-solid);
+  --ds-primary-foreground: var(--ds-magenta-foreground);
+  --ds-primary-soft: var(--ds-magenta-soft);
+  --ds-primary-ink: var(--ds-magenta-ink);
+  --ds-primary-border: var(--ds-magenta-border);
+  --ds-primary-action: var(--ds-magenta-action);
+  --ds-primary-on-action: var(--ds-magenta-on-action);
+  --ds-accent-1: var(--ds-amber-solid);
+  --ds-accent-1-foreground: var(--ds-amber-foreground);
+  --ds-accent-2: var(--ds-lime-solid);
+  --ds-accent-3: var(--ds-sky-solid);
+}
+/* Roles every palette derives the same way. */
+:root,
+[data-palette] {
+  --ds-ring: var(--ds-primary);
+  --ds-logo: var(--ds-primary);
+  --ds-selection: var(--ds-primary-soft);
+  --ds-selection-border: var(--ds-primary-border);
+  --ds-brand-soft: var(--ds-primary-soft);
+  --ds-chart-1: var(--ds-primary);
+  --ds-chart-2: var(--ds-accent-1);
+  --ds-chart-3: var(--ds-accent-2);
+  --ds-chart-4: var(--ds-accent-3);
+}
+
+/*
+ * Compact density, chosen by the user in the Console. Text never drops below 12px, and
+ * touch devices keep 40-44px targets.
+ */
+[data-density="compact"] {
+  --card-padding: 20px;
+  --control-height-xs: 24px;
+  --control-height-sm: 28px;
+  --control-height: 32px;
+  --control-height-lg: 36px;
+  --table-header-height: 32px;
+  --table-row-height: 36px;
+  --text-table: 13px;
+  --text-control: 13px;
+  --text-body: 13px;
+  --nav-item-height: 32px;
+  --settings-nav-item-height: 30px;
+  --page-padding-x: 24px;
+  --page-padding-y: 20px;
+  --page-gap: 16px;
+}
+@media (pointer: coarse) {
+  [data-density="compact"] {
+    --control-height: 40px;
+    --control-height-lg: 44px;
+    --table-row-height: 44px;
+    --nav-item-height: 40px;
+    --settings-nav-item-height: 40px;
+  }
+}
+
+/*
+ * Public landing page: dark only. Its colours follow the active palette through the
+ * primary and first accent roles, on one fixed dark neutral set.
+ */
+[data-landing] {
+  color-scheme: dark;
+  --lp-bg: #0b0b0c;
+  --lp-surface: #141416;
+  --lp-surface-2: #1b1b1e;
+  --lp-line: #2a2a2e;
+  --lp-fg: #f4f1ea;
+  --lp-muted: #8c8a84;
+  --lp-accent: var(--ds-primary);
+  --lp-on-accent: var(--ds-primary-foreground);
+  --lp-accent-2: var(--ds-accent-1);
+  --lp-on-accent-2: var(--ds-accent-1-foreground);
+  --lp-action: var(--ds-primary-action);
+  --lp-on-action: var(--ds-primary-on-action);
 }

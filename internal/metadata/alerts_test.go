@@ -4,6 +4,9 @@ import (
 	"math"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/google/uuid"
 )
 
 func validRuleFixture() CreateAlertRuleInput {
@@ -70,5 +73,35 @@ func TestValidAlertRuleMirrorsTheDatabaseConstraints(t *testing.T) {
 		if validAlertRule(mutate(validRuleFixture())) {
 			t.Fatalf("%s was accepted", name)
 		}
+	}
+}
+
+func TestAlertDeepLinkTargetsThePageThatExplainsTheMetric(t *testing.T) {
+	projectID := uuid.New()
+	from := time.Date(2026, 9, 6, 11, 55, 0, 0, time.UTC)
+	to := time.Date(2026, 9, 6, 12, 0, 0, 0, time.UTC)
+	for _, testCase := range []struct {
+		metric AlertMetric
+		page   string
+	}{
+		{AlertErrorCount, "issues"},
+		{AlertErrorRate, "issues"},
+		{AlertAPIFailureRate, "apis"},
+		{AlertLCPP75, "performance"},
+		{AlertMetric("unknown"), "overview"},
+	} {
+		link := AlertDeepLink(projectID, testCase.metric, from, to, "production")
+		want := "/projects/" + projectID.String() + "/" + testCase.page + "?"
+		if !strings.HasPrefix(link, want) {
+			t.Fatalf("metric %q produced %q, want prefix %q", testCase.metric, link, want)
+		}
+		for _, part := range []string{"to=2026-09-06T12%3A00%3A00Z", "from=2026-09-06T11%3A55%3A00Z", "environment=production"} {
+			if !strings.Contains(link, part) {
+				t.Fatalf("metric %q lost %s: %q", testCase.metric, part, link)
+			}
+		}
+	}
+	if strings.Contains(AlertDeepLink(projectID, AlertErrorRate, from, to, ""), "environment=") {
+		t.Fatal("a rule over every environment must not pin one")
 	}
 }

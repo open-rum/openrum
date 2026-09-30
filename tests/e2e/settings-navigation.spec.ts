@@ -70,17 +70,23 @@ test("a user without an instance role cannot reach the instance scope", async ({
 
   await page.goto(`/settings/project/${projectId}/general`);
   await expect(page.getByRole("navigation", { name: "设置 · 账户" })).toBeVisible();
-  await expect(page.getByRole("navigation", { name: "设置 · 实例" })).toHaveCount(0);
+  await expect(page.getByRole("navigation", { name: "设置 · 系统设置" })).toHaveCount(0);
+
+  await page.goto(`/projects/${projectId}/overview`);
+  await page.getByRole("button", { name: "打开账户菜单" }).click();
+  await expect(page.getByRole("menuitem", { name: "系统设置" })).toHaveCount(0);
 });
 
-test("settings replaces the primary sidebar and reaches all four scopes", async ({ page }) => {
+test("settings sit in the sidebar footer and system settings in the account menu", async ({
+  page,
+}) => {
   await mockOpenRUM(page, { projectExists: true, instanceRole: "instance_owner" });
   await page.goto(`/projects/${projectId}/overview`);
 
   const switcher = page.locator(".sidebar-nav-switcher");
   await expect(switcher).toHaveAttribute("data-level", "primary");
-  const settingsEntry = page.getByRole("navigation", { name: "主导航" }).getByRole("link", {
-    name: "项目设置",
+  const settingsEntry = page.getByRole("navigation", { name: "设置与快捷入口" }).getByRole("link", {
+    name: "设置",
     exact: true,
   });
   await expect(settingsEntry.locator(".nav-item__next")).toBeVisible();
@@ -92,6 +98,7 @@ test("settings replaces the primary sidebar and reaches all four scopes", async 
   await expect(switcher).toHaveAttribute("data-level", "settings");
   await expect(page.getByRole("navigation", { name: "主导航" })).not.toBeVisible();
   await expect(page.getByRole("link", { name: "返回设置", exact: true })).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "设置 · 系统设置" })).toHaveCount(0);
   const groupHeading = page.getByRole("heading", { name: "组织", exact: true });
   await expect
     .poll(() =>
@@ -100,7 +107,8 @@ test("settings replaces the primary sidebar and reaches all four scopes", async 
         return { fontSize: style.fontSize, fontWeight: style.fontWeight };
       }),
     )
-    .toEqual({ fontSize: "13px", fontWeight: "400" });
+    .toEqual({ fontSize: "12px", fontWeight: "400" });
+  await expect(groupHeading).toHaveCSS("white-space", "nowrap");
   await expect
     .poll(() =>
       groupHeading.evaluate(
@@ -114,7 +122,7 @@ test("settings replaces the primary sidebar and reaches all four scopes", async 
   await expect(activeItem).toHaveClass(/is-active/);
   await expect
     .poll(async () => {
-      const [activeStyle, inactiveStyle] = await Promise.all([
+      const [activeStyle, inactiveStyle, groupColor] = await Promise.all([
         activeItem.evaluate((element) => {
           const style = getComputedStyle(element);
           return {
@@ -123,23 +131,28 @@ test("settings replaces the primary sidebar and reaches all four scopes", async 
             fontWeight: style.fontWeight,
           };
         }),
-        inactiveItem.evaluate((element) => getComputedStyle(element).backgroundColor),
+        inactiveItem.evaluate((element) => {
+          const style = getComputedStyle(element);
+          return { background: style.backgroundColor, color: style.color };
+        }),
+        groupHeading.evaluate((element) => getComputedStyle(element).color),
       ]);
       return {
-        differentBackground: activeStyle.background !== inactiveStyle,
+        differentBackground: activeStyle.background !== inactiveStyle.background,
+        differentColor: groupColor !== inactiveStyle.color,
         fontSize: activeStyle.fontSize,
         fontWeight: activeStyle.fontWeight,
       };
     })
     .toEqual({
       differentBackground: true,
-      fontSize: "13px",
-      fontWeight: "400",
+      differentColor: true,
+      fontSize: "14px",
+      fontWeight: "500",
     });
   await page.screenshot({ path: "/tmp/openrum-secondary-nav-active.png" });
 
-  // Project scope, then across to the organization and the instance without restoring
-  // the primary menu between settings pages.
+  // Account, organization and project settings stay together in this rail.
   await page.getByRole("link", { name: "数据管理", exact: true }).click();
   await page.getByRole("tab", { name: "隐私脱敏", exact: true }).click();
   await expect(page).toHaveURL(new RegExp(`/settings/project/${projectId}/scrubbing$`));
@@ -148,10 +161,23 @@ test("settings replaces the primary sidebar and reaches all four scopes", async 
   await page.getByRole("link", { name: "成员与权限", exact: true }).click();
   await expect(page).toHaveURL(/\/settings\/org\/members$/);
 
+  await page.getByRole("link", { name: "返回设置", exact: true }).click();
+  await expect(page).toHaveURL(new RegExp(`/projects/${projectId}/overview`));
+  await expect(switcher).toHaveAttribute("data-level", "primary");
+  await expect(page.getByRole("navigation", { name: "主导航" })).toBeVisible();
+
+  await page.getByRole("button", { name: "打开账户菜单" }).click();
+  await page.getByRole("menuitem", { name: "系统设置" }).click();
+  await expect(page).toHaveURL(/\/settings\/instance$/);
+  await expect(switcher).toHaveAttribute("data-level", "settings");
+  await expect(page.getByRole("navigation", { name: "设置 · 系统设置" })).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "设置 · 项目" })).toHaveCount(0);
+  await expect(page.getByRole("navigation", { name: "设置 · 账户" })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "认证与访问", exact: true })).toBeVisible();
   await page.getByRole("link", { name: "数据生命周期", exact: true }).click();
   await expect(page).toHaveURL(/\/settings\/instance\/retention$/);
 
-  await page.getByRole("link", { name: "返回设置", exact: true }).click();
+  await page.getByRole("link", { name: "返回控制台", exact: true }).click();
   await expect(page).toHaveURL(new RegExp(`/projects/${projectId}/overview`));
   await expect(switcher).toHaveAttribute("data-level", "primary");
   await expect(page.getByRole("navigation", { name: "主导航" })).toBeVisible();
@@ -206,27 +232,27 @@ test("legacy project usage links keep their filters when redirected into setting
   );
 });
 
-test("project data deletion requires a disabled project and typed confirmation", async ({
+test("project deletion is confirmed by holding the button and returns to the list", async ({
   page,
 }) => {
   await mockOpenRUM(page, { projectExists: true, role: "owner" });
   await page.goto(projectGeneralPath);
 
-  const purgeButton = page.getByRole("button", { name: "清空全部数据" });
-  await expect(purgeButton).toBeDisabled();
-  page.once("dialog", (dialog) => dialog.accept());
-  // The native confirmation is created synchronously by the click handler.
-  await page.getByRole("button", { name: "停用项目" }).click();
-  await expect(page.getByText("项目已停用")).toBeVisible();
-  await expect(purgeButton).toBeEnabled();
+  const deleteButton = page.getByRole("button", { name: "长按删除项目 Magic Moment H5" });
+  await expect(deleteButton).toBeEnabled();
+  // A short press only starts the fill and must not delete anything.
+  await deleteButton.focus();
+  await page.keyboard.down("Enter");
+  await page.waitForTimeout(500);
+  await page.keyboard.up("Enter");
+  await expect(page).toHaveURL(new RegExp(`${projectGeneralPath}$`));
 
-  await purgeButton.click();
-  const dialog = page.getByRole("alertdialog");
-  const confirmButton = dialog.getByRole("button", { name: "确认清空" });
-  await expect(confirmButton).toBeDisabled();
-  await dialog.getByLabel("项目名称").fill("Magic Moment H5");
-  await expect(confirmButton).toBeEnabled();
-  await confirmButton.click();
-  await expect(page.getByText(/正在异步清空数据/)).toBeVisible();
-  await expect(page.getByRole("button", { name: "恢复项目" })).toBeDisabled();
+  const deletion = page.waitForRequest(
+    (request) =>
+      request.method() === "DELETE" && request.url().endsWith(`/api/v1/projects/${projectId}`),
+  );
+  await page.keyboard.down("Enter");
+  await deletion;
+  await page.keyboard.up("Enter");
+  await expect(page).toHaveURL(/\/projects$/);
 });

@@ -75,7 +75,7 @@ export function AccountPage() {
       <ConsolePageHeader title="Account" description="查看个人信息并管理登录安全。" />
 
       <section
-        className="rounded-lg border border-border bg-card p-6"
+        className="rounded-2xl border border-border bg-card p-6"
         aria-labelledby="profile-title"
       >
         <div className="flex items-center gap-2">
@@ -97,7 +97,7 @@ export function AccountPage() {
       </section>
 
       <section
-        className="rounded-lg border border-border bg-card p-6"
+        className="rounded-2xl border border-border bg-card p-6"
         aria-labelledby="linked-methods-title"
       >
         <div className="flex items-center gap-2">
@@ -136,7 +136,7 @@ export function AccountPage() {
         ) : null}
         <div className="mt-4 space-y-2">
           {hasPassword ? (
-            <div className="flex items-center justify-between rounded-md border border-border px-3 py-2 text-sm">
+            <div className="flex items-center justify-between rounded-xl border border-border px-3 py-2 text-sm">
               <span>邮箱与 OpenRUM 密码</span>
               <span className="text-muted-foreground">已启用</span>
             </div>
@@ -144,7 +144,7 @@ export function AccountPage() {
           {linked.data?.identities.map((identity) => (
             <div
               key={identity.id}
-              className="flex items-center justify-between gap-3 rounded-md border border-border px-3 py-2 text-sm"
+              className="flex items-center justify-between gap-3 rounded-xl border border-border px-3 py-2 text-sm"
             >
               <span>{identity.label}</span>
               <Button
@@ -201,7 +201,7 @@ export function AccountPage() {
         ) : null}
         {ldapMethod ? (
           <form
-            className="mt-4 grid gap-3 rounded-md border border-border p-4"
+            className="mt-4 grid gap-3 rounded-xl border border-border p-4"
             aria-label={`连接 ${ldapMethod.label}`}
             onSubmit={(event) => {
               event.preventDefault();
@@ -235,7 +235,7 @@ export function AccountPage() {
 
       <form
         ref={formRef}
-        className="rounded-lg border border-border bg-card p-6"
+        className="rounded-2xl border border-border bg-card p-6"
         onSubmit={(event) => {
           event.preventDefault();
           setMessage(null);

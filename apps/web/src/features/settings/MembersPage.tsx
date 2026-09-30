@@ -5,6 +5,13 @@ import { Key, Plus, Trash, UsersThree } from "@phosphor-icons/react";
 import { ConsolePage, ConsolePageHeader } from "@/components/layout/ConsolePage";
 import { Button } from "@/components/ui/button";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   addMember,
   canManageMembers,
   listMembers,
@@ -27,6 +34,7 @@ export function MembersPage() {
   const queryClient = useQueryClient();
   const { data: currentUser } = useSuspenseQuery(sessionQueryOptions());
   const [organizationId, setOrganizationId] = useState("");
+  const [inviteRole, setInviteRole] = useState<OrganizationRole>("member");
   const organizationsQuery = useQuery({ queryKey: ["organizations"], queryFn: listOrganizations });
   const organizations = useMemo(
     () => organizationsQuery.data?.organizations ?? [],
@@ -70,20 +78,28 @@ export function MembersPage() {
         title="成员与权限"
         description="角色权限在服务端逐 API 校验；组织始终必须保留至少一名 Owner。"
         actions={
-          <label className="text-sm font-medium text-foreground">
-            组织
-            <select
-              className="mt-2 block h-10 min-w-64 rounded-md border border-input bg-background px-3 text-sm"
+          <div className="text-sm font-medium text-foreground">
+            <label htmlFor="members-organization">组织</label>
+            <Select
               value={activeOrganizationId}
-              onChange={(event) => setOrganizationId(event.target.value)}
+              onValueChange={(value) => {
+                setOrganizationId(value);
+                setInviteRole("member");
+              }}
+              disabled={!organizations.length}
             >
-              {organizations.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.name} · {roleLabels[item.role]}
-                </option>
-              ))}
-            </select>
-          </label>
+              <SelectTrigger id="members-organization" className="mt-2 min-w-64">
+                <SelectValue placeholder="选择组织" />
+              </SelectTrigger>
+              <SelectContent>
+                {organizations.map((item) => (
+                  <SelectItem key={item.id} value={item.id}>
+                    {item.name} · {roleLabels[item.role]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         }
       />
 
@@ -97,7 +113,7 @@ export function MembersPage() {
                 const form = new FormData(event.currentTarget);
                 addMutation.mutate({
                   email: String(form.get("email") ?? ""),
-                  role: String(form.get("role") ?? "member") as OrganizationRole,
+                  role: inviteRole,
                 });
               }}
             >
@@ -107,24 +123,28 @@ export function MembersPage() {
                   name="email"
                   type="email"
                   required
-                  className="mt-2 h-10 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/15"
+                  className="mt-2 h-10 w-full rounded-full border border-input bg-background px-3 text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/15"
                   placeholder="developer@company.com"
                 />
               </label>
-              <label className="text-sm font-medium">
-                角色
-                <select
-                  name="role"
-                  className="mt-2 h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-                  defaultValue="member"
+              <div className="text-sm font-medium">
+                <label htmlFor="members-invite-role">角色</label>
+                <Select
+                  value={inviteRole}
+                  onValueChange={(value) => setInviteRole(value as OrganizationRole)}
                 >
-                  {manageableRoles(organization?.role).map((role) => (
-                    <option key={role} value={role}>
-                      {roleLabels[role]}
-                    </option>
-                  ))}
-                </select>
-              </label>
+                  <SelectTrigger id="members-invite-role" className="mt-2 w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {manageableRoles(organization?.role).map((role) => (
+                      <SelectItem key={role} value={role}>
+                        {roleLabels[role]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
               <Button type="submit" className="h-10" disabled={busy}>
                 <Plus weight="bold" /> 添加成员
               </Button>
@@ -190,27 +210,34 @@ export function MembersPage() {
                           </span>
                         </td>
                         <td className="px-4 py-3 max-sm:p-0">
-                          <select
-                            aria-label={`修改 ${member.displayName} 的角色`}
-                            className="h-9 rounded-md border border-input bg-background px-2 text-sm disabled:cursor-not-allowed disabled:opacity-60"
+                          <Select
                             value={member.role}
                             disabled={!editable || busy}
-                            onChange={(event) =>
+                            onValueChange={(value) =>
                               roleMutation.mutate({
                                 userId: member.userId,
-                                role: event.target.value as OrganizationRole,
+                                role: value as OrganizationRole,
                               })
                             }
                           >
-                            {(member.role === "owner" && protectedOwner
-                              ? (["owner"] as OrganizationRole[])
-                              : manageableRoles(organization?.role)
-                            ).map((role) => (
-                              <option key={role} value={role}>
-                                {roleLabels[role]}
-                              </option>
-                            ))}
-                          </select>
+                            <SelectTrigger
+                              size="sm"
+                              className="min-w-28"
+                              aria-label={`修改 ${member.displayName} 的角色`}
+                            >
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {(member.role === "owner" && protectedOwner
+                                ? (["owner"] as OrganizationRole[])
+                                : manageableRoles(organization?.role)
+                              ).map((role) => (
+                                <SelectItem key={role} value={role}>
+                                  {roleLabels[role]}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
                         </td>
                         <td className="px-4 py-3 text-muted-foreground max-sm:hidden">
                           {formatDate(member.createdAt)}

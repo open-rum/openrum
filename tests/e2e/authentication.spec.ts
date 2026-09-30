@@ -90,5 +90,22 @@ test("Owner settings explain the master key prerequisite", async ({ page }) => {
   await page.goto("/settings/instance/authentication");
   await expect(page.getByRole("heading", { name: "认证与访问" })).toBeVisible();
   await expect(page.getByText("需要启用加密托管")).toBeVisible();
+  for (const provider of ["Google", "GitHub", "LDAP", "通用 OIDC"]) {
+    await expect(page.getByRole("button", { name: `选择 ${provider} 登录方式` })).toBeVisible();
+  }
+  await page.getByRole("button", { name: "选择 LDAP 登录方式" }).click();
+  await expect(page.getByRole("button", { name: "选择 LDAP 登录方式" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await expect(page.getByLabel("LDAP URL")).toBeVisible();
   await expect(page.getByRole("button", { name: "保存配置" })).toHaveCount(0);
+  if (process.env.OPENRUM_AUTH_SETTINGS_DESKTOP)
+    await page.screenshot({ path: process.env.OPENRUM_AUTH_SETTINGS_DESKTOP, fullPage: true });
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true,
+  );
+  if (process.env.OPENRUM_AUTH_SETTINGS)
+    await page.screenshot({ path: process.env.OPENRUM_AUTH_SETTINGS, fullPage: true });
 });

@@ -3,6 +3,7 @@ import { countryGroupLabel } from "@/features/filters/dimensionLabels";
 import {
   Area,
   Bar,
+  BarStack,
   CartesianGrid,
   ComposedChart,
   Line,
@@ -11,6 +12,7 @@ import {
   YAxis,
 } from "recharts";
 import {
+  BAR_RADIUS_TOP,
   ChartContainer,
   ChartLegend,
   ChartLegendContent,
@@ -28,6 +30,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useChartMotion } from "@/lib/charts/useChartMotion";
+import { observeElementWidth } from "@/lib/charts/useChartWidth";
 import { smoothCurve } from "@/lib/charts/smoothCurve";
 import { COMPARISON_DASH, COMPARISON_STROKE } from "@/lib/charts/palette";
 import { TopIssuesContent } from "@/features/overview/TopIssues";
@@ -57,19 +60,28 @@ export function StatRenderer({ widget, data }: ModuleRenderProps) {
       <strong className="text-3xl font-semibold tracking-tight tabular-nums">
         {formatMetric(data.value, data.unit)}
       </strong>
-      <ModuleComparison widget={widget} data={data} />
     </div>
   );
+  const comparison = <ModuleComparison widget={widget} data={data} variant="corner" />;
   const appearance = widget.statAppearance ?? "plain";
-  if (appearance === "plain") return summary;
+  if (appearance === "plain")
+    return (
+      <>
+        {summary}
+        {comparison}
+      </>
+    );
   return (
-    <div
-      data-stat-appearance={appearance}
-      className="grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,0.8fr)] items-center gap-3"
-    >
-      {summary}
-      <StatTrend data={data.trend} appearance={appearance} />
-    </div>
+    <>
+      <div
+        data-stat-appearance={appearance}
+        className="grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,0.8fr)] items-center gap-3"
+      >
+        {summary}
+        <StatTrend data={data.trend} appearance={appearance} />
+      </div>
+      {comparison}
+    </>
   );
 }
 
@@ -89,9 +101,7 @@ export function PlotRenderer({
   useEffect(() => {
     const element = container.current;
     if (!element) return;
-    const observer = new ResizeObserver(([entry]) => setWidth(entry.contentRect.width));
-    observer.observe(element);
-    return () => observer.disconnect();
+    return observeElementWidth(element, setWidth);
   }, [empty, widget.view]);
   if (data.kind !== "series" && data.kind !== "categories") return null;
   if (data.empty || !data.rows.length)
@@ -104,6 +114,7 @@ export function PlotRenderer({
       </Empty>
     );
   const categories = data.kind === "categories";
+  const currentSeries = data.series.filter((series) => series.role !== "previous");
   const unit = data.series[0].unit;
   const config: ChartConfig = Object.fromEntries(
     data.series.map((series) => [
@@ -257,19 +268,21 @@ export function PlotRenderer({
                     isAnimationActive={animate}
                   />
                 ))}
-              {data.series
-                .filter((series) => series.role !== "previous")
-                .map((series, index) =>
-                  data.stacked && widget.view === "stacked-bar" ? (
+              {data.stacked && widget.view === "stacked-bar" ? (
+                <BarStack stackId="total" radius={BAR_RADIUS_TOP}>
+                  {currentSeries.map((series) => (
                     <Bar
                       key={series.key}
                       dataKey={series.key}
-                      stackId="total"
                       fill={series.color}
                       maxBarSize={32}
                       isAnimationActive={animate}
                     />
-                  ) : data.stacked ? (
+                  ))}
+                </BarStack>
+              ) : (
+                currentSeries.map((series, index) =>
+                  data.stacked ? (
                     <Area
                       key={series.key}
                       dataKey={series.key}
@@ -288,7 +301,7 @@ export function PlotRenderer({
                       key={series.key}
                       dataKey={series.key}
                       fill={series.color}
-                      radius={3}
+                      radius={BAR_RADIUS_TOP}
                       maxBarSize={categories ? 16 : 32}
                       isAnimationActive={animate}
                     />
@@ -316,7 +329,8 @@ export function PlotRenderer({
                       isAnimationActive={animate}
                     />
                   ),
-                )}
+                )
+              )}
               {data.series.length > 1 ? <ChartLegend content={<ChartLegendContent />} /> : null}
             </ComposedChart>
           </ChartContainer>

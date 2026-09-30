@@ -11,7 +11,7 @@ Project 设置决定一个被监控的 Web 产品如何上报和保留遥测数�
 
 Console 的设置地址会明确写出作用域：
 
-- **常规**（`/settings/project/<id>/general`）：名称、Slug、Origin、Environment、保留天数、停用/启用和数据清空。
+- **常规**（`/settings/project/<id>/general`）：名称、开发平台、Origin、保留天数、停用/启用和删除项目。
 - **接入指引**（`/projects/<id>/onboarding`）：复制项目默认 DSN 和平台接入代码。
 - **数据管理**：集中采样、速率限制、入站过滤、URL 归一化和隐私脱敏。通过页内标签切换，各项独立保存，作用于当前项目的全部环境。
 - **用量统计**（`/settings/project/<id>/usage`）：查看已接收量、估算原始量、处理结果并导出 CSV；采样配置与报表分开。
@@ -35,20 +35,18 @@ Console 的设置地址会明确写出作用域：
 ## 会立即影响上报的设置
 
 - 移除 Origin 后，Ingest 会拒绝该站点的新报告。
-- SDK `init()` 中的 `environment` 必须与 Project 下存在的 Environment 匹配。
+- 每个项目自动接收四个固定环境的上报：开发 `development`、测试 `test`、灰度 `staging`、生产 `production`，无需启用。SDK `init()` 的 `environment` 取其一，其他名称会被拒绝。环境切换器列出已有上报数据的环境，分析默认看全部环境。
 - 停用 Project 会拒绝所有新报告，但保留 DSN，适合临时停止噪声项目。
 
-## 清空项目数据
+## 删除项目
 
-“清空所有项目数据”会永久删除 Event、Session、Issue、Log、API、性能数据、用量聚合、告警历史、Release 和 Source Map，但保留 Project、Environment、DSN、Origin、采样、保留策略、告警规则和审计历史。
+常规页的「删除项目」会永久删除该项目及其全部数据，只有 Organization Owner 可以操作。**按住按钮 2 秒**确认，中途松开不会删除。
 
-为避免数据继续进入：
+- 立即吊销项目的全部 DSN，Ingest 不再接收该项目的上报，项目从列表和切换器中消失。
+- 后台任务随后删除 Event、Session、Issue、Log、API、性能数据、用量聚合、告警规则与历史、Release 和 Source Map，并在分析存储清空一分钟后再次确认没有残留。
+- 数据库中的项目记录以「删除中」状态保留（软删除），审计历史不受影响，但项目无法恢复。
 
-1. Organization Owner 必须先停用 Project。
-2. 输入完整 Project 名称确认。
-3. 清空任务排队、执行、重试或验证期间不能重新启用。
-
-任务在分析存储清空后等待一分钟再次验证，Project 不会自动重新启用。
+只想暂停上报时，请使用可随时恢复的「停用项目」。
 
 ## 归一化与脱敏
 

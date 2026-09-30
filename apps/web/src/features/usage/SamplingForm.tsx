@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
+import { Slider } from "@/components/ui/slider";
 import { canManageProjects, updateProject, type Project } from "@/lib/api/projects";
 import type { UsageResponse } from "@/lib/api/usage";
 import { ImpactPreview } from "./ImpactPreview";
@@ -140,26 +141,25 @@ function RateField({
 }) {
   const percentage = Math.round(value * 100);
   return (
-    <label className="mt-6 block text-sm font-medium">
+    <div className="mt-6 text-sm font-medium">
       <span className="flex items-center justify-between">
         <span>{label}</span>
         <strong>{percentage}%</strong>
       </span>
-      <input
-        className="mt-3 w-full accent-primary"
-        type="range"
-        min="0"
-        max="100"
-        step="1"
-        value={percentage}
+      <Slider
+        className="mt-3"
+        min={0}
+        max={100}
+        step={10}
+        value={[percentage]}
         disabled={disabled}
         aria-label={`${label}采样率`}
-        onChange={(event) => onChange(Number(event.target.value) / 100)}
+        onValueChange={([next]) => onChange(next / 100)}
       />
       <span className="mt-1 flex justify-between text-xs text-muted-foreground">
         <span>0%</span>
         <span>100%</span>
       </span>
-    </label>
+    </div>
   );
 }

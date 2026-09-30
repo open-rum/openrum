@@ -1,5 +1,5 @@
 import { Bar, ComposedChart, Line, XAxis, YAxis } from "recharts";
-import { ChartContainer } from "@/components/ui/chart";
+import { BAR_RADIUS_COMPACT, ChartContainer } from "@/components/ui/chart";
 import { useChartMotion } from "@/lib/charts/useChartMotion";
 import { smoothCurve } from "@/lib/charts/smoothCurve";
 import type { PlotData } from "./adapters";
@@ -64,7 +64,7 @@ export function StatTrend({
           <Bar
             dataKey={series.key}
             fill={series.color}
-            radius={[2, 2, 0, 0]}
+            radius={BAR_RADIUS_COMPACT}
             maxBarSize={8}
             isAnimationActive={animate}
             animationDuration={350}

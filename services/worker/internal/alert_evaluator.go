@@ -145,9 +145,27 @@ func (store *PostgresAlertStore) Record(ctx context.Context, rule metadata.Alert
 	if _, err := transaction.ExecContext(ctx, "SELECT pg_advisory_xact_lock(hashtextextended($1::text,0))", rule.ID); err != nil {
 		return false, err
 	}
-	var exists bool
-	if err := transaction.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM alert_evaluations
-		WHERE rule_id=$1 AND window_started_at=$2 AND window_ended_at=$3)`, rule.ID, evaluation.Window.StartedAt, evaluation.Window.EndedAt).Scan(&exists); err != nil || exists {
+	// A window is recorded once. It is offered for delivery again only while it is a
+	// breach that no channel has accepted yet, up to maxDeliveryAttempts per channel.
+	var existingID uuid.UUID
+	var existingStatus string
+	var notified sql.NullTime
+	err = transaction.QueryRowContext(ctx, `SELECT id, status, notified_at FROM alert_evaluations
+		WHERE rule_id=$1 AND window_started_at=$2 AND window_ended_at=$3`, rule.ID, evaluation.Window.StartedAt,
+		evaluation.Window.EndedAt).Scan(&existingID, &existingStatus, &notified)
+	if err == nil {
+		if existingStatus != "breached" || notified.Valid {
+			return false, nil
+		}
+		var attempts int
+		if err := transaction.QueryRowContext(ctx, `SELECT coalesce(max(attempts), 0) FROM (
+			SELECT count(*) AS attempts FROM alert_deliveries WHERE evaluation_id=$1 GROUP BY channel_id) per_channel`,
+			existingID).Scan(&attempts); err != nil {
+			return false, err
+		}
+		return attempts < maxDeliveryAttempts, nil
+	}
+	if !errors.Is(err, sql.ErrNoRows) {
 		return false, err
 	}
 	status := evaluation.Status

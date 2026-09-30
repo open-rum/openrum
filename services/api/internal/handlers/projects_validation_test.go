@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/google/uuid"
@@ -67,14 +68,38 @@ func TestValidateUpdateProjectRejectsInvalidEnvironmentSets(t *testing.T) {
 		t.Fatal("expected an invalid environment name to be rejected")
 	}
 
-	full := []string{
-		"environment-01", "environment-02", "environment-03", "environment-04",
-		"environment-05", "environment-06", "environment-07", "environment-08",
-		"environment-09", "environment-10", "environment-11", "environment-12",
-		"environment-13", "environment-14", "environment-15", "environment-16",
+	custom := []string{"production", "canary"}
+	if _, ok := validateUpdateProject(updateProjectRequest{Environments: &custom}); ok {
+		t.Fatal("expected an environment outside the fixed set to be rejected")
 	}
-	newDefault := "production"
-	if _, ok := validateUpdateProject(updateProjectRequest{Environment: &newDefault, Environments: &full}); ok {
-		t.Fatal("expected adding a default to a full environment set to be rejected")
+	all := []string{"development", "test", "staging", "production"}
+	if _, ok := validateUpdateProject(updateProjectRequest{Environments: &all}); !ok {
+		t.Fatal("expected all four fixed environments to be accepted")
+	}
+	customDefault := "preview"
+	if _, ok := validateUpdateProject(updateProjectRequest{Environment: &customDefault}); ok {
+		t.Fatal("expected a default outside the fixed set to be rejected")
+	}
+}
+
+func TestValidateCreateProjectGeneratesSlugWhenOmitted(t *testing.T) {
+	for name, prefix := range map[string]string{
+		"Shop H5 (Demo)": "shop-h5-demo-",
+		"商城 H5":          "h5-",
+		"商城":             "project-",
+	} {
+		input, ok := validateCreateProject(createProjectRequest{
+			Name: name, AllowedOrigins: []string{"https://example.com"},
+		}, uuid.New())
+		if !ok {
+			t.Fatalf("%q: expected project input to be valid", name)
+		}
+		if !strings.HasPrefix(input.Slug, prefix) || !validSlug(input.Slug) {
+			t.Fatalf("%q: slug = %q, want valid slug with prefix %q", name, input.Slug, prefix)
+		}
+	}
+	first := generatedProjectSlug("Storefront")
+	if first == generatedProjectSlug("Storefront") {
+		t.Fatalf("generated slugs repeat: %q", first)
 	}
 }

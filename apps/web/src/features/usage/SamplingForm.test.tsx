@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { afterEach, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, expect, it, vi } from "vitest";
 import { updateProject, type Project } from "@/lib/api/projects";
 import { SamplingForm } from "./SamplingForm";
 
@@ -32,10 +32,23 @@ const project: Project = {
   updatedAt: "2026-09-01T00:00:00Z",
 };
 
+beforeAll(() => {
+  vi.stubGlobal(
+    "ResizeObserver",
+    class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    },
+  );
+});
+
 afterEach(() => {
   cleanup();
   vi.resetAllMocks();
 });
+
+afterAll(() => vi.unstubAllGlobals());
 
 function renderForm(input = project) {
   const client = new QueryClient({ defaultOptions: { mutations: { retry: false } } });
@@ -53,10 +66,12 @@ it("saves without usage data, updates both caches and rolls back to the latest s
   const saved = { ...project, eventSampleRate: 0.4 };
   vi.mocked(updateProject).mockResolvedValueOnce(saved).mockRejectedValueOnce(new Error("offline"));
   const client = renderForm();
-  const slider = screen.getByLabelText("页面、性能与自定义事件采样率") as HTMLInputElement;
+  const slider = screen.getByRole("slider", { name: "页面、性能与自定义事件采样率" });
   const save = screen.getByRole("button", { name: "保存采样配置" }) as HTMLButtonElement;
   expect(screen.getByText("预估不可用")).toBeTruthy();
-  fireEvent.change(slider, { target: { value: "40" } });
+  // Each ArrowDown is one 10% step.
+  for (let step = 0; step < 6; step += 1) fireEvent.keyDown(slider, { key: "ArrowDown" });
+  expect(slider.getAttribute("aria-valuenow")).toBe("40");
   fireEvent.click(save);
   await waitFor(() => expect(client.getQueryData(["project", project.id])).toEqual(saved));
   expect(client.getQueryData(["projects", project.organizationId])).toEqual({ projects: [saved] });
@@ -66,11 +81,11 @@ it("saves without usage data, updates both caches and rolls back to the latest s
     apiSampleRate: 0.2,
     errorSampleRate: 1,
   });
-  fireEvent.change(slider, { target: { value: "30" } });
+  fireEvent.keyDown(slider, { key: "ArrowDown" });
   expect(screen.queryByText("已保存并开始分发")).toBeNull();
   fireEvent.click(save);
   await waitFor(() => expect(screen.getByRole("alert").textContent).toContain("已回滚"));
-  expect(slider.value).toBe("40");
+  expect(slider.getAttribute("aria-valuenow")).toBe("40");
   expect(save.disabled).toBe(true);
 });
 
@@ -80,7 +95,8 @@ it("keeps sampling read-only for members even when usage is unavailable", () => 
     true,
   );
   for (const slider of screen.getAllByRole("slider")) {
-    expect((slider as HTMLInputElement).disabled).toBe(true);
+    expect(slider.getAttribute("data-disabled")).toBe("");
+    expect(slider.getAttribute("tabindex")).toBeNull();
   }
   expect(updateProject).not.toHaveBeenCalled();
 });

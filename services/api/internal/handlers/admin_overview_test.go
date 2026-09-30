@@ -3,12 +3,15 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/redis/go-redis/v9"
 	"github.com/rs/zerolog"
 
 	"openrum/internal/auth"
@@ -22,6 +25,43 @@ type fixedAdminOverviewSource struct {
 
 func (source fixedAdminOverviewSource) Snapshot(context.Context) adminOverviewResponse {
 	return source.response
+}
+
+type fakeOverviewRedis struct {
+	err  error
+	gets int
+}
+
+func (client *fakeOverviewRedis) Ping(context.Context) *redis.StatusCmd {
+	return redis.NewStatusResult("PONG", nil)
+}
+
+func (client *fakeOverviewRedis) Get(context.Context, string) *redis.StringCmd {
+	client.gets++
+	return redis.NewStringResult("alive", client.err)
+}
+
+func TestWorkerDependencyReportsHeartbeatWithoutExposingRedisErrors(t *testing.T) {
+	for _, test := range []struct {
+		name   string
+		err    error
+		status string
+	}{
+		{name: "recent heartbeat", status: "healthy"},
+		{name: "missing heartbeat", err: redis.Nil, status: "unhealthy"},
+		{name: "redis unavailable", err: errors.New("dial redis.internal:6379 failed"), status: "unknown"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			client := &fakeOverviewRedis{err: test.err}
+			result := workerDependency(context.Background(), client, "instance-key")
+			if result.Status != test.status || client.gets != 1 || result.LatencyMS != nil {
+				t.Fatalf("worker status=%q gets=%d latency=%v", result.Status, client.gets, result.LatencyMS)
+			}
+			if strings.Contains(result.Detail, "redis.internal") {
+				t.Fatal("worker status exposed the Redis address")
+			}
+		})
+	}
 }
 
 func TestAdminOverviewRequiresInstanceRoleAndDoesNotExposeSecrets(t *testing.T) {

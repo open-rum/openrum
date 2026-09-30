@@ -203,10 +203,9 @@ export default defineConfig({
             { slug: "docs/product/dashboards" },
             { slug: "docs/product/investigation" },
             { slug: "docs/product/logs" },
-            // Analytics is the one capability with a model to learn before you can
-            // use it, so it is a group rather than a page. Collapsed by default: a
-            // reader who came for Alerts should not have to scroll past five
-            // analytics pages to find it.
+            // Capabilities with several task pages (analytics, alerts) are groups rather
+            // than pages, collapsed by default so a reader looking for one capability
+            // does not scroll past the others' pages.
             {
               label: "Analytics",
               translations: { zh: "行为分析", "zh-CN": "行为分析" },
@@ -221,7 +220,16 @@ export default defineConfig({
             },
             { slug: "docs/product/performance" },
             { slug: "docs/product/api-monitoring" },
-            { slug: "docs/product/alerts" },
+            {
+              label: "Alerts",
+              translations: { zh: "告警", "zh-CN": "告警" },
+              collapsed: true,
+              items: [
+                { slug: "docs/product/alerts" },
+                { slug: "docs/product/alerts/feishu" },
+                { slug: "docs/product/alerts/webhook" },
+              ],
+            },
             { slug: "docs/product/project-settings" },
             { slug: "docs/product/rate-limits" },
             { slug: "docs/product/inbound-filters" },

@@ -1,35 +1,30 @@
 import AxeBuilder from "@axe-core/playwright";
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 
-for (const [width, theme, prefix] of [
-  [1280, "light", ""],
-  [1280, "dark", "/zh"],
-  [390, "light", "/zh"],
-  [390, "dark", ""],
+for (const [width, prefix] of [
+  [1280, ""],
+  [390, "/zh"],
 ] as const) {
-  test(`local benchmark evidence stays usable at ${width}px in ${theme}`, async ({ page }) => {
+  test(`homepage tour, palettes and FAQ work at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 });
     await page.emulateMedia({ reducedMotion: "reduce" });
-    await page.addInitScript((value) => localStorage.setItem("openrum-theme", value), theme);
     const errors: string[] = [];
     page.on("pageerror", (error) => errors.push(error.message));
     await page.goto(`${prefix}/`);
-    const architecture = page.locator("#architecture");
-    await expect(architecture).toContainText("Apple M4 Pro");
-    await expect(architecture).toContainText("24 GiB");
-    await expect(architecture).toContainText("7.75 GiB");
-    await architecture.locator(`a[href="${prefix}/benchmarks"]`).click();
-    await expect(page).toHaveURL(new RegExp(`${prefix}/benchmarks/?$`));
-    await expect(page.locator("h1")).toHaveCount(1);
-    await expect(page.locator("#hardware")).toContainText("Apple M4 Pro");
-    await expect(page.locator("#limits")).toContainText("2026-09-03");
-    await expect(page.locator("a[download]")).toBeVisible();
-    const response = await page.request.get("/benchmarks/local-capacity.json");
-    expect(response.ok()).toBe(true);
-    const evidence = await response.json();
-    expect(evidence.productionClaim).toBe(false);
-    expect(evidence.acceptedEvents).toBe(evidence.uniqueEventIds);
-    await expect(page.locator("#result")).toContainText(evidence.id);
+    await expect(page.locator("html")).toHaveAttribute("data-palette", "amber");
+    const tabs = page.getByRole("tab");
+    await expect(tabs).toHaveCount(6);
+    await tabs.nth(2).click();
+    await expect(tabs.nth(2)).toHaveAttribute("aria-selected", "true");
+    await expect(page.getByRole("tabpanel")).toHaveCount(1);
+    await tabs.nth(2).press("ArrowRight");
+    await expect(tabs.nth(3)).toBeFocused();
+    const faq = page.locator(".lp-faq details");
+    await faq.nth(0).locator("summary").click();
+    await faq.nth(1).locator("summary").click();
+    await expect(faq.nth(1)).toHaveAttribute("open", "");
+    await expect(faq.nth(0)).not.toHaveAttribute("open", "");
+    await expect(page.locator("#architecture")).toContainText("ClickHouse");
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth - innerWidth),
     ).toBeLessThanOrEqual(1);
@@ -37,7 +32,49 @@ for (const [width, theme, prefix] of [
   });
 }
 
-const keyPages = ["/", "/product", "/self-host", "/docs/", "/docs/getting-started/quickstart/"];
+async function choosePalette(page: Page, menu: string, palette: string) {
+  await page.getByRole("banner").getByLabel(menu, { exact: true }).first().click();
+  await page.getByRole("menuitemradio", { name: palette }).click();
+}
+
+test("docs pages and the logo follow the homepage palette in both themes", async ({ page }) => {
+  await page.goto("/");
+  await choosePalette(page, "Choose palette", "Magenta");
+  await page.goto("/docs/getting-started/quickstart/");
+  const html = page.locator("html");
+  await expect(html).toHaveAttribute("data-palette", "magenta");
+  const logo = () =>
+    page
+      .locator(".brand-mark svg, header svg[aria-hidden]")
+      .first()
+      .evaluate((node) => getComputedStyle(node).color);
+  const magentaLogo = await logo();
+  for (const theme of ["light", "dark"]) {
+    await page.evaluate((value) => (document.documentElement.dataset.theme = value), theme);
+    expect(await logo()).toBe(magentaLogo);
+  }
+  await page.goto("/");
+  await choosePalette(page, "Choose palette", "Lime");
+  await page.goto("/docs/getting-started/quickstart/");
+  await expect(html).toHaveAttribute("data-palette", "lime");
+  expect(await logo()).not.toBe(magentaLogo);
+});
+
+test("homepage palette choice is kept across visits", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto("/zh/");
+  await choosePalette(page, "选择配色", "品红");
+  await expect(page.locator("html")).toHaveAttribute("data-palette", "magenta");
+  await page.reload();
+  await expect(page.locator("html")).toHaveAttribute("data-palette", "magenta");
+  await page.getByRole("banner").getByLabel("选择配色", { exact: true }).first().click();
+  await expect(page.getByRole("menuitemradio", { name: "品红" })).toHaveAttribute(
+    "aria-checked",
+    "true",
+  );
+});
+
+const keyPages = ["/", "/zh/", "/docs/", "/docs/getting-started/quickstart/"];
 
 for (const path of keyPages) {
   test(`${path} has metadata, one main heading and no blocking accessibility findings`, async ({
@@ -64,31 +101,28 @@ for (const path of keyPages) {
   });
 }
 
-// The suite above pins itself to the light theme, so a dark-only regression could ship
-// unseen: an unlayered `a { color: inherit }` in global.css outranked
-// `.ui-button-primary` in `@layer components` and left every anchor-shaped primary
-// button inheriting body text, which is 1.12:1 on the lemon-green fill in dark mode.
-test("primary buttons stay legible in the dark theme", async ({ page }) => {
-  await page.addInitScript(() => localStorage.setItem("openrum-theme", "dark"));
+// The homepage is dark only. Its primary actions must never inherit body text, which
+// is how an unlayered `a { color: inherit }` once made them unreadable.
+test("homepage primary actions stay legible in every palette", async ({ page }) => {
   await page.goto("/");
-  await expect(page.locator("html")).toHaveClass(/dark/);
-
-  // Asserted as "differs from body text" rather than against a literal colour so the
-  // test keeps describing the bug if the token's serialised form ever changes.
-  const colors = await page
-    .locator(".lp-hero a.ui-button-contrast")
-    .first()
-    .evaluate((node) => ({
-      button: getComputedStyle(node).color,
-      body: getComputedStyle(document.body).color,
-    }));
-  expect(colors.button).not.toBe(colors.body);
-
-  const result = await new AxeBuilder({ page }).include(".lp-page").analyze();
-  const blocking = result.violations.filter(
-    (violation) => violation.impact === "critical" || violation.impact === "serious",
-  );
-  expect(blocking.map((violation) => `${violation.id}: ${violation.help}`)).toEqual([]);
+  for (const palette of ["amber", "lime", "magenta"]) {
+    await page.evaluate((value) => (document.documentElement.dataset.palette = value), palette);
+    const colors = await page
+      .locator(".lp-hero a.lp-button-primary")
+      .first()
+      .evaluate((node) => ({
+        button: getComputedStyle(node).color,
+        body: getComputedStyle(document.body).color,
+      }));
+    expect(colors.button).not.toBe(colors.body);
+    const result = await new AxeBuilder({ page }).include(".lp").analyze();
+    const blocking = result.violations.filter(
+      (violation) => violation.impact === "critical" || violation.impact === "serious",
+    );
+    expect(blocking.map((violation) => `${palette} ${violation.id}: ${violation.help}`)).toEqual(
+      [],
+    );
+  }
 });
 
 for (const mode of ["reduced-motion", "animated"] as const) {
@@ -100,108 +134,33 @@ for (const mode of ["reduced-motion", "animated"] as const) {
       await page.emulateMedia({ reducedMotion: "reduce" });
     }
     await page.goto("/zh/");
-    await expect(page.locator(".lp-rays")).toHaveCount(0);
-    await expect(page.locator(".stroke-text[data-ready]")).toHaveCount(2);
-    await expect
-      .poll(() =>
-        page
-          .locator(".stroke-text clipPath rect")
-          .evaluateAll((nodes) => nodes.every((node) => Number(node.getAttribute("width")) === 1)),
-      )
-      .toBe(true);
     await expect(page.locator("#lp-hero-title")).toBeVisible();
-    await expect(page.locator(".lp-motion-toggle")).toBeHidden();
+    await expect(page.locator(".lp-shiny")).toHaveText("AI 即将支持");
     expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBe(0);
-    await page.locator(".lp-hero").getByRole("link", { name: "立即开始" }).click();
+    await page.locator(".lp-hero").getByRole("link", { name: "开始部署" }).click();
     await expect(page).toHaveURL(/\/zh\/docs\/getting-started\/quickstart\//);
     expect(errors).toEqual([]);
   });
 }
 
-test("technology icons use shadcn tooltips with hover, focus and Escape", async ({ page }) => {
-  await page.goto("/zh/");
-  const stack = page.getByRole("list", { name: "技术栈" });
-  const react = stack.getByRole("link", { name: "React", exact: true });
-  await react.hover();
-  await expect(page.getByRole("tooltip")).toHaveText("React");
-  await expect(page.locator('[data-slot="tooltip-content"]')).toBeVisible();
-  await expect(page.locator(".lp-tech-label")).toHaveCount(0);
-  await page.keyboard.press("Escape");
-  await expect(page.getByRole("tooltip")).toHaveCount(0);
-  await page.mouse.move(0, 0);
-  const postgres = stack.getByRole("link", { name: "PostgreSQL", exact: true });
-  await postgres.focus();
-  await expect(page.getByRole("tooltip")).toHaveText("PostgreSQL");
-  await page.keyboard.press("Escape");
-  await expect(page.getByRole("tooltip")).toHaveCount(0);
-  await expect(postgres).toBeFocused();
-  await page.keyboard.press("Enter");
-  await expect(page).toHaveURL(/\/zh\/docs\/self-hosting\/postgres\//);
-});
-
-test("headline draws strokes before filling without flashing or resizing", async ({ page }) => {
-  await page.emulateMedia({ reducedMotion: "no-preference" });
-  let release!: () => void;
-  const hydrate = new Promise<void>((resolve) => {
-    release = resolve;
-  });
-  await page.route(/StrokeText.*\.(?:jsx|js)(?:\?.*)?$/, async (route) => {
-    await hydrate;
-    await route.continue();
-  });
-  await page.goto("/zh/", { waitUntil: "commit" });
-  const root = page.locator(".stroke-text").first();
-  const layout = root.locator(".stroke-text__layout");
-  const svg = root.locator("svg");
-  const wipe = root.locator("clipPath rect");
-  await expect(root).toBeAttached();
-  await page.evaluate(() => document.fonts.ready);
-  await expect(layout).toHaveCSS("visibility", "hidden");
-  await expect(svg).toHaveCSS("visibility", "hidden");
-  await expect(wipe).toHaveAttribute("width", "0");
-  const before = await root.boundingBox();
-  release();
-  await expect(root).toHaveAttribute("data-ready", "true");
-  const stroke = root.locator("[data-stroke-char]").first();
-  const offset = () =>
-    stroke.evaluate((node) => parseFloat(getComputedStyle(node).strokeDashoffset));
-  const start = await offset();
-  expect(start).toBeGreaterThan(0);
-  await expect(wipe).toHaveAttribute("width", "0");
-  await expect.poll(offset).toBeLessThan(start);
-  await expect.poll(offset).toBe(0);
-  await expect(wipe).toHaveAttribute("width", "1");
-  expect(
-    await root
-      .locator("[data-stroke-char]")
-      .evaluateAll((nodes) =>
-        nodes.every((node) => parseFloat(getComputedStyle(node).strokeDashoffset) === 0),
-      ),
-  ).toBe(true);
-  const after = await root.boundingBox();
-  expect(after).toEqual(before);
-  await expect(layout).toHaveCSS("visibility", "hidden");
-  await expect(svg).toBeVisible();
-});
-
 test("theme and equivalent language navigation work without a network tracker", async ({
   page,
+  baseURL,
 }) => {
-  const foreignRequests = [];
+  const foreignRequests: string[] = [];
   page.on("request", (request) => {
-    if (new URL(request.url()).origin !== "http://127.0.0.1:4322")
+    if (new URL(request.url()).origin !== new URL(baseURL!).origin)
       foreignRequests.push(request.url());
   });
-  // Seeded to light so the click under test produces dark. Without the seed this
-  // asserted the default rather than the toggle, and it started failing the moment
-  // the default became dark.
-  await page.addInitScript(() => localStorage.setItem("openrum-theme", "light"));
-  await page.goto("/product");
-  await expect(page.locator("html")).not.toHaveClass(/dark/);
-  await page.getByRole("button", { name: "Toggle color theme" }).click();
-  await expect(page.locator("html")).toHaveClass(/dark/);
-  await page.getByRole("link", { name: "切换到简体中文" }).click();
-  await expect(page).toHaveURL(/\/zh\/product\/?$/);
+  await page.addInitScript(() => localStorage.setItem("starlight-theme", "light"));
+  await page.goto("/docs/product/investigation/");
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+  await page.locator("summary[aria-label='Select theme']").click();
+  await page.getByRole("menuitemradio", { name: "Dark", exact: true }).click();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+  await page.locator("summary[aria-label='Select language']").click();
+  await page.getByRole("menuitemradio", { name: "简体中文" }).click();
+  await expect(page).toHaveURL(/\/zh\/docs\/product\/investigation\/?$/);
   expect(foreignRequests).toEqual([]);
 });
 
@@ -210,13 +169,16 @@ test("docs language switch is site-wide and does not mix navigation locales", as
   const tabs = page.locator(".docs-tabs");
   await expect(tabs.getByRole("link", { name: "Start" })).toBeVisible();
   await expect(tabs.getByRole("link", { name: "开始" })).toHaveCount(0);
-  await page.locator("starlight-lang-select select").first().selectOption({ label: "简体中文" });
+  await page.locator("summary[aria-label='Select language']").click();
+  await page.getByRole("menuitemradio", { name: "简体中文" }).click();
   await expect(page).toHaveURL(/\/zh\/docs\/getting-started\/quickstart\/?$/);
   await expect(page.locator("h1")).toContainText("开始使用");
   const zhTabs = page.locator(".docs-tabs");
   await expect(zhTabs.getByRole("link", { name: "开始" })).toBeVisible();
   await expect(zhTabs.getByRole("link", { name: "Start" })).toHaveCount(0);
-  await expect(page.locator(".docs-sidebar-topic")).toHaveText("开始");
+  await expect(
+    page.locator("#starlight__sidebar").getByText("登录指南", { exact: true }),
+  ).toBeVisible();
 });
 
 test("authentication guide works in both languages and a narrow dark viewport", async ({
@@ -294,7 +256,8 @@ for (const guide of ["local-development", "production-deployment"]) {
     );
     const stepCount = guide === "local-development" ? 5 : 3;
     await expect(page.locator(".sl-steps > li")).toHaveCount(stepCount);
-    await page.locator("starlight-lang-select select").first().selectOption({ label: "简体中文" });
+    await page.locator("summary[aria-label='Select language']").click();
+    await page.getByRole("menuitemradio", { name: "简体中文" }).click();
     await expect(page).toHaveURL(new RegExp(`/zh/docs/getting-started/${guide}/?$`));
     await expect(page.locator(".docs-tabs a[aria-current]")).toHaveText("开始");
     await expect(page.locator(".sl-steps > li")).toHaveCount(stepCount);
@@ -320,14 +283,12 @@ test("start sidebar groups collapse and preserve child pages across languages", 
   await local.locator("summary").click();
   await local.getByRole("link", { name: "Connect and verify", exact: true }).click();
   await expect(page).toHaveURL(/\/docs\/getting-started\/local-development\/connect-app\/$/);
-  await page.locator("starlight-lang-select select").first().selectOption({ label: "简体中文" });
+  await page.locator("summary[aria-label='Select language']").click();
+  await page.getByRole("menuitemradio", { name: "简体中文" }).click();
   await expect(page).toHaveURL(/\/zh\/docs\/getting-started\/local-development\/connect-app\/$/);
   await expect(sidebar.locator('a[aria-current="page"]')).toHaveText("接入与验证");
-  const production = sidebar
-    .locator("details")
-    .filter({ has: page.locator("summary", { hasText: "生产部署" }) });
-  await production.locator("summary").click();
-  await production.getByRole("link", { name: "安装服务", exact: true }).click();
+  await sidebar.locator("summary").filter({ hasText: "部署生产" }).click();
+  await sidebar.getByRole("link", { name: "安装服务", exact: true }).click();
   await expect(page).toHaveURL(/\/zh\/docs\/getting-started\/production-deployment\/install\/$/);
   await expect(
     page.locator(".expressive-code .header").filter({ hasText: "runtime-secret.yaml" }),
@@ -341,6 +302,26 @@ test("start sidebar groups collapse and preserve child pages across languages", 
     )
     .click();
   await expect(page.locator("h1")).toHaveText("首次使用与维护");
+});
+
+test("Start sidebar ends with sign-in guides in both languages", async ({ page }) => {
+  await page.goto("/docs/getting-started/quickstart/");
+  const sidebar = page.locator("#starlight__sidebar");
+  const signIn = sidebar
+    .locator("details")
+    .filter({ has: page.locator("summary", { hasText: "Sign-in guide" }) });
+  await expect(sidebar.locator("details > summary").last()).toContainText("Sign-in guide");
+  await expect(signIn.locator("summary")).toBeVisible();
+  await signIn.locator("summary").click();
+  await signIn.getByRole("link", { name: "Sign in with LDAP" }).click();
+  await expect(page).toHaveURL(/\/docs\/getting-started\/sign-in\/ldap\/$/);
+  await expect(page.locator("h1")).toHaveText("Sign in with LDAP");
+
+  await page.locator("summary[aria-label='Select language']").click();
+  await page.getByRole("menuitemradio", { name: "简体中文" }).click();
+  await expect(page).toHaveURL(/\/zh\/docs\/getting-started\/sign-in\/ldap\/$/);
+  await expect(page.locator("h1")).toHaveText("使用 LDAP 登录");
+  await expect(sidebar.locator("details > summary").last()).toContainText("登录指南");
 });
 
 for (const [width, theme, prefix] of [
@@ -461,15 +442,16 @@ test("copy page hands over the page's own markdown", async ({ context, page }) =
   expect(copied).toContain("## Choose your path");
 });
 
-test("documentation search is local", async ({ page }) => {
+test("documentation search is local", async ({ page, baseURL }) => {
   const foreignRequests = [];
   page.on("request", (request) => {
-    if (new URL(request.url()).origin !== "http://127.0.0.1:4322")
+    if (new URL(request.url()).origin !== new URL(baseURL!).origin)
       foreignRequests.push(request.url());
   });
   await page.goto("/docs/getting-started/quickstart/");
   const search = page.getByRole("button", { name: /search/i }).first();
   await search.click();
   await page.getByRole("textbox").fill("Source Map");
+  await expect(page.locator(".pagefind-ui__result").first()).toBeVisible();
   expect(foreignRequests).toEqual([]);
 });
