@@ -34,6 +34,10 @@ and backend work, not only the project overview.
 
 Before changing Ingest rate limits, Project limit settings, 429 behavior, or related documentation, read `docs/agents/rate-limits.md`.
 
+### Alerts
+
+Before changing alert rules, evaluation, delivery, notification channels, or the Alerts and Notification channels pages, read `docs/agents/alerts.md`.
+
 ### Storage pressure
 
 Before changing ClickHouse capacity thresholds, emergency sampling, hard-stop behavior, or emergency cleanup, read `docs/agents/storage-pressure.md`.

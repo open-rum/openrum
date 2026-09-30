@@ -129,7 +129,7 @@ export function FilterSearchComposer({
     <div className="filter-search-composer">
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverAnchor asChild>
-          <InputGroup className="h-auto min-h-[var(--control-height)] flex-wrap bg-background">
+          <InputGroup className="h-auto min-h-[var(--control-height)] flex-wrap rounded-[calc(var(--control-height)/2)] bg-background">
             <InputGroupAddon className="flex-wrap justify-start gap-1.5">
               <SearchIcon aria-hidden="true" />
               {tokens.map((token) => (
@@ -213,7 +213,7 @@ export function FilterSearchComposer({
                     key={`${active.key}:${option.value}`}
                     type="button"
                     variant="ghost"
-                    className="h-auto min-h-11 justify-start px-3 py-2 text-left whitespace-normal"
+                    className="h-auto min-h-11 justify-start rounded-xl px-3 py-2 text-left whitespace-normal"
                     onClick={() => selectValue(option.value)}
                   >
                     <span className="min-w-0 flex-1">
@@ -266,7 +266,7 @@ export function FilterSearchComposer({
                       key={field.key}
                       type="button"
                       variant="ghost"
-                      className="h-auto min-h-14 justify-start gap-3 px-3 py-2 text-left whitespace-normal"
+                      className="h-auto min-h-14 justify-start rounded-xl gap-3 px-3 py-2 text-left whitespace-normal"
                       onClick={() => {
                         setActiveKey(field.key);
                         setDraft("");

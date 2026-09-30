@@ -6,7 +6,14 @@ import BrandWordmark from "../../components/BrandWordmark.astro";
 import ChartExamples from "../../components/design/ChartExamples";
 import FontPreview from "../../components/design/FontPreview.astro";
 import { ArrowUpRight, Download, Copy, Check, ArrowRight } from "lucide-astro";
-import { palettes, colorGroups, typeSamples } from "@openrum/design-tokens/catalog";
+import {
+  cardHues,
+  cardRoles,
+  colorGroups,
+  densities,
+  palettes,
+  typeSamples,
+} from "@openrum/design-tokens/catalog";
 const spaces = [
   ["--space-1", "04"],
   ["--space-2", "08"],
@@ -25,13 +32,13 @@ const spaces = [
       <p class="ds-overline">OPENRUM / VISUAL FOUNDATIONS</p><h1>
         设计规范<span>Design system.</span>
       </h1><p class="ds-intro-copy">
-        从品牌标识到每一条数据曲线。<br />在这里查看唯一的 Citrus 主题、规则与页面效果。
+        从品牌标识到每一条数据曲线。<br />在这里查看三套配色、四色色卡、两种密度与页面效果。
       </p>
     </div><div class="ds-intro-mark"><BrandMark size={112} /></div>
   </div>
   <div class="ds-summary">
-    <span><strong>01</strong> 唯一主题</span><span><strong>02</strong> 明暗模式</span><span
-      ><strong>03</strong> 图表类型</span
+    <span><strong>01</strong> 三套配色</span><span><strong>02</strong> 明暗模式</span><span
+      ><strong>03</strong> 两种密度</span
     ><span class="ds-summary-live"><i class="ds-status-dot"></i> 与共享 token 同步</span>
   </div>
 
@@ -39,29 +46,31 @@ const spaces = [
     id="brand"
     index="01"
     title="品牌标识"
-    description="网站和文档使用像素信号小怪。标记跟随页面配色，favicon 使用柠檬绿；字标保持中性文字色。"
+    description="控制台、网站和文档共用像素信号小怪，支持短暂的眨眼、挥手和信号闪动。标记跟随当前配色，favicon 使用默认的琥珀色；字标保持中性文字色。"
   >
     <div class="ds-brand-board">
       <div class="ds-brand-lockup">
         <span class="brand-mark" data-brand-download><BrandMark size={88} /></span><BrandWordmark />
       </div><span class="ds-board-caption">PRIMARY LOCKUP / SVG</span><button
         class="ds-text-button"
-        data-download-logo><Download size={15} />下载柠檬绿 SVG</button
+        data-download-logo><Download size={15} />下载当前配色 SVG</button
       >
     </div>
     <div class="ds-logo-variants">
       <div>
         <div class="ds-logo-sample brand-mark"><BrandMark size={46} /></div><span
-          >图标 · 24px 推荐</span
+          >图标 · 40px 推荐</span
         >
       </div>
       <div>
         <div class="ds-logo-sample" data-theme-scope="light"><BrandMark size={46} /></div><span
-          >柠檬绿 · 亮色表面</span
+          >当前配色 · 亮色表面</span
         >
       </div>
       <div>
-        <div class="ds-logo-sample dark"><BrandMark size={46} /></div><span>柠檬绿 · 深色表面</span>
+        <div class="ds-logo-sample dark"><BrandMark size={46} /></div><span
+          >当前配色 · 深色表面</span
+        >
       </div>
       <div>
         <div class="ds-logo-sample ds-clearspace">
@@ -72,37 +81,43 @@ const spaces = [
   </DesignSection>
 
   <DesignSection
-    id="citrus"
+    id="palettes"
     index="02"
-    title="Citrus 配色"
-    description="Citrus 是 OpenRUM 唯一主题。官网、文档、控制台和图表共同读取这一套语义 Token。"
+    title="配色"
+    description="默认琥珀，可切换柠檬绿和品红。选中的颜色成为主色，色卡里其余三色作为点缀。切换立即作用于本页、官网与文档；控制台在账户菜单里单独选择。"
   >
-    <fieldset class="ds-presets">
-      <legend class="sr-only">Citrus 主题</legend>
+    <fieldset class="ds-presets" role="radiogroup" aria-label="配色">
+      <legend class="sr-only">配色</legend>
       {
-        palettes.map((palette) => (
-          <div class="ds-preset ds-preset--canonical">
-            <div>
-              <span class="ds-preset-top">
-                <small>01 / {palette.label}</small>
-                <Check size={15} />
-              </span>
-              <strong>{palette.name}</strong>
-              <p>{palette.description}</p>
-              <span class="ds-preset-line" />
-            </div>
-          </div>
+        palettes.map((palette, index) => (
+          <button
+            type="button"
+            role="radio"
+            aria-checked="false"
+            class="ds-preset ds-palette-card"
+            data-palette-option={palette.id}
+          >
+            <span class="ds-preset-top">
+              <small>
+                0{index + 1} / {palette.label}
+              </small>
+              <Check size={15} />
+            </span>
+            <span class="ds-palette-dots" aria-hidden="true">
+              {palette.dots.map((hue) => (
+                <i style={`background:var(--ds-${hue}-solid)`} />
+              ))}
+            </span>
+            <strong>{palette.name}</strong>
+            <p>{palette.description}</p>
+          </button>
         ))
       }
     </fieldset>
     <div class="ds-guidance">
-      <span>参考基准</span><p>
-        颜色遵循 <a
-          href="https://www.shadcnblocks.com/block/dashboard9"
-          target="_blank"
-          rel="noreferrer">shadcnblocks dashboard9</a
-        >
-        的 Citrus 截图：中性底色与文字、柠檬绿 Logo 和主系列、蓝绿色辅助系列、淡黄色周期对比。 图表折线与填充使用同一系列色，不使用深橄榄绿文字色描边。
+      <span>色卡规则</span><p>
+        琥珀、柠檬绿、天蓝、品红组成四色色卡。主色只用于
+        Logo、选中、焦点、开关、进度与第一数据系列；点缀色用于徽标、分类标签和第二到第四数据系列。主要操作保持黑白对比，不用品牌色填充；上一周期是中性灰虚线；警告状态用橙色，与琥珀主色区分。
       </p>
     </div>
     <div class="ds-color-contract">
@@ -123,14 +138,15 @@ const spaces = [
         </div>
         <div>
           <dt>导航与控件</dt><dd>
-            选中导航用 <code>--ds-sidebar-accent</code> 浅灰背景和中性文字；普通操作用灰色边框。主操作用
-            Primary 或黑白对比，柠檬绿填充配黑字。
+            选中导航用 <code>--ds-sidebar-accent</code> 浅灰背景和中性文字；选中的表单选项用 <code
+              >--ds-selection</code
+            > 与主色描边。主操作亮色黑底、暗色白底。
           </dd>
         </div>
         <div>
           <dt>状态反馈</dt><dd>
             成功、警告、错误分别使用
-            Success、Warning、Danger，配文字或图标。普通系列不借用红色，淡黄色对比线不表示告警。
+            Success、Warning、Danger，配文字或图标。点缀色只表达分类，不表达好坏。
           </dd>
         </div>
       </dl>
@@ -138,8 +154,63 @@ const spaces = [
   </DesignSection>
 
   <DesignSection
-    id="colors"
+    id="card"
     index="03"
+    title="四色色卡"
+    description="每个色相有实心、浅底、可读文字和描边四种角色；亮色与暗色各一套，文字对比度都不低于 4.5:1。"
+  >
+    <div class="ds-card-grid">
+      {
+        cardHues.map((hue) => (
+          <div class="ds-card-hue">
+            <h3>
+              {hue.label} <span>{hue.name}</span>
+            </h3>
+            {cardRoles.map(([role, usage]) => (
+              <button
+                class="ds-swatch"
+                data-copy-token={`--ds-${hue.id}-${role}`}
+                aria-label={`复制 --ds-${hue.id}-${role}`}
+              >
+                <span class="ds-swatch-paint" style={`background:var(--ds-${hue.id}-${role})`} />
+                <span class="ds-swatch-title">
+                  {usage}
+                  <Copy size={13} />
+                </span>
+                <span
+                  class="ds-swatch-value"
+                  data-token-value={`--ds-${hue.id}-${role}`}
+                  data-token-format="color"
+                />
+                <code>{`--ds-${hue.id}-${role}`}</code>
+              </button>
+            ))}
+          </div>
+        ))
+      }
+    </div>
+    <div class="ds-badge-row" aria-label="徽标示例">
+      <span
+        class="ds-badge"
+        style="background:var(--ds-primary-soft);color:var(--ds-primary-ink);border-color:var(--ds-primary-border)"
+        >品牌 · 随配色</span
+      >
+      {
+        cardHues.map((hue) => (
+          <span
+            class="ds-badge"
+            style={`background:var(--ds-${hue.id}-soft);color:var(--ds-${hue.id}-ink);border-color:var(--ds-${hue.id}-border)`}
+          >
+            {hue.label}
+          </span>
+        ))
+      }
+    </div>
+  </DesignSection>
+
+  <DesignSection
+    id="colors"
+    index="04"
     title="语义颜色"
     description="颜色以用途命名。点击色卡复制 CSS 变量；数值读取当前主题，并随明暗模式实时更新。"
   >
@@ -179,7 +250,7 @@ const spaces = [
 
   <DesignSection
     id="typography"
-    index="04"
+    index="05"
     title="字体与排版"
     description="比较五款候选字体，分别选择英文与中文，观察正文、KPI、表格和图表的效果。当前产品使用 IBM Plex Sans + 系统黑体；以下候选可用于本页对比预览。"
   >
@@ -211,9 +282,9 @@ const spaces = [
 
   <DesignSection
     id="foundations"
-    index="05"
+    index="06"
     title="空间与质感"
-    description="统一的间距步长与边界，构成界面的秩序。官网和控制台共享基础，但不强制使用相同的留白。"
+    description="Maia 圆角体系：按钮与单行表单使用胶囊圆角，多行表单、卡片和弹层使用分级大圆角。官网和控制台共享基础。"
   >
     <div class="ds-foundation-grid">
       <div class="ds-material">
@@ -234,7 +305,7 @@ const spaces = [
       <div class="ds-material">
         <h3>Radius & elevation</h3><div class="ds-radius-list">
           {
-            ["sm", "md", "lg"].map((size) => (
+            ["control", "field", "surface", "overlay"].map((size) => (
               <div>
                 <>
                   <i style={`border-radius:var(--radius-${size})`} />
@@ -258,8 +329,51 @@ const spaces = [
   </DesignSection>
 
   <DesignSection
+    id="density"
+    index="07"
+    title="布局密度"
+    description="控制台提供舒适和紧凑两种密度，由用户在账户菜单里选择。紧凑模式缩小控件、表格行和页面间距，文字不小于 12px，触屏设备仍保持 44px 点击区域。"
+  >
+    <div class="ds-density-grid">
+      {
+        densities.map((density) => (
+          <div class="ds-density-panel" data-density={density.id}>
+            <div class="ds-density-head">
+              <strong>{density.label}</strong>
+              <small>{density.description}</small>
+            </div>
+            <div class="ds-density-controls">
+              <span class="ds-density-button ds-density-button--primary">保存规则</span>
+              <span class="ds-density-button">取消</span>
+              <span class="ds-density-input">搜索页面…</span>
+            </div>
+            <div class="ds-density-table" role="table" aria-label={`${density.label}密度表格示例`}>
+              <div role="row" class="ds-density-row ds-density-row--head">
+                <span role="columnheader">页面</span>
+                <span role="columnheader">PV</span>
+                <span role="columnheader">错误率</span>
+              </div>
+              {[
+                ["/checkout", "12,480", "0.8%"],
+                ["/product", "9,221", "0.3%"],
+                ["/search", "6,907", "0.1%"],
+              ].map(([page, views, rate]) => (
+                <div role="row" class="ds-density-row">
+                  <span role="cell">{page}</span>
+                  <span role="cell">{views}</span>
+                  <span role="cell">{rate}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))
+      }
+    </div>
+  </DesignSection>
+
+  <DesignSection
     id="charts"
-    index="06"
+    index="08"
     title="数据可视化"
     description="使用项目现有 shadcn Chart / Recharts 基础。三种常用图表共享同一套语义配色，支持悬停与键盘查看数据。"
   >
@@ -296,7 +410,7 @@ const spaces = [
 
   <DesignSection
     id="previews"
-    index="07"
+    index="09"
     title="落地页方案"
     description="保留不同版本，使用相同配色对比布局。方案 1 对应文档，后续方案会继续加入这里。"
   >

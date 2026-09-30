@@ -1,18 +1,40 @@
 ---
-import { signalScoutBodyPath, signalScoutEyePath } from "../lib/siteBrand";
-const { size = 28 } = Astro.props;
+import {
+  brandMarkViewBox,
+  signalScoutTorsoPath,
+  signalScoutArmPath,
+  signalScoutEyePath,
+  signalScoutNearSignalPath,
+  signalScoutFarSignalPath,
+} from "@openrum/design-tokens/brand";
+import "@openrum/design-tokens/brand.css";
+const { size = 40 } = Astro.props;
+// Eyes are cut out of the body; the blink fades the mask shapes and closes the holes.
+const maskId = `signal-scout-eyes-${crypto.randomUUID().slice(0, 8)}`;
 ---
 
 <svg
+  class="signal-scout"
   style="color:var(--ds-logo)"
   width={size}
   height={size}
-  viewBox="0 0 24 24"
+  viewBox={brandMarkViewBox}
   fill="none"
   shape-rendering="crispEdges"
   aria-hidden="true"
   focusable="false"
 >
-  <path d={signalScoutBodyPath} fill="currentColor"></path>
-  <path d={signalScoutEyePath} fill="#262723"></path>
+  <defs>
+    <mask id={maskId} maskUnits="userSpaceOnUse" x="2" y="1" width="20" height="20">
+      <rect x="2" y="1" width="20" height="20" fill="white"></rect>
+      <path class="signal-scout__eyes" d={signalScoutEyePath} fill="black"></path>
+    </mask>
+  </defs>
+  <g class="signal-scout__body" fill="currentColor" mask={`url(#${maskId})`}>
+    <path d={signalScoutTorsoPath}></path>
+    <path class="signal-scout__arm" d={signalScoutArmPath}></path>
+    <path class="signal-scout__signal" d={signalScoutNearSignalPath}></path>
+    <path class="signal-scout__signal signal-scout__signal--far" d={signalScoutFarSignalPath}
+    ></path>
+  </g>
 </svg>

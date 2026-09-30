@@ -6,11 +6,16 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="theme-color" content="#ffffff" />
     <meta name="description" content="OpenRUM 前端真实用户监控平台" />
-    <title>OpenRUM · 生产环境概览</title>
+    <title>OpenRUM</title>
     <script>
       try {
-        document.documentElement.dataset.palette = "citrus";
-        localStorage.removeItem("openrum-palette");
+        // Palette and density come before first paint, so nothing flashes the defaults.
+        const palette = localStorage.getItem("openrum-palette");
+        document.documentElement.dataset.palette = ["amber", "lime", "magenta"].includes(palette)
+          ? palette
+          : "amber";
+        document.documentElement.dataset.density =
+          localStorage.getItem("openrum-density") === "compact" ? "compact" : "comfortable";
         const saved = localStorage.getItem("openrum-theme") || "system";
         const resolved =
           saved === "system"

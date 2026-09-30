@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
-import { ChevronsUpDown, LogOut, Monitor, Moon, Sun, UserRound } from "lucide-react";
+import { ChevronsUpDown, LogOut, Monitor, Moon, Settings, Sun, UserRound } from "lucide-react";
+import { densities, palettes } from "@openrum/design-tokens/catalog";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -18,6 +19,8 @@ type AccountMenuProps = {
   email: string;
   signingOut: boolean;
   onSignOut: () => void;
+  /** Instance administrators reach system settings from here. */
+  showInstanceSettings?: boolean;
 };
 
 function initials(displayName: string) {
@@ -30,8 +33,14 @@ function initials(displayName: string) {
     .toUpperCase();
 }
 
-export function AccountMenu({ displayName, email, signingOut, onSignOut }: AccountMenuProps) {
-  const { theme, setTheme } = useTheme();
+export function AccountMenu({
+  displayName,
+  email,
+  signingOut,
+  onSignOut,
+  showInstanceSettings = false,
+}: AccountMenuProps) {
+  const { theme, setTheme, palette, setPalette, density, setDensity } = useTheme();
 
   return (
     <DropdownMenu>
@@ -64,6 +73,14 @@ export function AccountMenu({ displayName, email, signingOut, onSignOut }: Accou
               Account
             </Link>
           </DropdownMenuItem>
+          {showInstanceSettings ? (
+            <DropdownMenuItem asChild>
+              <Link to="/settings/instance">
+                <Settings />
+                系统设置
+              </Link>
+            </DropdownMenuItem>
+          ) : null}
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
         <div className="account-menu__appearance" role="group" aria-label="外观">
@@ -87,6 +104,43 @@ export function AccountMenu({ displayName, email, signingOut, onSignOut }: Accou
                 onClick={() => setTheme(value as Theme)}
               >
                 <Icon aria-hidden="true" />
+              </button>
+            ))}
+          </div>
+        </div>
+        {palettes.length > 1 ? (
+          <div className="account-menu__appearance" role="group" aria-label="配色">
+            <span>配色</span>
+            <div className="account-menu__palette-dots">
+              {palettes.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  className="account-menu__palette-dot"
+                  data-palette-dot={item.id}
+                  aria-label={item.label}
+                  aria-pressed={palette === item.id}
+                  title={item.label}
+                  onClick={() => setPalette(item.id)}
+                />
+              ))}
+            </div>
+          </div>
+        ) : null}
+        <div className="account-menu__appearance" role="group" aria-label="布局密度">
+          <span>布局</span>
+          <div className="account-menu__theme-options">
+            {densities.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                className="account-menu__theme-button account-menu__density-button"
+                data-active={density === item.id}
+                aria-pressed={density === item.id}
+                title={item.description}
+                onClick={() => setDensity(item.id)}
+              >
+                {item.label}
               </button>
             ))}
           </div>

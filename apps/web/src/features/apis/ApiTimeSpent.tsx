@@ -1,5 +1,10 @@
 import { Bar, BarChart, Cell, XAxis, YAxis } from "recharts";
-import { ChartContainer, ChartTooltip, type ChartConfig } from "@/components/ui/chart";
+import {
+  BAR_RADIUS_TRAILING,
+  ChartContainer,
+  ChartTooltip,
+  type ChartConfig,
+} from "@/components/ui/chart";
 import { useChartMotion } from "@/lib/charts/useChartMotion";
 import { apiFailureRate, formatAPIDuration, type APIsResponse } from "@/lib/api/apis";
 
@@ -84,7 +89,7 @@ export function ApiTimeSpent({
           />
           <Bar
             dataKey="weight"
-            radius={[0, 2, 2, 0]}
+            radius={BAR_RADIUS_TRAILING}
             isAnimationActive={animate}
             onClick={(point: unknown) => {
               const payload = point as { payload?: (typeof points)[number] } | undefined;

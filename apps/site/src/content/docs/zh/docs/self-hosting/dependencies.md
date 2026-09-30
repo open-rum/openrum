@@ -29,7 +29,7 @@ description: PostgreSQL、ClickHouse、Kafka、Redis 和可选对象存储的要
 
 ## Redis
 
-Redis 不是事实来源，但其故障会影响限流、缓存和短期状态。参见 [Redis](/zh/docs/self-hosting/redis/)。
+Redis 不是事实来源，但其故障会影响限流、缓存和短期状态；连不上时 API 和 Ingest 会报告未就绪。Helm Chart 可以替你运行一个单实例 Redis，也可以使用你自己的，见 [Redis：自带或外部](/zh/docs/self-hosting/kubernetes/#redis自带或外部)和 [Redis](/zh/docs/self-hosting/redis/)。
 
 ## 对象存储
 

@@ -1,5 +1,5 @@
-// The fixed category order from docs/design.md ("Chart color contract"): lemon, blue,
-// orange, violet, teal, coral, cyan, magenta, gold, slate. A colour belongs to a rank —
+// The category order from docs/design.md ("Chart color contract"): the palette's primary,
+// its three accents, then violet, teal, coral, indigo, umber and slate. A colour belongs to a rank —
 // a series' configured position or a group's returned rank — never to an array length,
 // so adding a series does not repaint the ones already there.
 const CATEGORY_SLOTS = 9;

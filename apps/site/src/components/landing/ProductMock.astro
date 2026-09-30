@@ -1,0 +1,266 @@
+---
+// Schematic product screens for the landing page. They stand in for real Console
+// screenshots: shapes and sample numbers only, drawn with the landing palette, and
+// hidden from assistive technology because the surrounding copy carries the meaning.
+type Kind = "overview" | "errors" | "performance" | "sessions" | "logs" | "alerts" | "events";
+const { kind, lang = "en" } = Astro.props as { kind: Kind; lang?: string };
+const zh = lang === "zh";
+
+const trend = [34, 38, 36, 44, 41, 49, 46, 55, 52, 60, 57, 66, 62, 70, 68, 76];
+const previous = [30, 33, 35, 36, 38, 37, 41, 43, 42, 46, 47, 49, 50, 53, 52, 55];
+const path = (values: number[], width = 400, height = 120, top = 80) =>
+  values
+    .map((value, index) => {
+      const x = (index / (values.length - 1)) * width;
+      const y = height - (value / top) * height;
+      return `${index ? "L" : "M"}${x.toFixed(1)} ${y.toFixed(1)}`;
+    })
+    .join(" ");
+const spark = (values: number[]) => path(values, 64, 20, Math.max(...values) * 1.1);
+
+const title = {
+  overview: zh ? "默认仪表盘" : "Default dashboard",
+  errors: zh ? "问题" : "Issues",
+  performance: zh ? "性能" : "Performance",
+  sessions: zh ? "会话详情" : "Session",
+  logs: zh ? "日志" : "Logs",
+  alerts: zh ? "告警" : "Alerts",
+  events: zh ? "事件对比" : "Event comparison",
+}[kind];
+
+const stats = zh
+  ? [
+      ["会话数", "48.2k", "+12%"],
+      ["PV", "163k", "+8%"],
+      ["错误率", "0.42%", "−0.1pt"],
+      ["LCP P75", "1.9 s", "−6%"],
+    ]
+  : [
+      ["Sessions", "48.2k", "+12%"],
+      ["Page Views", "163k", "+8%"],
+      ["Error rate", "0.42%", "−0.1pt"],
+      ["LCP P75", "1.9 s", "−6%"],
+    ];
+const pages = [
+  ["/checkout", 82],
+  ["/product", 64],
+  ["/search", 47],
+  ["/account", 29],
+];
+const issues = zh
+  ? [
+      ["TypeError", "Cannot read properties of undefined", "1,284"],
+      ["ChunkLoadError", "Loading chunk 42 failed", "391"],
+      ["NetworkError", "POST /api/pay 503", "207"],
+    ]
+  : [
+      ["TypeError", "Cannot read properties of undefined", "1,284"],
+      ["ChunkLoadError", "Loading chunk 42 failed", "391"],
+      ["NetworkError", "POST /api/pay 503", "207"],
+    ];
+const vitals = [
+  ["LCP", "1.9 s"],
+  ["INP", "164 ms"],
+  ["CLS", "0.04"],
+];
+const timeline = zh
+  ? [
+      ["10:02:11", "页面浏览", "/product/42"],
+      ["10:02:19", "点击", "加入购物车"],
+      ["10:02:31", "页面浏览", "/checkout"],
+      ["10:02:40", "API", "POST /api/pay · 503"],
+      ["10:02:41", "错误", "TypeError", "error"],
+    ]
+  : [
+      ["10:02:11", "Page view", "/product/42"],
+      ["10:02:19", "Click", "Add to cart"],
+      ["10:02:31", "Page view", "/checkout"],
+      ["10:02:40", "API", "POST /api/pay · 503"],
+      ["10:02:41", "Error", "TypeError", "error"],
+    ];
+const volume = [6, 9, 7, 12, 10, 15, 11, 18, 14, 22, 16, 13, 19, 24, 17, 12];
+const logs = [
+  ["10:02:40.118", "ERROR", "payment request failed", "order.id=order-123"],
+  ["10:02:39.902", "WARN", "retrying payment", "attempt=2"],
+  ["10:02:31.447", "INFO", "checkout started", "order.id=order-123"],
+  ["10:02:19.031", "INFO", "cart updated", "items=3"],
+];
+const alerts = zh
+  ? [
+      ["新问题或回归", "TypeError 在 1.4.2 回归", "触发中", "firing"],
+      ["错误影响升高", "受影响用户 > 200 / 10 分钟", "触发中", "firing"],
+      ["消费延迟", "Consumer 延迟 > 60 秒", "正常", "ok"],
+    ]
+  : [
+      ["New or regressed issue", "TypeError regressed in 1.4.2", "Firing", "firing"],
+      ["Error impact rising", "Affected users > 200 / 10 min", "Firing", "firing"],
+      ["Consumer lag", "Consumer lag > 60 s", "OK", "ok"],
+    ];
+const started = [40, 44, 42, 50, 48, 56, 53, 61, 58, 64, 62, 70];
+const succeeded = started.map((value, index) => value * 0.8 - (index % 3));
+const failed = started.map((value, index) => value * 0.12 + (index % 4));
+const series = zh
+  ? ["发起支付", "支付成功", "支付失败"]
+  : ["Checkout started", "Payment succeeded", "Payment failed"];
+---
+
+<div class="lp-mock" aria-hidden="true" data-kind={kind}>
+  <div class="lp-mock-bar"><span></span><span></span><span></span><strong>{title}</strong></div>
+  {
+    kind === "overview" && (
+      <div class="lp-mock-body lp-mock-overview">
+        <div class="lp-mock-stats">
+          {stats.map(([label, value, change]) => (
+            <div class="lp-mock-card">
+              <small>{label}</small>
+              <b>{value}</b>
+              <em>{change}</em>
+              <svg viewBox="0 0 64 20">
+                <path d={spark(trend)} />
+              </svg>
+            </div>
+          ))}
+        </div>
+        <div class="lp-mock-card lp-mock-chart">
+          <small>{zh ? "会话趋势 · 对比上一周期" : "Sessions · vs previous period"}</small>
+          <svg viewBox="0 0 400 120" preserveAspectRatio="none">
+            <path class="lp-mock-prev" d={path(previous)} />
+            <path class="lp-mock-line" d={path(trend)} />
+          </svg>
+        </div>
+        <div class="lp-mock-card lp-mock-rank">
+          <small>{zh ? "Top 页面" : "Top pages"}</small>
+          {pages.map(([name, width]) => (
+            <div class="lp-mock-row">
+              <span>{name}</span>
+              <i style={`--w:${width}%`} />
+            </div>
+          ))}
+        </div>
+      </div>
+    )
+  }
+  {
+    kind === "errors" && (
+      <div class="lp-mock-body lp-mock-list">
+        {issues.map(([type, message, count], index) => (
+          <div class="lp-mock-card lp-mock-issue">
+            <span class="lp-mock-dot" />
+            <div>
+              <b>{type}</b>
+              <small>{message}</small>
+            </div>
+            <svg viewBox="0 0 64 20">
+              <path d={spark(index ? previous : trend)} />
+            </svg>
+            <em>{count}</em>
+          </div>
+        ))}
+        <div class="lp-mock-card lp-mock-stack">
+          <small>{zh ? "堆栈 · 已还原到源码" : "Stack · resolved to source"}</small>
+          <code>checkout/cart.ts:118 renderItems</code>
+          <code>checkout/page.tsx:42 CheckoutPage</code>
+        </div>
+      </div>
+    )
+  }
+  {
+    kind === "performance" && (
+      <div class="lp-mock-body lp-mock-perf">
+        <div class="lp-mock-card lp-mock-score">
+          <svg viewBox="0 0 120 120">
+            <circle class="lp-mock-track" cx="60" cy="60" r="48" />
+            <circle class="lp-mock-arc" cx="60" cy="60" r="48" pathLength="100" />
+            <text x="60" y="60">
+              92
+            </text>
+          </svg>
+        </div>
+        <div class="lp-mock-vitals">
+          {vitals.map(([label, value]) => (
+            <div class="lp-mock-card">
+              <small>{label} · P75</small>
+              <b>{value}</b>
+            </div>
+          ))}
+        </div>
+        <div class="lp-mock-card lp-mock-chart">
+          <small>{zh ? "LCP 趋势" : "LCP trend"}</small>
+          <svg viewBox="0 0 400 120" preserveAspectRatio="none">
+            <path class="lp-mock-threshold" d="M0 40 H400" />
+            <path class="lp-mock-line" d={path([...trend].reverse())} />
+          </svg>
+        </div>
+      </div>
+    )
+  }
+  {
+    kind === "sessions" && (
+      <div class="lp-mock-body lp-mock-timeline">
+        {timeline.map(([time, label, detail, tone]) => (
+          <div class="lp-mock-event" data-tone={tone}>
+            <time>{time}</time>
+            <span class="lp-mock-node" />
+            <b>{label}</b>
+            <small>{detail}</small>
+          </div>
+        ))}
+      </div>
+    )
+  }
+  {
+    kind === "logs" && (
+      <div class="lp-mock-body lp-mock-logs">
+        <div class="lp-mock-card lp-mock-volume">
+          {volume.map((value) => (
+            <i style={`--h:${value * 4}%`} />
+          ))}
+        </div>
+        {logs.map(([time, level, message, attribute]) => (
+          <div class="lp-mock-log" data-level={level.toLowerCase()}>
+            <time>{time}</time>
+            <span>{level}</span>
+            <b>{message}</b>
+            <small>{attribute}</small>
+          </div>
+        ))}
+      </div>
+    )
+  }
+  {
+    kind === "alerts" && (
+      <div class="lp-mock-body lp-mock-list">
+        {alerts.map(([name, condition, status, tone]) => (
+          <div class="lp-mock-card lp-mock-alert" data-tone={tone}>
+            <span class="lp-mock-dot" />
+            <div>
+              <b>{name}</b>
+              <small>{condition}</small>
+            </div>
+            <small>Webhook</small>
+            <em>{status}</em>
+          </div>
+        ))}
+      </div>
+    )
+  }
+  {
+    kind === "events" && (
+      <div class="lp-mock-body lp-mock-events">
+        <div class="lp-mock-card lp-mock-chart">
+          <small>{zh ? "事件次数 · 按事件名称" : "Event count · by event name"}</small>
+          <svg viewBox="0 0 400 120" preserveAspectRatio="none">
+            <path class="lp-mock-line" d={path(started)} />
+            <path class="lp-mock-line-2" d={path(succeeded)} />
+            <path class="lp-mock-line-3" d={path(failed)} />
+          </svg>
+          <div class="lp-mock-legend">
+            {series.map((name, index) => (
+              <span data-series={index + 1}>{name}</span>
+            ))}
+          </div>
+        </div>
+      </div>
+    )
+  }
+</div>

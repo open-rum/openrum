@@ -35,7 +35,7 @@
   padding: 20px;
   background: var(--ds-surface);
   border: 1px solid var(--ds-border);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-surface);
   position: sticky;
   top: 80px;
   max-height: calc(100vh - 100px);

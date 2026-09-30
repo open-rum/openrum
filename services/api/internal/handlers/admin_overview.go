@@ -3,6 +3,8 @@ package handlers
 import (
 	"context"
 	"database/sql"
+	"errors"
+	"fmt"
 	"net/http"
 	"sync"
 	"time"
@@ -14,8 +16,11 @@ import (
 	"openrum/internal/auth"
 	"openrum/internal/httpx"
 	"openrum/internal/metadata"
+	"openrum/internal/servicehealth"
 	"openrum/internal/storagepressure"
 )
+
+const capacityDiskDetail = "容量来自 ClickHouse system.disks；Docker 部署时可能是虚拟磁盘，不代表宿主机剩余空间。占用及预留包含同盘其他数据，并非 OpenRUM 数据量"
 
 type adminOverviewRoles interface {
 	RoleForUser(context.Context, uuid.UUID) (metadata.InstanceRole, error)
@@ -79,19 +84,21 @@ type adminOverviewDatabase interface {
 
 type adminOverviewRedis interface {
 	Ping(context.Context) *redis.StatusCmd
+	Get(context.Context, string) *redis.StringCmd
 }
 
 type SQLAdminOverviewSource struct {
-	postgres          adminOverviewDatabase
-	clickHouse        adminOverviewDatabase
-	redis             adminOverviewRedis
-	version           string
-	environment       string
-	deploymentMode    string
-	storageConfigured bool
-	startedAt         time.Time
-	now               func() time.Time
-	pressure          interface {
+	postgres           adminOverviewDatabase
+	clickHouse         adminOverviewDatabase
+	redis              adminOverviewRedis
+	version            string
+	environment        string
+	deploymentMode     string
+	storageConfigured  bool
+	workerHeartbeatKey string
+	startedAt          time.Time
+	now                func() time.Time
+	pressure           interface {
 		Snapshot() storagepressure.Snapshot
 	}
 }
@@ -105,6 +112,7 @@ func NewSQLAdminOverviewSource(
 	redisClient *redis.Client,
 	version, environment, deploymentMode string,
 	storageConfigured bool,
+	workerHeartbeatKey string,
 	startedAt time.Time,
 	pressure ...interface {
 		Snapshot() storagepressure.Snapshot
@@ -113,7 +121,8 @@ func NewSQLAdminOverviewSource(
 	source := &SQLAdminOverviewSource{
 		postgres: postgres, clickHouse: clickHouse, redis: redisClient,
 		version: version, environment: environment, deploymentMode: deploymentMode,
-		storageConfigured: storageConfigured, startedAt: startedAt.UTC(), now: time.Now,
+		storageConfigured: storageConfigured, workerHeartbeatKey: workerHeartbeatKey,
+		startedAt: startedAt.UTC(), now: time.Now,
 	}
 	if len(pressure) > 0 {
 		source.pressure = pressure[0]
@@ -152,7 +161,7 @@ func (source *SQLAdminOverviewSource) Snapshot(ctx context.Context) adminOvervie
 			{ID: "redis", Label: "Redis", Status: "checking", Detail: "正在检查缓存与接入状态"},
 			{ID: "kafka", Label: "Kafka", Status: "unknown", Detail: "消费延迟采集将在维护任务阶段接入"},
 			{ID: "object-storage", Label: "对象存储", Status: "not_configured", Detail: "可选能力未启用；核心监控不受影响"},
-			{ID: "worker", Label: "Worker", Status: "unknown", Detail: "Worker 心跳尚未接入"},
+			{ID: "worker", Label: "Worker", Status: "unknown", Detail: "正在检查 Worker 心跳"},
 		},
 		Pipeline: adminPipelineResponse{
 			Capacity: adminCapacityResponse{Status: "unknown", Mode: "unknown", Pressure: "unknown", Detail: "容量暂时无法读取"},
@@ -164,7 +173,7 @@ func (source *SQLAdminOverviewSource) Snapshot(ctx context.Context) adminOvervie
 	}
 
 	var wait sync.WaitGroup
-	wait.Add(5)
+	wait.Add(6)
 	go func() {
 		defer wait.Done()
 		response.Dependencies[1] = pingDependency(ctx, source.postgres, "postgres", "PostgreSQL", "元数据存储可连接")
@@ -186,6 +195,10 @@ func (source *SQLAdminOverviewSource) Snapshot(ctx context.Context) adminOvervie
 		}
 		response.Dependencies[3].Status = "healthy"
 		response.Dependencies[3].Detail = "缓存与接入状态可连接"
+	}()
+	go func() {
+		defer wait.Done()
+		response.Dependencies[6] = workerDependency(ctx, source.redis, source.workerHeartbeatKey)
 	}()
 	go func() {
 		defer wait.Done()
@@ -212,7 +225,7 @@ func (source *SQLAdminOverviewSource) Snapshot(ctx context.Context) adminOvervie
 				if snapshot.IngestBlocked {
 					rate = 0
 				}
-				status, detail := "available", "ClickHouse 节点磁盘容量"
+				status, detail := "available", capacityDiskDetail
 				if !snapshot.ProbeSuccessful {
 					status, detail = "unknown", "容量探测失败；展示最近一次成功结果"
 				}
@@ -231,13 +244,29 @@ func (source *SQLAdminOverviewSource) Snapshot(ctx context.Context) adminOvervie
 				used, usedPercent := total-free, float64(total-free)/float64(total)*100
 				response.Pipeline.Capacity = adminCapacityResponse{
 					Status: "available", Mode: "unknown", Pressure: "unknown", UsedBytes: &used, FreeBytes: &free,
-					CapacityBytes: &total, UsedPercent: &usedPercent, Detail: "ClickHouse 节点磁盘容量",
+					CapacityBytes: &total, UsedPercent: &usedPercent, Detail: capacityDiskDetail,
 				}
 			}
 		}
 	}()
 	wait.Wait()
 	return response
+}
+
+func workerDependency(ctx context.Context, client adminOverviewRedis, key string) adminDependencyResponse {
+	result := adminDependencyResponse{ID: "worker", Label: "Worker", Status: "unknown", Detail: "无法检查 Worker 心跳；请先检查 Redis"}
+	if key == "" {
+		return result
+	}
+	switch err := client.Get(ctx, key).Err(); {
+	case err == nil:
+		result.Status = "healthy"
+		result.Detail = fmt.Sprintf("最近 %.0f 秒内收到进程心跳；后台任务结果需单独检查", servicehealth.WorkerHeartbeatTTL.Seconds())
+	case errors.Is(err, redis.Nil):
+		result.Status = "unhealthy"
+		result.Detail = fmt.Sprintf("%.0f 秒内未收到心跳；请检查 Worker 服务及 REDIS_ADDR", servicehealth.WorkerHeartbeatTTL.Seconds())
+	}
+	return result
 }
 
 func pingDependency(ctx context.Context, database adminOverviewDatabase, id, label, healthyDetail string) adminDependencyResponse {

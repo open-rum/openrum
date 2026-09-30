@@ -9,17 +9,17 @@ architecture, not the current palette. The user-supplied
 landing-page reference concept. Its earlier Acid Green direction is no longer
 an active product theme.
 
-The current color reference is the user's Citrus screenshot of
+The layout and neutral-surface reference is the user's screenshot of
 [shadcnblocks dashboard9](https://www.shadcnblocks.com/block/dashboard9)
-(2026-09-12). Match its neutral text and surfaces, lemon-green logo and chart
-series, teal secondary series, and pale-yellow period comparison. The screenshot
-takes precedence over the upstream preview's default, uncustomized theme.
+(2026-09-12): neutral text and surfaces, a bright brand logo and first chart
+series. Its lemon-green hue was replaced on 2026-09-29 by the amber brand and
+four-color card described in [ADR 0010](adr/0010-amber-brand-four-color-card-and-user-density.md).
 
 ## Visual workbench
 
 `apps/site/src/pages/design/index.astro` publishes `/design/`: brand assets,
-the canonical Citrus theme, semantic colors, typography, spacing, radii, material, and
-Area / Bar / Line chart examples. It is a site route, not a package or a
+the three palettes, the four-color card, semantic colors, typography, spacing, radii,
+material, the two densities, and Area / Bar / Line chart examples. It is a site route, not a package or a
 component-library application. The page reads actual CSS custom properties;
 it does not maintain a second table of color values.
 
@@ -33,29 +33,47 @@ stylesheet loads only when selected, with Unicode subsets fetched as needed.
 
 Shared foundations remain in `packages/design-tokens`:
 
-- `tokens.css`: canonical Citrus roles and design scales.
-- `catalog.ts`: Citrus display metadata and the semantic-token catalogue.
-- `brand.ts`: the two paths of the Console's rounded, split-ring SVG mark.
+- `tokens.css`: the four-color card, palette mappings, semantic roles, densities and
+  design scales. It is the only file allowed to hold raw color values.
+- `catalog.ts`: the palette, card and density lists plus the semantic-token catalogue.
+  Every palette switcher reads its options from here.
+- `brand.ts`: shared pixel signal-scout geometry for the Console, site and docs.
+- `brand.css`: finite greeting and hover/focus gestures, with reduced-motion support.
 
-The site, documentation, and console apply `data-palette="citrus"` to the
-root. Citrus is the only supported palette; legacy `openrum-palette` storage
-and `?palette=` values are ignored and cleaned up during bootstrap. Preview
-links carry only `?theme=dark|light`. Theme storage remains per origin, so site
-and console ports can still have independent light/dark preferences.
+The site, documentation, design workbench and Console set `html[data-palette]`
+(`amber` by default, `lime` or `magenta`) before first paint from the
+`openrum-palette` storage key. The site also reads the legacy
+`openrum-site-palette` and `openrum-landing-palette` keys once. The Console also sets
+`html[data-density]` (`comfortable` or `compact`) from `openrum-density`. Storage is
+per origin, so the site and Console remember their palette and theme separately.
+Preview links carry only `?theme=dark|light`.
 
-The public website and docs use a site-local 24×24 pixel signal mascot defined in
-`apps/site/src/lib/siteBrand.ts`. Its body follows `--ds-logo`; its two eyes stay dark.
-The site favicon is a static Citrus-coloured copy, and `/design/` provides SVG downloads
-and light/dark previews. The Console keeps the rounded, split-ring mark from `brand.ts`
-and its own favicon. Wordmarks use neutral text.
+The Console, public website and docs use the shared pixel signal scout from
+`packages/design-tokens/brand.ts`. Its body follows `--ds-logo` (the active palette's
+primary); its eyes are cut out through an SVG mask, so the background shows through and the
+blink briefly closes them. Both favicons are static amber copies, and
+`/design/` downloads the SVG in the current palette and theme. Wordmarks use neutral text.
 
-Header brand lockups pair the mascot with the existing wordmark. The public mark
-uses a 24×24 pixel grid; keep its rendering on whole-pixel sizes where space allows.
+Primary brand lockups use a 36px mark (`--brand-lockup-mark-size`), an 18px wordmark and a
+9px gap, in the Console sidebar, the homepage and the docs header. The 20-unit viewBox trims
+the original canvas padding; at 36px each design pixel is 1.8px, and `crispEdges` keeps the
+edges sharp. Keep this size in the collapsed Console sidebar and on narrow screens; compact
+product mockups may scale down.
+
+The mascot briefly waves, blinks and flashes its signal on arrival. Hovering or
+keyboard-focusing its existing brand link replays the greeting with a small hop.
+Animations stop after the gesture (under two seconds), use stepped whole-pixel
+movement and turn off completely with `prefers-reduced-motion`. Do not add tab
+stops to the decorative SVG or animate browser favicons and downloaded assets.
 
 ## Visual language
 
-- Citrus is the only product theme. Do not add page-level palette switches or
-  alternate palette overrides.
+- Amber is the brand. Lime and magenta are alternative palettes a viewer may choose;
+  they may be removed later, so no feature may depend on a non-default palette. When
+  `catalog.ts` lists a single palette, every switcher hides itself.
+- The four-color card is amber, lime, sky and magenta. The chosen palette's hue is
+  the primary; the other three are accents (`--ds-accent-1..3`). Sky is only ever an
+  accent. Do not add page-level palette overrides.
 - Headings, KPI values and table content use `--ds-text`; field labels and
   legends use `--ds-text-secondary`; descriptions and axes use `--ds-text-muted`.
   Legend swatches carry series color; their labels remain neutral.
@@ -63,8 +81,10 @@ uses a 24×24 pixel grid; keep its rendering on whole-pixel sizes where space al
   Ordinary controls use neutral borders and surfaces. Primary fills pair with
   `--ds-primary-foreground`; contrast actions retain black/white tokens.
 - Link ink (`--ds-brand`) follows neutral `--ds-text` in both modes, per the
-  user's preference. Distinguish prose links with underlines, not olive or lime
-  text. Logos and chart series retain their separate color tokens.
+  user's preference. The exception is documentation prose: its links use
+  `--ds-primary-ink`, the palette's text-safe role (4.5:1 or better on the canvas in
+  both modes, also checked inside asides), and keep their underline. Never color
+  text with a `-solid` fill. Logos and chart series retain their separate color tokens.
 - Main homepage actions remain black and white. Landing concept 01 follows the
   document's green action in dark mode and a dark action in light mode.
 - Error, warning, and success remain independently recognizable and pair
@@ -74,28 +94,34 @@ uses a 24×24 pixel grid; keep its rendering on whole-pixel sizes where space al
   wordmark uses SVG outlines. Marketing display sizes are 56 / 38px and
   section headings 40 / 30px. Product UI uses a comfortable 12–14px scale.
 
-### Light-mode Citrus accent hierarchy
+### Brand accent hierarchy
 
 Light mode keeps neutral canvas, cards, typography, borders, tables, and primary
 actions. A page's main submit or create action uses the black/white contrast
-tokens; lemon green is not the default button fill.
+tokens; the brand color is not the default button fill.
 
-Use lemon green in small, semantically meaningful regions:
+Use the current primary in small, semantically meaningful regions:
 
 - selected choices and active form options use `--ds-selection`,
   `--ds-selection-foreground`, and `--ds-selection-border`;
 - compact badges, icons, switches, progress, focus rings, and data-series marks
   may use `--ds-primary` with `--ds-primary-foreground`;
-- use one or two green anchors per content group rather than tinting the whole
+- use one or two brand anchors per content group rather than tinting the whole
   card or section;
-- hover without selection remains neutral, so green continues to mean selected,
-  enabled, or currently effective;
+- hover without selection remains neutral, so the brand color continues to mean
+  selected, enabled, or currently effective;
 - success, warning, danger, and information states retain their own semantic
-  tokens and must not be recolored as Citrus decoration.
+  tokens and must not be recolored as brand decoration.
+
+Accents label categories, never state. Badge variants `amber`, `lime`, `sky` and
+`magenta` use a card hue's soft surface, ink text and border; `brand` follows the
+current primary. Use them for tags, kinds and categories that need to be told apart.
+Text on the card uses the `-ink` role, fills use `-solid` with `-foreground`; the
+token test keeps both at 4.5:1 or better in each mode.
 
 The Rate Limits settings page is the reference composition: neutral cards and
-black submit action, lime summary marks and effective-state badges, and a pale
-lime surface plus stronger lime border for selected source and strategy options.
+black submit action, brand summary marks and effective-state badges, and a soft
+brand surface plus stronger brand border for selected source and strategy options.
 The same pattern should be reused by other Console settings forms.
 
 ## Landing concepts
@@ -116,10 +142,10 @@ The same pattern should be reused by other Console settings forms.
 - Its feature overview uses `FeatureBento.astro` after the technology strip:
   analytics and errors are the two large cards (7/5 columns); sessions,
   performance, API monitoring and alerts form four smaller cards. The alert
-  illustration connects a metric rule to a team IM notification through Webhook;
-  it does not imply native integrations with specific IM providers.
+  illustration connects a metric rule to a team IM notification. Feishu is the only
+  native IM channel today (ADR 0009); do not imply others are available.
   At 1100px the grid becomes two columns, and at 600px one column. Use shared
-  Citrus surfaces, typography and radii, with lime data accents. Illustrations
+  surfaces, typography and radii, with brand data accents. Illustrations
   are static HTML/SVG, explicitly labelled as example data, and cards link to
   the corresponding localized documentation. Maintain keyboard focus and
   reduced-motion support; do not imply an interactive Console or Session Replay.
@@ -140,10 +166,19 @@ Appearance controls sit outside the concept and hide in embedded previews.
 ## Component foundation
 
 OpenRUM uses shadcn/ui conventions everywhere custom product UI is built. The
-shared baseline is the Radix Nova preset, Radix primitives, Tailwind CSS v4,
+shared baseline is the Radix Maia preset, Radix primitives, Tailwind CSS v4,
 CSS variables, and Lucide icons. `apps/web/components.json` is the currently
 verified configuration; `apps/site` must use the same style, base, icon library,
 radius, and semantic-token contract.
+
+The 2026-09-30 Maia direction references `https://ui.shadcn.com/create?preset=b1skV8ORc`.
+Buttons and single-line controls use full pill rounding at every density. The shared
+10px base produces 14px multiline fields, 18px cards/menus, and 26px dialogs through
+`--radius-field`, `--radius-surface`, and `--radius-overlay`; `--radius-control` is the
+pill token for native CSS controls. Maia's subtle input fill uses the existing input
+role. Keep the four-color card, user density, typography, and line-style navigation
+tabs. A wrapping filter composer caps its radius at half a single row's height so
+chips and multiple input rows do not run into an elliptical edge.
 
 Two workspace packages prevent the console and public site from drifting:
 
@@ -181,8 +216,8 @@ shared shadcn primitives instead of introducing a second component vocabulary.
 
 ## Color modes
 
-OpenRUM supports light, dark, and system appearance modes within the single
-Citrus theme. The public site and design previews default to dark; the console
+OpenRUM supports light, dark, and system appearance modes in every palette; each
+card hue has separate light and dark values. The public site and design previews default to dark; the console
 retains its system preference. Theme choice is applied before rendering to
 prevent a flash of the wrong theme.
 
@@ -200,14 +235,16 @@ The visual workbench maps its Recharts series to shared roles:
 
 | Role                | Token                                         | Use                                      |
 | ------------------- | --------------------------------------------- | ---------------------------------------- |
-| Primary series      | `--ds-chart-1` → lemon green                  | Lines, bars, points and area outlines    |
+| Primary series      | `--ds-chart-1` → palette primary              | Lines, bars, points and area outlines    |
 | Categorical palette | `--ds-chart-1` … `--ds-chart-10`              | Up to ten discrete, unordered categories |
-| Prior period        | `--ds-chart-comparison` → pale yellow         | Same metric, dashed line                 |
+| Prior period        | `--ds-chart-comparison` → neutral gray        | Same metric, dashed line                 |
 | Status              | `--ds-success`, `--ds-warning`, `--ds-danger` | Ratings and thresholds                   |
 | Area fill           | `--ds-chart-area` → primary                   | Translucent volume under a clear outline |
 
-The categorical order is lemon, blue, orange, violet, teal, coral, cyan,
-magenta, gold and slate. Keep this fixed order across the console. Do not derive
+Chart 1 is the palette primary and charts 2–4 are its three accents, so the
+default amber palette reads amber, lime, sky, magenta. Charts 5–10 are fixed hues
+that stay clear of the card: violet, teal, coral, indigo, brown and slate. Keep
+this order across the console. Do not derive
 colors from the array length or generate random hues during rendering: that
 makes a category change color when data refreshes. For more than ten categories,
 show the nine most important categories and combine the remainder into `Other`
@@ -215,18 +252,18 @@ using chart 10. A stable hash may select from this palette when a domain needs
 the same named category to retain its color across separate charts, but the
 palette remains fixed and collisions still need labels or direct interaction.
 
-The comparison stroke is `oklch(0.9002 0.137175 94.1925)`. It does not indicate
-a warning. Never rely on color alone: categorical charts retain labels, legends
+The comparison stroke is a neutral gray, so it never reads as the amber primary
+or as a warning. The warning status leans orange to stay distinct from amber. Never rely on color alone: categorical charts retain labels, legends
 and tooltips, and line charts distinguish overlapping series with dash patterns.
 
 Axes, annotations and tooltips use neutral text; grids and cursors use borders.
 Performance trends use chart 1; their success/error thresholds and rated Route
 bars retain status colors. Error-rate series retain danger. Pair status color
 with a label or icon. Each chart exposes its values through a tooltip or table.
-For rated bars and gauges, `--ds-chart-success` supplies lemon green and
-`--ds-chart-warning` golden yellow; poor ratings use danger. Keep their badge
-text and threshold annotations on the darker success/warning tokens. The
-warning fill has its own semantic role, separate from period comparisons.
+For rated bars and gauges, `--ds-chart-success` and `--ds-chart-warning` point at
+the green success and orange warning status tokens; poor ratings use danger. None
+of them follow the palette, so a lime or amber palette never changes what a rating
+means. The warning fill stays separate from period comparisons.
 
 When a chart stacks bands of very different magnitudes, stroke only the band
 that carries the volume. Several stacked strokes inside a few pixels read as
@@ -237,6 +274,9 @@ is re-exported at its existing console import path. The workbench uses that
 same primitive through an isolated `client:visible` React island. Example
 charts use fixed data and disable animation to keep comparisons stable.
 Live console charts retain `isAnimationActive={useChartMotion()}`.
+Maia-style vertical columns have 6px rounded top corners and square bottoms;
+Recharts `BarStack` rounds only the outline of a stacked column. Compact Stat
+columns use 4px top corners and horizontal bars use 6px trailing corners.
 
 Console Line/Area trends share `apps/web/src/lib/charts/smoothCurve.ts`:
 monotone-X interpolation and rounded stroke caps/joins. Apply it to page charts,
@@ -257,7 +297,7 @@ table, API fields, shared code entry points and the remaining legacy consumers.
 
 Category Bar breakdowns are ranked lists, not small axis-heavy plots. Place
 the category name and existing metadata icon on the left, exact value and share
-on the right, and a thin lime bar below. Use a shared zero baseline and scale to
+on the right, and a thin brand-colored bar below. Use a shared zero baseline and scale to
 the largest returned group; do not assign arbitrary rainbow colors to rankings.
 Shares describe the full returned group sum, not only visible Top 10 rows.
 Show all returned groups in enlarged details and disclose overlapping unique
@@ -307,6 +347,11 @@ and let users hide series. Do not extend this exception to unrelated charts.
 `src/styles/docs.css`. Three of those mappings exist because the obvious version
 was wrong, and are worth not undoing:
 
+**Layout width.** From 72rem up, the article is at most 1200px wide and centred
+between the section sidebar and the "On this page" column. The table of contents keeps
+the sidebar width and stays pinned to the right edge. Starlight's default 45rem
+column, which drifted towards the table of contents, is overridden in `docs.css`.
+
 **Starlight's grey ramp keeps `gray-1` through `gray-3` as text colours** and
 only becomes hairlines at `gray-4`. Mapping `gray-3` onto `--ds-border` painted
 hairline-coloured text at about 1.2:1 everywhere Starlight draws secondary text
@@ -327,8 +372,8 @@ twice.
 
 First it made every documentation prose link render as body text, outranking
 Starlight's `@layer starlight.core` link colour. `docs.css` explicitly styles
-`.sl-markdown-content` links and underlines them. Keep those underlines now
-that the chosen link color is intentionally neutral.
+`.sl-markdown-content` links, colors them with `--ds-primary-ink` and underlines
+them. Keep the underline so links never depend on hue alone.
 
 Then it outranked `.ui-button-primary` in `@layer components`, so every
 anchor-shaped primary button inherited body text instead of
@@ -366,7 +411,7 @@ Do not replace the drawing phase with a static CSS outline. Hidden native text
 reserves the layout; await fonts and initialize the SVG dash/clip state before
 revealing it. The SVG uses those font metrics and baseline, without glyph-bounds
 padding or a visible solid-HTML-to-SVG swap. Resizing must not restart the animation.
-The first line uses the foreground token; the second draws in Citrus primary and
+The first line uses the foreground token; the second draws in the palette primary and
 fills with the accessible brand token. Keep the existing localized copy and typography.
 Without JavaScript, the reserved text is shown as a static outline.
 Reduced motion shows the completed heading without animation. All animation resources
@@ -375,7 +420,7 @@ are bundled locally; the existing performance thresholds remain in force.
 Buttons use the shared `ui-button-contrast` and `ui-button-neutral` variants:
 white/black in dark mode and black/white in light mode. Hover applies a small
 lift, a neutral fill adjustment and arrow movement; buttons have no continuous
-sheen or colored glow. The logo is an open ring with a signal, and the Space
+sheen or colored glow. The logo is the shared pixel signal scout, and the Space
 Grotesk wordmark is outlined SVG, preserving neutral Open and theme-colored RUM
 without adding a font request. Product typography remains Geist.
 
@@ -440,12 +485,27 @@ one implementation rather than page-level utility overrides.
 | Table header                    | 40px high, 12px text                                        | Keep labels concise instead of shrinking text                |
 | Table body row                  | At least 44px high, 14px text, 16px horizontal cell padding | Multi-line identity rows may grow beyond 44px                |
 
-Compact density is an explicit variant, not a page-level default. It is valid
-for the sticky status bar, sidebar icon rail, table row actions, and dense query
-builders where surrounding labels already provide context. Primary forms,
-settings pages, empty states, and main calls to action always use the default
-size. At touch breakpoints, interactive targets must be at least 44px even when
-the desktop composition uses a compact variant.
+Compact size variants remain explicit per component. They are valid for the
+sticky status bar, sidebar icon rail, table row actions, and dense query builders
+where surrounding labels already provide context. Primary forms, settings pages,
+empty states, and main calls to action use the default size.
+
+Separately, a Console user may choose the global compact density in the account
+menu (`html[data-density="compact"]`). It only rewrites the size tokens, so pages
+must read heights, paddings and gaps from tokens and never force compact
+themselves:
+
+| Token group                     | Comfortable       | Compact           |
+| ------------------------------- | ----------------- | ----------------- |
+| Controls lg / default / sm / xs | 44 / 40 / 32 / 28 | 36 / 32 / 28 / 24 |
+| Table header / body row         | 40 / 44 px        | 32 / 36 px        |
+| Body, table and control text    | 14px              | 13px              |
+| Sidebar / settings nav item     | 40 / 36 px        | 32 / 30 px        |
+| Page padding x / y, page gap    | 32 / 32 / 24 px   | 24 / 20 / 16 px   |
+
+Metadata text never goes below 12px. On coarse pointers, controls keep a 44px
+target in either density. Compact applies to the Console only; the public site
+and docs have no density switch.
 
 ## Layout inventory
 
@@ -515,7 +575,7 @@ INP, CLS, FCP, and TTFB values. One SVG segmented score ring shows the total
 in its center and the metric names directly outside their sectors, with no
 separate legend beneath. Sector capacity follows the metric's default score weight;
 the colored part
-shows the earned score and a neutral track shows the remainder. Preserve Citrus
+shows the earned score and a neutral track shows the remainder. Preserve the shared
 series colors and use INP rather than the reference image's legacy FID label.
 Center the total using SVG middle text anchoring and a central dominant baseline,
 so font x-height does not shift the number above the ring center.
@@ -570,10 +630,9 @@ Performance suggestions omit their own active dimension when computing options,
 retain other filters, and return at most 100 values ordered by sample count.
 
 The project list is an operational landing surface rather than a settings
-index. Each project card leads with the previous 24 complete hours of PV, UV,
-error events, PV trend, and reporting freshness. Sampling, retention, and other
-configuration metadata stay in the footer so users can first answer whether a
-project is receiving traffic and whether it needs attention.
+index. It answers first whether each project is receiving traffic and whether it
+needs attention, then offers entry into the project and a settings shortcut
+(`/settings/project/:projectId/general`) on every row and card.
 
 - The nine first-level product areas, in order, are **数据大盘、分析、错误、性能、事件、API、告警、会话、设置**. “探索” is the advanced filtering mode inside Sessions; “洞察” is reserved for future system-generated findings.
 - 数据大盘 is the landing surface: the signed-in root, the project switcher, and the onboarding magic moment all resolve to it. It owns the range-wide KPI row and the cross-cutting trend panels, and it answers “is this project healthy” without owning any diagnosis. Every panel on it links into the area that does.
@@ -586,7 +645,7 @@ project is receiving traffic and whether it needs attention.
 - 洞察 synthesizes meaningful changes across behavior, errors, performance, events, and APIs; every insight must show its evidence and open a filtered investigation rather than present an unexplained score.
 - 项目设置 exposes **常规、接入指引、数据管理、用量统计**. Data management groups **采样配置、速率限制、入站过滤、URL 归一化、隐私脱敏** into route-backed page tabs with one shared header, width and task description. The sidebar highlights 数据管理 across those routes; keep existing deep links and independent saves. Sampling is `/settings/project/:projectId/sampling`, separate from the report at `/settings/project/:projectId/usage`. A failed usage estimate must not hide sampling controls. Organization membership, notification channels, appearance, and Instance administration remain account-scoped.
 - 接入、发布、用量、配额与开发造数据统一收进 **项目设置** 的上下文导航，不再占用主侧边栏入口。
-- 组织与成员、通知渠道、实例级系统设置统一从底部账户菜单进入；实例级设置仅对管理员显示。
+- 组织与成员、通知渠道在设置的组织分组里；实例级设置是单独的「系统设置」入口，仅对实例管理员显示。告警页头部提供「通知渠道」的快捷入口。
 - Visual polish is part of the product promise for self-hosted users: analytics screens must preserve the same readable type scale, clear empty states, URL-backed filters, light/dark themes, and keyboard behavior as error screens.
 
 ## Component families
@@ -612,14 +671,26 @@ server cannot be represented as complete counts.
 
 ### Project list presentation
 
-The project list offers three locally remembered views of the same API data:
-lightweight cards for quick entry, expanded trend cards for inspection, and a
-table for cross-project comparison. Keep the view switch labeled and keyboard
-accessible. All views share query-cache entries, show the last 24 hours in each
-project's default environment, and preserve PV, approximate UV, error events,
-reporting freshness and project entry. Do not turn missing or failed summaries
-into zero values, or render synthetic trends when there are no samples. Tables
-scroll horizontally on narrow screens; cards stack and controls wrap.
+The project list offers two locally remembered views, with the table as the
+default. Older stored layouts fall back to the table. Keep the view switch labeled
+and keyboard accessible, and state each view's window beside the project count.
+
+- **Table** — the previous 24 complete hours in each project's default environment:
+  PV, approximate UV, error events, a shared `Sparkline` of PV, reporting freshness,
+  project entry and the settings icon.
+- **Cards** — the last 30 UTC days as a code-contribution style heatmap: one square
+  per day, Monday-first week columns, with 30-day PV, active days and error events
+  beside it. The request passes `TIME_SERIES_MAX_POINTS`, so the shared policy
+  resolves to daily buckets; the heatmap refuses any other interval rather than
+  re-aggregating. Five levels step through quarters of the project's own peak using
+  `--ds-chart-1`, so the palette recolors it and one busy project never washes out
+  another. A real zero is the lightest filled square; a day the server did not return
+  is a dashed gap. Today's square is marked as still filling in its hover title, and
+  the figure carries one spoken summary.
+
+Do not turn missing or failed summaries into zero values, or render synthetic trends
+when there are no samples. Tables scroll horizontally on narrow screens; cards stack
+and controls wrap.
 
 - App shell, sidebar navigation, project switcher, operator card.
 - Select controls, tabs, buttons, status badges, KPI cells.

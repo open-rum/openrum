@@ -51,6 +51,7 @@
     "ldaps",
     "lijie",
     "Lucide",
+    "maxmemory",
     "metacharacter",
     "MinIO",
     "Noto",
@@ -61,6 +62,7 @@
     "opensource",
     "orrp",
     "Pagefind",
+    "palettechange",
     "PITR",
     "PKCE",
     "presign",
@@ -78,6 +80,7 @@
     "sparklines",
     "sslmode",
     "Starlight",
+    "statefulset",
     "staticcheck",
     "symbolicated",
     "symbolication",
@@ -95,6 +98,14 @@
     "wordmarks",
     "wght",
     "YYYYMMDDTHHMMSSZ",
-    "zerolog"
+    "zerolog",
+    "hostable",
+    "Vite",
+    "Feishu",
+    "feishu",
+    "larksuite",
+    "lettermark",
+    "dingtalk",
+    "wecom"
   ]
 }

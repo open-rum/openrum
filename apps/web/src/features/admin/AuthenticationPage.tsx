@@ -1,6 +1,8 @@
 import { useState, type Dispatch, type SetStateAction } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { KeyRoundIcon, PlusIcon } from "lucide-react";
+import { SiGithub } from "@icons-pack/react-simple-icons";
+import { Building2Icon, CheckIcon, KeyRoundIcon, ShieldCheckIcon } from "lucide-react";
+import { GoogleIcon } from "@/components/icons/GoogleIcon";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,6 +16,7 @@ import {
   type ProviderSettings,
 } from "@/lib/auth/providers";
 import { sessionQueryOptions } from "@/lib/auth/session";
+import { cn } from "@/lib/utils";
 import { AdminPageLayout } from "./AdminPageLayout";
 import { ReauthenticationDialog } from "./ReauthenticationDialog";
 
@@ -26,6 +29,17 @@ type Draft = {
   secret: string;
   existing: boolean;
 };
+
+const providerChoices: Array<{
+  kind: AuthMethod["kind"];
+  label: string;
+  description: string;
+}> = [
+  { kind: "google", label: "Google", description: "Google 账号与 Workspace" },
+  { kind: "github", label: "GitHub", description: "GitHub 账号与已验证邮箱" },
+  { kind: "ldap", label: "LDAP", description: "企业目录，支持 LDAPS 和 StartTLS" },
+  { kind: "oidc", label: "通用 OIDC", description: "连接企业 SSO，可添加多个提供者" },
+];
 
 function newDraft(kind: AuthMethod["kind"] = "google"): Draft {
   return {
@@ -105,51 +119,122 @@ export function AuthenticationPage() {
     session.data?.instanceRole === "instance_owner" && query.data?.managedSecretsAvailable;
   const currentProvider = query.data?.providers.find((provider) => provider.id === draft.id);
 
+  const selectProviderKind = (kind: AuthMethod["kind"]) => {
+    const configured =
+      kind === "oidc"
+        ? undefined
+        : query.data?.providers.find((provider) => provider.kind === kind);
+    setDraft(configured ? fromProvider(configured) : newDraft(kind));
+    setMessage("");
+  };
+
   return (
     <AdminPageLayout
       title="认证与访问"
       description="管理控制台登录方式。只有 Instance Owner 可以修改；本地 Owner 登录始终保留。"
     >
-      <div className="grid gap-5 xl:grid-cols-[minmax(260px,0.8fr)_minmax(0,1.4fr)]">
-        <section className="rounded-lg border border-border bg-card p-5" aria-label="登录方式列表">
+      {query.data && !query.data.managedSecretsAvailable ? (
+        <Alert className="mb-5">
+          <AlertTitle>需要启用加密托管</AlertTitle>
+          <AlertDescription>
+            可以选择卡片查看配置项。部署时设置 OPENRUM_ALLOW_MANAGED_SECRETS=true 和
+            OPENRUM_MASTER_KEY，重启 API 后才能保存并启用外部登录。
+          </AlertDescription>
+        </Alert>
+      ) : null}
+      <section
+        className="rounded-2xl border border-border bg-card p-5"
+        aria-labelledby="provider-choices-title"
+      >
+        <h2 id="provider-choices-title" className="text-base font-semibold">
+          选择外部登录方式
+        </h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          选择卡片查看配置；只有保存并启用后，登录页才会显示该方式。
+        </p>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {providerChoices.map((choice) => {
+            const configured = query.data?.providers.filter(
+              (provider) => provider.kind === choice.kind,
+            );
+            const enabledCount = configured?.filter((provider) => provider.enabled).length ?? 0;
+            const status: ProviderStatus = enabledCount
+              ? { tone: "enabled", label: enabledCount > 1 ? `${enabledCount} 个已启用` : "已启用" }
+              : configured?.length
+                ? { tone: "configured", label: "已配置 · 未启用" }
+                : { tone: "empty", label: "未配置" };
+            return (
+              <button
+                key={choice.kind}
+                type="button"
+                aria-label={`选择 ${choice.label} 登录方式`}
+                aria-pressed={draft.kind === choice.kind}
+                onClick={() => selectProviderKind(choice.kind)}
+                className={cn(
+                  "flex min-h-36 flex-col items-start rounded-2xl border border-border bg-background p-4 text-left hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
+                  draft.kind === choice.kind &&
+                    "border-[var(--ds-selection-border)] bg-[var(--ds-selection)] text-[var(--ds-selection-foreground)]",
+                )}
+              >
+                <span className="flex w-full items-start justify-between">
+                  <ProviderTypeIcon kind={choice.kind} />
+                  {draft.kind === choice.kind ? (
+                    <CheckIcon className="size-4" aria-hidden="true" />
+                  ) : null}
+                </span>
+                <span className="mt-3 text-sm font-semibold">{choice.label}</span>
+                <span className="mt-1 text-xs leading-5 text-muted-foreground">
+                  {choice.description}
+                </span>
+                <span className="mt-auto pt-3">
+                  <StatusPill status={status} />
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </section>
+      <div className="mt-5 grid gap-5 xl:grid-cols-[minmax(260px,0.8fr)_minmax(0,1.4fr)]">
+        <section
+          className="self-start rounded-2xl border border-border bg-card p-5"
+          aria-label="登录方式列表"
+        >
           <h2 className="text-base font-semibold">已配置方式</h2>
           <div className="mt-4 space-y-2">
-            <div className="rounded-md border border-border px-3 py-3 text-sm">
+            <div className="rounded-xl border border-border px-3 py-3 text-sm">
               邮箱与 OpenRUM 密码 · 始终启用
             </div>
             {query.data?.providers.map((provider) => (
               <button
                 key={provider.id}
                 type="button"
+                aria-pressed={draft.existing && draft.id === provider.id}
                 onClick={() => {
                   setDraft(fromProvider(provider));
                   setMessage("");
                 }}
-                className="flex w-full items-center justify-between rounded-md border border-border px-3 py-3 text-left text-sm hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring"
+                className={cn(
+                  "flex w-full items-center justify-between rounded-xl border border-border px-3 py-3 text-left text-sm hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring",
+                  draft.existing &&
+                    draft.id === provider.id &&
+                    "border-[var(--ds-selection-border)] bg-[var(--ds-selection)]",
+                )}
               >
                 <span>{provider.label}</span>
-                <span className="text-xs text-muted-foreground">
-                  {provider.enabled ? "已启用" : "已停用"}
-                </span>
+                <StatusPill
+                  status={
+                    provider.enabled
+                      ? { tone: "enabled", label: "已启用" }
+                      : { tone: "configured", label: "已停用" }
+                  }
+                />
               </button>
             ))}
           </div>
-          {canEdit ? (
-            <Button
-              className="mt-4"
-              variant="outline"
-              onClick={() => {
-                setDraft(newDraft());
-                setMessage("");
-              }}
-            >
-              <PlusIcon /> 添加方式
-            </Button>
-          ) : null}
         </section>
 
         <section
-          className="rounded-lg border border-border bg-card p-5"
+          className="rounded-2xl border border-border bg-card p-5"
           aria-labelledby="provider-form-title"
         >
           <div className="flex items-center gap-2">
@@ -158,15 +243,6 @@ export function AuthenticationPage() {
               配置登录方式
             </h2>
           </div>
-          {!query.data?.managedSecretsAvailable ? (
-            <Alert className="mt-4">
-              <AlertTitle>需要启用加密托管</AlertTitle>
-              <AlertDescription>
-                部署时设置 OPENRUM_ALLOW_MANAGED_SECRETS=true 和 OPENRUM_MASTER_KEY，重启 API
-                后才可保存外部登录密钥。
-              </AlertDescription>
-            </Alert>
-          ) : null}
           {query.error ? (
             <p className="mt-4 text-sm text-destructive" role="alert">
               无法读取认证配置，请检查 API。
@@ -199,20 +275,6 @@ export function AuthenticationPage() {
               setAction("save");
             }}
           >
-            <label className="grid gap-2 text-sm font-medium">
-              类型
-              <select
-                value={draft.kind}
-                disabled={draft.existing || !canEdit}
-                onChange={(event) => setDraft(newDraft(event.target.value as Draft["kind"]))}
-                className="h-10 rounded-md border border-input bg-background px-3"
-              >
-                <option value="google">Google</option>
-                <option value="github">GitHub</option>
-                <option value="ldap">LDAP</option>
-                <option value="oidc">通用 OIDC</option>
-              </select>
-            </label>
             <label className="grid gap-2 text-sm font-medium">
               提供者 ID
               <Input
@@ -332,6 +394,55 @@ export function AuthenticationPage() {
   );
 }
 
+type ProviderStatus = { tone: "enabled" | "configured" | "empty"; label: string };
+
+// Enabled is the only state that changes the sign-in page, so it gets the strongest
+// treatment; configured-but-off warns, and unconfigured stays a quiet dashed outline.
+function StatusPill({ status }: { status: ProviderStatus }) {
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs font-medium",
+        status.tone === "enabled" &&
+          "border-transparent bg-[var(--ds-success-soft)] text-[var(--ds-success)]",
+        status.tone === "configured" &&
+          "border-transparent bg-[var(--ds-warning-soft)] text-[var(--ds-warning)]",
+        status.tone === "empty" && "border-dashed border-border text-muted-foreground",
+      )}
+    >
+      <span
+        className={cn(
+          "size-1.5 rounded-full",
+          status.tone === "enabled" && "bg-[var(--ds-success)]",
+          status.tone === "configured" && "bg-[var(--ds-warning)]",
+          status.tone === "empty" && "bg-[var(--ds-text-muted)]",
+        )}
+        aria-hidden="true"
+      />
+      {status.label}
+    </span>
+  );
+}
+
+// Brands keep their own mark (Google's multicolour G, GitHub's black Octocat);
+// protocol-only methods use a neutral line icon. All sit on the same tile so the four
+// cards carry equal visual weight.
+function ProviderTypeIcon({ kind }: { kind: AuthMethod["kind"] }) {
+  return (
+    <span className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-border bg-card">
+      {kind === "google" ? (
+        <GoogleIcon className="size-5" />
+      ) : kind === "github" ? (
+        <SiGithub className="size-5" aria-hidden="true" />
+      ) : kind === "ldap" ? (
+        <Building2Icon className="size-5 text-muted-foreground" aria-hidden="true" />
+      ) : (
+        <ShieldCheckIcon className="size-5 text-muted-foreground" aria-hidden="true" />
+      )}
+    </span>
+  );
+}
+
 function OAuthFields({
   draft,
   setDraft,
@@ -411,7 +522,7 @@ function LDAPFields({
       <label className="grid gap-2 text-sm font-medium">
         自定义 CA 证书（PEM，可选）
         <textarea
-          className="min-h-24 rounded-md border border-input bg-background p-3 font-mono text-xs"
+          className="min-h-24 rounded-xl border border-input bg-background p-3 font-mono text-xs"
           value={draft.settings.caCertificate ?? ""}
           disabled={disabled}
           onChange={(event) => update("caCertificate", event.target.value)}

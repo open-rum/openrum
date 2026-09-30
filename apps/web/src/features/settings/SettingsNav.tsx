@@ -17,12 +17,6 @@ import {
 import type { Project } from "@/lib/api/projects";
 import { projectDataSettings } from "./projectDataSettings";
 
-// One menu for every scope a setting can belong to. Settings used to live in three
-// navigations that shared no entry point — a project rail, an account rail reached from
-// the sidebar footer, and `/admin` — so a value capped at the instance (retention is the
-// live example) could not link to the value it capped. Listing all four scopes at once is
-// what makes those references possible in both directions.
-//
 // App owns the scope data and passes it here so the hidden panel does not subscribe to a
 // second copy of the same organization, project, and session queries.
 
@@ -41,75 +35,82 @@ export function SettingsNav({
   instanceOwner: boolean;
 }) {
   const pathname = useRouterState({ select: (state) => state.location.pathname });
+  const systemSettings = pathname.startsWith("/settings/instance");
+  const backLabel = systemSettings ? "返回控制台" : "返回设置";
   return (
     <div className="settings-sidebar-nav">
       <Link
         to={project ? "/projects/$projectId/overview" : "/projects"}
         params={project ? { projectId: project.id } : undefined}
         className="settings-sidebar-nav__back"
-        aria-label="返回设置"
+        aria-label={backLabel}
       >
         <ArrowLeft size={16} aria-hidden="true" />
-        <span>返回设置</span>
+        <span>{backLabel}</span>
       </Link>
 
-      <Scope label="账户">
-        <NavItem to="/settings/account" icon={<UserRoundIcon />} exact>
-          个人资料
-        </NavItem>
-      </Scope>
+      {!systemSettings ? (
+        <>
+          <Scope label="账户">
+            <NavItem to="/settings/account" icon={<UserRoundIcon />} exact>
+              个人资料
+            </NavItem>
+          </Scope>
 
-      <Scope label="组织" badge={organizationName}>
-        <NavItem to="/settings/org/members" icon={<UsersRoundIcon />} exact>
-          成员与权限
-        </NavItem>
-        <NavItem to="/settings/org/channels" icon={<BellRingIcon />}>
-          通知渠道
-        </NavItem>
-      </Scope>
+          <Scope label="组织" badge={organizationName}>
+            <NavItem to="/settings/org/members" icon={<UsersRoundIcon />} exact>
+              成员与权限
+            </NavItem>
+            <NavItem to="/settings/org/channels" icon={<BellRingIcon />}>
+              通知渠道
+            </NavItem>
+          </Scope>
 
-      {project ? (
-        <Scope label="项目" badge={project.name}>
-          <NavItem
-            to="/settings/project/$projectId/general"
-            params={{ projectId: project.id }}
-            icon={<SlidersHorizontalIcon />}
-            exact
-          >
-            常规
-          </NavItem>
-          <NavItem
-            to="/projects/$projectId/onboarding"
-            params={{ projectId: project.id }}
-            icon={<PlugZapIcon />}
-          >
-            接入指引
-          </NavItem>
+          {project ? (
+            <Scope label="项目" badge={project.name}>
+              <NavItem
+                to="/settings/project/$projectId/general"
+                params={{ projectId: project.id }}
+                icon={<SlidersHorizontalIcon />}
+                exact
+              >
+                常规
+              </NavItem>
+              <NavItem
+                to="/projects/$projectId/onboarding"
+                params={{ projectId: project.id }}
+                icon={<PlugZapIcon />}
+              >
+                接入指引
+              </NavItem>
 
-          <NavItem
-            to="/settings/project/$projectId/sampling"
-            params={{ projectId: project.id }}
-            icon={<DatabaseIcon />}
-            active={projectDataSettings.some(
-              (item) => pathname.replace(/\/$/, "") === item.path.replace("$projectId", project.id),
-            )}
-          >
-            数据管理
-          </NavItem>
-          <NavItem
-            to="/settings/project/$projectId/usage"
-            params={{ projectId: project.id }}
-            icon={<ChartColumnIcon />}
-          >
-            用量统计
-          </NavItem>
-        </Scope>
+              <NavItem
+                to="/settings/project/$projectId/sampling"
+                params={{ projectId: project.id }}
+                icon={<DatabaseIcon />}
+                active={projectDataSettings.some(
+                  (item) =>
+                    pathname.replace(/\/$/, "") === item.path.replace("$projectId", project.id),
+                )}
+              >
+                数据管理
+              </NavItem>
+              <NavItem
+                to="/settings/project/$projectId/usage"
+                params={{ projectId: project.id }}
+                icon={<ChartColumnIcon />}
+              >
+                用量统计
+              </NavItem>
+            </Scope>
+          ) : null}
+        </>
       ) : null}
 
       {/* Mirrors the condition the instance routes enforce: without an instance role the
           whole scope is absent rather than present and rejecting. */}
-      {showInstance ? (
-        <Scope label="实例" badge={instanceOwner ? "Owner" : "Admin"}>
+      {showInstance && systemSettings ? (
+        <Scope label="系统设置" badge={instanceOwner ? "Owner" : "Admin"}>
           <NavItem to="/settings/instance" icon={<ServerCogIcon />} exact>
             实例概览
           </NavItem>

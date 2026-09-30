@@ -5,12 +5,12 @@ import BrandMark from "../BrandMark.astro";
 import { topics } from "../../lib/docsTopics";
 import DocsLanguageMenu from "./DocsLanguageMenu.astro";
 import DocsThemeMenu from "./DocsThemeMenu.astro";
+import PaletteMenu from "../PaletteMenu.astro";
 
 const route = Astro.locals.starlightRoute;
 const zh = Astro.url.pathname.startsWith("/zh/");
 const prefix = zh ? "/zh" : "";
 const tabs = topics(route.sidebar);
-
 ---
 
 <div class="docs-header">
@@ -33,6 +33,7 @@ const tabs = topics(route.sidebar);
 
   <div class="docs-header-actions print:hidden">
     <div class="docs-header-icons sl-flex"><SocialIcons /></div>
+    <PaletteMenu lang={zh ? "zh" : "en"} />
     <DocsThemeMenu />
     <DocsLanguageMenu />
   </div>

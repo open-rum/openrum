@@ -51,9 +51,19 @@ function renderPage(managedSecretsAvailable: boolean, providers: AdminAuthProvid
 describe("Instance authentication settings", () => {
   it("shows the key prerequisite and disables edits when managed secrets are unavailable", async () => {
     const view = renderPage(false);
+    const user = userEvent.setup();
     expect(await view.findByText("需要启用加密托管")).toBeTruthy();
     expect(view.getByText(/OPENRUM_MASTER_KEY/)).toBeTruthy();
     expect(view.queryByRole("button", { name: "保存配置" })).toBeNull();
+    const github = view.getByRole("button", { name: "选择 GitHub 登录方式" });
+    expect(github.hasAttribute("disabled")).toBe(false);
+    github.focus();
+    await user.keyboard("{Enter}");
+    expect(github.getAttribute("aria-pressed")).toBe("true");
+    expect((view.getByLabelText("提供者 ID") as HTMLInputElement).value).toBe("github");
+    await user.click(view.getByRole("button", { name: "选择 通用 OIDC 登录方式" }));
+    expect(view.getByLabelText("Issuer URL")).toBeTruthy();
+    expect(view.queryByRole("combobox", { name: "类型" })).toBeNull();
   });
 
   it("reverifies the Owner before saving and never displays the saved secret", async () => {

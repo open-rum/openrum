@@ -22,7 +22,7 @@ import {
   ArrowUpIcon,
   CopyIcon,
   GripVerticalIcon,
-  ChartNoAxesCombinedIcon,
+  Maximize2Icon,
   Settings2Icon,
   Trash2Icon,
 } from "lucide-react";
@@ -132,9 +132,19 @@ export function DashboardGrid({
                   query={queries.get(record.id)}
                   filters={filters}
                   showDescription={editing}
+                  headerAction={editing ? handle : undefined}
                   actions={(openDetails) => (
-                    <div className="flex items-center gap-1">
-                      {editing ? handle : null}
+                    <>
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        aria-label={`放大 ${typeof record.title === "string" ? record.title : "模块"}`}
+                        title="放大查看"
+                        disabled={!readWidget(record)}
+                        onClick={openDetails}
+                      >
+                        <Maximize2Icon />
+                      </Button>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button
@@ -149,10 +159,6 @@ export function DashboardGrid({
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuGroup>
-                            <DropdownMenuItem disabled={!readWidget(record)} onSelect={openDetails}>
-                              <ChartNoAxesCombinedIcon />
-                              详细
-                            </DropdownMenuItem>
                             <DropdownMenuItem
                               disabled={!readWidget(record)}
                               onSelect={() => {
@@ -230,7 +236,7 @@ export function DashboardGrid({
                           </DropdownMenuGroup>
                         </DropdownMenuContent>
                       </DropdownMenu>
-                    </div>
+                    </>
                   )}
                 />
               )}
@@ -304,12 +310,16 @@ export function ModuleCard({
   query,
   filters,
   actions,
+  headerAction,
   showDescription = false,
 }: {
   record: StoredWidget;
   query?: ModuleQuery;
   filters: OverviewFilters;
+  /** Floating hover toolbar at the card's bottom-right (expand, settings). */
   actions: (openDetails: () => void) => ReactNode;
+  /** Always-visible control in the header, such as the drag handle while editing. */
+  headerAction?: ReactNode;
   showDescription?: boolean;
 }) {
   const widget = readWidget(record);
@@ -348,9 +358,9 @@ export function ModuleCard({
               </CardDescription>
             ) : null}
           </div>
-          <CardAction className="flex items-center gap-2">
-            {actions(() => setDetailsOpen(true))}
-          </CardAction>
+          {headerAction ? (
+            <CardAction className="flex items-center gap-2">{headerAction}</CardAction>
+          ) : null}
         </CardHeader>
         {widget?.data.source === "catalog" && Object.values(widget.data.filters).some(Boolean) ? (
           // A filtered catalog module says so on the card, one badge per filter.
@@ -374,6 +384,9 @@ export function ModuleCard({
         <CardContent className="min-w-0 flex-1">
           <ModuleContent record={record} query={query} filters={filters} />
         </CardContent>
+        <div className="dashboard-module-actions" role="toolbar" aria-label={`${title} 操作`}>
+          {actions(() => setDetailsOpen(true))}
+        </div>
       </Card>
       <ModuleDetailsDialog record={record} query={query} filters={filters} sourceRef={cardRef} />
     </Dialog>

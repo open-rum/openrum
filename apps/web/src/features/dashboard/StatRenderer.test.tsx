@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, render } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { StatRenderer } from "./ModuleRenderers";
 import { createWidget } from "./model";
@@ -27,14 +27,30 @@ describe("stat card hierarchy", () => {
       expect(container.querySelector('[data-slot="chart"]')).toBeNull();
     },
   );
-  it("places only comparison below the value without description or sampling metadata", () => {
+  it("shows the value alone and pins the comparison to the top-right corner", () => {
     const { container } = render(<StatRenderer widget={createWidget("stat")} data={data} />);
-    const children = [...container.firstElementChild!.children];
-    expect(children[0].tagName).toBe("STRONG");
-    expect(children[1].textContent).toBe("+20.0%较上一周期");
-    expect(children).toHaveLength(2);
+    const summary = container.firstElementChild!;
+    expect([...summary.children].map((child) => child.tagName)).toEqual(["STRONG"]);
+    const corner = container.querySelector(".dashboard-comparison-corner")!;
+    expect(corner.textContent).toBe("+20.0%");
+    expect(container.textContent).not.toContain("较上一周期");
     expect(container.textContent).not.toContain("页面浏览次数");
     expect(container.textContent).not.toContain("采集样本");
+  });
+  it("explains the comparison and the previous value on hover or focus", async () => {
+    // Radix positions the tooltip with ResizeObserver, which jsdom lacks.
+    globalThis.ResizeObserver ??= class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    } as unknown as typeof ResizeObserver;
+    render(<StatRenderer widget={createWidget("stat")} data={data} />);
+    const badge = screen.getByLabelText("相比上一周期 +20.0%；上一周期 100");
+    act(() => {
+      fireEvent.focus(badge);
+    });
+    expect((await screen.findAllByText("较上一周期 +20.0%")).length).toBeGreaterThan(0);
+    expect(screen.getAllByText("上一周期 100").length).toBeGreaterThan(0);
   });
   it("shows only the value when there is no previous-period comparison", () => {
     const widget = createWidget("stat", {
@@ -51,7 +67,7 @@ describe("stat card hierarchy", () => {
     const { container } = render(
       <StatRenderer widget={widget} data={{ ...data, unit: "ms", insufficient: true }} />,
     );
-    expect(container.textContent).toContain("样本不足仅供参考");
+    expect(container.querySelector(".dashboard-comparison-corner")?.textContent).toBe("样本不足");
     expect(container.textContent).not.toContain("交互响应耗时 · P75");
     expect(container.textContent).not.toContain("较上一周期");
   });

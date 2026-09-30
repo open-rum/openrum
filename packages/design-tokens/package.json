@@ -5,6 +5,7 @@
   "type": "module",
   "exports": {
     "./tokens.css": "./tokens.css",
+    "./brand.css": "./brand.css",
     "./catalog": "./catalog.ts",
     "./brand": "./brand.ts"
   }

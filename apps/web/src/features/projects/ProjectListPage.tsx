@@ -2,19 +2,16 @@ import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import {
-  ActivityIcon,
   CircleAlertIcon,
   Clock3Icon,
   EyeIcon,
   FolderKanbanIcon,
   LayoutGridIcon,
-  ChartNoAxesCombinedIcon,
   ListIcon,
   PlusIcon,
-  PlugIcon,
-  UsersIcon,
+  SettingsIcon,
+  SunIcon,
 } from "lucide-react";
-import { CartesianGrid, Line, LineChart, XAxis } from "recharts";
 import { AsyncError } from "@/components/ui/AsyncState";
 import { ConsolePage, ConsolePageHeader } from "@/components/layout/ConsolePage";
 import { Badge } from "@/components/ui/badge";
@@ -28,19 +25,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import {
-  ChartContainer,
-  ChartTooltip,
-  ChartTooltipContent,
-  type ChartConfig,
-} from "@/components/ui/chart";
-import {
-  Empty,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-} from "@/components/ui/empty";
 import { EmptyState } from "@/components/ui/EmptyState";
 import {
   Select,
@@ -60,8 +44,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { useChartMotion } from "@/lib/charts/useChartMotion";
-import { smoothCurve } from "@/lib/charts/smoothCurve";
+import { Sparkline } from "@/lib/charts/Sparkline";
+import { TIME_SERIES_MAX_POINTS, bucketRows, type TimeSeriesRow } from "@/lib/charts/timeSeries";
 import { getOverview, type OverviewResponse } from "@/lib/api/client";
 import {
   canManageProjects,
@@ -70,61 +54,42 @@ import {
   type Project,
 } from "@/lib/api/projects";
 import { rememberProject } from "@/lib/projects/currentProject";
+import { cn } from "@/lib/utils";
+import { ActivityHeatmap } from "./ActivityHeatmap";
+import { buildHeatmap } from "./heatmapLayout";
 import { ProjectPlatformIcon, getProjectPlatform } from "./projectPlatforms";
 
+const DAY = 24 * 60 * 60 * 1000;
 const compactNumber = new Intl.NumberFormat("zh-CN", {
   notation: "compact",
   maximumFractionDigits: 1,
 });
-const preciseNumber = new Intl.NumberFormat("zh-CN", { maximumFractionDigits: 0 });
-const timeFormatter = new Intl.DateTimeFormat("zh-CN", {
-  hour: "2-digit",
-  minute: "2-digit",
-  hour12: false,
-});
-const dateTimeFormatter = new Intl.DateTimeFormat("zh-CN", {
-  month: "2-digit",
-  day: "2-digit",
-  hour: "2-digit",
-  minute: "2-digit",
-  hour12: false,
-});
-const activityChartConfig = {
-  pageViews: {
-    label: "PV",
-    color: "var(--ds-chart-1)",
-  },
-} satisfies ChartConfig;
 
 const views = [
   {
-    value: "compact",
-    label: "轻量卡片",
-    icon: LayoutGridIcon,
-    description: "把项目身份和关键指标放在首位，适合快速进入项目。",
-  },
-  {
-    value: "trends",
-    label: "趋势卡片",
-    icon: ChartNoAxesCombinedIcon,
-    description: "展开访问趋势与配置信息，适合逐个观察项目。",
-  },
-  {
     value: "table",
-    label: "数据表格",
+    label: "表格",
     icon: ListIcon,
-    description: "对齐所有项目的指标和上报时间，适合横向比较。",
+    scope: "最近 24 小时",
+    description: "对齐指标，横向比较各项目",
+  },
+  {
+    value: "cards",
+    label: "卡片",
+    icon: LayoutGridIcon,
+    scope: "最近 30 天",
+    description: "每格一天，看出项目的活跃节奏",
   },
 ] as const;
 type ProjectView = (typeof views)[number]["value"];
 const viewStorageKey = "openrum-project-list-view";
 
+// Older builds stored "compact" or "trends"; anything unknown falls back to the table.
 function initialView(): ProjectView {
   try {
-    const saved = localStorage.getItem(viewStorageKey);
-    return views.find((view) => view.value === saved)?.value ?? "compact";
+    return localStorage.getItem(viewStorageKey) === "cards" ? "cards" : "table";
   } catch {
-    return "compact";
+    return "table";
   }
 }
 
@@ -147,12 +112,13 @@ export function ProjectListPage() {
     enabled: Boolean(organizationId),
   });
   const projects = projectsQuery.data?.projects ?? [];
+  const current = views.find((item) => item.value === view) ?? views[0];
 
   return (
     <ConsolePage width="wide">
       <ConsolePageHeader
         title="项目"
-        description="快速确认项目是否持续上报、最近 24 小时的访问规模与错误情况。"
+        description="确认各项目是否持续上报、访问规模与错误情况，进入项目或项目设置。"
         actions={
           <>
             {organizations.length > 1 ? (
@@ -232,23 +198,18 @@ export function ProjectListPage() {
       {projects.length ? (
         <div className="flex flex-col gap-5">
           <div className="flex flex-wrap items-center justify-between gap-4">
-            <div>
-              <p className="text-sm font-medium">
-                {projects.length} 个项目{" "}
-                <span className="ml-2 font-normal text-muted-foreground">
-                  最近 24 小时 · 各项目默认环境
-                </span>
-              </p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                {views.find((item) => item.value === view)?.description}
-              </p>
-            </div>
+            <p className="text-sm font-medium">
+              {projects.length} 个项目
+              <span className="ml-2 font-normal text-muted-foreground">
+                {current.scope} · 全部环境 · {current.description}
+              </span>
+            </p>
             <ToggleGroup
               type="single"
               value={view}
               variant="selection"
               aria-label="项目展示方式"
-              className="max-w-full flex-wrap rounded-lg border bg-card p-1"
+              className="max-w-full rounded-full border bg-card p-1"
               onValueChange={(value) => {
                 const next = views.find((item) => item.value === value)?.value;
                 if (!next) return;
@@ -269,7 +230,7 @@ export function ProjectListPage() {
             </ToggleGroup>
           </div>
           {view === "table" ? (
-            <div className="overflow-hidden rounded-xl border bg-card" aria-label="项目列表">
+            <div className="overflow-x-auto rounded-xl border bg-card" aria-label="项目列表">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -280,7 +241,7 @@ export function ProjectListPage() {
                     <TableHead>错误事件</TableHead>
                     <TableHead>PV 趋势</TableHead>
                     <TableHead>最近上报</TableHead>
-                    <TableHead>
+                    <TableHead className="text-right">
                       <span className="sr-only">操作</span>
                     </TableHead>
                   </TableRow>
@@ -293,21 +254,10 @@ export function ProjectListPage() {
               </Table>
             </div>
           ) : (
-            <div
-              className={
-                view === "compact"
-                  ? "grid gap-4 md:grid-cols-2 xl:grid-cols-3"
-                  : "grid gap-5 lg:grid-cols-2"
-              }
-              aria-label="项目列表"
-            >
-              {projects.map((project) =>
-                view === "compact" ? (
-                  <CompactProjectCard key={project.id} project={project} />
-                ) : (
-                  <ProjectCard key={project.id} project={project} />
-                ),
-              )}
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3" aria-label="项目列表">
+              {projects.map((project) => (
+                <ProjectHeatmapCard key={project.id} project={project} />
+              ))}
             </div>
           )}
         </div>
@@ -316,205 +266,218 @@ export function ProjectListPage() {
   );
 }
 
-function useProjectOverview(project: Project) {
+const overviewTiming = { staleTime: 30_000, refetchInterval: 60_000 };
+
+/** The previous 24 complete hours, for the comparison table. */
+function useProjectSummary(project: Project) {
   return useQuery({
-    queryKey: ["project-card-overview", project.id],
+    queryKey: ["project-list-summary", project.id, "24h", TIME_SERIES_MAX_POINTS],
     queryFn: ({ signal }) => {
       const to = new Date();
       to.setUTCMinutes(0, 0, 0);
-      const from = new Date(to.getTime() - 24 * 60 * 60 * 1000);
       return getOverview(
         {
           projectId: project.id,
-          from,
+          from: new Date(to.getTime() - DAY),
           to,
-          environment: project.environment,
         },
         signal,
+        TIME_SERIES_MAX_POINTS,
       );
     },
-    staleTime: 30_000,
-    refetchInterval: 60_000,
+    ...overviewTiming,
   });
 }
 
-function ProjectCard({ project }: { project: Project }) {
-  const overviewQuery = useProjectOverview(project);
-  const overview = overviewQuery.data;
+/**
+ * Thirty UTC days ending today, for the heatmap. Just under 30 days, so the shared
+ * policy resolves to daily buckets; the last one is today and still filling.
+ */
+function useProjectActivity(project: Project) {
+  return useQuery({
+    queryKey: ["project-list-activity", project.id, "30d", TIME_SERIES_MAX_POINTS],
+    queryFn: ({ signal }) => {
+      const to = new Date();
+      const from = new Date(Date.UTC(to.getUTCFullYear(), to.getUTCMonth(), to.getUTCDate() - 29));
+      return getOverview({ projectId: project.id, from, to }, signal, TIME_SERIES_MAX_POINTS);
+    },
+    ...overviewTiming,
+  });
+}
+
+function ProjectTableRow({ project }: { project: Project }) {
+  const query = useProjectSummary(project);
+  const data = query.data;
+  return (
+    <TableRow>
+      <TableCell className="py-4">
+        <div className="flex items-center gap-3">
+          <ProjectPlatformIcon platform={project.sdkPlatform} className="size-5" />
+          <div className="min-w-0">
+            <ProjectNameLink project={project} className="block max-w-52" />
+            <p className="mt-1 text-xs text-muted-foreground">
+              {getProjectPlatform(project.sdkPlatform).label}
+            </p>
+          </div>
+        </div>
+      </TableCell>
+      <TableCell>
+        <StatusBadge status={project.status} />
+      </TableCell>
+      {data ? (
+        <>
+          <TableCell className="tabular-nums">{formatMetric(data.kpis.pageViews.value)}</TableCell>
+          <TableCell className="tabular-nums">
+            {data.kpis.uniqueUsers.approximate ? "≈" : ""}
+            {formatMetric(data.kpis.uniqueUsers.value)}
+          </TableCell>
+          <TableCell className="tabular-nums">
+            {formatMetric(data.kpis.errorRate.numerator)}
+          </TableCell>
+          <TableCell>
+            <PageViewSparkline overview={data} />
+          </TableCell>
+          <TableCell>
+            <FreshnessLabel freshness={data.freshness} />
+          </TableCell>
+        </>
+      ) : (
+        <TableCell colSpan={5}>
+          {query.isError ? (
+            <span className="text-muted-foreground">摘要暂不可用</span>
+          ) : (
+            <Skeleton className="h-6" aria-label="正在加载项目摘要" />
+          )}
+        </TableCell>
+      )}
+      <TableCell>
+        <div className="flex items-center justify-end gap-1">
+          <ProjectEntry project={project} />
+          <ProjectSettingsLink project={project} />
+        </div>
+      </TableCell>
+    </TableRow>
+  );
+}
+
+function PageViewSparkline({ overview }: { overview: OverviewResponse }) {
+  const rows = bucketRows(
+    overview.series.map((point) => ({ bucket: point.bucket, pageViews: point.pageViews.value })),
+    overview,
+  );
+  const values = rows.map((row) => {
+    const value = (row as TimeSeriesRow).pageViews;
+    return typeof value === "number" ? value : null;
+  });
+  const hasActivity = overview.kpis.pageViews.value > 0 || values.some((value) => (value ?? 0) > 0);
+  return hasActivity ? (
+    <Sparkline values={values} color="var(--ds-chart-1)" className="h-8 w-28" />
+  ) : (
+    <span className="text-xs text-muted-foreground">暂无访问</span>
+  );
+}
+
+function ProjectHeatmapCard({ project }: { project: Project }) {
+  const query = useProjectActivity(project);
+  const data = query.data;
+  const heatmap = data
+    ? buildHeatmap(
+        data,
+        data.series.map((point) => ({ bucket: point.bucket, value: point.pageViews.value })),
+      )
+    : null;
 
   return (
-    <Card className="min-h-88">
-      <CardHeader className="border-b">
-        <CardTitle className="flex items-center gap-2">
-          <ProjectPlatformIcon platform={project.sdkPlatform} className="size-4" />
-          {project.name}
-        </CardTitle>
-        <CardDescription>
-          {project.slug} · {project.environments?.length ?? 1} 个环境
-        </CardDescription>
-        <CardAction>
-          <Badge variant={project.status === "active" ? "secondary" : "outline"}>
-            {statusLabel(project.status)}
-          </Badge>
+    <Card className="gap-4">
+      <CardHeader>
+        <div className="flex min-w-0 items-center gap-3">
+          <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted">
+            <ProjectPlatformIcon platform={project.sdkPlatform} className="size-5" />
+          </div>
+          <div className="min-w-0">
+            <CardTitle className="text-base">
+              <ProjectNameLink project={project} className="block" />
+            </CardTitle>
+            <CardDescription className="truncate">
+              {getProjectPlatform(project.sdkPlatform).label}
+            </CardDescription>
+          </div>
+        </div>
+        <CardAction className="flex items-center gap-1">
+          <StatusBadge status={project.status} />
+          <ProjectSettingsLink project={project} />
         </CardAction>
       </CardHeader>
-      <CardContent className="flex flex-1 flex-col gap-4">
-        {overview ? (
-          <ProjectActivity overview={overview} />
-        ) : overviewQuery.isError ? (
-          <ProjectActivityUnavailable />
+      <CardContent className="flex flex-1 flex-col gap-3">
+        {data && heatmap ? (
+          <>
+            <dl className="grid grid-cols-3 gap-3">
+              <HeatmapStat icon={EyeIcon} label="30 天 PV" value={formatMetric(heatmap.total)} />
+              <HeatmapStat
+                icon={SunIcon}
+                label="活跃天数"
+                value={`${heatmap.activeDays}/${heatmap.cells.length}`}
+              />
+              <HeatmapStat
+                icon={CircleAlertIcon}
+                label="错误事件"
+                value={formatMetric(data.kpis.errorRate.numerator)}
+              />
+            </dl>
+            <ActivityHeatmap heatmap={heatmap} />
+          </>
+        ) : query.isError || (data && !heatmap) ? (
+          <p className="py-6 text-sm text-muted-foreground" role="status">
+            活动数据暂不可用，仍可进入项目。
+          </p>
         ) : (
-          <ProjectActivitySkeleton />
+          <Skeleton className="h-36" aria-label="正在加载项目活动" />
         )}
+        {heatmap && !heatmap.hasData ? (
+          <p className="text-xs text-muted-foreground">暂无访问数据，完成 SDK 接入后会逐日点亮。</p>
+        ) : null}
       </CardContent>
-      <CardFooter className="flex-wrap justify-between gap-2">
+      <CardFooter className="justify-between gap-2">
         <div className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
-          <span className="flex items-center gap-1">
-            <ActivityIcon /> 默认 {project.environment}
-          </span>
-          <span aria-hidden="true">·</span>
-          <span>{project.retentionDays} 天保留</span>
-          <span aria-hidden="true">·</span>
-          <span>{formatRate(project.eventSampleRate)} 采样</span>
+          {data ? <FreshnessLabel freshness={data.freshness} /> : null}
         </div>
-        <div className="flex gap-2">
-          <Button asChild size="sm" variant="ghost">
-            <Link to="/projects/$projectId/onboarding" params={{ projectId: project.id }}>
-              <PlugIcon data-icon="inline-start" />
-              接入
-            </Link>
-          </Button>
-          <Button asChild size="sm">
-            <Link
-              to="/projects/$projectId/analytics"
-              params={{ projectId: project.id }}
-              onClick={() => rememberProject(project)}
-            >
-              进入项目
-            </Link>
-          </Button>
-        </div>
+        <ProjectEntry project={project} />
       </CardFooter>
     </Card>
   );
 }
 
-function ProjectActivity({ overview }: { overview: OverviewResponse }) {
+function HeatmapStat({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: typeof EyeIcon;
+  label: string;
+  value: string;
+}) {
   return (
-    <>
-      <ProjectMetrics overview={overview} />
-      <section className="flex flex-1 flex-col gap-2" aria-label="最近 24 小时 PV 趋势">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <h3 className="text-sm font-medium">PV 趋势</h3>
-            <p className="text-xs text-muted-foreground">最近 24 小时 · 反映项目访问活跃度</p>
-          </div>
-          <FreshnessLabel freshness={overview.freshness} />
-        </div>
-        <ProjectTrend overview={overview} />
-      </section>
-    </>
-  );
-}
-
-function ProjectMetrics({ overview }: { overview: OverviewResponse }) {
-  return (
-    <div className="grid grid-cols-3 divide-x divide-border">
-      <ProjectMetric
-        icon={EyeIcon}
-        label="24h PV"
-        value={formatMetric(overview.kpis.pageViews.value)}
-      />
-      <ProjectMetric
-        icon={UsersIcon}
-        label="24h UV"
-        value={`${overview.kpis.uniqueUsers.approximate ? "≈" : ""}${formatMetric(overview.kpis.uniqueUsers.value)}`}
-      />
-      <ProjectMetric
-        icon={CircleAlertIcon}
-        label="错误事件"
-        value={formatMetric(overview.kpis.errorRate.numerator)}
-      />
+    <div className="flex min-w-0 flex-col gap-0.5">
+      <dt className="flex items-center gap-1 text-xs text-muted-foreground">
+        <Icon className="size-3.5 shrink-0" aria-hidden="true" />
+        {label}
+      </dt>
+      <dd className="truncate text-base font-semibold tabular-nums">{value}</dd>
     </div>
   );
 }
 
-function ProjectTrend({
-  overview,
-  compact = false,
-}: {
-  overview: OverviewResponse;
-  compact?: boolean;
-}) {
-  const animate = useChartMotion();
-  const data = overview.series.map((point) => ({
-    bucket: point.bucket,
-    pageViews: point.pageViews.value,
-  }));
-  const hasActivity =
-    overview.kpis.pageViews.value > 0 || data.some((point) => point.pageViews > 0);
-
-  return hasActivity ? (
-    <ChartContainer
-      className={compact ? "h-12 w-full aspect-auto" : "h-28 w-full aspect-auto"}
-      config={activityChartConfig}
-      initialDimension={{ width: 480, height: 112 }}
-      role="img"
-      aria-label="最近 24 小时 PV 折线图"
+function ProjectNameLink({ project, className }: { project: Project; className?: string }) {
+  return (
+    <Link
+      className={cn("truncate font-medium hover:underline", className)}
+      title={project.name}
+      to="/projects/$projectId/analytics"
+      params={{ projectId: project.id }}
+      onClick={() => rememberProject(project)}
     >
-      <LineChart data={data} margin={{ top: 8, right: 4, bottom: 0, left: 4 }}>
-        {!compact && (
-          <CartesianGrid vertical={false} stroke="var(--ds-border-soft)" strokeDasharray="2 3" />
-        )}
-        <XAxis
-          hide={compact}
-          dataKey="bucket"
-          axisLine={false}
-          tickLine={false}
-          tickMargin={8}
-          minTickGap={56}
-          tickFormatter={(value: string) => timeFormatter.format(new Date(value))}
-        />
-        <ChartTooltip
-          cursor={{ stroke: "var(--ds-border-strong)" }}
-          content={
-            <ChartTooltipContent
-              hideIndicator
-              labelFormatter={(_, payload) => {
-                const bucket = payload[0]?.payload?.bucket as string | undefined;
-                return bucket ? dateTimeFormatter.format(new Date(bucket)) : "";
-              }}
-              formatter={(value) => (
-                <div className="flex min-w-32 items-center justify-between gap-4">
-                  <span className="text-muted-foreground">PV</span>
-                  <span className="font-mono font-medium tabular-nums">
-                    {preciseNumber.format(Number(value))}
-                  </span>
-                </div>
-              )}
-            />
-          }
-        />
-        <Line
-          {...smoothCurve}
-          dataKey="pageViews"
-          stroke="var(--color-pageViews)"
-          strokeWidth={2}
-          dot={false}
-          activeDot={{ r: 3 }}
-          isAnimationActive={animate}
-        />
-      </LineChart>
-    </ChartContainer>
-  ) : compact ? (
-    <div className="flex h-12 items-center text-xs text-muted-foreground">暂无访问数据</div>
-  ) : (
-    <Empty className="h-28 gap-2 rounded-lg border border-border p-3">
-      <EmptyHeader className="gap-1">
-        <EmptyTitle>暂无访问数据</EmptyTitle>
-        <EmptyDescription className="text-xs">完成 SDK 接入后将在这里展示趋势。</EmptyDescription>
-      </EmptyHeader>
-    </Empty>
+      {project.name}
+    </Link>
   );
 }
 
@@ -532,128 +495,28 @@ function ProjectEntry({ project }: { project: Project }) {
   );
 }
 
-function CompactProjectCard({ project }: { project: Project }) {
-  const query = useProjectOverview(project);
+function ProjectSettingsLink({ project }: { project: Project }) {
   return (
-    <Card className="gap-4">
-      <CardHeader>
-        <div className="mb-2 flex items-center justify-between gap-3">
-          <div className="flex size-10 items-center justify-center rounded-lg bg-muted">
-            <ProjectPlatformIcon platform={project.sdkPlatform} className="size-5" />
-          </div>
-          <Badge variant="outline">{statusLabel(project.status)}</Badge>
-        </div>
-        <CardTitle className="truncate text-base" title={project.name}>
-          {project.name}
-        </CardTitle>
-        <CardDescription className="truncate">
-          {getProjectPlatform(project.sdkPlatform).label} · {project.slug} ·{" "}
-          {project.environments?.length ?? 1} 个环境
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-1 flex-col gap-3">
-        {query.data ? (
-          <>
-            <ProjectMetrics overview={query.data} />
-            <ProjectTrend overview={query.data} compact />
-            <FreshnessLabel freshness={query.data.freshness} />
-          </>
-        ) : query.isError ? (
-          <p className="text-sm text-muted-foreground" role="status">
-            摘要暂不可用，仍可进入项目。
-          </p>
-        ) : (
-          <Skeleton className="h-32" aria-label="正在加载项目摘要" />
-        )}
-      </CardContent>
-      <CardFooter className="justify-between gap-2">
-        <span className="truncate text-xs text-muted-foreground" title={project.environment}>
-          默认 {project.environment}
-        </span>
-        <ProjectEntry project={project} />
-      </CardFooter>
-    </Card>
+    <Button asChild size="icon-sm" variant="ghost">
+      <Link
+        to="/settings/project/$projectId/general"
+        params={{ projectId: project.id }}
+        onClick={() => rememberProject(project)}
+        aria-label={`项目设置：${project.name}`}
+        title="项目设置"
+      >
+        <SettingsIcon />
+      </Link>
+    </Button>
   );
 }
 
-function ProjectTableRow({ project }: { project: Project }) {
-  const query = useProjectOverview(project);
-  const data = query.data;
+function StatusBadge({ status }: { status: Project["status"] }) {
   return (
-    <TableRow>
-      <TableCell className="py-5">
-        <div className="flex items-center gap-3">
-          <ProjectPlatformIcon platform={project.sdkPlatform} className="size-5" />
-          <div className="min-w-0">
-            <Link
-              className="block max-w-52 truncate font-medium hover:underline"
-              title={project.name}
-              to="/projects/$projectId/analytics"
-              params={{ projectId: project.id }}
-              onClick={() => rememberProject(project)}
-            >
-              {project.name}
-            </Link>
-            <p className="mt-1 text-xs text-muted-foreground">
-              默认 {project.environment} · {project.environments?.length ?? 1} 个环境
-            </p>
-          </div>
-        </div>
-      </TableCell>
-      <TableCell>
-        <Badge variant="outline">{statusLabel(project.status)}</Badge>
-      </TableCell>
-      {data ? (
-        <>
-          <TableCell className="tabular-nums">{formatMetric(data.kpis.pageViews.value)}</TableCell>
-          <TableCell className="tabular-nums">
-            {data.kpis.uniqueUsers.approximate ? "≈" : ""}
-            {formatMetric(data.kpis.uniqueUsers.value)}
-          </TableCell>
-          <TableCell className="tabular-nums">
-            {formatMetric(data.kpis.errorRate.numerator)}
-          </TableCell>
-          <TableCell>
-            <div className="w-28">
-              <ProjectTrend overview={data} compact />
-            </div>
-          </TableCell>
-          <TableCell>
-            <FreshnessLabel freshness={data.freshness} />
-          </TableCell>
-        </>
-      ) : (
-        <TableCell colSpan={5}>
-          {query.isError ? (
-            <span className="text-muted-foreground">摘要暂不可用</span>
-          ) : (
-            <Skeleton className="h-6" aria-label="正在加载项目摘要" />
-          )}
-        </TableCell>
-      )}
-      <TableCell>
-        <ProjectEntry project={project} />
-      </TableCell>
-    </TableRow>
-  );
-}
-
-function ProjectMetric({
-  icon: Icon,
-  label,
-  value,
-}: {
-  icon: typeof EyeIcon;
-  label: string;
-  value: string;
-}) {
-  return (
-    <div className="flex min-w-0 flex-col gap-1 px-3 py-2.5">
-      <span className="flex items-center gap-1 text-xs text-muted-foreground">
-        <Icon className="size-3.5 shrink-0" aria-hidden="true" /> {label}
-      </span>
-      <strong className="truncate text-base font-semibold tabular-nums">{value}</strong>
-    </div>
+    <Badge variant="outline" className="gap-1.5">
+      <span className="project-status-dot" data-status={status} aria-hidden="true" />
+      {statusLabel(status)}
+    </Badge>
   );
 }
 
@@ -669,45 +532,8 @@ function FreshnessLabel({ freshness }: { freshness: OverviewResponse["freshness"
   );
 }
 
-function ProjectActivitySkeleton() {
-  return (
-    <div className="flex flex-1 flex-col gap-4" aria-label="正在加载项目摘要">
-      <div className="grid grid-cols-3 gap-2">
-        <Skeleton className="h-16" />
-        <Skeleton className="h-16" />
-        <Skeleton className="h-16" />
-      </div>
-      <Skeleton className="h-32" />
-    </div>
-  );
-}
-
-function ProjectActivityUnavailable() {
-  return (
-    <Empty className="min-h-48 border border-border">
-      <EmptyHeader>
-        <EmptyMedia variant="icon">
-          <ActivityIcon aria-hidden="true" />
-        </EmptyMedia>
-        <EmptyTitle>项目摘要暂时不可用</EmptyTitle>
-        <EmptyDescription>仍可进入项目查看其他数据。</EmptyDescription>
-      </EmptyHeader>
-    </Empty>
-  );
-}
-
 function ProjectListSkeleton() {
-  return (
-    <div className="grid gap-4 lg:grid-cols-2" aria-label="正在加载项目">
-      {[0, 1].map((item) => (
-        <Skeleton key={item} className="h-96" />
-      ))}
-    </div>
-  );
-}
-
-function formatRate(value: number) {
-  return `${Math.round(value * 100)}%`;
+  return <Skeleton className="h-64" aria-label="正在加载项目" />;
 }
 
 function formatMetric(value: number) {

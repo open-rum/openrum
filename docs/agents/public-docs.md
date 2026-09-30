@@ -54,3 +54,26 @@ the marketing site's `openrum-theme` preference does not select a docs theme.
 
 Examples: the pages under `apps/site/src/content/docs/docs/getting-started/` and
 their Chinese counterparts. Reference: https://starlight.astro.build/components/using-components/.
+
+## Home page
+
+The home page (`apps/site/src/components/landing/`) was redesigned on 2026-09-28 at the
+user's request: grand and minimal, with as little copy as possible.
+
+- Five sections only: hero, a six-tab product tour (errors, performance, sessions, logs, alerts, dashboards), architecture and
+  performance, FAQ, and "Make it better, together." for contributors. Each section has
+  one title, at most one line of subtitle and one visual.
+- Dark only. The site shares the whole-product palettes from
+  `packages/design-tokens` (amber default, lime, magenta; see ADR 0010). The choice is a
+  per-visitor convenience stored in `localStorage` (`openrum-palette`);
+  `SitePaletteBootstrap.astro` sets `html[data-palette]` before paint on the home page,
+  docs, design workbench and previews. `PaletteMenu.astro` is the one switcher: a
+  daisyUI-style tile of the primary plus three accents, in the home header, the docs
+  header and the design workbench. The home page's `--lp-*` tokens read the palette
+  tokens; docs keep both light and dark themes in every palette. The favicon is
+  static amber. At 420px the home header drops its GitHub icon and at 360px its
+  wordmark so the palette menu and call to action still fit.
+- Product visuals are schematic mocks (`ProductMock.astro`) until real Console
+  screenshots replace them.
+- Performance numbers come from `docs/benchmarks/local-capacity-2026-09-18.md` and must
+  keep their footnote: a synthetic single-machine run, not a production certification.

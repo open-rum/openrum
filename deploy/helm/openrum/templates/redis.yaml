@@ -1,0 +1,142 @@
+{{- if eq .Values.redis.mode "bundled" }}
+{{- $redis := .Values.redis.bundled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "openrum.fullname" . }}-redis
+  labels:
+    {{- include "openrum.labels" . | nindent 4 }}
+    app.kubernetes.io/component: redis
+spec:
+  selector:
+    {{- include "openrum.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: redis
+  ports:
+    # Not named "http", so the ServiceMonitor never scrapes it.
+    - name: redis
+      port: 6379
+      targetPort: redis
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "openrum.fullname" . }}-redis
+  labels:
+    {{- include "openrum.labels" . | nindent 4 }}
+    app.kubernetes.io/component: redis
+spec:
+  # A single instance: OpenRUM connects to one address and has no Sentinel support.
+  replicas: 1
+  serviceName: {{ include "openrum.fullname" . }}-redis
+  selector:
+    matchLabels:
+      {{- include "openrum.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: redis
+  template:
+    metadata:
+      labels:
+        {{- include "openrum.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: redis
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets: {{ toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        runAsNonRoot: true
+        # The redis user in the official Alpine image.
+        runAsUser: 999
+        runAsGroup: 999
+        fsGroup: 999
+        fsGroupChangePolicy: OnRootMismatch
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: redis
+          image: "{{ $redis.image.repository }}:{{ $redis.image.tag }}"
+          imagePullPolicy: {{ $redis.image.pullPolicy }}
+          command:
+            - redis-server
+            - --maxmemory
+            - {{ $redis.maxMemory | quote }}
+            - --maxmemory-policy
+            - allkeys-lru
+            {{- if $redis.persistence.enabled }}
+            - --appendonly
+            - "yes"
+            {{- else }}
+            - --appendonly
+            - "no"
+            - --save
+            - ""
+            {{- end }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          ports:
+            - name: redis
+              containerPort: 6379
+          readinessProbe:
+            exec: { command: ["redis-cli", "ping"] }
+            periodSeconds: 5
+            timeoutSeconds: 3
+          livenessProbe:
+            exec: { command: ["redis-cli", "ping"] }
+            periodSeconds: 20
+            timeoutSeconds: 3
+          volumeMounts:
+            - name: data
+              mountPath: /data
+          resources: {{ toYaml $redis.resources | nindent 12 }}
+      {{- if not $redis.persistence.enabled }}
+      volumes:
+        - name: data
+          emptyDir:
+            sizeLimit: 64Mi
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector: {{ toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations: {{ toYaml . | nindent 8 }}
+      {{- end }}
+  {{- if $redis.persistence.enabled }}
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+        labels:
+          {{- include "openrum.selectorLabels" . | nindent 10 }}
+          app.kubernetes.io/component: redis
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        {{- with $redis.persistence.storageClassName }}
+        storageClassName: {{ . | quote }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ $redis.persistence.size }}
+  {{- end }}
+{{- if $redis.networkPolicy.enabled }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "openrum.fullname" . }}-redis
+  labels:
+    {{- include "openrum.labels" . | nindent 4 }}
+    app.kubernetes.io/component: redis
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "openrum.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: redis
+  policyTypes: ["Ingress"]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              {{- include "openrum.selectorLabels" . | nindent 14 }}
+      ports:
+        - port: redis
+          protocol: TCP
+{{- end }}
+{{- end }}

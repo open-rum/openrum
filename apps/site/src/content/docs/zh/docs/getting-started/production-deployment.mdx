@@ -24,7 +24,7 @@ import { Steps, Aside, LinkCard } from "@astrojs/starlight/components";
    Worker            → 后台任务、告警、可选的 Source Map 对象存储
    ```
 
-   Helm Chart 部署五个 OpenRUM 应用服务以及数据库迁移任务。数据库、Kafka、Redis、TLS 证书和运行时 Secret 需要提前准备，Chart 不会替你创建它们。
+   Helm Chart 部署五个 OpenRUM 应用服务、数据库迁移任务，默认还会运行一个单实例 Redis。数据库、Kafka、TLS 证书和运行时 Secret 需要提前准备，Chart 不会替你创建它们。
 
    **完成标志：** 已明确集群和各数据服务由谁维护，以及实例使用的公开域名。
 
@@ -33,7 +33,7 @@ import { Steps, Aside, LinkCard } from "@astrojs/starlight/components";
    - **Helm、kubectl：** 本地已安装，且能够访问目标集群
    - **镜像仓库：** 构建者能推送，集群能拉取
    - **域名与 HTTPS：** 例如 `rum.example.com`，指向 Ingress，证书覆盖该域名
-   - **数据服务：** PostgreSQL、ClickHouse、Kafka、Redis，网络允许 OpenRUM Pod 访问
+   - **数据服务：** PostgreSQL、ClickHouse、Kafka，网络允许 OpenRUM Pod 访问；不使用自带 Redis 时还需要 Redis
    - **容量与持久化：** 存储持久化、备份、容量告警；按预期流量预留空间
 
    ```sh

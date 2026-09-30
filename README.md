@@ -59,3 +59,7 @@ pnpm site:check
 ```
 
 Its two adoption paths are the local [Quickstart](docs/quickstart.md) and the source repository. The release target is `openrum.dev`, but this README does not imply that DNS or a public GitHub repository is live until the external launch checks have passed. There is no hosted Demo, SaaS signup or pricing flow in the self-hosted Alpha.
+
+## License
+
+OpenRUM is released under the [MIT License](LICENSE).

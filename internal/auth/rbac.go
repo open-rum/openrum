@@ -17,6 +17,9 @@ const (
 	ActionManageKeys     Action = "project.keys.manage"
 	ActionDeleteProject  Action = "project.delete"
 	ActionManageAlerts   Action = "alerts.manage"
+	// ActionManageChannels covers organization notification channels, which hold
+	// delivery secrets. Members manage rules but not where alerts are sent.
+	ActionManageChannels Action = "channels.manage"
 	ActionManageMembers  Action = "members.manage"
 	ActionConfigureOIDC  Action = "oidc.configure"
 	ActionDeleteOrg      Action = "organization.delete"
@@ -37,7 +40,7 @@ func Can(role metadata.OrganizationRole, action Action) bool {
 		return role == metadata.RoleOwner || role == metadata.RoleAdmin || role == metadata.RoleMember || role == metadata.RoleViewer
 	case ActionResolveIssue, ActionSendTestEvent, ActionManageReleases:
 		return role == metadata.RoleOwner || role == metadata.RoleAdmin || role == metadata.RoleMember
-	case ActionManageKeys:
+	case ActionManageKeys, ActionManageChannels:
 		return role == metadata.RoleOwner || role == metadata.RoleAdmin
 	case ActionManageAlerts:
 		return role == metadata.RoleOwner || role == metadata.RoleAdmin || role == metadata.RoleMember

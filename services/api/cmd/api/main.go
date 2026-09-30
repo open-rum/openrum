@@ -23,6 +23,7 @@ import (
 	"openrum/internal/observability"
 	"openrum/internal/query"
 	"openrum/internal/service"
+	"openrum/internal/servicehealth"
 	"openrum/internal/sourcemap"
 	"openrum/internal/storagepressure"
 	"openrum/services/api/internal/handlers"
@@ -137,7 +138,8 @@ func registerRoutes(ctx context.Context, router *httpx.Router, configuration con
 		instanceMemberRepository,
 		handlers.NewSQLAdminOverviewSource(
 			database, clickHouse, redisClient, buildVersion(), configuration.AppEnv, deploymentMode(),
-			configuration.ObjectStorageProvider != config.ObjectStorageProviderNone, startedAt, pressureMonitor,
+			configuration.ObjectStorageProvider != config.ObjectStorageProviderNone,
+			servicehealth.WorkerHeartbeatKey(configuration.PublicBaseURL.String()), startedAt, pressureMonitor,
 		),
 		logger,
 	)
@@ -156,6 +158,7 @@ func registerRoutes(ctx context.Context, router *httpx.Router, configuration con
 	dashboardHandler := handlers.NewDashboardHandler(projectRepository, metadata.NewDashboardRepository(database), logger)
 	metricsHandler := handlers.NewMetricsHandler(projectRepository, query.NewMetricsRepository(clickHouse), query.NewMetricsCache(redisClient), connectionStatus, logger)
 	analyticsHandler := handlers.NewAnalyticsHandler(projectRepository, query.NewBehaviorRepository(clickHouse), logger)
+	environmentHandler := handlers.NewEnvironmentHandler(projectRepository, query.NewEnvironmentRepository(clickHouse), logger)
 	funnelHandler := handlers.NewFunnelHandler(projectRepository, query.NewFunnelRepository(clickHouse), logger)
 	journeyHandler := handlers.NewJourneyHandler(projectRepository, query.NewPathRepository(clickHouse), query.NewRetentionRepository(clickHouse), logger)
 	performanceHandler := handlers.NewPerformanceHandler(projectRepository, query.NewPerformanceRepository(clickHouse), logger)
@@ -302,6 +305,7 @@ func registerRoutes(ctx context.Context, router *httpx.Router, configuration con
 	router.Handle("POST /api/v1/projects/{projectId}/dashboards/{dashboardId}/duplicate", requireSession(requireCSRF(http.HandlerFunc(dashboardHandler.Duplicate))))
 	router.Handle("GET /api/v1/projects/{projectId}/metrics/catalog", requireSession(http.HandlerFunc(metricsHandler.Catalog)))
 	router.Handle("GET /api/v1/projects/{projectId}/metrics/query", requireSession(http.HandlerFunc(metricsHandler.Query)))
+	router.Handle("GET /api/v1/projects/{projectId}/environments", requireSession(http.HandlerFunc(environmentHandler.List)))
 	router.Handle("GET /api/v1/projects/{projectId}/analytics/events", requireSession(http.HandlerFunc(analyticsHandler.Get)))
 	router.Handle("GET /api/v1/projects/{projectId}/analytics/events/samples", requireSession(http.HandlerFunc(analyticsHandler.Samples)))
 	router.Handle("POST /api/v1/projects/{projectId}/analytics/funnels/query", requireSession(requireCSRF(http.HandlerFunc(funnelHandler.Query))))
@@ -333,8 +337,13 @@ func registerRoutes(ctx context.Context, router *httpx.Router, configuration con
 	router.Handle("DELETE /api/v1/projects/{projectId}/keys/{keyId}", requireSession(requireCSRF(http.HandlerFunc(projectKeyHandler.Revoke))))
 	router.Handle("GET /api/v1/projects/{projectId}/alerts", requireSession(http.HandlerFunc(alertHandler.List)))
 	router.Handle("POST /api/v1/projects/{projectId}/alerts", requireSession(requireCSRF(http.HandlerFunc(alertHandler.Create))))
+	router.Handle("PATCH /api/v1/projects/{projectId}/alerts/{ruleId}", requireSession(requireCSRF(http.HandlerFunc(alertHandler.Update))))
+	router.Handle("DELETE /api/v1/projects/{projectId}/alerts/{ruleId}", requireSession(requireCSRF(http.HandlerFunc(alertHandler.Delete))))
 	router.Handle("GET /api/v1/organizations/{orgId}/channels", requireSession(http.HandlerFunc(channelHandler.List)))
 	router.Handle("POST /api/v1/organizations/{orgId}/channels", requireSession(requireCSRF(http.HandlerFunc(channelHandler.Create))))
+	router.Handle("PATCH /api/v1/organizations/{orgId}/channels/{channelId}", requireSession(requireCSRF(http.HandlerFunc(channelHandler.Update))))
+	router.Handle("DELETE /api/v1/organizations/{orgId}/channels/{channelId}", requireSession(requireCSRF(http.HandlerFunc(channelHandler.Delete))))
+	router.Handle("POST /api/v1/organizations/{orgId}/channels/{channelId}/test", requireSession(requireCSRF(http.HandlerFunc(channelHandler.Test))))
 	// Registered only outside production, so the generator is absent rather
 	// than merely refusing requests wherever it must not run.
 	if devDataHandler != nil {

@@ -39,6 +39,7 @@ import { getSessionTimelinePage } from "@/lib/api/sessions";
 import { listOrganizations, listProjects, type Project } from "@/lib/api/projects";
 import { HTTPError } from "@/lib/auth/session";
 import { projectIdFromPathname } from "@/lib/projects/currentProject";
+import { projectEnvironments } from "@/lib/projects/environments";
 
 const labels: Record<string, string> = {
   storefront: "综合电商旅程",
@@ -299,7 +300,7 @@ export function DevDataForm({
     queryClient.getQueryState(["dev-data-probe", result?.probeEventId])?.dataUpdateCount ?? 0;
   const probePending =
     Boolean(result?.probeEventId) && !probe.data && !probe.error && attempts < 15;
-  const environments = project.environments?.length ? project.environments : [project.environment];
+  const environments = projectEnvironments.map((item) => item.id);
   const blocked = project.status !== "active" || project.role === "viewer";
 
   return (

@@ -1,0 +1,181 @@
+---
+// The palette picker for public pages, in the daisyUI style: each palette shows its
+// primary colour and three accents as a 2x2 tile. The trigger tile reads the active
+// palette's own tokens, so it repaints itself when the palette changes. It hides when
+// the catalog has a single palette.
+import { Check } from "lucide-astro";
+import { palettes } from "@openrum/design-tokens/catalog";
+
+const { lang = "en", align = "end" } = Astro.props as { lang?: string; align?: "start" | "end" };
+const zh = lang === "zh";
+const label = zh ? "选择配色" : "Choose palette";
+---
+
+{
+  palettes.length > 1 ? (
+    <details class="palette-menu" data-align={align}>
+      <summary aria-label={label} title={label}>
+        <span class="palette-tile palette-tile--active" aria-hidden="true">
+          <i />
+          <i />
+          <i />
+          <i />
+        </span>
+      </summary>
+      <div class="palette-menu__panel" role="menu" aria-label={label}>
+        {palettes.map((palette) => (
+          <button
+            type="button"
+            role="menuitemradio"
+            aria-checked="false"
+            data-palette-option={palette.id}
+            title={palette.description}
+          >
+            <span class="palette-tile" aria-hidden="true">
+              {palette.dots.map((hue) => (
+                <i style={`background: var(--ds-${hue}-solid)`} />
+              ))}
+            </span>
+            <span>{zh ? palette.label : palette.name}</span>
+            <Check class="palette-menu__check" size={15} aria-hidden="true" />
+          </button>
+        ))}
+      </div>
+    </details>
+  ) : null
+}
+
+<script>
+  const storageKey = "openrum-palette";
+  const sync = () => {
+    const active = document.documentElement.dataset.palette || "amber";
+    document.querySelectorAll<HTMLButtonElement>("[data-palette-option]").forEach((button) => {
+      button.setAttribute("aria-checked", String(button.dataset.paletteOption === active));
+    });
+  };
+  document.querySelectorAll<HTMLButtonElement>("[data-palette-option]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const palette = button.dataset.paletteOption || "amber";
+      document.documentElement.dataset.palette = palette;
+      try {
+        localStorage.setItem(storageKey, palette);
+        localStorage.removeItem("openrum-site-palette");
+        localStorage.removeItem("openrum-landing-palette");
+      } catch {}
+      sync();
+      document.dispatchEvent(new CustomEvent("openrum:palettechange", { detail: palette }));
+      button.closest("details")?.removeAttribute("open");
+    });
+  });
+  document.addEventListener("click", (event) => {
+    document.querySelectorAll<HTMLDetailsElement>(".palette-menu[open]").forEach((menu) => {
+      if (!menu.contains(event.target as Node)) menu.removeAttribute("open");
+    });
+  });
+  sync();
+</script>
+
+<style>
+  .palette-menu {
+    position: relative;
+  }
+  .palette-menu summary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    border-radius: var(--radius-control);
+    cursor: pointer;
+    list-style: none;
+  }
+  .palette-menu summary::-webkit-details-marker {
+    display: none;
+  }
+  .palette-menu summary:hover {
+    background: var(--ds-surface-hover);
+  }
+  .palette-menu summary:focus-visible,
+  .palette-menu button:focus-visible {
+    outline: 2px solid var(--ds-ring);
+    outline-offset: 2px;
+  }
+  .palette-tile {
+    display: grid;
+    grid-template-columns: repeat(2, 6px);
+    gap: 3px;
+    place-content: center;
+    width: 24px;
+    height: 24px;
+    border: 1px solid var(--ds-border);
+    border-radius: 6px;
+    background: var(--ds-surface);
+  }
+  .palette-tile i {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+  }
+  .palette-tile--active i:nth-child(1) {
+    background: var(--ds-primary);
+  }
+  .palette-tile--active i:nth-child(2) {
+    background: var(--ds-accent-1);
+  }
+  .palette-tile--active i:nth-child(3) {
+    background: var(--ds-accent-2);
+  }
+  .palette-tile--active i:nth-child(4) {
+    background: var(--ds-accent-3);
+  }
+  .palette-menu__panel {
+    position: absolute;
+    top: calc(100% + 6px);
+    z-index: 50;
+    display: grid;
+    gap: 2px;
+    min-width: 170px;
+    padding: 6px;
+    border: 1px solid var(--ds-border);
+    border-radius: var(--radius-surface);
+    background: var(--ds-surface-overlay);
+    box-shadow: var(--shadow-flyout);
+  }
+  .palette-menu[data-align="end"] .palette-menu__panel {
+    right: 0;
+  }
+  .palette-menu[data-align="start"] .palette-menu__panel {
+    left: 0;
+  }
+  .palette-menu button {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 36px;
+    padding: 4px 8px;
+    border: 1px solid transparent;
+    border-radius: var(--radius-field);
+    color: var(--ds-text);
+    background: transparent;
+    font: 500 14px/1.2 var(--font-product-sans);
+    text-align: left;
+    cursor: pointer;
+  }
+  .palette-menu button:hover {
+    background: var(--ds-surface-hover);
+  }
+  .palette-menu button span:nth-child(2) {
+    flex: 1;
+  }
+  .palette-menu button[aria-checked="true"] {
+    border-color: var(--ds-selection-border);
+    background: var(--ds-selection);
+  }
+  .palette-menu__check {
+    visibility: hidden;
+    color: var(--ds-primary-ink);
+  }
+  .palette-menu button[aria-checked="true"] .palette-menu__check {
+    visibility: visible;
+  }
+</style>

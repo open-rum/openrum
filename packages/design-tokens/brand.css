@@ -1,0 +1,135 @@
+.signal-scout {
+  display: block;
+  flex-shrink: 0;
+  overflow: visible;
+}
+
+/* A short greeting on arrival; no continuous movement while reading or working. */
+.signal-scout__arm {
+  animation: signal-scout-wave 1.4s steps(1, end);
+}
+.signal-scout__eyes {
+  animation: signal-scout-blink 1.4s steps(1, end);
+}
+.signal-scout__signal {
+  animation: signal-scout-receive 1.4s steps(1, end);
+}
+.signal-scout__signal--far {
+  animation-delay: 120ms;
+}
+
+/* Existing links supply keyboard focus; the decorative SVG adds no tab stop. */
+:is(a, button):is(:hover, :focus-visible) .signal-scout,
+.signal-scout:hover {
+  .signal-scout__body {
+    animation: signal-scout-hop 1.2s steps(1, end);
+  }
+  .signal-scout__arm {
+    animation-name: signal-scout-wave-again;
+  }
+  .signal-scout__eyes {
+    animation-name: signal-scout-blink-again;
+  }
+  .signal-scout__signal {
+    animation-name: signal-scout-receive-again;
+  }
+}
+
+@keyframes signal-scout-wave {
+  0%,
+  40%,
+  80%,
+  100% {
+    transform: translateY(0);
+  }
+  20%,
+  60% {
+    transform: translateY(-2px);
+  }
+}
+@keyframes signal-scout-wave-again {
+  0%,
+  40%,
+  80%,
+  100% {
+    transform: translateY(0);
+  }
+  20%,
+  60% {
+    transform: translateY(-2px);
+  }
+}
+@keyframes signal-scout-blink {
+  0%,
+  20%,
+  32%,
+  100% {
+    opacity: 1;
+  }
+  24% {
+    opacity: 0;
+  }
+}
+@keyframes signal-scout-blink-again {
+  0%,
+  20%,
+  32%,
+  100% {
+    opacity: 1;
+  }
+  24% {
+    opacity: 0;
+  }
+}
+@keyframes signal-scout-receive {
+  0%,
+  48%,
+  100% {
+    opacity: 1;
+  }
+  16%,
+  64% {
+    opacity: 0.25;
+  }
+  32%,
+  80% {
+    opacity: 0.65;
+  }
+}
+@keyframes signal-scout-receive-again {
+  0%,
+  48%,
+  100% {
+    opacity: 1;
+  }
+  16%,
+  64% {
+    opacity: 0.25;
+  }
+  32%,
+  80% {
+    opacity: 0.65;
+  }
+}
+@keyframes signal-scout-hop {
+  0%,
+  16%,
+  66%,
+  100% {
+    transform: translateY(0);
+  }
+  33%,
+  50% {
+    transform: translateY(-1px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .signal-scout,
+  .signal-scout * {
+    animation: none !important;
+    transition: none !important;
+    transform: none !important;
+    opacity: 1 !important;
+  }
+}

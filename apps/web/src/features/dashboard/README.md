@@ -147,14 +147,16 @@ rates and P75 directly from backend aggregates. Missing rates and percentiles
 remain null; sample and approximation notes remain available in the details dialog. Event Stat modules
 do not fabricate previous-period comparisons.
 
-In viewing mode cards show a title and primary value/chart. Stat cards place a
-left-aligned comparison badge and "较上一周期" below the number, without a metric
-description. Explanations stay in configuration/details. Reserve the top-right for the settings menu icon, without
-a competing comparison badge. Rising traffic is positive; rising errors/failures or
-Web Vitals is negative. Unavailable comparisons, rounded-zero changes and
-insufficient samples stay neutral. A hover/focus settings menu is available without
-entering edit mode; its icon remains visible on touch/narrow screens. The menu
-includes configure, duplicate, preset widths, move, remove and **详细**.
+In viewing mode cards show a title and primary value/chart. Stat cards show the number
+alone and pin the previous-period badge to the card's top-right; its hover/focus tooltip
+reads "较上一周期 +x%" and the previous period's value (insufficient samples read "样本不足").
+Explanations stay in configuration/details. Rising traffic is positive; rising
+errors/failures or Web Vitals is negative. Unavailable comparisons, rounded-zero changes
+and insufficient samples stay neutral. Card actions float at the bottom-right in a frosted
+capsule — an expand button that opens **详细** and the settings menu — shown on hover or
+keyboard focus without entering edit mode, and always visible on touch screens. The menu
+includes configure, duplicate, preset widths, move and remove. While editing, the drag
+handle sits in the header and the corner badge is hidden.
 `ModuleDetailsDialog.tsx` owns the scoped 1160px, viewport-bounded detail shell;
 `ModuleDetails.tsx` composes the summary, chart/data-table Tabs and statistics rail.
 On narrow screens the rail stacks below the chart. The Dialog reuses loaded data

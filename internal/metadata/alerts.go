@@ -27,7 +27,15 @@ var ErrSecretsUnavailable = errors.New("managed secrets are not configured")
 const (
 	ChannelSMTP    ChannelKind = "smtp"
 	ChannelWebhook ChannelKind = "webhook"
+	ChannelFeishu  ChannelKind = "feishu"
 )
+
+// creatableChannelKinds are the kinds with a delivery implementation. SMTP rows may
+// exist from earlier versions but new ones are refused until email delivery ships.
+var creatableChannelKinds = map[ChannelKind]bool{ChannelWebhook: true, ChannelFeishu: true}
+
+// maxRuleChannels bounds how many channels one rule may notify.
+const maxRuleChannels = 10
 
 type AlertMetric string
 
@@ -45,6 +53,7 @@ type NotificationChannel struct {
 	Kind            ChannelKind `json:"kind"`
 	EncryptionKeyID string      `json:"encryptionKeyId"`
 	Enabled         bool        `json:"enabled"`
+	RuleCount       int         `json:"ruleCount"`
 	CreatedAt       time.Time   `json:"createdAt"`
 	UpdatedAt       time.Time   `json:"updatedAt"`
 	EncryptedConfig []byte      `json:"-"`
@@ -61,24 +70,45 @@ type AlertRule struct {
 	CooldownMinutes int16       `json:"cooldownMinutes"`
 	Environment     string      `json:"environment"`
 	Enabled         bool        `json:"enabled"`
-	CreatedBy       *uuid.UUID  `json:"createdBy,omitempty"`
-	CreatedAt       time.Time   `json:"createdAt"`
-	UpdatedAt       time.Time   `json:"updatedAt"`
+	ChannelIDs      []uuid.UUID `json:"channelIds"`
+	// LastStatus is the most recent evaluation's status, or "" before the first one.
+	LastStatus      string     `json:"lastStatus"`
+	LastEvaluatedAt *time.Time `json:"lastEvaluatedAt,omitempty"`
+	CreatedBy       *uuid.UUID `json:"createdBy,omitempty"`
+	CreatedAt       time.Time  `json:"createdAt"`
+	UpdatedAt       time.Time  `json:"updatedAt"`
 }
 
 // AlertNotification is a breached evaluation surfaced back to the console. It
 // carries the rule's threshold so a notification stays readable after the rule
 // has been retuned.
 type AlertNotification struct {
-	ID         uuid.UUID
-	RuleID     uuid.UUID
-	ProjectID  uuid.UUID
-	Title      string
-	Metric     AlertMetric
-	Value      float64
-	Threshold  float64
+	ID          uuid.UUID
+	RuleID      uuid.UUID
+	ProjectID   uuid.UUID
+	Title       string
+	Metric      AlertMetric
+	Comparator  string
+	Environment string
+	Value       float64
+	Threshold   float64
+	// Status is "breached" or "suppressed" (inside the rule's cooldown).
 	Status     string
+	StartedAt  time.Time
 	OccurredAt time.Time
+	NotifiedAt *time.Time
+	Deliveries []AlertDelivery
+}
+
+// AlertDelivery is the latest outcome of one channel for one notification.
+type AlertDelivery struct {
+	ChannelID   uuid.UUID   `json:"channelId"`
+	ChannelName string      `json:"channelName"`
+	ChannelKind ChannelKind `json:"channelKind"`
+	Status      string      `json:"status"`
+	Attempts    int         `json:"attempts"`
+	ErrorCode   string      `json:"errorCode,omitempty"`
+	At          time.Time   `json:"at"`
 }
 
 type CreateAlertRuleInput struct {
@@ -90,6 +120,7 @@ type CreateAlertRuleInput struct {
 	CooldownMinutes int16
 	Environment     string
 	Enabled         bool
+	ChannelIDs      []uuid.UUID
 }
 
 type EnvelopeCodec interface {
@@ -122,9 +153,15 @@ func (repository *AlertRepository) ListRules(ctx context.Context, actorID, proje
 	if err != nil {
 		return nil, "", err
 	}
-	rows, err := repository.database.QueryContext(ctx, `SELECT id,project_id,name,metric,comparator,threshold,
-		window_minutes,cooldown_minutes,environment,enabled,created_by,created_at,updated_at
-		FROM alert_rules WHERE project_id=$1 ORDER BY created_at, id`, projectID)
+	rows, err := repository.database.QueryContext(ctx, `SELECT r.id,r.project_id,r.name,r.metric,r.comparator,r.threshold,
+		r.window_minutes,r.cooldown_minutes,r.environment,r.enabled,r.created_by,r.created_at,r.updated_at,
+		coalesce((SELECT string_agg(rc.channel_id::text, ',' ORDER BY rc.created_at, rc.channel_id)
+		          FROM alert_rule_channels rc WHERE rc.rule_id=r.id), ''),
+		coalesce(last.status,''), last.evaluated_at
+		FROM alert_rules r
+		LEFT JOIN LATERAL (SELECT status, evaluated_at FROM alert_evaluations
+		                   WHERE rule_id=r.id ORDER BY window_ended_at DESC LIMIT 1) last ON true
+		WHERE r.project_id=$1 ORDER BY r.created_at, r.id`, projectID)
 	if err != nil {
 		return nil, "", err
 	}
@@ -132,30 +169,39 @@ func (repository *AlertRepository) ListRules(ctx context.Context, actorID, proje
 	rules := make([]AlertRule, 0)
 	for rows.Next() {
 		var rule AlertRule
+		var channels string
+		var lastEvaluated sql.NullTime
 		if err := rows.Scan(&rule.ID, &rule.ProjectID, &rule.Name, &rule.Metric, &rule.Comparator,
 			&rule.Threshold, &rule.WindowMinutes, &rule.CooldownMinutes, &rule.Environment, &rule.Enabled,
-			&rule.CreatedBy, &rule.CreatedAt, &rule.UpdatedAt); err != nil {
+			&rule.CreatedBy, &rule.CreatedAt, &rule.UpdatedAt, &channels, &rule.LastStatus, &lastEvaluated); err != nil {
 			return nil, "", err
+		}
+		rule.ChannelIDs = parseUUIDList(channels)
+		if lastEvaluated.Valid {
+			at := lastEvaluated.Time.UTC()
+			rule.LastEvaluatedAt = &at
 		}
 		rules = append(rules, rule)
 	}
 	return rules, role, rows.Err()
 }
 
-// ListNotifications returns recent breached evaluations. Suppressed windows are
-// excluded because the cooldown already decided they are not worth surfacing.
+// ListNotifications returns recent breached evaluations, including those held back
+// by the rule's cooldown, each with the latest outcome of every channel it reached.
 func (repository *AlertRepository) ListNotifications(ctx context.Context, actorID, projectID uuid.UUID, limit int) ([]AlertNotification, error) {
 	if limit < 1 || limit > 200 {
 		limit = 50
 	}
 	rows, err := repository.database.QueryContext(ctx, `SELECT alert_evaluations.id, alert_rules.id, alert_rules.project_id,
-		alert_rules.name, alert_rules.metric, coalesce(alert_evaluations.value,0), alert_rules.threshold,
-		alert_evaluations.status, alert_evaluations.window_ended_at
+		alert_rules.name, alert_rules.metric, alert_rules.comparator, alert_rules.environment,
+		coalesce(alert_evaluations.value,0), alert_rules.threshold, alert_evaluations.status,
+		alert_evaluations.window_started_at, alert_evaluations.window_ended_at, alert_evaluations.notified_at
 		FROM alert_evaluations
 		JOIN alert_rules ON alert_rules.id=alert_evaluations.rule_id
 		JOIN projects ON projects.id=alert_rules.project_id
 		JOIN organization_members ON organization_members.organization_id=projects.organization_id
-		WHERE alert_rules.project_id=$1 AND organization_members.user_id=$2 AND alert_evaluations.status='breached'
+		WHERE alert_rules.project_id=$1 AND organization_members.user_id=$2
+		  AND alert_evaluations.status IN ('breached','suppressed')
 		ORDER BY alert_evaluations.window_ended_at DESC, alert_evaluations.id
 		LIMIT $3`, projectID, actorID, limit)
 	if err != nil {
@@ -163,17 +209,65 @@ func (repository *AlertRepository) ListNotifications(ctx context.Context, actorI
 	}
 	defer func() { _ = rows.Close() }()
 	notifications := make([]AlertNotification, 0)
+	ids := make([]string, 0)
 	for rows.Next() {
 		var notification AlertNotification
+		var notified sql.NullTime
 		if err := rows.Scan(&notification.ID, &notification.RuleID, &notification.ProjectID, &notification.Title,
-			&notification.Metric, &notification.Value, &notification.Threshold, &notification.Status,
-			&notification.OccurredAt); err != nil {
+			&notification.Metric, &notification.Comparator, &notification.Environment, &notification.Value,
+			&notification.Threshold, &notification.Status, &notification.StartedAt, &notification.OccurredAt, &notified); err != nil {
 			return nil, err
 		}
+		notification.StartedAt = notification.StartedAt.UTC()
 		notification.OccurredAt = notification.OccurredAt.UTC()
+		if notified.Valid {
+			at := notified.Time.UTC()
+			notification.NotifiedAt = &at
+		}
+		notification.Deliveries = []AlertDelivery{}
 		notifications = append(notifications, notification)
+		ids = append(ids, notification.ID.String())
 	}
-	return notifications, rows.Err()
+	if err := rows.Err(); err != nil || len(ids) == 0 {
+		return notifications, err
+	}
+	deliveries, err := repository.latestDeliveries(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+	for index := range notifications {
+		if found, ok := deliveries[notifications[index].ID]; ok {
+			notifications[index].Deliveries = found
+		}
+	}
+	return notifications, nil
+}
+
+// latestDeliveries returns, per evaluation, each channel's most recent outcome and how
+// many attempts it took.
+func (repository *AlertRepository) latestDeliveries(ctx context.Context, evaluationIDs []string) (map[uuid.UUID][]AlertDelivery, error) {
+	rows, err := repository.database.QueryContext(ctx, `SELECT DISTINCT ON (d.evaluation_id, d.channel_id)
+		d.evaluation_id, d.channel_id, c.name, c.kind, d.status, d.error_code, d.created_at,
+		count(*) OVER (PARTITION BY d.evaluation_id, d.channel_id)
+		FROM alert_deliveries d JOIN notification_channels c ON c.id=d.channel_id
+		WHERE d.evaluation_id::text = ANY(string_to_array($1, ','))
+		ORDER BY d.evaluation_id, d.channel_id, d.created_at DESC`, strings.Join(evaluationIDs, ","))
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+	result := map[uuid.UUID][]AlertDelivery{}
+	for rows.Next() {
+		var evaluationID uuid.UUID
+		var delivery AlertDelivery
+		if err := rows.Scan(&evaluationID, &delivery.ChannelID, &delivery.ChannelName, &delivery.ChannelKind,
+			&delivery.Status, &delivery.ErrorCode, &delivery.At, &delivery.Attempts); err != nil {
+			return nil, err
+		}
+		delivery.At = delivery.At.UTC()
+		result[evaluationID] = append(result[evaluationID], delivery)
+	}
+	return result, rows.Err()
 }
 
 func (repository *AlertRepository) CreateRule(ctx context.Context, actorID, projectID uuid.UUID, input CreateAlertRuleInput) (AlertRule, error) {
@@ -203,6 +297,9 @@ func (repository *AlertRepository) CreateRule(ctx context.Context, actorID, proj
 	if err != nil {
 		return AlertRule{}, translateConstraintError(err)
 	}
+	if rule.ChannelIDs, err = replaceRuleChannels(ctx, transaction, organizationID, rule.ID, input.ChannelIDs); err != nil {
+		return AlertRule{}, err
+	}
 	if err := insertAudit(ctx, transaction, organizationID, actorID, "alert_rule.created", "alert_rule", rule.ID); err != nil {
 		return AlertRule{}, err
 	}
@@ -214,7 +311,8 @@ func (repository *AlertRepository) CreateRule(ctx context.Context, actorID, proj
 
 func (repository *AlertRepository) ListChannels(ctx context.Context, actorID, organizationID uuid.UUID) ([]NotificationChannel, error) {
 	rows, err := repository.database.QueryContext(ctx, `SELECT c.id,c.organization_id,c.name,c.kind,
-		c.encryption_key_id,c.enabled,c.created_at,c.updated_at
+		c.encryption_key_id,c.enabled,c.created_at,c.updated_at,
+		(SELECT count(*) FROM alert_rule_channels rc WHERE rc.channel_id=c.id)
 		FROM notification_channels c
 		JOIN organization_members m ON m.organization_id=c.organization_id
 		WHERE c.organization_id=$1 AND m.user_id=$2
@@ -227,7 +325,7 @@ func (repository *AlertRepository) ListChannels(ctx context.Context, actorID, or
 	for rows.Next() {
 		var channel NotificationChannel
 		if err := rows.Scan(&channel.ID, &channel.OrganizationID, &channel.Name, &channel.Kind,
-			&channel.EncryptionKeyID, &channel.Enabled, &channel.CreatedAt, &channel.UpdatedAt); err != nil {
+			&channel.EncryptionKeyID, &channel.Enabled, &channel.CreatedAt, &channel.UpdatedAt, &channel.RuleCount); err != nil {
 			return nil, err
 		}
 		channels = append(channels, channel)
@@ -270,7 +368,7 @@ func (repository *AlertRepository) CreateChannel(ctx context.Context, actorID, o
 	if repository.codec == nil {
 		return NotificationChannel{}, ErrSecretsUnavailable
 	}
-	if name == "" || len(name) > 120 || (kind != ChannelSMTP && kind != ChannelWebhook) || !validChannelConfig(config) {
+	if name == "" || len(name) > 120 || !creatableChannelKinds[kind] || !validChannelConfig(config) {
 		return NotificationChannel{}, ErrInvalidAlertConfig
 	}
 	transaction, err := repository.database.BeginTx(ctx, nil)
@@ -360,4 +458,8 @@ func validChannelConfig(value json.RawMessage) bool {
 	return json.Unmarshal(value, &object) == nil && object != nil
 }
 
-func channelAAD(id uuid.UUID) []byte { return []byte("openrum:notification-channel:" + id.String()) }
+// ChannelAAD binds an encrypted channel config to its row, so a ciphertext copied
+// onto another channel does not decrypt. The worker uses it to open configs.
+func ChannelAAD(id uuid.UUID) []byte { return []byte("openrum:notification-channel:" + id.String()) }
+
+func channelAAD(id uuid.UUID) []byte { return ChannelAAD(id) }

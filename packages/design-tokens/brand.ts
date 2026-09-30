@@ -1,6 +1,11 @@
-// Vector reconstruction of the two-part rounded ring in the Landing Page Spec v1.
 export const brandName = "OpenRUM";
-// UI lockups retain a small optical margin; favicons use a tighter 4 4 32 32 crop.
-export const brandMarkViewBox = "2 2 36 36";
-export const brandMarkPath =
-  "M11 6.5C12.9 5.3 14.6 5 18 5H22C30.3 5 35 9.7 35 18V24C35 26 34.4 27.6 33.2 28.5C32.6 29 31.8 28.9 31.2 28.3L28 25.1C27.4 24.5 27 23.7 27 22.8V18C27 14.4 25.6 13 22 13H18C16.6 13 15.7 13.1 14.7 13.4C14 13.6 13.4 13.4 12.9 12.9L9.6 9.6C8.8 8.8 9.4 7.5 11 6.5Z";
+
+// The selected signal scout, cropped to a 20-unit grid: each pixel is 2px at 40px.
+// Separate parts keep the resting silhouette intact while allowing small gestures.
+export const brandMarkViewBox = "2 1 20 20";
+export const signalScoutTorsoPath =
+  "M12 2h2v2h-1v2h3v2h2v3h3v2h-3v4h-1v3h-3v-3h-4v3H7v-3H6V8h2V6h4Z";
+export const signalScoutArmPath = "M3 8h2v2h1v2H3z";
+export const signalScoutEyePath = "M9 10h1v1h-1zM14 10h1v1h-1z";
+export const signalScoutNearSignalPath = "M16 3h1v2h-1z";
+export const signalScoutFarSignalPath = "M19 2h1v4h-1z";

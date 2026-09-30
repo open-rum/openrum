@@ -65,7 +65,10 @@ func (notifier *WebhookNotifier) Send(ctx context.Context, notification Notifica
 		request.Header.Set("X-OpenRUM-Signature", webhookSignature(notifier.config.Secret, timestamp, body))
 		response, err := notifier.client.Do(request)
 		if err != nil {
-			return !errors.Is(err, ErrUnsafeWebhookURL), err
+			if errors.Is(err, ErrUnsafeWebhookURL) {
+				return false, err
+			}
+			return true, &DeliveryError{Code: "network", Err: err}
 		}
 		_, _ = io.Copy(io.Discard, io.LimitReader(response.Body, 4096))
 		_ = response.Body.Close()
@@ -73,7 +76,7 @@ func (notifier *WebhookNotifier) Send(ctx context.Context, notification Notifica
 			return false, nil
 		}
 		retryable := response.StatusCode == http.StatusTooManyRequests || response.StatusCode >= 500
-		return retryable, fmt.Errorf("webhook returned HTTP %d", response.StatusCode)
+		return retryable, &DeliveryError{Code: fmt.Sprintf("http_%d", response.StatusCode), Err: fmt.Errorf("webhook returned HTTP %d", response.StatusCode)}
 	})
 }
 

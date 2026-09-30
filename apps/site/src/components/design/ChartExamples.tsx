@@ -9,7 +9,13 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "./chart";
+import {
+  BAR_RADIUS_TOP,
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  type ChartConfig,
+} from "./chart";
 
 const visits = [
   { day: "Mon", web: 1860, mobile: 1240 },
@@ -115,14 +121,14 @@ export default function ChartExamples() {
               <Bar
                 dataKey="web"
                 fill="var(--color-web)"
-                radius={[3, 3, 0, 0]}
+                radius={BAR_RADIUS_TOP}
                 isAnimationActive={false}
               />
               <Bar
                 dataKey="mobile"
                 fill="var(--color-mobile)"
                 fillOpacity={0.55}
-                radius={[3, 3, 0, 0]}
+                radius={BAR_RADIUS_TOP}
                 isAnimationActive={false}
               />
             </BarChart>

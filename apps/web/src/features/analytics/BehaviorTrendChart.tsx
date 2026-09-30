@@ -32,9 +32,9 @@ export function BehaviorTrendChart({ data }: { data: BehaviorTrendPoint[] }) {
       >
         <AreaChart data={points} margin={{ top: 16, right: 12, bottom: 0, left: -8 }}>
           <defs>
-            {/* Citrus fills come from --ds-primary, which holds its lightness in
-                both modes; --ds-brand is darkened for text contrast in light
-                mode and turns the band olive. See docs/design.md. */}
+            {/* Brand fills come from --ds-primary, the active palette's solid, which
+                holds its lightness in both modes; --ds-brand is neutral text ink and
+                would turn the band grey. See docs/design.md. */}
             <linearGradient id="behaviorEvents" x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%" stopColor="var(--ds-primary)" stopOpacity={0.38} />
               <stop offset="100%" stopColor="var(--ds-primary)" stopOpacity={0.04} />

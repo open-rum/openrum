@@ -20,7 +20,7 @@ import { VitalTrendChart } from "./PerformanceOverview";
 import { formatTrendDate } from "./trendTime";
 import { deviceLabel } from "@/features/filters/dimensionLabels";
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
-import { ChartContainer, ChartTooltip } from "@/components/ui/chart";
+import { BAR_RADIUS_TOP, ChartContainer, ChartTooltip } from "@/components/ui/chart";
 import { useChartMotion } from "@/lib/charts/useChartMotion";
 import { PercentileSelect } from "./PerformanceControls";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
@@ -137,7 +137,7 @@ export function RouteDetail({
                   <Bar
                     dataKey="samples"
                     fill="var(--color-samples)"
-                    radius={[4, 4, 0, 0]}
+                    radius={BAR_RADIUS_TOP}
                     isAnimationActive={animate}
                   />
                 </BarChart>
