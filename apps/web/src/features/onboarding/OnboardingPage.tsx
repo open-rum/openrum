@@ -32,6 +32,7 @@ import {
 import { getProject, listOrganizations } from "@/lib/api/projects";
 import { recordProductEvent } from "@/lib/telemetry/productEvents";
 import { ProjectCreatePage } from "@/features/projects/ProjectCreatePage";
+import { UploadTokensSection } from "@/features/settings/UploadTokensSection";
 import { getProjectPlatform } from "@/features/projects/projectPlatforms";
 import { ConnectionStatus } from "./ConnectionStatus";
 import { rejectGuidance } from "./guidance";
@@ -228,6 +229,8 @@ function ProjectOnboarding({
           />
         </CardContent>
       </Card>
+
+      <UploadTokensSection projectId={project.id} />
 
       <Separator />
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">

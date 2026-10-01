@@ -23,6 +23,7 @@ Protected assets are tenant telemetry, user/session identifiers, project write k
 | Decompression/parse exhaustion       | Compressed/raw byte caps, decompression-ratio cap, single gzip member, source-map size cap                   | privacy and ingest bomb tests                          |
 | Webhook SSRF / credential leak       | HTTPS only, public-IP validation before request and redirects, proxy disabled, HMAC, encrypted config        | webhook security tests                                 |
 | Source-map overwrite/tamper          | Scoped immutable object keys, expected size/SHA-256 metadata, private OSS                                    | source-map tests and OSS runbook                       |
+| Upload-token abuse                   | Hashed project-scoped tokens, upload/list only, no deletes, revocable, last-use shown                        | upload token auth tests                                |
 | Queue/database outage                | Acks-all before success, no offset commit before ClickHouse write, bounded retry/backpressure                | pipeline tests and failure runbooks                    |
 | Supply-chain/image compromise        | Locked Go/pnpm dependencies, CI vulnerability scans, non-root read-only containers, dropped capabilities     | CI and Helm render/lint                                |
 | High-cardinality metrics/log leakage | Bounded reason codes and route patterns; request IDs instead of raw dependency errors                        | metric and handler tests                               |

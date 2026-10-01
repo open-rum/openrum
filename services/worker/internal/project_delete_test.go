@@ -112,3 +112,19 @@ func TestProjectDeletionWithoutObjectStorageOnlyBlocksExistingArtifacts(t *testi
 		})
 	}
 }
+
+// forbiddenObjectError is a provider 403 for a credential without delete rights.
+type forbiddenObjectError struct{}
+
+func (forbiddenObjectError) Error() string       { return "AccessDenied" }
+func (forbiddenObjectError) HTTPStatusCode() int { return 403 }
+
+func TestProjectDeletionCompletesWhenStorageForbidsDeletes(t *testing.T) {
+	deletion := ProjectDeletion{ProjectID: uuid.New(), DeadlineAt: time.Now().Add(time.Hour), OSSKeys: []string{"a.map", "b.map"}}
+	store := &deletionStoreFixture{deletion: deletion, found: true, confirmed: true}
+	objects := &objectDeletionFixture{err: forbiddenObjectError{}}
+	processed, err := NewProjectDeletionJob(store, &analyticsDeletionFixture{}, objects).RunOne(t.Context())
+	if err != nil || !processed || store.completed != 1 || store.retries != 0 || len(objects.keys) != 2 {
+		t.Fatalf("processed=%v completed=%d retries=%d keys=%v err=%v", processed, store.completed, store.retries, objects.keys, err)
+	}
+}

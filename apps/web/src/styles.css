@@ -3820,6 +3820,44 @@ body {
   color: var(--ds-text-muted);
   font-size: var(--text-caption);
 }
+.stack-frames__failure {
+  color: var(--ds-warning);
+  font-size: var(--text-caption);
+  line-height: 1.4;
+  white-space: normal;
+}
+.stack-guidance {
+  margin: var(--space-3) var(--space-4) 0;
+  padding: var(--space-3);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--space-3);
+  border: 1px solid color-mix(in srgb, var(--ds-warning) 40%, var(--ds-border));
+  border-radius: var(--radius-surface);
+  background: var(--ds-warning-soft);
+}
+.stack-guidance > svg {
+  width: 18px;
+  margin-top: 2px;
+  flex: 0 0 auto;
+  color: var(--ds-warning);
+}
+.stack-guidance > div {
+  min-width: 220px;
+  flex: 1 1 0;
+  display: grid;
+  gap: 4px;
+}
+.stack-guidance strong {
+  color: var(--ds-text);
+  font-size: var(--text-table);
+}
+.stack-guidance p {
+  color: var(--ds-text-secondary);
+  font-size: var(--text-caption);
+  line-height: 1.6;
+}
 .source-context {
   min-width: 0;
   background: color-mix(in srgb, var(--ds-surface-subtle) 40%, var(--ds-surface));
@@ -5204,39 +5242,48 @@ body {
   font-size: var(--text-caption);
   font-weight: 600;
 }
-.release-form input,
-.match-tester input {
-  width: 100%;
-  height: 36px;
-  padding: 0 11px;
-  border: 1px solid var(--ds-border-strong);
-  border-radius: var(--radius-control);
-  color: var(--ds-text);
-  background: var(--ds-surface);
-  font-size: var(--text-table);
-  box-shadow: var(--shadow-control);
-  outline: none;
-}
-.release-form input:focus,
-.match-tester input:focus {
-  border-color: var(--ds-text);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ds-ring) 14%, transparent);
-}
 .release-form__error {
   margin-top: var(--space-3);
   color: var(--destructive);
   font-size: var(--text-table);
 }
 .release-list {
-  padding: 0 !important;
   display: grid;
+  overflow: hidden;
+  border: 1px solid var(--ds-border);
+  border-radius: var(--radius-surface);
+}
+.release-form__hint,
+.release-form__notice {
+  margin-bottom: var(--space-3);
+  color: var(--ds-text-secondary);
+  font-size: var(--text-table);
+}
+.release-form__notice {
+  margin: var(--space-3) 0 0;
+}
+.release-search {
+  position: relative;
+  display: block;
+}
+.release-search > svg {
+  position: absolute;
+  top: 50%;
+  left: var(--space-3);
+  width: 16px;
+  color: var(--ds-text-muted);
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+.release-search input {
+  padding-left: calc(var(--space-3) + 22px);
 }
 .release-list > button {
   width: 100%;
   min-height: 64px;
   padding: var(--space-3) var(--space-4);
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(80px, 0.6fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto minmax(72px, 0.5fr) auto;
   align-items: center;
   gap: var(--space-3);
   text-align: left;
@@ -5302,11 +5349,134 @@ body {
   color: var(--ds-text-muted);
   font-size: var(--text-caption);
 }
-.artifact-drop input {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  opacity: 0;
+.artifact-drop > span {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.artifact-drop__blocked {
+  color: var(--ds-warning) !important;
+}
+.artifact-drop__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.artifact-uploader {
+  display: grid;
+  gap: var(--space-3);
+}
+.artifact-uploader__prefix {
+  display: grid;
+  gap: 6px;
+}
+.artifact-uploader__prefix label {
+  display: grid;
+  gap: 6px;
+  color: var(--ds-text-secondary);
+  font-size: var(--text-caption);
+  font-weight: 600;
+}
+.artifact-uploader__prefix p {
+  color: var(--ds-text-muted);
+  font-size: var(--text-caption);
+  line-height: 1.6;
+}
+.artifact-uploader code,
+.releases-layout [data-slot="card-description"] code,
+.release-security code,
+.match-tester__hint code,
+.stack-guidance code {
+  font-family: var(--font-mono);
+  font-size: var(--text-caption);
+  overflow-wrap: anywhere;
+}
+.upload-queue {
+  display: grid;
+  gap: var(--space-2);
+}
+.upload-queue > header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  color: var(--ds-text-secondary);
+  font-size: var(--text-table);
+}
+.upload-queue > header > div {
+  display: flex;
+  gap: var(--space-2);
+}
+.upload-queue > ol {
+  max-height: 360px;
+  overflow: auto;
+  border: 1px solid var(--ds-border);
+  border-radius: var(--radius-surface);
+}
+.upload-queue li {
+  min-height: var(--table-row-height);
+  padding: var(--space-2) var(--space-3);
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  border-top: 1px solid var(--ds-border);
+}
+.upload-queue li:first-child {
+  border-top: 0;
+}
+.upload-queue__name {
+  min-width: 0;
+  flex: 1 1 auto;
+  display: grid;
+  gap: 4px;
+}
+.upload-queue__name code {
+  color: var(--ds-text);
+}
+.upload-queue__name small {
+  color: var(--ds-text-muted);
+  font-size: var(--text-caption);
+}
+.upload-queue__state {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--space-2);
+}
+.upload-queue__error {
+  color: var(--destructive);
+  font-size: var(--text-caption);
+  line-height: 1.5;
+  white-space: normal;
+}
+.upload-queue__note {
+  color: var(--ds-text-secondary);
+  font-size: var(--text-caption);
+}
+.release-detail__dist {
+  margin-left: var(--space-2);
+  color: var(--ds-text-muted);
+  font-size: var(--text-caption);
+  font-weight: 500;
+}
+.release-danger {
+  padding-top: var(--space-4);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  border-top: 1px solid var(--ds-border);
+}
+.release-danger strong {
+  color: var(--ds-text);
+  font-size: var(--text-table);
+}
+.release-danger p {
+  margin-top: 2px;
+  color: var(--ds-text-muted);
+  font-size: var(--text-caption);
 }
 .release-empty-copy {
   padding: var(--space-5);
@@ -5334,7 +5504,20 @@ body {
 }
 .release-security svg {
   width: 17px;
+  flex: 0 0 auto;
   color: var(--success);
+}
+.release-security a,
+.match-tester__hint a {
+  margin-left: var(--space-1);
+  color: var(--ds-brand);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.match-tester__hint {
+  color: var(--ds-text-secondary);
+  font-size: var(--text-caption);
+  line-height: 1.6;
 }
 .match-tester {
   display: grid;
@@ -5387,6 +5570,12 @@ body {
   }
   .release-list > button {
     grid-template-columns: 1fr auto;
+  }
+  .release-list code {
+    display: none;
+  }
+  .upload-queue li {
+    flex-direction: column;
   }
   .release-list time {
     grid-column: 1 / -1;

@@ -20,7 +20,10 @@ export async function mockOpenRUM(
   let projectCreated = options.projectExists ?? false;
   let queryable = options.projectExists ?? false;
   let releaseCreated = true;
-  let artifactReady = false;
+  // Source Map artifacts keyed by id. Presign records the artifactName the Console actually
+  // sends, so a naming bug (e.g. dropping the folder path) shows up in the artifact list.
+  const artifacts = new Map<string, ReturnType<typeof artifact>>();
+  const uploadTokens: Array<Record<string, unknown>> = [];
   const projectSettings: MutableProject = { ...defaultProjectSettings };
   let dataPurge = {
     projectId,
@@ -463,35 +466,118 @@ export async function mockOpenRUM(
       });
     }
     if (path.startsWith("/api/v1/events/")) return json(route, eventDetail("v1:e2e-0", true));
+    if (path === `/api/v1/projects/${projectId}/sourcemaps/status`)
+      return json(route, {
+        storage: "ready",
+        maxArtifactBytes: 67108864,
+        remapWindowDays: 7,
+      });
+    if (path === `/api/v1/projects/${projectId}/upload-tokens`) {
+      if (request.method() === "POST") {
+        const { name } = request.postDataJSON() as { name: string };
+        const token = {
+          id: `upload-token-${uploadTokens.length + 1}`,
+          name,
+          tokenPrefix: "orut_e2eAbCd",
+          createdByName: "E2E Owner",
+          createdAt: now,
+          lastUsedAt: null,
+          revokedAt: null,
+        };
+        uploadTokens.push(token);
+        return json(
+          route,
+          { token, secret: "orut_e2eAbCdEfGhIjKlMnOpQrStUvWxYz0123456789ab" },
+          201,
+        );
+      }
+      return json(route, { tokens: uploadTokens, canManage: role === "owner" || role === "admin" });
+    }
+    if (
+      path.startsWith(`/api/v1/projects/${projectId}/upload-tokens/`) &&
+      request.method() === "DELETE"
+    ) {
+      const token = uploadTokens.find((item) => path.endsWith(`/${String(item.id)}`));
+      if (token) token.revokedAt = now;
+      return route.fulfill({ status: 204 });
+    }
     if (path === `/api/v1/projects/${projectId}/releases`) {
-      if (request.method() === "POST") releaseCreated = true;
-      return json(
-        route,
-        request.method() === "POST" ? release() : { releases: releaseCreated ? [release()] : [] },
-        request.method() === "POST" ? 201 : 200,
-      );
+      if (request.method() === "POST") {
+        const existed = releaseCreated;
+        releaseCreated = true;
+        return json(route, release(artifacts), existed ? 200 : 201);
+      }
+      return json(route, {
+        releases: releaseCreated ? [release(artifacts)] : [],
+        nextCursor: null,
+      });
+    }
+    if (
+      path === `/api/v1/projects/${projectId}/releases/release-e2e` &&
+      request.method() === "DELETE"
+    ) {
+      releaseCreated = false;
+      artifacts.clear();
+      return route.fulfill({ status: 204 });
     }
     if (path === `/api/v1/projects/${projectId}/releases/release-e2e/artifacts`) {
-      return json(route, { artifacts: artifactReady ? [artifact()] : [] });
+      return json(route, { artifacts: [...artifacts.values()] });
     }
     if (path === `/api/v1/projects/${projectId}/releases/release-e2e/artifacts/presign`) {
+      const body = request.postDataJSON() as {
+        artifactName: string;
+        sha256: string;
+        sizeBytes: number;
+        replace?: boolean;
+      };
+      const existing = [...artifacts.values()].find(
+        (item) => item.artifactName === body.artifactName,
+      );
+      if (existing?.status === "ready" && existing.sha256 === body.sha256)
+        return json(route, { artifact: existing, skipped: true });
+      if (existing?.status === "ready" && !body.replace)
+        return json(
+          route,
+          {
+            error: {
+              code: "ARTIFACT_EXISTS",
+              message: "an artifact with this name already exists",
+              requestId: "e2e",
+            },
+          },
+          409,
+        );
+      if (existing) artifacts.delete(existing.id);
+      const created = {
+        ...artifact(body.artifactName, `artifact-e2e-${artifacts.size + 1}`),
+        sizeBytes: body.sizeBytes,
+        sha256: body.sha256,
+        status: "pending" as const,
+      };
+      artifacts.set(created.id, created);
       return json(
         route,
         {
-          artifact: { ...artifact(), status: "pending" },
+          artifact: created,
           uploadUrl: "https://oss.example/openrum-upload",
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           expiresAt: "2026-09-03T00:15:00.000Z",
+          skipped: false,
         },
         201,
       );
     }
-    if (
-      path === `/api/v1/projects/${projectId}/releases/release-e2e/artifacts/artifact-e2e/complete`
-    ) {
-      artifactReady = true;
-      return json(route, artifact());
+    const completeMatch = path.match(
+      new RegExp(`^/api/v1/projects/${projectId}/releases/release-e2e/artifacts/([^/]+)/complete$`),
+    );
+    if (completeMatch) {
+      const stored = artifacts.get(completeMatch[1]);
+      if (!stored)
+        return json(route, { error: { code: "NOT_FOUND", message: path, requestId: "e2e" } }, 404);
+      const ready = { ...stored, status: "ready" as const };
+      artifacts.set(ready.id, ready);
+      return json(route, ready);
     }
     if (path === `/api/v1/projects/${projectId}/sourcemaps/test`)
       return json(route, {
@@ -917,7 +1003,8 @@ function performance(route: string | null, selectedMetric: string | null) {
   };
 }
 
-function release() {
+function release(artifacts: Map<string, { status: string }> = new Map()) {
+  const all = [...artifacts.values()];
   return {
     id: "release-e2e",
     projectId,
@@ -927,16 +1014,19 @@ function release() {
     deployedAt: now,
     createdAt: now,
     updatedAt: now,
+    artifactCount: all.length,
+    readyCount: all.filter((item) => item.status === "ready").length,
   };
 }
 
-function artifact() {
+function artifact(artifactName = "assets/app.js.map", id = "artifact-e2e") {
   return {
-    id: "artifact-e2e",
+    id,
     releaseId: "release-e2e",
-    artifactName: "assets/app.js.map",
+    artifactName,
     sizeBytes: 1048,
-    status: "ready",
+    sha256: "",
+    status: "ready" as "pending" | "ready" | "failed",
     createdAt: now,
     updatedAt: now,
   };

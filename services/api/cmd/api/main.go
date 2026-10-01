@@ -171,17 +171,9 @@ func registerRoutes(ctx context.Context, router *httpx.Router, configuration con
 	issueHandler := handlers.NewIssueHandler(projectRepository, issuesRepository, eventRepository, issueStateRepository, logger)
 	eventHandler := handlers.NewEventHandler(projectRepository, eventRepository, logger)
 	sessionHandler := handlers.NewSessionHandler(projectRepository, query.NewSessionRepository(clickHouse), logger)
-	sourceMapStorage, storageProber, storageErr := sourcemap.NewConfiguredStorage(connectCtx, configuration)
-	if storageErr != nil {
-		_ = database.Close()
-		_ = clickHouse.Close()
-		_ = redisClient.Close()
-		_ = eventProducer.Close()
-		return nil, storageErr
-	}
 	var instanceSecretRepository *metadata.InstanceSecretRepository
 	var authKeyring *openrumcrypto.Keyring
-	var storageSwitcher *sourcemap.SwitchableStorage
+	var storageSecrets sourcemap.ManagedStorageSource
 	// Nil until managed secrets are configured. Alert rules work regardless;
 	// only notification channels need to seal a webhook secret at rest.
 	var channelCodec metadata.EnvelopeCodec
@@ -193,37 +185,36 @@ func registerRoutes(ctx context.Context, router *httpx.Router, configuration con
 		authKeyring = keyring
 		channelCodec = keyring
 		instanceSecretRepository = metadata.NewInstanceSecretRepository(database, keyring)
-		managed, _, managedErr := instanceSecretRepository.GetObjectStorage(connectCtx)
-		if managedErr == nil {
-			configuration.ObjectStorageProvider = config.ObjectStorageProvider(managed.Provider)
-			configuration.ObjectStorageEndpoint = managed.Endpoint
-			configuration.ObjectStorageBucket = managed.Bucket
-			configuration.ObjectStorageRegion = managed.Region
-			configuration.ObjectStorageForcePathStyle = managed.ForcePathStyle
-			configuration.ObjectStorageCredential = config.ObjectStorageCredentialManaged
-			configuration.ObjectStorageMaskedIdentity = managed.AccessKeyID[:min(len(managed.AccessKeyID), 3)] + "••••"
-			sourceMapStorage, storageProber, storageErr = sourcemap.NewManagedStorage(connectCtx, managed)
-		} else if !errors.Is(managedErr, metadata.ErrNotFound) {
-			return nil, managedErr
-		}
-		storageSwitcher = sourcemap.NewSwitchableStorage(sourceMapStorage, storageProber)
-		sourceMapStorage, storageProber = storageSwitcher, storageSwitcher
+		storageSecrets = instanceSecretRepository
 	}
-	if storageErr != nil {
-		return nil, storageErr
-	}
-	adminStorageHandler := handlers.NewAdminStorageHandler(instanceMemberRepository, sessionManager, storageProber, configuration, logger)
+	// Every consumer holds the switcher, so the refresher can replace the client
+	// when the managed configuration changes on any replica.
+	storageSwitcher := sourcemap.NewSwitchableStorage(nil, nil)
+	adminStorageHandler := handlers.NewAdminStorageHandler(instanceMemberRepository, sessionManager, storageSwitcher, configuration, logger)
+	adminStorageHandler.EnableArtifactUsage(issueStateRepository)
 	externalAuthHandler := handlers.NewExternalAuthHandler(auth.NewExternalStore(database, authKeyring), sessionManager,
 		redisClient, failureLimiter, instanceMemberRepository, configuration.PublicBaseURL, secureCookie, logger)
 	if instanceSecretRepository != nil {
 		adminStorageHandler.EnableManagedSecrets(instanceSecretRepository, storageSwitcher)
 	}
-	releaseHandler := handlers.NewReleaseHandler(projectRepository, issueStateRepository, sourceMapStorage, logger)
-	var sourceMapMapper *sourcemap.Mapper
-	if sourceMapStorage != nil {
-		sourceMapMapper = sourcemap.NewMapper(sourcemap.NewArtifactCatalog(database), sourceMapStorage, sourcemap.NewCache(128<<20))
+	storageRefresher := sourcemap.NewStorageRefresher(storageSwitcher, configuration, storageSecrets)
+	storageRefresher.OnChange(func(loaded sourcemap.LoadedStorage) {
+		if loaded.Managed != nil {
+			adminStorageHandler.ApplyManagedStorage(*loaded.Managed)
+		}
+	})
+	if _, err := storageRefresher.Refresh(connectCtx); err != nil {
+		logger.Error().Err(err).Msg("object storage could not be loaded; source map uploads are unavailable until it recovers")
 	}
+	go storageRefresher.Run(ctx, sourcemap.StorageRefreshInterval, func(err error) {
+		logger.Error().Err(err).Msg("object storage refresh failed")
+	})
+	uploadTokenRepository := metadata.NewUploadTokenRepository(database)
+	uploadTokenHandler := handlers.NewUploadTokenHandler(projectRepository, uploadTokenRepository, logger)
+	releaseHandler := handlers.NewReleaseHandler(projectRepository, issueStateRepository, storageSwitcher, metadata.NewRemapRepository(database), logger)
+	sourceMapMapper := sourcemap.NewMapper(sourcemap.NewArtifactCatalog(database), storageSwitcher, sourcemap.NewCache(128<<20))
 	sourceMapMatchHandler := handlers.NewSourceMapMatchHandler(projectRepository, sourceMapMapper, logger)
+	sourceMapMatchHandler.UseStorageState(storageSwitcher)
 	alertRepository := metadata.NewAlertRepository(database, channelCodec)
 	alertHandler := handlers.NewAlertHandler(alertRepository, logger)
 	channelHandler := handlers.NewChannelHandler(alertRepository, organizationRepository, logger)
@@ -324,12 +315,21 @@ func registerRoutes(ctx context.Context, router *httpx.Router, configuration con
 	router.Handle("GET /api/v1/events/{eventId}", requireSession(http.HandlerFunc(eventHandler.Get)))
 	router.Handle("GET /api/v1/projects/{projectId}/analytics/sessions", requireSession(http.HandlerFunc(sessionHandler.List)))
 	router.Handle("GET /api/v1/projects/{projectId}/analytics/sessions/{sessionId}", requireSession(http.HandlerFunc(sessionHandler.Get)))
-	router.Handle("POST /api/v1/projects/{projectId}/releases", requireSession(requireCSRF(http.HandlerFunc(releaseHandler.Create))))
-	router.Handle("GET /api/v1/projects/{projectId}/releases", requireSession(http.HandlerFunc(releaseHandler.ListReleases)))
-	router.Handle("POST /api/v1/projects/{projectId}/releases/{releaseId}/artifacts/presign", requireSession(requireCSRF(http.HandlerFunc(releaseHandler.Presign))))
-	router.Handle("POST /api/v1/projects/{projectId}/releases/{releaseId}/artifacts/{artifactId}/complete", requireSession(requireCSRF(http.HandlerFunc(releaseHandler.Complete))))
-	router.Handle("GET /api/v1/projects/{projectId}/releases/{releaseId}/artifacts", requireSession(http.HandlerFunc(releaseHandler.List)))
-	router.Handle("DELETE /api/v1/projects/{projectId}/releases/{releaseId}/artifacts/{artifactId}", requireSession(requireCSRF(http.HandlerFunc(releaseHandler.Delete))))
+	// Release and artifact routes also accept a project upload token so build
+	// pipelines need no Console session; the handlers scope tokens to their
+	// project and refuse them on DELETE.
+	requireSessionOrUploadToken := httpx.RequireSessionOrUploadToken(sessionManager, uploadTokenRepository, configuration.PublicBaseURL)
+	router.Handle("POST /api/v1/projects/{projectId}/releases", requireSessionOrUploadToken(http.HandlerFunc(releaseHandler.Create)))
+	router.Handle("GET /api/v1/projects/{projectId}/releases", requireSessionOrUploadToken(http.HandlerFunc(releaseHandler.ListReleases)))
+	router.Handle("DELETE /api/v1/projects/{projectId}/releases/{releaseId}", requireSessionOrUploadToken(http.HandlerFunc(releaseHandler.DeleteRelease)))
+	router.Handle("POST /api/v1/projects/{projectId}/releases/{releaseId}/artifacts/presign", requireSessionOrUploadToken(http.HandlerFunc(releaseHandler.Presign)))
+	router.Handle("POST /api/v1/projects/{projectId}/releases/{releaseId}/artifacts/{artifactId}/complete", requireSessionOrUploadToken(http.HandlerFunc(releaseHandler.Complete)))
+	router.Handle("GET /api/v1/projects/{projectId}/releases/{releaseId}/artifacts", requireSessionOrUploadToken(http.HandlerFunc(releaseHandler.List)))
+	router.Handle("DELETE /api/v1/projects/{projectId}/releases/{releaseId}/artifacts/{artifactId}", requireSessionOrUploadToken(http.HandlerFunc(releaseHandler.Delete)))
+	router.Handle("GET /api/v1/projects/{projectId}/sourcemaps/status", requireSession(http.HandlerFunc(releaseHandler.SourceMapStatus)))
+	router.Handle("GET /api/v1/projects/{projectId}/upload-tokens", requireSession(http.HandlerFunc(uploadTokenHandler.List)))
+	router.Handle("POST /api/v1/projects/{projectId}/upload-tokens", requireSession(requireCSRF(http.HandlerFunc(uploadTokenHandler.Create))))
+	router.Handle("DELETE /api/v1/projects/{projectId}/upload-tokens/{tokenId}", requireSession(requireCSRF(http.HandlerFunc(uploadTokenHandler.Revoke))))
 	router.Handle("POST /api/v1/projects/{projectId}/sourcemaps/test", requireSession(requireCSRF(http.HandlerFunc(sourceMapMatchHandler.Test))))
 	router.Handle("POST /api/v1/projects/{projectId}/test-event", requireSession(requireCSRF(http.HandlerFunc(testEventHandler.Create))))
 	router.Handle("POST /api/v1/projects/{projectId}/keys", requireSession(requireCSRF(http.HandlerFunc(projectKeyHandler.Create))))

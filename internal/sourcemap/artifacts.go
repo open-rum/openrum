@@ -22,8 +22,11 @@ type Artifact struct {
 	SizeBytes    int64
 }
 
-type ArtifactFinder interface {
-	Find(context.Context, uuid.UUID, string, string, string) (Artifact, error)
+// ArtifactLister returns every ready artifact of one release build. The mapper
+// asks once per stack and matches frames in memory, instead of querying once
+// per frame.
+type ArtifactLister interface {
+	ReadyArtifacts(context.Context, uuid.UUID, string, string) ([]Artifact, error)
 }
 
 type ArtifactCatalog struct{ database *sql.DB }
@@ -32,35 +35,25 @@ func NewArtifactCatalog(database *sql.DB) *ArtifactCatalog {
 	return &ArtifactCatalog{database: database}
 }
 
-func (catalog *ArtifactCatalog) Find(ctx context.Context, projectID uuid.UUID, release, dist, generatedURL string) (Artifact, error) {
+func (catalog *ArtifactCatalog) ReadyArtifacts(ctx context.Context, projectID uuid.UUID, release, dist string) ([]Artifact, error) {
 	rows, err := catalog.database.QueryContext(ctx,
 		`SELECT a.id, r.project_id, r.version, r.dist, a.artifact_name, a.oss_key, a.sha256, a.size_bytes
 		 FROM sourcemap_artifacts a JOIN releases r ON r.id=a.release_id
 		 WHERE r.project_id=$1 AND r.version=$2 AND r.dist=$3 AND a.status='ready'`, projectID, release, dist)
 	if err != nil {
-		return Artifact{}, err
+		return nil, err
 	}
 	defer func() { _ = rows.Close() }()
-	artifacts := make(map[string]Artifact)
-	candidates := make([]ArtifactCandidate, 0)
+	artifacts := make([]Artifact, 0)
 	for rows.Next() {
 		var artifact Artifact
 		if err := rows.Scan(&artifact.ID, &artifact.ProjectID, &artifact.Release, &artifact.Dist, &artifact.ArtifactName,
 			&artifact.OSSKey, &artifact.SHA256, &artifact.SizeBytes); err != nil {
-			return Artifact{}, err
+			return nil, err
 		}
-		key := artifact.ID.String()
-		artifacts[key] = artifact
-		candidates = append(candidates, ArtifactCandidate{ID: key, Release: artifact.Release, Dist: artifact.Dist, ArtifactName: artifact.ArtifactName})
+		artifacts = append(artifacts, artifact)
 	}
-	if err := rows.Err(); err != nil {
-		return Artifact{}, err
-	}
-	matched, err := MatchArtifact(candidates, release, dist, generatedURL)
-	if err != nil {
-		return Artifact{}, err
-	}
-	return artifacts[matched.ID], nil
+	return artifacts, rows.Err()
 }
 
 func ArtifactCacheKey(artifact Artifact) string {

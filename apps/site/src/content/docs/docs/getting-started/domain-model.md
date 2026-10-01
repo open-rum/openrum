@@ -36,6 +36,7 @@ OpenRUM documentation, Console labels and APIs share one glossary. The repositor
 | --- | --- | --- |
 | **Session Replay** | Privacy-filtered reconstruction of visible browser experience inside a Session. | Recording, video |
 | **Source Map Artifact** | Build artifact that maps generated code locations back to authored source for a Release. | Source map file, debug file |
+| **Upload Token** | Revocable Project-scoped secret that lets CI create Releases and upload Source Map Artifacts without a Console session. | API key, CI token, session token |
 
 ## How the terms connect
 

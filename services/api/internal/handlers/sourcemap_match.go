@@ -15,13 +15,20 @@ import (
 )
 
 type sourceMapMatcher interface {
-	MapStack(context.Context, uuid.UUID, string, string, string) sourcemap.MappedStack
+	MapStack(context.Context, uuid.UUID, string, string, string) (sourcemap.MappedStack, error)
 }
 
 type SourceMapMatchHandler struct {
 	projects overviewProjects
 	mapper   sourceMapMatcher
+	storage  storageStateReporter
 	logger   zerolog.Logger
+}
+
+// UseStorageState lets a failed match distinguish missing configuration from a
+// temporarily failing backend.
+func (handler *SourceMapMatchHandler) UseStorageState(storage storageStateReporter) {
+	handler.storage = storage
 }
 
 func NewSourceMapMatchHandler(projects overviewProjects, mapper sourceMapMatcher, logger zerolog.Logger) *SourceMapMatchHandler {
@@ -63,8 +70,20 @@ func (handler *SourceMapMatchHandler) Test(writer http.ResponseWriter, request *
 		return
 	}
 	if handler.mapper == nil {
-		httpx.WriteError(writer, request, http.StatusServiceUnavailable, "OBJECT_STORAGE_UNAVAILABLE", "Source map storage is not configured.")
+		httpx.WriteError(writer, request, http.StatusServiceUnavailable, "OBJECT_STORAGE_NOT_CONFIGURED", "Source map storage is not configured.")
 		return
 	}
-	writeJSON(writer, http.StatusOK, handler.mapper.MapStack(request.Context(), projectID, payload.Release, payload.Dist, payload.Stack))
+	mapped, err := handler.mapper.MapStack(request.Context(), projectID, payload.Release, payload.Dist, payload.Stack)
+	if err != nil {
+		// A transient storage or catalog failure says nothing about the map;
+		// report it instead of showing a misleading per-frame failure.
+		if handler.storage != nil && handler.storage.State() == sourcemap.StorageNotConfigured {
+			httpx.WriteError(writer, request, http.StatusServiceUnavailable, "OBJECT_STORAGE_NOT_CONFIGURED", "Source map storage is not configured.")
+			return
+		}
+		handler.logger.Warn().Err(err).Str("request_id", httpx.RequestIDFromContext(request.Context())).Msg("source map match test unavailable")
+		httpx.WriteError(writer, request, http.StatusServiceUnavailable, "OBJECT_STORAGE_UNAVAILABLE", "Source map storage is temporarily unavailable.")
+		return
+	}
+	writeJSON(writer, http.StatusOK, mapped)
 }

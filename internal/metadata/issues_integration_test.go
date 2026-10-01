@@ -16,9 +16,9 @@ func TestIssueReleaseArtifactConstraintsAndCascades(t *testing.T) {
 	ctx := context.Background()
 	ownerID, projectID := seedIssueProject(t, database)
 	repository := NewIssueRepository(database)
-	release, err := repository.CreateReleaseForActor(ctx, ownerID, Release{ProjectID: projectID, Version: "checkout@1.0.0", Dist: "web"})
-	if err != nil {
-		t.Fatal(err)
+	release, created, err := repository.CreateReleaseForActor(ctx, ownerID, Release{ProjectID: projectID, Version: "checkout@1.0.0", Dist: "web"})
+	if err != nil || !created {
+		t.Fatalf("created=%v err=%v", created, err)
 	}
 	if _, err := repository.CreateRelease(ctx, Release{ProjectID: projectID, Version: release.Version, Dist: release.Dist}); err == nil {
 		t.Fatal("expected duplicate release to fail")

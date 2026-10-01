@@ -354,7 +354,7 @@ func loadObjectStorage(values func(string) string, appEnv string) (objectStorage
 		return objectStorageConfig{}, fmt.Errorf("OBJECT_STORAGE_BUCKET and OBJECT_STORAGE_REGION are required when object storage is enabled")
 	}
 	allowlist := splitCommaSeparated(firstValue(values("OPENRUM_OBJECT_STORAGE_ENDPOINT_ALLOWLIST"), values("OPENRUM_OSS_ENDPOINT_ALLOWLIST")))
-	if err := validateObjectStorageEndpoint(endpoint, appEnv, provider, allowlist); err != nil {
+	if err := ValidateObjectStorageEndpoint(endpoint, appEnv, provider, allowlist); err != nil {
 		return objectStorageConfig{}, err
 	}
 	forcePathStyle := provider == ObjectStorageProviderS3 && endpoint != ""
@@ -405,7 +405,10 @@ func maskCredentialIdentity(value string) string {
 	return string(runes[:3]) + "••••" + string(runes[len(runes)-4:])
 }
 
-func validateObjectStorageEndpoint(raw, appEnv string, provider ObjectStorageProvider, allowlist []string) error {
+// ValidateObjectStorageEndpoint applies the SSRF boundary shared by deployment
+// configuration and Console-managed storage: outside production any http(s) URL is
+// accepted, while production requires https and an Alibaba OSS or allowlisted host.
+func ValidateObjectStorageEndpoint(raw, appEnv string, provider ObjectStorageProvider, allowlist []string) error {
 	if raw == "" {
 		return nil
 	}

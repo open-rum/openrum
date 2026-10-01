@@ -99,3 +99,7 @@ _Avoid_: Recording, video
 **Source Map Artifact**:
 A build artifact that maps generated browser code locations back to authored source locations for a release.
 _Avoid_: Source map file, debug file
+
+**Upload Token**:
+A revocable, project-scoped secret that lets a CI pipeline create releases and upload Source Map Artifacts for one project, without a Console session.
+_Avoid_: API key, CI token, session token

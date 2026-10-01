@@ -235,11 +235,17 @@ When implementing from a selected generated mock, treat that image as the source
   settings and on the login page; do not use a monochrome Google glyph. Provider
   selection cards use a transparent icon without a white tile and keep all four
   provider icons at 24px; login buttons keep their icons at 16px.
-- Object storage settings are provider-first and page-managed by default. Let
-  administrators choose Alibaba OSS, Amazon S3, Cloudflare R2, MinIO, or another
-  S3-compatible service, then show only the relevant connection and credential
-  fields. Test write/read/delete before saving encrypted credentials; keep
-  RAM/IAM roles and deployment-managed Secrets as the advanced production path.
+- Object storage settings lead with the active storage once configured: a status
+  badge (已启用 / 删除受限), provider, Bucket, Region, Endpoint, masked credential and
+  stored Source Map totals, with 测试连接 and 更换配置 actions and inline probe
+  results. The provider-first form (Alibaba OSS, Amazon S3, Cloudflare R2, MinIO,
+  other S3-compatible) shows only when unconfigured or replacing; it prefills the
+  current values, keeps stored credentials when both fields stay blank for the same
+  provider, explains why saving is disabled, and requires explicit confirmation
+  before moving to another Bucket while Source Maps exist. Saving needs write and
+  read; a refused delete saves with a warning. Show probe failures from a rejected
+  save, and keep the collapsible CORS help for Console direct uploads. RAM/IAM roles
+  and deployment-managed Secrets remain the advanced production path.
 - Every authenticated Console route uses the shared Console page components.
   Choose only `fluid`, `wide`, or `narrow`; render the desktop `ContextRail`
   only when the page supplies contextual navigation, and compose header,
@@ -269,9 +275,10 @@ When implementing from a selected generated mock, treat that image as the source
   on hover or keyboard focus. Project routes show project name and environment
   beside the slightly larger mark; non-project routes show the OpenRUM name.
 - A Project represents one monitored product and owns a bounded list of
-  Environments. The project hover panel selects from the server-provided list;
-  never hard-code environment names in Console filters. Project rows show the
-  project Slug rather than presenting the default Environment as project metadata.
+  Environments from the fixed set development, test, staging and production. The
+  project hover panel lists the environments that have reported data (from the
+  project environments API). Project rows
+  show the SDK platform; the project Slug is internal and no longer shown.
 - The right workspace always has one sticky app status bar. Global utilities
   such as appearance, future language, and notifications live on its right
   edge. Do not render explanatory copy on the left side of this bar. Data-analysis

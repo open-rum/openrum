@@ -1,6 +1,6 @@
 ---
 title: Project settings
-description: Configure Environments, keys, Origins, sampling, retention and Releases.
+description: Configure Environments, keys, Source Map upload tokens, Origins, sampling and retention.
 ---
 
 **Applies to:** Alpha. Status: Alpha implemented.
@@ -13,7 +13,10 @@ Project settings define how a monitored web product sends and retains telemetry.
 - **Client DSNs** with Origin allowlists, rotation and revocation
 - **Sampling** for Events, API Requests and errors
 - **Retention** for raw and aggregate data
-- **Releases** used to associate Source Map Artifacts
+- **Source Map upload tokens** that let CI upload Source Map Artifacts for this Project
+
+Releases and their Source Map Artifacts are not a setting: open **Releases** in the Project's
+main navigation (`/projects/<id>/releases`).
 
 ## Where to change them
 
@@ -22,7 +25,7 @@ names its scope in the path, so a link is unambiguous about which of account, or
 project or instance it belongs to:
 
 - **General** (`/settings/project/<id>/general`) — name, SDK platform, allowed Origins, retention days, and a danger zone to disable, re-enable or delete the project.
-- **Onboarding** (`/projects/<id>/onboarding`) — copy the Project's default DSN and platform-specific integration code.
+- **Onboarding** (`/projects/<id>/onboarding`) — copy the Project's default DSN and platform-specific integration code, and manage **Source Map upload tokens**. Owners and Admins create and revoke tokens; the secret is shown once. See [Release and Source Maps](/docs/sdk/source-maps/).
 - **Data management** — one entry for sampling, rate limits, inbound filters, URL normalization and privacy scrubbing. Switch between the page's tabs; each setting saves independently and applies across the Project's environments.
 - **Usage statistics** (`/settings/project/<id>/usage`) — accepted volume, estimated source volume and processing outcomes, with CSV export. Sampling configuration is separate from this report.
 
@@ -115,5 +118,6 @@ For the IP guard, Redis fallback, response headers, sizing formula and troublesh
 - Keep Origin allowlists tight in production.
 - Treat DSNs as browser-public connection strings protected by Origin and rate limits.
 - Configure object storage only when Source Map upload is required.
+- Create one Source Map upload token per CI pipeline and revoke tokens that are no longer used.
 
 Related: [Create your first project](/docs/getting-started/create-first-project/), [Data lifecycle](/docs/self-hosting/data-lifecycle/), [Privacy](/docs/self-hosting/security/privacy/).

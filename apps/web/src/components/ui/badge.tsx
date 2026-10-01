@@ -13,6 +13,8 @@ const badgeVariants = cva(
         secondary: "bg-secondary text-secondary-foreground [a]:hover:bg-secondary/80",
         destructive:
           "bg-destructive/10 text-destructive focus-visible:ring-destructive/20 dark:bg-destructive/20 dark:focus-visible:ring-destructive/40 [a]:hover:bg-destructive/20",
+        // A limitation that does not block the user, distinct from a failure.
+        warning: "border-transparent bg-[var(--ds-warning-soft)] text-[var(--ds-warning)]",
         success:
           "border-[color-mix(in_srgb,var(--ds-success)_35%,var(--ds-border))] bg-[var(--ds-success-soft)] text-[var(--ds-success)]",
         outline: "border-border text-foreground [a]:hover:bg-muted [a]:hover:text-muted-foreground",

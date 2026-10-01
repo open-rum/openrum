@@ -19,3 +19,16 @@ func TestCacheParsesOnceAndEvictsByWeight(t *testing.T) {
 		t.Fatal("expected oldest map to be evicted")
 	}
 }
+
+func TestCacheGetReportsOnlyParsedEntries(t *testing.T) {
+	cache := NewCache(1 << 20)
+	if _, ok := cache.Get("a"); ok {
+		t.Fatal("empty cache returned an entry")
+	}
+	if _, err := cache.GetOrParse("a", "", []byte(`{"version":3,"sources":["a.ts"],"mappings":"AAAA"}`)); err != nil {
+		t.Fatal(err)
+	}
+	if parsed, ok := cache.Get("a"); !ok || parsed == nil || cache.parseCalls != 1 {
+		t.Fatalf("parsed=%v ok=%v calls=%d", parsed, ok, cache.parseCalls)
+	}
+}

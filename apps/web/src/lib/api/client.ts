@@ -122,6 +122,15 @@ export async function requestJSON<T>(
   path: string,
   options: RequestOptions = {},
 ): Promise<T> {
+  return (await requestJSONWithStatus(schema, path, options)).data;
+}
+
+/** Like requestJSON, but also returns the HTTP status for endpoints where 200 and 201 differ. */
+export async function requestJSONWithStatus<T>(
+  schema: ZodType<T>,
+  path: string,
+  options: RequestOptions = {},
+): Promise<{ data: T; status: number }> {
   const { redirectOnUnauthorized = true, ...init } = options;
   const response = await fetch(path, {
     ...init,
@@ -138,6 +147,7 @@ export async function requestJSON<T>(
       detail?.code ?? "REQUEST_FAILED",
       detail?.requestId ?? response.headers.get("X-Request-ID") ?? "",
       detail?.message ?? "请求失败，请稍后重试。",
+      payload,
     );
   }
   const result = schema.safeParse(payload);
@@ -149,7 +159,31 @@ export async function requestJSON<T>(
       "服务端返回了无法识别的数据。请刷新重试。",
     );
   }
-  return result.data;
+  return { data: result.data, status: response.status };
+}
+
+/** Sends a request whose success response has no body (typically 204), raising HTTPError otherwise. */
+export async function requestNoContent(
+  path: string,
+  init: RequestInit,
+  fallbackMessage = "请求失败，请稍后重试。",
+): Promise<void> {
+  const response = await fetch(path, {
+    ...init,
+    credentials: "same-origin",
+    headers: { Accept: "application/json", ...init.headers },
+  });
+  if (response.ok) return;
+  const payload: unknown = await response.json().catch(() => null);
+  const parsed = errorEnvelopeSchema.safeParse(payload);
+  const detail = parsed.success ? parsed.data.error : undefined;
+  if (response.status === 401) redirectToLogin(true);
+  throw new HTTPError(
+    response.status,
+    detail?.code ?? "REQUEST_FAILED",
+    detail?.requestId ?? response.headers.get("X-Request-ID") ?? "",
+    detail?.message ?? fallbackMessage,
+  );
 }
 
 export function getOverview(filters: OverviewFilters, signal?: AbortSignal, maxPoints?: number) {

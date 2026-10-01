@@ -69,10 +69,19 @@ func TestStorageProbeWritesReadsAndAlwaysDeletesDiagnosticObject(t *testing.T) {
 }
 
 func TestStorageProbeReportsReadIntegrityAndCleanupFailures(t *testing.T) {
-	client := &fakeOSSObjectClient{deleteErr: errors.New("delete denied")}
+	// Storage that writes and reads but cannot delete still works; the probe
+	// passes with a warning instead of blocking the configuration.
+	client := &fakeOSSObjectClient{deleteErr: errors.New("delete timed out")}
 	storage := &OSSStorage{probeClient: client, bucket: "openrum-test"}
 	result := storage.Probe(t.Context())
-	if result.Success || result.ErrorCode != "cleanup_failed" || !client.deleted {
+	if !result.Success || result.ErrorCode != "" || len(result.Warnings) != 1 || result.Warnings[0] != "cleanup_failed" || !client.deleted {
+		t.Fatalf("result=%+v", result)
+	}
+
+	client = &fakeOSSObjectClient{deleteErr: statusError{status: 403}}
+	storage = &OSSStorage{probeClient: client, bucket: "openrum-test"}
+	result = storage.Probe(t.Context())
+	if !result.Success || len(result.Warnings) != 1 || result.Warnings[0] != "delete_forbidden" {
 		t.Fatalf("result=%+v", result)
 	}
 

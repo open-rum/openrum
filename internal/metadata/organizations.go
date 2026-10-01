@@ -319,9 +319,15 @@ func canManageMembers(role OrganizationRole) bool {
 }
 
 func insertAudit(ctx context.Context, transaction *sql.Tx, organizationID, actorID uuid.UUID, action, resourceType string, resourceID uuid.UUID) error {
+	// A nil actor is recorded as NULL: upload tokens outlive the user who created
+	// them, and their actions are still audited.
+	var actor any = actorID
+	if actorID == uuid.Nil {
+		actor = nil
+	}
 	if _, err := transaction.ExecContext(ctx,
 		"INSERT INTO audit_logs (organization_id, actor_user_id, action, resource_type, resource_id) VALUES ($1, $2, $3, $4, $5)",
-		organizationID, actorID, action, resourceType, resourceID); err != nil {
+		organizationID, actor, action, resourceType, resourceID); err != nil {
 		return fmt.Errorf("insert audit log: %w", err)
 	}
 	return nil
