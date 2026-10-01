@@ -36,5 +36,6 @@ OpenRUM 文档、Console 和 API 共用一套术语，根目录 `CONTEXT.md` 是
 | --- | --- | --- |
 | **Session Replay** | 经过隐私处理的可见浏览器体验重建 | Recording、video |
 | **Source Map Artifact** | 把 Release 的生成代码映射回源代码的构建产物 | Source map file、debug file |
+| **Upload Token（上传令牌）** | 可吊销、按项目签发的密钥，让 CI 无需 Console 会话即可创建 Release 并上传 Source Map Artifact | API key、CI token、session token |
 
 访客在一个 Session 中产生 Event；行为分析聚合 Page View 和 Custom Event；错误 Event 按 Fingerprint 归入 Issue；运维人员可从行为变化或失败 Session 进入 Issue 和对应 Release 的 Source Map Artifact，无需手工复制 ID。

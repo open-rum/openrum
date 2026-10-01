@@ -31,6 +31,10 @@ type Release struct {
 	DeployedAt *time.Time `json:"deployedAt,omitempty"`
 	CreatedAt  time.Time  `json:"createdAt"`
 	UpdatedAt  time.Time  `json:"updatedAt"`
+	// ArtifactCount and ReadyCount let the Console show upload completeness
+	// without listing every artifact of every release.
+	ArtifactCount int `json:"artifactCount"`
+	ReadyCount    int `json:"readyCount"`
 }
 
 type SourceMapArtifact struct {
@@ -79,32 +83,50 @@ func (repository *IssueRepository) CreateRelease(ctx context.Context, release Re
 	return release, nil
 }
 
-func (repository *IssueRepository) CreateReleaseForActor(ctx context.Context, actorID uuid.UUID, release Release) (Release, error) {
+// CreateReleaseForActor creates the release or returns the existing one with
+// the same version and dist, so repeated builds can rerun their upload step.
+// created reports which happened; only a new release is audited.
+func (repository *IssueRepository) CreateReleaseForActor(ctx context.Context, actorID uuid.UUID, release Release) (Release, bool, error) {
 	transaction, err := repository.database.BeginTx(ctx, nil)
 	if err != nil {
-		return Release{}, err
+		return Release{}, false, err
 	}
 	defer func() { _ = transaction.Rollback() }()
 	if release.ID == uuid.Nil {
 		release.ID = uuid.New()
 	}
 	var organizationID uuid.UUID
+	if err := transaction.QueryRowContext(ctx, "SELECT organization_id FROM projects WHERE id=$1", release.ProjectID).Scan(&organizationID); errors.Is(err, sql.ErrNoRows) {
+		return Release{}, false, ErrNotFound
+	} else if err != nil {
+		return Release{}, false, err
+	}
+	var insertedID uuid.UUID
 	err = transaction.QueryRowContext(ctx,
 		`INSERT INTO releases (id, project_id, version, dist, commit_sha, deployed_at)
 		 VALUES ($1,$2,$3,$4,$5,$6)
-		 RETURNING (SELECT organization_id FROM projects WHERE id=$2), created_at, updated_at`,
+		 ON CONFLICT (project_id, version, dist) DO NOTHING
+		 RETURNING id`,
 		release.ID, release.ProjectID, release.Version, release.Dist, release.CommitSHA, release.DeployedAt,
-	).Scan(&organizationID, &release.CreatedAt, &release.UpdatedAt)
-	if err != nil {
-		return Release{}, translateConstraintError(err)
+	).Scan(&insertedID)
+	created := err == nil
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return Release{}, false, translateConstraintError(err)
 	}
-	if err := insertAudit(ctx, transaction, organizationID, actorID, "release.created", "release", release.ID); err != nil {
-		return Release{}, err
+	stored, err := scanRelease(transaction.QueryRowContext(ctx,
+		releaseSelect+` WHERE r.project_id=$1 AND r.version=$2 AND r.dist=$3`, release.ProjectID, release.Version, release.Dist))
+	if err != nil {
+		return Release{}, false, err
+	}
+	if created {
+		if err := insertAudit(ctx, transaction, organizationID, actorID, "release.created", "release", stored.ID); err != nil {
+			return Release{}, false, err
+		}
 	}
 	if err := transaction.Commit(); err != nil {
-		return Release{}, err
+		return Release{}, false, err
 	}
-	return release, nil
+	return stored, created, nil
 }
 
 func (repository *IssueRepository) CreateArtifact(ctx context.Context, artifact SourceMapArtifact) (SourceMapArtifact, error) {
@@ -129,39 +151,7 @@ func (repository *IssueRepository) CreateArtifact(ctx context.Context, artifact 
 }
 
 func (repository *IssueRepository) GetRelease(ctx context.Context, projectID, releaseID uuid.UUID) (Release, error) {
-	var release Release
-	err := repository.database.QueryRowContext(ctx,
-		`SELECT id, project_id, version, dist, commit_sha, deployed_at, created_at, updated_at
-		 FROM releases WHERE id=$1 AND project_id=$2`, releaseID, projectID,
-	).Scan(&release.ID, &release.ProjectID, &release.Version, &release.Dist, &release.CommitSHA,
-		&release.DeployedAt, &release.CreatedAt, &release.UpdatedAt)
-	if errors.Is(err, sql.ErrNoRows) {
-		return Release{}, ErrNotFound
-	}
-	return release, err
-}
-
-func (repository *IssueRepository) ListReleases(ctx context.Context, projectID uuid.UUID, limit int) ([]Release, error) {
-	if limit < 1 || limit > 100 {
-		limit = 50
-	}
-	rows, err := repository.database.QueryContext(ctx,
-		`SELECT id, project_id, version, dist, commit_sha, deployed_at, created_at, updated_at
-		 FROM releases WHERE project_id=$1 ORDER BY created_at DESC, id DESC LIMIT $2`, projectID, limit)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = rows.Close() }()
-	releases := make([]Release, 0)
-	for rows.Next() {
-		var release Release
-		if err := rows.Scan(&release.ID, &release.ProjectID, &release.Version, &release.Dist, &release.CommitSHA,
-			&release.DeployedAt, &release.CreatedAt, &release.UpdatedAt); err != nil {
-			return nil, err
-		}
-		releases = append(releases, release)
-	}
-	return releases, rows.Err()
+	return scanRelease(repository.database.QueryRowContext(ctx, releaseSelect+` WHERE r.id=$1 AND r.project_id=$2`, releaseID, projectID))
 }
 
 func (repository *IssueRepository) GetArtifact(ctx context.Context, projectID, releaseID, artifactID uuid.UUID) (SourceMapArtifact, error) {
@@ -356,4 +346,18 @@ func (repository *IssueRepository) MutateIssueState(ctx context.Context, actorID
 		return IssueState{}, err
 	}
 	return state, nil
+}
+
+// ArtifactStorageUsage totals ready Source Map objects across the Instance.
+type ArtifactStorageUsage struct {
+	Count int64
+	Bytes int64
+}
+
+func (repository *IssueRepository) ArtifactStorageUsage(ctx context.Context) (ArtifactStorageUsage, error) {
+	var usage ArtifactStorageUsage
+	err := repository.database.QueryRowContext(ctx,
+		`SELECT count(*), COALESCE(sum(size_bytes), 0) FROM sourcemap_artifacts WHERE status='ready'`,
+	).Scan(&usage.Count, &usage.Bytes)
+	return usage, err
 }

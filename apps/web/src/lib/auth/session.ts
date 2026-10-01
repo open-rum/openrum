@@ -21,6 +21,8 @@ export class HTTPError extends Error {
     readonly code: string,
     readonly requestId: string,
     message: string,
+    /** The parsed response body, for endpoints that explain a refusal in it. */
+    readonly body?: unknown,
   ) {
     super(message);
   }

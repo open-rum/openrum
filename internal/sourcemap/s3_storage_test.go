@@ -51,3 +51,34 @@ func TestS3StorageRejectsInvalidConfiguration(t *testing.T) {
 		t.Fatalf("err=%v", err)
 	}
 }
+
+func TestS3StorageProbeWarnsWhenDeleteIsForbidden(t *testing.T) {
+	t.Setenv("AWS_ACCESS_KEY_ID", "test-access-key")
+	t.Setenv("AWS_SECRET_ACCESS_KEY", "test-secret")
+	objects := make(map[string][]byte)
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		switch request.Method {
+		case http.MethodPut:
+			objects[request.URL.Path], _ = io.ReadAll(request.Body)
+			writer.Header().Set("ETag", `"probe"`)
+		case http.MethodGet:
+			_, _ = writer.Write(objects[request.URL.Path])
+		case http.MethodDelete:
+			writer.Header().Set("Content-Type", "application/xml")
+			writer.WriteHeader(http.StatusForbidden)
+			_, _ = io.WriteString(writer, `<Error><Code>AccessDenied</Code><Message>denied</Message></Error>`)
+		}
+	}))
+	defer server.Close()
+	storage, err := NewS3Storage(t.Context(), "us-east-1", server.URL, "openrum-test", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	result := storage.Probe(t.Context())
+	if !result.Success || result.ErrorCode != "" || len(result.Warnings) != 1 || result.Warnings[0] != "delete_forbidden" {
+		t.Fatalf("result=%+v", result)
+	}
+	if step := result.Steps[2]; step.Name != "delete" || step.Status != "failed" || step.ErrorCode != "forbidden" {
+		t.Fatalf("delete step=%+v", step)
+	}
+}

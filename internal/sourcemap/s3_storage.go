@@ -113,11 +113,7 @@ func (storage *S3Storage) Probe(ctx context.Context) (result StorageProbeResult)
 		result.ErrorCode = classifyS3ProbeError(ctx, readErr)
 		return result
 	}
-	if cleanup.Status != "passed" {
-		result.ErrorCode = "cleanup_failed"
-		return result
-	}
-	result.Success = true
+	finishProbe(&result, cleanup)
 	return result
 }
 

@@ -98,7 +98,7 @@ const originalPositionSchema = z.object({
   sourceContent: z.string().optional(),
 });
 
-const mappedStackSchema = z.object({
+export const mappedStackSchema = z.object({
   raw: z.string(),
   status: z.enum(["mapped", "partial", "failed"]),
   failure: z.string().optional(),
