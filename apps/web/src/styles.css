@@ -965,6 +965,10 @@ select {
 .analysis-time-popover__calendar-grid {
   --cell-size: 36px;
 }
+/* Holds the calendar's place while its module loads, so the popover does not jump. */
+.analysis-time-popover__calendar-loading {
+  min-height: 19rem;
+}
 .analysis-time-popover__times {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

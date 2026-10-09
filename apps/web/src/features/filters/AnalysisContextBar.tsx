@@ -1,6 +1,8 @@
 /* eslint-disable react-refresh/only-export-components -- shared analysis context and toolbar are one product contract */
 import {
   createContext,
+  lazy,
+  Suspense,
   useCallback,
   useContext,
   useEffect,
@@ -11,9 +13,7 @@ import {
 } from "react";
 import { ArrowLeftIcon, CalendarRangeIcon, CheckIcon, ChevronRightIcon } from "lucide-react";
 import type { DateRange } from "react-day-picker";
-import { zhCN } from "react-day-picker/locale";
 import { Button } from "@/components/ui/button";
-import { Calendar } from "@/components/ui/calendar";
 import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import {
@@ -27,6 +27,8 @@ import {
 import { Separator } from "@/components/ui/separator";
 import type { Project } from "@/lib/api/projects";
 import { cn } from "@/lib/utils";
+
+const RangeCalendar = lazy(() => import("./RangeCalendar"));
 
 const DAY = 24 * 60 * 60 * 1000;
 const MAX_RANGE = 30 * DAY;
@@ -328,16 +330,15 @@ export function AnalysisContextControls({ context }: { context: AnalysisContextV
                 </PopoverHeader>
                 <Separator />
                 <div className="analysis-time-popover__calendar">
-                  <Calendar
-                    mode="range"
-                    selected={dateDraft}
-                    onSelect={(range) => setDateDraft(range ?? { from: undefined, to: undefined })}
-                    numberOfMonths={2}
-                    max={30}
-                    defaultMonth={context.from}
-                    locale={zhCN}
-                    className="analysis-time-popover__calendar-grid"
-                  />
+                  <Suspense fallback={<div className="analysis-time-popover__calendar-loading" />}>
+                    <RangeCalendar
+                      selected={dateDraft}
+                      onSelect={(range) =>
+                        setDateDraft(range ?? { from: undefined, to: undefined })
+                      }
+                      defaultMonth={context.from}
+                    />
+                  </Suspense>
                   <Separator />
                   <FieldGroup className="analysis-time-popover__times">
                     <Field data-invalid={Boolean(customError)}>

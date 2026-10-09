@@ -46,7 +46,8 @@ describe("analysis time filter", () => {
     await user.click(screen.getByRole("button", { name: "自定义" }));
 
     expect(screen.getByText("自定义时间范围")).toBeTruthy();
-    expect(document.querySelector('[data-slot="calendar"]')).toBeTruthy();
+    // The calendar is a separate module that loads when the custom range opens.
+    await waitFor(() => expect(document.querySelector('[data-slot="calendar"]')).toBeTruthy());
     expect(document.querySelectorAll('input[type="time"]')).toHaveLength(2);
 
     await user.click(screen.getByRole("button", { name: "返回快捷时间范围" }));
