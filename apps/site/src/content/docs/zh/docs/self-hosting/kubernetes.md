@@ -72,7 +72,7 @@ ingress:
       secretName: openrum-tls
 ```
 
-如果使用内网镜像仓库，在这份文件中补上 `image.repository: registry.example.com/openrum` 和 `image.tag: "0.1.0"`，版本应与 Chart 匹配。如果仓库是私有的，先在同一命名空间创建镜像拉取 Secret，再添加 `imagePullSecrets: [{ name: your-registry-secret }]`。Chart 会将其传给业务 Deployment、安装前的迁移 Job 和 Helm 测试 Pod。如果集群也无法拉取默认的 `busybox:1.37` 测试镜像，还需覆盖 `smokeTest.image`。
+如果使用内网镜像仓库，在这份文件中补上 `image.repository: registry.example.com/openrum` 和 `image.tag: "0.1.1"`，版本应与 Chart 匹配。如果仓库是私有的，先在同一命名空间创建镜像拉取 Secret，再添加 `imagePullSecrets: [{ name: your-registry-secret }]`。Chart 会将其传给业务 Deployment、安装前的迁移 Job 和 Helm 测试 Pod。如果集群也无法拉取默认的 `busybox:1.37` 测试镜像，还需覆盖 `smokeTest.image`。
 
 `publicBaseURL` 必须是绝对的 `http(s)` URL，在 `appEnv: production` 下还必须是 HTTPS。它是 Console 和 SDK 被告知要使用的源，所以必须填用户真正访问的地址，而不是集群内部的 Service 名。
 
@@ -102,11 +102,11 @@ ingress:
 
 ## 3. 安装
 
-官方 `0.1.0` 版本发布后，可用 OCI Chart 和配套的默认镜像安装：
+官方 `0.1.1` 版本发布后，可用 OCI Chart 和配套的默认镜像安装：
 
 ```sh
 helm upgrade --install openrum oci://ghcr.io/open-rum/charts/openrum \
-  --version 0.1.0 \
+  --version 0.1.1 \
   --namespace openrum --create-namespace \
   --values values.production.yaml \
   --wait --timeout 15m

@@ -49,7 +49,7 @@ test("rejects a tag that differs from the package version", () => {
 });
 
 test("rejects product tags, moving tags and a private package", () => {
-  for (const tag of ["v0.1.0", "latest", "browser-v1.2"]) {
+  for (const tag of ["v0.1.1", "latest", "browser-v1.2"]) {
     const result = check(tag, { SDK_MANIFEST: manifest({}) });
     assert.notEqual(result.status, 0, tag);
     assert.match(result.stderr, /RELEASE_TAG must look like browser-v/);

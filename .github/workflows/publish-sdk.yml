@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "SDK tag to validate without publishing, for example browser-v0.1.0"
+        description: "SDK tag to validate without publishing, for example browser-v0.1.1"
         required: true
         type: string
 

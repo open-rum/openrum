@@ -89,7 +89,7 @@ docker compose --env-file deploy/compose/.env.example \
 在控制台创建项目，将被监控网站的 Origin 加入允许列表，并复制客户端 DSN。对于本地测试页面，可以直接加载当前实例提供的浏览器 SDK：
 
 ```html
-<script src="http://127.0.0.1:4173/api/v1/sdk/browser/0.1.0/openrum.min.js"></script>
+<script src="http://127.0.0.1:4173/api/v1/sdk/browser/0.1.1/openrum.min.js"></script>
 <script>
   OpenRUM.init({
     dsn: "PASTE_YOUR_PROJECT_DSN",

@@ -19,7 +19,7 @@ Browser SDK 向 Ingest 提交有界 Envelope。HTTP 成功表示 Kafka 已持久
 
 ## SDK 分发
 
-Instance 提供版本化 IIFE 构建，当前地址为 `/sdk/browser/0.1.0/openrum.min.js`，在 `window.OpenRUM` 暴露 API。脚本公开、允许 CORS 并缓存一年；修改内容必须发布新版本 URL。
+Instance 提供版本化 IIFE 构建，当前地址为 `/sdk/browser/0.1.1/openrum.min.js`，在 `window.OpenRUM` 暴露 API。脚本公开、允许 CORS 并缓存一年；修改内容必须发布新版本 URL。
 
 ## Console API
 

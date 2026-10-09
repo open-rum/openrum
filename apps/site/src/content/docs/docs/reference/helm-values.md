@@ -17,7 +17,7 @@ fullnameOverride: ""
 
 image:
   repository: ghcr.io/open-rum/openrum
-  tag: "0.1.0"
+  tag: "0.1.1"
   pullPolicy: IfNotPresent
 
 services:

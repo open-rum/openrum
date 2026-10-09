@@ -1,5 +1,5 @@
 // Validates an SDK release tag against the package manifest and reports the npm dist-tag.
-// Tags look like browser-v0.1.0 or browser-v0.1.0-alpha.1; the SDK has its own version
+// Tags look like browser-v0.1.1 or browser-v0.1.1-alpha.1; the SDK has its own version
 // lifecycle, separate from the product's vX.Y.Z tags (see docs/operations/releasing.md).
 import { appendFile, readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
@@ -13,7 +13,7 @@ const match =
   );
 if (!match) {
   throw new Error(
-    `RELEASE_TAG must look like browser-v0.1.0 or browser-v0.1.0-alpha.1; received ${JSON.stringify(tag)}`,
+    `RELEASE_TAG must look like browser-v0.1.1 or browser-v0.1.1-alpha.1; received ${JSON.stringify(tag)}`,
   );
 }
 
