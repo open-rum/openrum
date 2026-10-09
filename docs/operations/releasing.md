@@ -18,13 +18,32 @@ The Chart and release workflow are pinned to `ghcr.io/open-rum`. Before tagging,
 
 Make one release-preparation PR that updates `deploy/helm/openrum/Chart.yaml` (`version` and `appVersion`), `deploy/helm/openrum/values.yaml` (`image.tag`), the public Chinese and English documentation, and any release notes. The product version uses `vX.Y.Z` Git tags; the Chart and image omit the leading `v`. The Browser SDK has its own version and is published by a separate workflow; see [Publish the browser SDK](#publish-the-browser-sdk).
 
+### Where each version number lives
+
+The version is repeated in several places, and the release checks only catch some of them. Change them together in the preparation PR, then search for the old number to find stragglers (for example `git grep -nI "0.1.0" -- . ':!pnpm-lock.yaml'`; ignore application release names such as `storefront@0.1.0` in examples).
+
+| Release                            | Change                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Product `vX.Y.Z` (image and Chart) | `deploy/helm/openrum/Chart.yaml` (`version`, `appVersion`) and `deploy/helm/openrum/values.yaml` (`image.tag`); `check-version.mjs` fails the release if they disagree with the tag. Docs that print the Chart version or `helm install --version` (English and Chinese).                                                                                                                                                                                                                                 |
+| Browser SDK `browser-vX.Y.Z`       | `packages/browser-sdk/package.json` (`version`); `SDK_VERSION` in `packages/browser-sdk/src/transport/sender.ts`; `OPENRUM_BROWSER_SDK_VERSION` in `packages/protocol/src/dsn.ts`; the SDK path constants in `services/api/internal/handlers/browser_sdk.go`; the `appliesTo` front matter and `/sdk/browser/X.Y.Z/` URLs in the SDK docs, English and Chinese. `check-sdk-version.mjs` compares the tag with `package.json`, and `pnpm run sdk:size` compares `package.json` with the protocol constant. |
+
+The npm package is independent of the product, but the script an Instance serves at `/sdk/browser/X.Y.Z/` is built into its image, so Instances only serve a new SDK path after the next product release.
+
 Keep the docs for unreleased features in review until the corresponding artifact is published. The current public docs site shows one current version; the versioned static archive preserves the exact docs built from each tag, but the site does not yet serve archived versions at separate URLs.
 
 Run normal CI on the PR, then use **Publish release → Run workflow** with a version such as `v0.1.1` to run the full release validation without publishing. The dry run checks the version contract, renders and packages the Chart, builds the documentation from the candidate commit, and retains both artifacts for inspection. It does not push images, Chart packages, tags, GitHub Releases, or production deployments.
 
 ## Publish
 
-After the release-preparation PR is merged and the commit is approved, create and push an immutable tag:
+A release is published by pushing a Git tag, from a clone, not from the GitHub web interface. Before tagging:
+
+1. The preparation PR is merged and the `main` commit you are releasing has a green CI run (`gh run list --repo open-rum/openrum --branch main --limit 3`).
+2. The dry run of the workflow you are about to trigger passed on that commit.
+3. Your clone is on that commit: `git checkout main && git pull`. Both release workflows refuse a tag that is not on `main`.
+
+Do not create the tag through **Releases → Draft a new release**. That also creates a GitHub Release, and the workflow deliberately fails when a release for the tag already exists.
+
+Then create and push an immutable tag:
 
 ```sh
 git tag -a v0.1.1 -m "OpenRUM v0.1.1"
@@ -39,6 +58,12 @@ git push origin v0.1.1
 4. Create the GitHub pre-release with generated notes only after the artifacts have been published.
 
 Do not move or republish a public version tag. If publication fails partway through, inspect which versioned artifacts exist before retrying; use a new patch/prerelease version when their contents might differ. Publishing does not run `helm upgrade` against any cluster.
+
+After the workflow finishes:
+
+- Check the artifacts exist: `docker pull ghcr.io/open-rum/openrum:0.1.1` and `helm show chart oci://ghcr.io/open-rum/charts/openrum --version 0.1.1`.
+- The first time, packages created by the workflow are private. Make `openrum` and `charts/openrum` public under the organization's **Packages** settings before telling anyone they can install anonymously.
+- If a `public-release` reviewer is configured, the publish job waits at **Review deployments** until that person approves it.
 
 The mutable Docker registry cache entry only stores intermediate build layers across release tags. It is not an installable product version and must not be used in Helm values.
 
@@ -56,14 +81,14 @@ To release:
 
 1. Bump `version` in `packages/browser-sdk/package.json`, update the SDK docs, and merge to `main`.
 2. Use **Publish browser SDK → Run workflow** with a tag such as `browser-v0.1.1` for a dry run. It checks the tag against the package version, runs lint, type check, tests and the build, then packs the tarball and installs it into an empty project to import it and type-check against it. That last step is what catches a private workspace dependency leaking into the published package. A dry run never publishes.
-3. Push the tag:
+3. Run the same pre-tag checks as for a product release (green `main`, clone on the latest `main`, no GitHub web Release), then push the tag:
 
 ```sh
 git tag -a browser-v0.1.1 -m "@openrum/browser 0.1.1"
 git push origin browser-v0.1.1
 ```
 
-The workflow refuses an existing npm version, publishes with provenance (only while the repository is public; npm cannot sign provenance for a private repository), and reads the version back from the registry. A plain version publishes under `latest`; a prerelease such as `browser-v0.1.1-alpha.1` publishes under `next`, so `npm install @openrum/browser` never picks it up. npm does not allow republishing a version, so fix a bad release with a new patch version.
+The workflow refuses an existing npm version, publishes with provenance (only while the repository is public; npm cannot sign provenance for a private repository), and reads the version back from the registry. A plain version publishes under `latest`; a prerelease such as `browser-v0.1.1-alpha.1` publishes under `next`, so `npm install @openrum/browser` never picks it up. npm does not allow republishing a version, so fix a bad release with a new patch version. When both are released together, push the SDK tag first: the documentation tells readers to `npm install @openrum/browser`, so the package should exist before the product release announces it. Verify with `npm view @openrum/browser@0.1.1 version`.
 
 ## Deploy separately
 
