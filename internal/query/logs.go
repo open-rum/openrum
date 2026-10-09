@@ -9,8 +9,9 @@ import (
 	"time"
 	"unicode"
 
-	"github.com/google/uuid"
 	"openrum/internal/event"
+
+	"github.com/google/uuid"
 )
 
 var ErrInvalidLogFilters = errors.New("invalid log filters or search syntax")
@@ -241,7 +242,7 @@ func (repository *LogRepository) List(ctx context.Context, requested LogFilters)
 	for rows.Next() {
 		var bucket LogBucket
 		if err = rows.Scan(&bucket.Bucket, &bucket.Trace, &bucket.Debug, &bucket.Info, &bucket.Warn, &bucket.Error, &bucket.Fatal); err != nil {
-			rows.Close()
+			_ = rows.Close()
 			return LogPage{}, err
 		}
 		bucket.Bucket = bucket.Bucket.UTC()
@@ -249,7 +250,7 @@ func (repository *LogRepository) List(ctx context.Context, requested LogFilters)
 		result.Trend = append(result.Trend, bucket)
 	}
 	err = rows.Err()
-	rows.Close()
+	_ = rows.Close()
 	if err != nil {
 		return LogPage{}, err
 	}
@@ -265,7 +266,7 @@ func (repository *LogRepository) List(ctx context.Context, requested LogFilters)
 	if err != nil {
 		return LogPage{}, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	for rows.Next() {
 		var item LogEntry
 		if err = rows.Scan(&item.EventID, &item.Timestamp, &item.Level, &item.Message, &item.Logger, &item.Environment, &item.Release,

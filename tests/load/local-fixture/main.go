@@ -11,10 +11,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	"openrum/internal/auth"
 	"openrum/internal/devstack"
 	"openrum/internal/metadata"
+
+	"github.com/google/uuid"
 )
 
 func main() {
@@ -44,7 +45,7 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	if len(os.Args) == 3 && os.Args[1] == "revoke" {
 		projectID, err := uuid.Parse(os.Args[2])
 		if err != nil {
@@ -60,7 +61,7 @@ func run() error {
 		if err != nil {
 			return err
 		}
-		defer tx.Rollback()
+		defer func() { _ = tx.Rollback() }()
 		for _, query := range []string{`UPDATE sessions SET revoked_at=now() WHERE user_id=$1`, `UPDATE users SET status='disabled' WHERE id=$1`} {
 			if _, err = tx.ExecContext(ctx, query, actorID); err != nil {
 				return err

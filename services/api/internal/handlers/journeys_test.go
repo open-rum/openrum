@@ -34,7 +34,7 @@ func TestJourneyHandlerChecksProjectAccess(t *testing.T) {
 	paths, retention := &fakePathQueries{}, &fakeRetentionQueries{}
 	handler := NewJourneyHandler(fakeOverviewProjects{err: metadata.ErrNotFound}, paths, retention, zerolog.Nop())
 	router := journeyTestRouter(handler, uuid.New())
-	request := httptest.NewRequest(http.MethodGet, "/api/v1/projects/"+uuid.NewString()+"/analytics/paths?from=2026-09-01T00:00:00Z&to=2026-09-02T00:00:00Z", nil)
+	request := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/api/v1/projects/"+uuid.NewString()+"/analytics/paths?from=2026-09-01T00:00:00Z&to=2026-09-02T00:00:00Z", nil)
 	request.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "valid"})
 	response := httptest.NewRecorder()
 	router.ServeHTTP(response, request)
@@ -48,7 +48,7 @@ func TestJourneyHandlerRejectsUnboundedPathBeforeQuery(t *testing.T) {
 	handler := NewJourneyHandler(fakeOverviewProjects{}, paths, retention, zerolog.Nop())
 	router := journeyTestRouter(handler, uuid.New())
 	to := time.Date(2026, 9, 3, 0, 0, 0, 0, time.UTC)
-	request := httptest.NewRequest(http.MethodGet, "/api/v1/projects/"+uuid.NewString()+"/analytics/paths?depth=5&topN=20&from="+to.Add(-8*24*time.Hour).Format(time.RFC3339)+"&to="+to.Format(time.RFC3339), nil)
+	request := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/api/v1/projects/"+uuid.NewString()+"/analytics/paths?depth=5&topN=20&from="+to.Add(-8*24*time.Hour).Format(time.RFC3339)+"&to="+to.Format(time.RFC3339), nil)
 	request.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "valid"})
 	response := httptest.NewRecorder()
 	router.ServeHTTP(response, request)

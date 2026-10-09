@@ -1,0 +1,69 @@
+---
+title: 介绍
+description: OpenRUM 是什么、覆盖哪些能力、从哪里开始，以及如何在文档里找到内容。
+appliesTo: Alpha
+---
+
+import { Aside, CardGrid, LinkCard } from "@astrojs/starlight/components";
+
+OpenRUM 是开源、可自托管的前端监控平台。你在自己的基础设施上运行一套**实例**，给 Web 应用接入 Browser SDK，就能在**控制台**里查看用户行为、错误、性能和 API 请求。遥测数据始终留在你自己运维的基础设施里。
+
+它围绕一条排查路径设计：从行为变化或一次失败的会话出发，追到背后的 **Issue**，再定位到需要修复的堆栈帧，中间不用在多个工具之间复制 ID。
+
+## 覆盖哪些能力
+
+| 能力             | 你能得到什么                                                       | 阅读                                                |
+| ---------------- | ------------------------------------------------------------------ | --------------------------------------------------- |
+| 错误与排查       | 按 Issue 聚合 JavaScript 错误，可选的 Source Map 堆栈帧，以及每个错误前后的会话时间线。 | [排查线上问题](/zh/docs/product/investigation/)     |
+| 性能与 API       | Core Web Vitals、路由性能、请求延迟与失败。                        | [性能](/zh/docs/product/performance/)               |
+| 行为分析         | 页面浏览、访客、自定义事件、漏斗、路径与留存。                     | [行为分析](/zh/docs/product/analytics/)             |
+| 日志             | 可按级别、用户和会话检索的结构化浏览器日志。                       | [日志](/zh/docs/product/logs/)                      |
+| 仪表盘与告警     | 项目仪表盘，以及发送到飞书/Lark 或 Webhook 的指标告警。            | [告警](/zh/docs/product/alerts/)                    |
+| 默认保护隐私     | 自动采集不包含原始输入值、请求或响应正文，也不包含请求头。         | [隐私](/zh/docs/self-hosting/security/privacy/)     |
+
+## 从哪里开始
+
+<CardGrid>
+  <LinkCard
+    title="在本地运行"
+    description="用演示数据启动完整服务，或者从源码开发 OpenRUM。"
+    href="/zh/docs/getting-started/local-development/"
+  />
+  <LinkCard
+    title="部署到生产"
+    description="Kubernetes 加 Helm，或者单台 Linux 服务器加 Docker，以及它们需要的数据服务。"
+    href="/zh/docs/self-hosting/overview/"
+  />
+  <LinkCard
+    title="接入应用"
+    description="创建项目、安装 Browser SDK，看到第一个事件到达。"
+    href="/zh/docs/getting-started/create-first-project/"
+  />
+  <LinkCard
+    title="查一个配置项"
+    description="环境变量、SDK 选项、Event schema 和 HTTP API。"
+    href="/zh/docs/reference/configuration/"
+  />
+</CardGrid>
+
+## 速查导航
+
+| 我想……                                | 去这里                                                                   |
+| ------------------------------------- | ------------------------------------------------------------------------ |
+| 在自己电脑上试用                      | [本地开发](/zh/docs/getting-started/local-development/)                    |
+| 为团队部署                            | [部署准备](/zh/docs/getting-started/production-deployment/)              |
+| 升级、备份或排查实例问题              | [运维](/zh/docs/self-hosting/upgrades/)                                  |
+| 配置 Google、GitHub、OIDC 或 LDAP 登录 | [认证配置](/zh/docs/self-hosting/authentication/)                        |
+| 在 Next.js 或 Astro 里接入 SDK        | [Next.js](/zh/docs/sdk/browser/nextjs/) · [Astro](/zh/docs/sdk/browser/astro/)           |
+| 拿到可读的堆栈                        | [Source Map](/zh/docs/sdk/source-maps/)                                  |
+| 了解各部分如何配合                    | [架构](/zh/docs/self-hosting/architecture/)                              |
+| 确认某个术语的含义                    | [术语与核心概念](/zh/docs/reference/glossary/)                       |
+| 修改 OpenRUM 本身                     | [参与贡献](/zh/docs/contributing/)                                       |
+
+## 运行时有什么
+
+一套实例有五个应用服务：控制台 Web 服务、API、Ingest、Consumer 和 Worker。它们使用四个必需依赖：PostgreSQL 保存账号、项目和设置，ClickHouse 保存事件并提供分析查询，Kafka 作为接收缓冲，Redis 提供缓存和限流。对象存储是可选的，只有上传 Source Map 时才需要。事件如何在它们之间流转，见[架构](/zh/docs/self-hosting/architecture/)。
+
+<Aside type="caution" title="Alpha 阶段">
+  OpenRUM 处于 Alpha。第一个稳定版本之前，schema 和 API 都可能变化。接入生产流量前，请完成部署指南中的容量、备份和访问检查。本地压测结果不代表生产容量保证。
+</Aside>

@@ -1,4 +1,5 @@
 import type { ReactElement } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { CheckIcon, PlusIcon, Rows3Icon } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -12,9 +13,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import type { Organization, Project } from "@/lib/api/projects";
+import { getReportedEnvironments, type Organization, type Project } from "@/lib/api/projects";
+import { environmentLabel, projectEnvironments } from "@/lib/projects/environments";
 import { rememberProject } from "@/lib/projects/currentProject";
-import { ProjectPlatformIcon } from "./projectPlatforms";
+import { ProjectPlatformIcon, getProjectPlatform } from "./projectPlatforms";
 
 export function ProjectSwitcher({
   organization,
@@ -34,11 +36,17 @@ export function ProjectSwitcher({
   children: ReactElement;
 }) {
   const navigate = useNavigate();
-  const environments = project?.environments?.length
-    ? project.environments
-    : project
-      ? [project.environment]
-      : [];
+  // Every project accepts the four fixed environments; offer the ones that have data.
+  const reported = useQuery({
+    queryKey: ["reported-environments", project?.id],
+    queryFn: ({ signal }) => getReportedEnvironments(project!.id, signal),
+    enabled: Boolean(project && onEnvironmentChange),
+    staleTime: 60_000,
+  });
+  const reportedNames = new Set(reported.data?.environments.map((item) => item.name));
+  const environments = projectEnvironments
+    .map((item) => item.id)
+    .filter((name) => reportedNames.has(name) || name === currentEnvironment);
 
   return (
     <HoverCard openDelay={120} closeDelay={240}>
@@ -72,7 +80,7 @@ export function ProjectSwitcher({
               <ProjectPlatformIcon platform={item.sdkPlatform} data-icon="inline-start" />
               <span>
                 <strong>{item.name}</strong>
-                <small>{item.slug}</small>
+                <small>{getProjectPlatform(item.sdkPlatform).label}</small>
               </span>
               {item.id === project?.id ? <CheckIcon data-icon="inline-end" /> : null}
             </Button>
@@ -84,7 +92,9 @@ export function ProjectSwitcher({
             <div className="project-hover-card__environment">
               <div className="project-hover-card__environment-heading">
                 <span>环境</span>
-                <small>默认 {formatEnvironmentLabel(project.environment)}</small>
+                <small>
+                  {reported.isSuccess && !environments.length ? "尚无上报数据" : "按上报数据列出"}
+                </small>
               </div>
               <Select
                 value={currentEnvironment ?? "all"}
@@ -137,7 +147,5 @@ export function ProjectSwitcher({
 
 function formatEnvironmentLabel(value?: string) {
   if (!value) return "全部环境";
-  if (value === "production") return "Production";
-  if (value === "test") return "Test";
-  return value;
+  return `${environmentLabel(value)} · ${value}`;
 }

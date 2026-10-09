@@ -12,7 +12,10 @@ export function useIssueFilters(projectId: string) {
     (patch: Partial<Omit<IssueFilters, "projectId">>, mode: "push" | "replace" = "push") => {
       const next = { ...filters, ...patch, projectId };
       const url = new URL(window.location.href);
+      // The shared analysis context owns the relative time preset; keep it across filter edits.
+      const timePreset = url.searchParams.get("timePreset");
       url.search = serializeIssueFilters(next).toString();
+      if (timePreset) url.searchParams.set("timePreset", timePreset);
       window.history[mode === "replace" ? "replaceState" : "pushState"]({}, "", url);
       window.dispatchEvent(new Event("openrum:urlchange"));
     },

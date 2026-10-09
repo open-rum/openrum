@@ -10,7 +10,7 @@ data:
   KAFKA_BROKERS: {{ .Values.config.kafkaBrokers | quote }}
   KAFKA_EVENT_TOPIC: {{ .Values.config.kafkaEventTopic | quote }}
   OPENRUM_KAFKA_RETENTION_DURATION: {{ .Values.config.kafkaRetentionDuration | quote }}
-  REDIS_ADDR: {{ .Values.config.redisAddress | quote }}
+  REDIS_ADDR: {{ include "openrum.redisAddress" . | quote }}
   OPENRUM_STORAGE_PRESSURE_GUARD_ENABLED: {{ .Values.config.storagePressure.guardEnabled | quote }}
   OPENRUM_STORAGE_WARNING_FREE_RATIO: {{ .Values.config.storagePressure.warningFreeRatio | quote }}
   OPENRUM_STORAGE_CRITICAL_FREE_RATIO: {{ .Values.config.storagePressure.criticalFreeRatio | quote }}

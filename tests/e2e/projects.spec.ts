@@ -7,7 +7,7 @@ test("a user with no projects starts in project creation", async ({ page }) => {
 
   await expect(page).toHaveURL(/\/projects\/new$/);
   await expect(page.getByRole("heading", { name: "创建监控项目" })).toBeVisible();
-  await expect(page.getByRole("radio", { name: "React" })).toBeVisible();
+  await expect(page.getByRole("combobox", { name: "开发平台" })).toHaveText(/JavaScript/);
 });
 
 test("project creation keeps the selected platform and opens its onboarding recipe", async ({
@@ -17,8 +17,8 @@ test("project creation keeps the selected platform and opens its onboarding reci
   await page.goto("/projects/new");
 
   await page.getByLabel("项目名称").fill("Vue Store");
-  await page.getByLabel("项目 Slug").fill("vue-store");
-  await page.getByRole("radio", { name: "Vue" }).click();
+  await page.getByRole("combobox", { name: "开发平台" }).click();
+  await page.getByRole("option", { name: "Vue" }).click();
   await page.getByLabel("允许的 Origin").fill("https://store.example.com");
   await page.getByRole("button", { name: "创建项目" }).click();
 

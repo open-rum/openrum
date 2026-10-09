@@ -20,6 +20,7 @@ Source Map 和通知渠道凭据是敏感资产。项目 ID 与组织 ID 本身�
 | 解压/解析耗尽 | 压缩和原始字节上限、压缩比上限、单 Gzip Member | Bomb 测试 |
 | Webhook SSRF | 仅 HTTPS、请求与跳转前验证公网 IP、禁用 Proxy、HMAC、加密配置 | 安全测试 |
 | Source Map 篡改 | 作用域不可变 Key、预期大小/SHA-256、私有 Bucket | Artifact 测试 |
+| 上传令牌滥用 | 按项目签发并哈希存储、仅能上传和列出、不能删除、可吊销、显示最近使用时间 | 上传令牌鉴权测试 |
 | 队列/数据库故障 | `acks=all` 后成功、写入前不提交 Offset、有界重试与背压 | Pipeline/Runbook |
 
 ## 安全不变量

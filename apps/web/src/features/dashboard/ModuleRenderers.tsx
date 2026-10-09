@@ -1,9 +1,9 @@
-import { lazy, Suspense, useEffect, useId, useRef, useState } from "react";
-import { Skeleton } from "@/components/ui/skeleton";
-import { countryMapLabel } from "@/components/world-map/data";
+import { useEffect, useId, useRef, useState } from "react";
+import { countryGroupLabel } from "@/features/filters/dimensionLabels";
 import {
   Area,
   Bar,
+  BarStack,
   CartesianGrid,
   ComposedChart,
   Line,
@@ -12,6 +12,7 @@ import {
   YAxis,
 } from "recharts";
 import {
+  BAR_RADIUS_TOP,
   ChartContainer,
   ChartLegend,
   ChartLegendContent,
@@ -29,9 +30,10 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useChartMotion } from "@/lib/charts/useChartMotion";
+import { observeElementWidth } from "@/lib/charts/useChartWidth";
 import { smoothCurve } from "@/lib/charts/smoothCurve";
+import { COMPARISON_DASH, COMPARISON_STROKE } from "@/lib/charts/palette";
 import { TopIssuesContent } from "@/features/overview/TopIssues";
-import { SlowApisContent } from "@/features/overview/SlowApis";
 import { chartTicks, intervalLabel, timeTickLabel } from "./chartDensity";
 import { formatMetric, formatDetailedMetric, type AdaptedData, type PlotData } from "./adapters";
 import type { Widget } from "./model";
@@ -40,6 +42,7 @@ import { StatTrend } from "./StatTrend";
 import { isolatedDot } from "./isolatedDot";
 import { DonutDistribution } from "./DonutDistribution";
 import { CategoryRanking } from "./CategoryRanking";
+import { MetricTable, RankedTable } from "./CatalogTables";
 
 export type ModuleRenderProps = {
   widget: Widget;
@@ -50,11 +53,6 @@ export type ModuleRenderProps = {
   showInterval?: boolean;
 };
 
-const WorldMap = lazy(() =>
-  import("@/components/WorldMap").then((module) => ({ default: module.WorldMap })),
-);
-const formatCountryValue = (value: number) => formatDetailedMetric(value, "count");
-
 export function StatRenderer({ widget, data }: ModuleRenderProps) {
   if (data.kind !== "scalar") return null;
   const summary = (
@@ -62,19 +60,28 @@ export function StatRenderer({ widget, data }: ModuleRenderProps) {
       <strong className="text-3xl font-semibold tracking-tight tabular-nums">
         {formatMetric(data.value, data.unit)}
       </strong>
-      <ModuleComparison widget={widget} data={data} />
     </div>
   );
+  const comparison = <ModuleComparison widget={widget} data={data} variant="corner" />;
   const appearance = widget.statAppearance ?? "plain";
-  if (appearance === "plain") return summary;
+  if (appearance === "plain")
+    return (
+      <>
+        {summary}
+        {comparison}
+      </>
+    );
   return (
-    <div
-      data-stat-appearance={appearance}
-      className="grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,0.8fr)] items-center gap-3"
-    >
-      {summary}
-      <StatTrend data={data.trend} appearance={appearance} />
-    </div>
+    <>
+      <div
+        data-stat-appearance={appearance}
+        className="grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,0.8fr)] items-center gap-3"
+      >
+        {summary}
+        <StatTrend data={data.trend} appearance={appearance} />
+      </div>
+      {comparison}
+    </>
   );
 }
 
@@ -84,7 +91,8 @@ export function PlotRenderer({
   detailed = false,
   showTable = detailed,
   showNotes = detailed,
-  showInterval = true,
+  // Cards stay uncluttered; the aggregation interval is listed in 详细.
+  showInterval = false,
 }: ModuleRenderProps) {
   const gradientId = `module-${useId().replace(/:/g, "")}`;
   const animate = useChartMotion();
@@ -94,9 +102,7 @@ export function PlotRenderer({
   useEffect(() => {
     const element = container.current;
     if (!element) return;
-    const observer = new ResizeObserver(([entry]) => setWidth(entry.contentRect.width));
-    observer.observe(element);
-    return () => observer.disconnect();
+    return observeElementWidth(element, setWidth);
   }, [empty, widget.view]);
   if (data.kind !== "series" && data.kind !== "categories") return null;
   if (data.empty || !data.rows.length)
@@ -109,6 +115,7 @@ export function PlotRenderer({
       </Empty>
     );
   const categories = data.kind === "categories";
+  const currentSeries = data.series.filter((series) => series.role !== "previous");
   const unit = data.series[0].unit;
   const config: ChartConfig = Object.fromEntries(
     data.series.map((series) => [
@@ -137,21 +144,6 @@ export function PlotRenderer({
             />
           ) : null}
         </>
-      ) : widget.view === "map" ? (
-        <>
-          <Suspense fallback={<Skeleton className="h-64 w-full" aria-label="正在加载世界地图" />}>
-            <WorldMap
-              title={widget.title}
-              metricLabel={data.series[0].label}
-              formatValue={formatCountryValue}
-              data={data.rows.map((row) => ({
-                code: String(row.label),
-                value: Number(row[data.series[0].key]),
-              }))}
-            />
-          </Suspense>
-          {showTable ? <PlotTable data={data} title={widget.title} countryLabels /> : null}
-        </>
       ) : widget.view === "table" ? (
         <PlotTable data={data} title={widget.title} />
       ) : categories && widget.view === "bar" ? (
@@ -160,7 +152,7 @@ export function PlotRenderer({
         <>
           <ChartContainer
             config={config}
-            className={detailed ? "h-80 w-full sm:h-96" : "h-64 w-full"}
+            className={detailed ? "h-80 w-full sm:h-96" : "h-64 w-full min-[1680px]:h-72"}
             initialDimension={{ width: 600, height: 256 }}
             aria-label={widget.title}
           >
@@ -259,40 +251,86 @@ export function PlotRenderer({
                   />
                 </>
               ) : null}
-              {data.series.map((series, index) =>
-                widget.view === "bar" ? (
-                  <Bar
-                    key={series.key}
-                    dataKey={series.key}
-                    fill={series.color}
-                    radius={3}
-                    maxBarSize={categories ? 16 : 32}
-                    isAnimationActive={animate}
-                  />
-                ) : widget.view === "line" || index > 0 ? (
+              {/* The previous period sits behind the current one, dashed in the comparison
+                  colour, so it reads as context rather than a second series. */}
+              {data.series
+                .filter((series) => series.role === "previous")
+                .map((series) => (
                   <Line
                     key={series.key}
                     dataKey={series.key}
                     {...smoothCurve}
-                    stroke={series.ink}
-                    strokeWidth={2}
-                    dot={isolatedDot(data, series.key, series.ink)}
-                    connectNulls={false}
-                    isAnimationActive={animate}
-                  />
-                ) : (
-                  <Area
-                    key={series.key}
-                    dataKey={series.key}
-                    {...smoothCurve}
-                    stroke={series.ink}
-                    fill={`url(#${gradientId}-${index})`}
+                    stroke={COMPARISON_STROKE}
+                    strokeDasharray={COMPARISON_DASH}
                     strokeWidth={1.5}
-                    dot={isolatedDot(data, series.key, series.ink)}
+                    dot={isolatedDot(data, series.key, COMPARISON_STROKE)}
+                    activeDot={false}
                     connectNulls={false}
                     isAnimationActive={animate}
                   />
-                ),
+                ))}
+              {data.stacked && widget.view === "stacked-bar" ? (
+                <BarStack stackId="total" radius={BAR_RADIUS_TOP}>
+                  {currentSeries.map((series) => (
+                    <Bar
+                      key={series.key}
+                      dataKey={series.key}
+                      fill={series.color}
+                      maxBarSize={32}
+                      isAnimationActive={animate}
+                    />
+                  ))}
+                </BarStack>
+              ) : (
+                currentSeries.map((series, index) =>
+                  data.stacked ? (
+                    <Area
+                      key={series.key}
+                      dataKey={series.key}
+                      stackId="total"
+                      {...smoothCurve}
+                      stroke={series.ink}
+                      fill={series.color}
+                      fillOpacity={0.35}
+                      strokeWidth={1}
+                      dot={false}
+                      connectNulls={false}
+                      isAnimationActive={animate}
+                    />
+                  ) : widget.view === "bar" ? (
+                    <Bar
+                      key={series.key}
+                      dataKey={series.key}
+                      fill={series.color}
+                      radius={BAR_RADIUS_TOP}
+                      maxBarSize={categories ? 16 : 32}
+                      isAnimationActive={animate}
+                    />
+                  ) : widget.view === "line" || index > 0 ? (
+                    <Line
+                      key={series.key}
+                      dataKey={series.key}
+                      {...smoothCurve}
+                      stroke={series.ink}
+                      strokeWidth={2}
+                      dot={isolatedDot(data, series.key, series.ink)}
+                      connectNulls={false}
+                      isAnimationActive={animate}
+                    />
+                  ) : (
+                    <Area
+                      key={series.key}
+                      dataKey={series.key}
+                      {...smoothCurve}
+                      stroke={series.ink}
+                      fill={`url(#${gradientId}-${index})`}
+                      strokeWidth={1.5}
+                      dot={isolatedDot(data, series.key, series.ink)}
+                      connectNulls={false}
+                      isAnimationActive={animate}
+                    />
+                  ),
+                )
               )}
               {data.series.length > 1 ? <ChartLegend content={<ChartLegendContent />} /> : null}
             </ComposedChart>
@@ -348,7 +386,7 @@ export function PlotTable({
                 {data.kind === "series"
                   ? new Date(String(row.label)).toLocaleString("zh-CN")
                   : countryLabels
-                    ? countryMapLabel(String(row.label))
+                    ? countryGroupLabel(String(row.label))
                     : row.label}
               </TableCell>
               {data.series.map((s) => (
@@ -368,9 +406,18 @@ export function PlotTable({
   );
 }
 
+export function TableRenderer({ widget, data, detailed = false }: ModuleRenderProps) {
+  if (data.kind === "ranked")
+    return (
+      <RankedTable data={data} title={widget.title} filters={data.filters} detailed={detailed} />
+    );
+  if (data.kind === "matrix")
+    return <MetricTable data={data} title={widget.title} detailed={detailed} />;
+  return null;
+}
+
 export function ListRenderer({ data }: ModuleRenderProps) {
   if (data.kind === "issues")
     return <TopIssuesContent issues={data.issues} filters={data.filters} />;
-  if (data.kind === "apis") return <SlowApisContent apis={data.apis} filters={data.filters} />;
   return null;
 }

@@ -7,7 +7,7 @@ import { chromium } from "@playwright/test";
 const origin = "http://127.0.0.1:4323";
 const routes = [
   ["Landing", "/"],
-  ["Quickstart", "/docs/getting-started/quickstart/"],
+  ["Introduction", "/docs/introduction/"],
   ["SDK install", "/docs/sdk/browser/"],
   ["Self-host", "/self-host/"],
 ];

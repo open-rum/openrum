@@ -17,7 +17,8 @@ test("Alpha demo connects a behavior funnel to a mapped error source", async ({ 
   await expect(
     page.getByRole("heading", { name: "TypeError: checkout amount is undefined" }),
   ).toBeVisible();
-  await expect(page.getByText("已映射")).toBeVisible();
-  await page.getByRole("tab", { name: "映射源码" }).click();
-  await expect(page.getByText("src/checkout/submit.ts:4:11")).toBeVisible();
+  await expect(page.getByText("已还原源码")).toBeVisible();
+  const frames = page.getByRole("list", { name: "映射后的调用帧" });
+  await expect(frames.getByText("src/checkout/submit.ts").first()).toBeVisible();
+  await expect(frames.getByText("4:11").first()).toBeVisible();
 });

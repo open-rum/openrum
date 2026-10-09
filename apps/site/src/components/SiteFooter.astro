@@ -5,14 +5,14 @@ const { lang = "en" } = Astro.props;
 const zh = lang === "zh";
 const release = import.meta.env.PUBLIC_OPENRUM_RELEASE || "Alpha";
 const commit = import.meta.env.PUBLIC_COMMIT_SHA || "local";
-const repository = import.meta.env.PUBLIC_REPOSITORY_URL || "https://github.com/openrum/openrum";
+const repository = import.meta.env.PUBLIC_REPOSITORY_URL || "https://github.com/open-rum/openrum";
 ---
 
 <footer class="site-footer">
   <div class="site-container footer-grid">
     <div>
       <a class="site-brand" aria-label="OpenRUM" href={zh ? "/zh/" : "/"}
-        ><span class="brand-mark"><BrandMark size={28} /></span><BrandWordmark /></a
+        ><span class="brand-mark"><BrandMark /></span><BrandWordmark /></a
       ><p class="footer-meta">
         {
           zh
@@ -24,8 +24,8 @@ const repository = import.meta.env.PUBLIC_REPOSITORY_URL || "https://github.com/
       </p>
     </div><div class="footer-links">
       <a href="/design/">Design</a>
-      <a href={zh ? "/zh/docs/getting-started/quickstart/" : "/docs/getting-started/quickstart/"}
-        >{zh ? "快速开始" : "Quickstart"}</a
+      <a href={zh ? "/zh/docs/introduction/" : "/docs/introduction/"}
+        >{zh ? "快速开始" : "Get started"}</a
       ><a href={`${repository}/issues`}>Issues</a><a href={`${repository}/security`}>Security</a><a
         href={repository}>GitHub</a
       >

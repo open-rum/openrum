@@ -16,6 +16,7 @@ func TestRoleMatrix(t *testing.T) {
 		{ActionResolveIssue, map[metadata.OrganizationRole]bool{metadata.RoleOwner: true, metadata.RoleAdmin: true, metadata.RoleMember: true}},
 		{ActionManageReleases, map[metadata.OrganizationRole]bool{metadata.RoleOwner: true, metadata.RoleAdmin: true, metadata.RoleMember: true}},
 		{ActionManageKeys, map[metadata.OrganizationRole]bool{metadata.RoleOwner: true, metadata.RoleAdmin: true}},
+		{ActionManageChannels, map[metadata.OrganizationRole]bool{metadata.RoleOwner: true, metadata.RoleAdmin: true}},
 		{ActionManageAlerts, map[metadata.OrganizationRole]bool{metadata.RoleOwner: true, metadata.RoleAdmin: true, metadata.RoleMember: true}},
 		{ActionManageMembers, map[metadata.OrganizationRole]bool{metadata.RoleOwner: true, metadata.RoleAdmin: true}},
 		{ActionConfigureOIDC, map[metadata.OrganizationRole]bool{metadata.RoleOwner: true}},

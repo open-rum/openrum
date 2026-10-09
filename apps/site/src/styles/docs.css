@@ -46,7 +46,7 @@
    its siblings by weight and the caret alone. Same visual weight, different affordance. */
 #starlight__sidebar summary {
   padding: 0.5rem;
-  border-radius: 0.5rem;
+  border-radius: var(--radius-field);
 }
 #starlight__sidebar summary:hover {
   background: var(--ds-surface-subtle);
@@ -84,7 +84,7 @@
   font-size: 0.875rem;
   font-weight: 400;
   padding-block: 0.5rem;
-  border-radius: 0.5rem;
+  border-radius: var(--radius-field);
 }
 #starlight__sidebar a[aria-current="page"] {
   font-weight: 600;
@@ -119,16 +119,19 @@
 }
 
 /* Keep this unlayered to match the global anchor reset. Only prose links use
-   underlines; Starlight's heading anchors and LinkCards retain native styles. */
+   underlines; Starlight's heading anchors and LinkCards retain native styles.
+   Prose links take the palette's ink role rather than its fill: amber, lime and
+   magenta fills are too light to read as text on the light theme, while each `-ink`
+   value is held at 4.5:1 or better against the canvas by `tests/tokens.test.mjs`. */
 .sl-markdown-content a:not(:where(.not-content *, .sl-anchor-link, .sl-link-card *)) {
-  color: color-mix(in oklch, var(--ds-secondary), var(--ds-text) 25%);
+  color: var(--ds-primary-ink);
   text-decoration: underline;
   text-decoration-thickness: 1px;
   text-underline-offset: 0.2em;
   text-decoration-color: color-mix(in oklch, currentColor, transparent 55%);
 }
 .sl-markdown-content a:hover:not(:where(.not-content *, .sl-anchor-link, .sl-link-card *)) {
-  color: color-mix(in oklch, var(--ds-secondary), var(--ds-text) 25%);
+  color: var(--ds-primary-ink);
   text-decoration-color: currentColor;
 }
 
@@ -150,4 +153,40 @@
   font-size: 0.75rem;
   font-weight: 650;
   pointer-events: none;
+}
+
+/* Starlight caps prose at 45rem and, when there is spare room, splits it between the
+   article and the "On this page" column, so the article hugged the table of contents
+   and the TOC drifted towards the middle on wide screens. Docs pages instead give
+   the article up to 1200px centred in the space between the two sidebars, and pin
+   the table of contents to the right edge at its own width. */
+@media (min-width: 72rem) {
+  :root[data-has-sidebar] {
+    --sl-content-width: 75rem;
+  }
+  .right-sidebar-container {
+    width: var(--sl-sidebar-width);
+  }
+  :root[data-has-sidebar][data-has-toc] .main-pane {
+    --sl-content-margin-inline: auto;
+    width: calc(100% - var(--sl-sidebar-width));
+  }
+}
+
+/* Match the shared Maia controls while keeping Starlight's mobile search full-screen. */
+site-search button[data-open-modal],
+#starlight__search .pagefind-ui__search-input {
+  border-radius: var(--radius-control);
+}
+#starlight__search {
+  --sl-search-corners: var(--radius-field);
+}
+.sl-link-card,
+.pagination-links a {
+  border-radius: var(--radius-surface);
+}
+@media (min-width: 50rem) {
+  site-search dialog {
+    border-radius: var(--radius-overlay);
+  }
 }

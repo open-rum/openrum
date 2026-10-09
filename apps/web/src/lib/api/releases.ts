@@ -1,8 +1,13 @@
 import { z } from "zod";
 import { csrfHeaders } from "@/lib/auth/session";
-import { requestJSON } from "./client";
+import { requestJSON, requestJSONWithStatus, requestNoContent } from "./client";
+import { mappedStackSchema } from "./issues";
 
 const isoTime = z.iso.datetime({ offset: true });
+
+/** Server-side ceiling for one Source Map artifact (sourcemap.MaxMapBytes, 64 MiB). */
+export const MAX_ARTIFACT_BYTES = 64 * 1024 * 1024;
+
 export const releaseSchema = z.object({
   id: z.string(),
   projectId: z.string(),
@@ -12,6 +17,8 @@ export const releaseSchema = z.object({
   deployedAt: isoTime.nullable().optional(),
   createdAt: isoTime,
   updatedAt: isoTime,
+  artifactCount: z.number().int().nonnegative().default(0),
+  readyCount: z.number().int().nonnegative().default(0),
 });
 export const artifactSchema = z.object({
   id: z.string(),
@@ -23,108 +30,177 @@ export const artifactSchema = z.object({
   createdAt: isoTime,
   updatedAt: isoTime,
 });
-const mappedStackSchema = z.object({
-  raw: z.string(),
-  status: z.enum(["mapped", "partial", "failed"]),
-  failure: z.string().optional(),
-  frames: z.array(
-    z.object({
-      function: z.string().optional(),
-      url: z.string(),
-      line: z.number().int(),
-      column: z.number().int(),
-      failure: z.string().optional(),
-      original: z
-        .object({
-          source: z.string(),
-          function: z.string().optional(),
-          line: z.number().int(),
-          column: z.number().int(),
-          sourceContent: z.string().optional(),
-        })
-        .optional(),
-    }),
-  ),
+const releasePageSchema = z.object({
+  releases: z.array(releaseSchema),
+  nextCursor: z.string().nullable().optional(),
 });
+const sourceMapStatusSchema = z.object({
+  storage: z.enum(["ready", "not_configured", "unavailable"]),
+  maxArtifactBytes: z.number().int().positive().default(MAX_ARTIFACT_BYTES),
+  remapWindowDays: z.number().int().positive().default(7),
+  // False when storage refuses deletes: deleting files leaves them in the bucket.
+  deleteAllowed: z.boolean().default(true),
+});
+const presignSchema = z.union([
+  z.object({ artifact: artifactSchema, skipped: z.literal(true) }),
+  z.object({
+    artifact: artifactSchema,
+    skipped: z.literal(false).optional(),
+    uploadUrl: z.string().url(),
+    method: z.string(),
+    headers: z.record(z.string(), z.string()),
+    expiresAt: isoTime,
+  }),
+]);
+
 export type Release = z.infer<typeof releaseSchema>;
+export type ReleasePage = z.infer<typeof releasePageSchema>;
 export type Artifact = z.infer<typeof artifactSchema>;
 export type SourceMapMatch = z.infer<typeof mappedStackSchema>;
+export type SourceMapStatus = z.infer<typeof sourceMapStatusSchema>;
+export type PresignResult = z.infer<typeof presignSchema>;
 
-export function listReleases(projectId: string, signal?: AbortSignal) {
+function projectPath(projectId: string) {
+  return `/api/v1/projects/${encodeURIComponent(projectId)}`;
+}
+function releasePath(projectId: string, releaseId: string) {
+  return `${projectPath(projectId)}/releases/${encodeURIComponent(releaseId)}`;
+}
+function jsonHeaders() {
+  return { "Content-Type": "application/json", ...csrfHeaders() };
+}
+
+export function listReleases(
+  projectId: string,
+  options: { q?: string; cursor?: string; limit?: number } = {},
+  signal?: AbortSignal,
+) {
+  const parameters = new URLSearchParams({ limit: String(options.limit ?? 20) });
+  if (options.q) parameters.set("q", options.q);
+  if (options.cursor) parameters.set("cursor", options.cursor);
   return requestJSON(
-    z.object({ releases: z.array(releaseSchema) }),
-    `/api/v1/projects/${encodeURIComponent(projectId)}/releases`,
+    releasePageSchema,
+    `${projectPath(projectId)}/releases?${parameters.toString()}`,
     { signal },
   );
 }
-export function createRelease(
+
+/** Idempotent: an existing (version, dist) comes back with `created: false`. */
+export async function createRelease(
   projectId: string,
   input: { version: string; dist: string; commitSha: string },
 ) {
-  return requestJSON(releaseSchema, `/api/v1/projects/${encodeURIComponent(projectId)}/releases`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", ...csrfHeaders() },
-    body: JSON.stringify({ ...input, deployedAt: new Date().toISOString() }),
+  const { data, status } = await requestJSONWithStatus(
+    releaseSchema,
+    `${projectPath(projectId)}/releases`,
+    {
+      method: "POST",
+      headers: jsonHeaders(),
+      // Registering a release is not deploying it; the list shows "登记于" until a
+      // deploy time is reported.
+      body: JSON.stringify(input),
+    },
+  );
+  return { release: data, created: status === 201 };
+}
+
+function deleteRequest(path: string, fallback: string) {
+  return requestNoContent(path, { method: "DELETE", headers: csrfHeaders() }, fallback);
+}
+
+export function deleteRelease(projectId: string, releaseId: string) {
+  return deleteRequest(releasePath(projectId, releaseId), "删除版本失败，请稍后重试。");
+}
+
+export function getSourceMapStatus(projectId: string, signal?: AbortSignal) {
+  return requestJSON(sourceMapStatusSchema, `${projectPath(projectId)}/sourcemaps/status`, {
+    signal,
   });
 }
+
 export function listArtifacts(projectId: string, releaseId: string, signal?: AbortSignal) {
   return requestJSON(
     z.object({ artifacts: z.array(artifactSchema) }),
-    `/api/v1/projects/${encodeURIComponent(projectId)}/releases/${encodeURIComponent(releaseId)}/artifacts`,
+    `${releasePath(projectId, releaseId)}/artifacts`,
     { signal },
   );
 }
-export async function uploadArtifact(projectId: string, releaseId: string, file: File) {
-  const sha256 = [
-    ...new Uint8Array(await crypto.subtle.digest("SHA-256", await file.arrayBuffer())),
-  ]
-    .map((value) => value.toString(16).padStart(2, "0"))
-    .join("");
-  const grant = await requestJSON(
-    z.object({
-      artifact: artifactSchema,
-      uploadUrl: z.string().url(),
-      method: z.string(),
-      headers: z.record(z.string(), z.string()),
-      expiresAt: isoTime,
-    }),
-    `/api/v1/projects/${encodeURIComponent(projectId)}/releases/${encodeURIComponent(releaseId)}/artifacts/presign`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json", ...csrfHeaders() },
-      body: JSON.stringify({ artifactName: file.name, sha256, sizeBytes: file.size }),
-    },
-  );
-  const uploaded = await fetch(grant.uploadUrl, {
-    method: grant.method,
-    headers: grant.headers,
-    body: file,
+
+export function presignArtifact(
+  projectId: string,
+  releaseId: string,
+  input: { artifactName: string; sha256: string; sizeBytes: number; replace?: boolean },
+) {
+  return requestJSON(presignSchema, `${releasePath(projectId, releaseId)}/artifacts/presign`, {
+    method: "POST",
+    headers: jsonHeaders(),
+    body: JSON.stringify(input),
   });
-  if (!uploaded.ok) throw new Error(`OSS upload failed (${uploaded.status})`);
+}
+
+export function completeArtifact(projectId: string, releaseId: string, artifactId: string) {
   return requestJSON(
     artifactSchema,
-    `/api/v1/projects/${encodeURIComponent(projectId)}/releases/${encodeURIComponent(releaseId)}/artifacts/${encodeURIComponent(grant.artifact.id)}/complete`,
+    `${releasePath(projectId, releaseId)}/artifacts/${encodeURIComponent(artifactId)}/complete`,
     { method: "POST", headers: csrfHeaders() },
   );
 }
-export async function deleteArtifact(projectId: string, releaseId: string, artifactId: string) {
-  const response = await fetch(
-    `/api/v1/projects/${encodeURIComponent(projectId)}/releases/${encodeURIComponent(releaseId)}/artifacts/${encodeURIComponent(artifactId)}`,
-    { method: "DELETE", credentials: "same-origin", headers: csrfHeaders() },
-  );
-  if (!response.ok) throw new Error("删除 Source Map 失败");
+
+/** Failure of the direct PUT to object storage; status 0 means the request never got a response. */
+export class ObjectUploadError extends Error {
+  constructor(readonly status: number) {
+    super(status ? `对象存储返回 HTTP ${status}` : "无法连接对象存储");
+  }
 }
+
+/** PUTs bytes straight to the presigned URL with XMLHttpRequest so upload progress is observable. */
+export function putArtifactBytes(
+  grant: { uploadUrl: string; method: string; headers: Record<string, string> },
+  file: Blob,
+  onProgress: (fraction: number) => void,
+) {
+  return new Promise<void>((resolve, reject) => {
+    const request = new XMLHttpRequest();
+    request.open(grant.method || "PUT", grant.uploadUrl);
+    for (const [name, value] of Object.entries(grant.headers)) {
+      // Browsers set these themselves and throw on attempts to override them.
+      if (/^(content-length|host)$/i.test(name)) continue;
+      request.setRequestHeader(name, value);
+    }
+    request.upload.onprogress = (event) => {
+      if (event.lengthComputable && event.total > 0) onProgress(event.loaded / event.total);
+    };
+    request.onload = () => {
+      if (request.status >= 200 && request.status < 300) {
+        onProgress(1);
+        resolve();
+      } else reject(new ObjectUploadError(request.status));
+    };
+    request.onerror = () => reject(new ObjectUploadError(0));
+    request.onabort = () => reject(new ObjectUploadError(0));
+    request.send(file);
+  });
+}
+
+export async function sha256Hex(file: Blob) {
+  const digest = await crypto.subtle.digest("SHA-256", await file.arrayBuffer());
+  return [...new Uint8Array(digest)].map((value) => value.toString(16).padStart(2, "0")).join("");
+}
+
+export function deleteArtifact(projectId: string, releaseId: string, artifactId: string) {
+  return deleteRequest(
+    `${releasePath(projectId, releaseId)}/artifacts/${encodeURIComponent(artifactId)}`,
+    "删除 Source Map 失败，请稍后重试。",
+  );
+}
+
 export function testSourceMap(
   projectId: string,
   input: { release: string; dist: string; stack: string },
 ) {
-  return requestJSON(
-    mappedStackSchema,
-    `/api/v1/projects/${encodeURIComponent(projectId)}/sourcemaps/test`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json", ...csrfHeaders() },
-      body: JSON.stringify(input),
-    },
-  );
+  return requestJSON(mappedStackSchema, `${projectPath(projectId)}/sourcemaps/test`, {
+    method: "POST",
+    headers: jsonHeaders(),
+    body: JSON.stringify(input),
+  });
 }

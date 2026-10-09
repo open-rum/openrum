@@ -1,0 +1,44 @@
+---
+title: React
+description: Initialize the OpenRUM browser SDK once in a Vite-built React app.
+appliesTo: "@openrum/browser 0.1.1"
+---
+
+Before you start, install the SDK and copy the Project's DSN as described in the
+[Browser SDK overview](/docs/sdk/browser/#initialize). Add your app's origin to the Project's
+allowed origins.
+
+## Initialize
+
+```ts title="src/monitoring.ts"
+import { init } from "@openrum/browser";
+
+init({
+  dsn: import.meta.env.VITE_OPENRUM_DSN,
+  environment: import.meta.env.MODE,
+  release: import.meta.env.VITE_APP_RELEASE,
+});
+```
+
+```ts title="src/main.tsx"
+import "./monitoring.ts";
+import { createRoot } from "react-dom/client";
+```
+
+Importing the module for its side effect keeps initialization out of a component, so it
+cannot run twice under Strict Mode or on a re-render. Client-side navigations are captured
+without extra wiring, because React Router navigates through `history.pushState`.
+
+## Run the example
+
+A runnable version lives at `examples/react-vite`:
+
+```sh
+cp examples/react-vite/.env.example examples/react-vite/.env.local
+pnpm --filter @openrum/example-react-vite dev
+```
+
+## Next steps
+
+- [Verify](/docs/sdk/browser/#verify) that capture, ingest and aggregation agree.
+- Upload [Source Maps for React (Vite)](/docs/sdk/source-maps/react/) so production errors map back to source.

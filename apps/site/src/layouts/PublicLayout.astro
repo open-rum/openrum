@@ -3,13 +3,22 @@ import "../styles/global.css";
 import SiteHeader from "../components/SiteHeader.astro";
 import SiteFooter from "../components/SiteFooter.astro";
 import PaletteBootstrap from "../components/PaletteBootstrap.astro";
-const { title, description, lang = "en" } = Astro.props;
+import SitePaletteBootstrap from "../components/SitePaletteBootstrap.astro";
+// `landing` renders the page without the shared header and footer, fixed to the dark
+// landing palettes; the home page brings its own chrome.
+const { title, description, lang = "en", landing = false } = Astro.props;
 const canonical = new URL(Astro.url.pathname, Astro.site);
 const image = new URL("/og.svg", Astro.site);
 ---
 
 <!doctype html>
-<html lang={lang === "zh" ? "zh-CN" : "en"}>
+<html
+  lang={lang === "zh" ? "zh-CN" : "en"}
+  class={landing ? "dark" : undefined}
+  data-theme={landing ? "dark" : undefined}
+  data-landing={landing ? "" : undefined}
+  data-palette="amber"
+>
   <head
     ><meta charset="UTF-8" /><meta name="viewport" content="width=device-width" /><title>
       {title}
@@ -25,10 +34,20 @@ const image = new URL("/og.svg", Astro.site);
     /><link rel="icon" href="/favicon.svg" type="image/svg+xml" /><meta
       name="twitter:card"
       content="summary_large_image"
-    /><PaletteBootstrap manageTheme /></head
+    /><PaletteBootstrap manageTheme={!landing} /><SitePaletteBootstrap /></head
   ><body
-    ><a class="sr-only" href="#main-content">Skip to content</a><SiteHeader
-      lang={lang}
-      path={Astro.url.pathname}
-    /><main id="main-content"><slot /></main><SiteFooter lang={lang} /></body>
+    ><a class="sr-only" href="#main-content">Skip to content</a>{
+      landing ? (
+        <slot />
+      ) : (
+        <>
+          <SiteHeader lang={lang} path={Astro.url.pathname} />
+          <main id="main-content">
+            <slot />
+          </main>
+          <SiteFooter lang={lang} />
+        </>
+      )
+    }</body
+  >
 </html>

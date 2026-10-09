@@ -1,0 +1,57 @@
+---
+title: Console authentication
+description: Configure Google, GitHub, OIDC and LDAP sign-in for a self-hosted Instance.
+appliesTo: Alpha
+---
+
+import { Aside, Steps } from "@astrojs/starlight/components";
+
+Email and OpenRUM password sign-in remain available. An Instance Owner can add Google, GitHub, multiple OpenID Connect (OIDC) providers, and direct LDAP sign-in. The login page shows only enabled and fully configured providers.
+
+For provider-specific setup and user sign-in steps, see the [sign-in guide](/docs/getting-started/sign-in/).
+
+<Steps>
+
+1. ## Keep a local Owner account
+
+   Complete `/setup` with an OpenRUM password and store the local Owner credentials in your normal recovery vault. Test local sign-in before enabling external methods. If an identity provider is unavailable, use this local Owner account to sign in and disable or repair it under **System Settings → Authentication**. Removing the encryption key also hides external login methods until the key is restored.
+
+1. ## Enable encrypted secrets
+
+   Set `OPENRUM_ALLOW_MANAGED_SECRETS=true` and `OPENRUM_MASTER_KEY` to Base64 for exactly 32 random bytes. Generate a new key with `openssl rand -base64 32`. Store it in the deployment Secret or the private production `.env` file, never in source control. Back up both the key and its `OPENRUM_MASTER_KEY_ID`: changing either without re-encrypting existing secrets makes those credentials unreadable. Restart the API after changing its environment. Without an active key, the Authentication page cannot enable a provider.
+
+1. ## Register a provider callback
+
+   Use the canonical HTTPS `PUBLIC_BASE_URL` origin. Register this exact redirect URI with each OAuth/OIDC provider, replacing the ID with the one entered in the Authentication page:
+
+   ```text
+   https://rum.example.com/api/v1/auth/providers/<provider-id>/callback
+   ```
+
+   Google requires an OAuth web application with `openid`, `profile` and `email` scopes. GitHub requires an OAuth App with `read:user` and `user:email` scopes and a verified primary email. For generic OIDC, enter the exact HTTPS Issuer URL from its discovery document; OpenRUM verifies the signed ID Token, audience, issuer, expiry, nonce and `email_verified` claim. You can create several OIDC entries with distinct IDs. Each provider needs its own Client ID and Client Secret.
+
+1. ## Save, test and enable
+
+   Sign in as Instance Owner and open **System Settings → Authentication**. Enter the provider ID, display name, Client ID, Client Secret and any provider-specific settings. Saving, testing and disabling require the Owner's OpenRUM password to have been reverified within five minutes. Provider secrets are encrypted in PostgreSQL and never returned by the settings API. For Google, GitHub and OIDC, **Test connection** completes a real authorization and callback without creating an account. For LDAP, it checks TLS, the search-account bind and Base DN. Enable the provider, then test the normal login and account access in a separate browser session.
+
+</Steps>
+
+## LDAP directory settings
+
+New to LDAP? Start with [Sign in with LDAP](/docs/getting-started/sign-in/ldap/) for the terminology, IT checklist, and step-by-step acceptance test.
+
+LDAP uses `ldaps://host:636` or `ldap://host:389` with StartTLS before any bind. Provide a trusted certificate chain through the host trust store or paste a PEM CA certificate in the provider settings. Certificate verification cannot be disabled. The API service must reach the directory over the configured port.
+
+Use a read-only search account DN and its password. Set Base DN, a filter with `{username}` such as `(uid={username})`, a stable unique ID attribute (`entryUUID` or Active Directory `objectGUID`), an email attribute (often `mail`), and an optional display name attribute. The search must return exactly one user; OpenRUM then binds as that user's DN with the submitted password. User passwords are never stored by OpenRUM. The connection test checks the TLS connection, search-account bind and Base DN. Finish with a real user sign-in to validate the filter and attributes.
+
+## Account access and linking
+
+The first successful external sign-in creates a **pending** account. Pending users can see their access status and sign out. An organization administrator adds the user's email through the existing member flow and assigns an organization role; the next status check unlocks the Console. An Instance administrator role additionally requires that user to set an independent OpenRUM password under **Account** after approval. That password is also used for five-minute re-verification before sensitive operations.
+
+Accounts with the same email are **not** merged automatically. An existing user signs in using a current method, then connects an external identity under **Account**. The stable provider subject is linked to that signed-in account. A disabled provider remains in the identity history, so reconfiguring its ID cannot silently point existing users at a different directory. Create a new provider ID when changing its Issuer, Client ID, LDAP URL, Base DN or stable ID attribute. Users can unlink an identity as long as another active sign-in method remains.
+
+<Aside type="caution" title="Deployment verification">
+  Local mock-provider tests validate the protocol and account rules. Before production use, test
+  Google, GitHub and your own OIDC/LDAP directory with real test accounts, including denied consent,
+  expired callbacks, certificate failures and local Owner recovery.
+</Aside>

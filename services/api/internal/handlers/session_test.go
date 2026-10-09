@@ -37,7 +37,7 @@ func TestSessionTimelineHandlerParsesPaginationAndKinds(t *testing.T) {
 	events := &fakeSessionQueries{}
 	handler := NewSessionHandler(fakeOverviewProjects{}, events, zerolog.Nop())
 	router := sessionTestRouter(handler)
-	request := httptest.NewRequest(http.MethodGet, "/api/v1/projects/"+projectID.String()+"/analytics/sessions/"+
+	request := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/api/v1/projects/"+projectID.String()+"/analytics/sessions/"+
 		sessionID.String()+"?from=2026-09-03T00:00:00Z&to=2026-09-03T01:00:00Z&limit=25&type=page_view,click&type=api&cursor=cursor", nil)
 	request.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "valid"})
 	response := httptest.NewRecorder()
@@ -55,7 +55,7 @@ func TestSessionTimelineHandlerMapsMissingSession(t *testing.T) {
 	events := &fakeSessionQueries{timelineErr: query.ErrSessionNotFound}
 	handler := NewSessionHandler(fakeOverviewProjects{}, events, zerolog.Nop())
 	router := sessionTestRouter(handler)
-	request := httptest.NewRequest(http.MethodGet, "/api/v1/projects/"+projectID.String()+"/analytics/sessions/"+
+	request := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/api/v1/projects/"+projectID.String()+"/analytics/sessions/"+
 		sessionID.String()+"?from=2026-09-03T00:00:00Z&to=2026-09-03T01:00:00Z", nil)
 	request.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "valid"})
 	response := httptest.NewRecorder()
@@ -78,7 +78,7 @@ func TestSessionListHandlerChecksProjectBeforeQuery(t *testing.T) {
 	router := httpx.NewRouter(zerolog.Nop())
 	authenticated := httpx.RequireSession(connectionFixtureAuthenticator{principal: auth.Principal{UserID: uuid.New()}})
 	router.Handle("GET /api/v1/projects/{projectId}/analytics/sessions", authenticated(http.HandlerFunc(handler.List)))
-	request := httptest.NewRequest(http.MethodGet, "/api/v1/projects/"+uuid.NewString()+"/analytics/sessions?from=2026-09-03T00:00:00Z&to=2026-09-03T01:00:00Z", nil)
+	request := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/api/v1/projects/"+uuid.NewString()+"/analytics/sessions?from=2026-09-03T00:00:00Z&to=2026-09-03T01:00:00Z", nil)
 	request.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "valid"})
 	response := httptest.NewRecorder()
 	router.ServeHTTP(response, request)
@@ -93,7 +93,7 @@ func TestSessionHandlerChecksProjectBeforeTimelineQuery(t *testing.T) {
 	router := httpx.NewRouter(zerolog.Nop())
 	authenticated := httpx.RequireSession(connectionFixtureAuthenticator{principal: auth.Principal{UserID: uuid.New()}})
 	router.Handle("GET /api/v1/projects/{projectId}/analytics/sessions/{sessionId}", authenticated(http.HandlerFunc(handler.Get)))
-	request := httptest.NewRequest(http.MethodGet, "/api/v1/projects/"+uuid.NewString()+"/analytics/sessions/"+uuid.NewString()+"?from=2026-09-03T00:00:00Z&to=2026-09-03T01:00:00Z", nil)
+	request := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/api/v1/projects/"+uuid.NewString()+"/analytics/sessions/"+uuid.NewString()+"?from=2026-09-03T00:00:00Z&to=2026-09-03T01:00:00Z", nil)
 	request.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "valid"})
 	response := httptest.NewRecorder()
 	router.ServeHTTP(response, request)

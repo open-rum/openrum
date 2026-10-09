@@ -1,0 +1,80 @@
+---
+title: Event pipeline
+description: Every check an Event passes between the browser and ClickHouse, in order, and what the caller sees when one fails.
+appliesTo: Alpha
+---
+
+import { Aside } from "@astrojs/starlight/components";
+
+An Event reaches storage in two halves with Kafka between them. **Ingest** is synchronous: it answers the browser. **Consumer** is asynchronous: it prepares and stores what Ingest queued. Knowing which half a rule belongs to tells you where to look when data is missing.
+
+```text
+Browser SDK ──► Ingest ──► Kafka ──► Consumer ──► ClickHouse
+   batch       checks,     durable     prepares,      stored
+               accepts     buffer      stores          Events
+```
+
+## Half one: Ingest
+
+The SDK sends a batch, called an Envelope, of 1 to 100 Events in one `POST`. Ingest runs these checks in this order and stops at the first that fails. The order matters: cheap checks run before the request body is read.
+
+| Order | Check | If it fails |
+| --- | --- | --- |
+| 1 | Storage pressure hard stop | `202` with nothing stored; see the note below |
+| 2 | Per-IP request limit, before the key is known | `429`, scope `ip` |
+| 3 | `X-OpenRUM-Key` identifies an active Project key | `401` `INVALID_KEY` |
+| 4 | The request `Origin` is allowed for the Project | `403` `ORIGIN_REJECTED` |
+| 5 | Project Rate Limit | `429`, scope `project` |
+| 6 | Body is JSON, plain or gzip, within the size limits | `413`, `415` or `400` |
+| 7 | Envelope matches the schema and carries 1 to 100 Events | `400` `INVALID_ENVELOPE` |
+| 8 | The Envelope's Environment is registered for the Project | `400` `ENVIRONMENT_MISMATCH` |
+| 9 | Kafka acknowledges the write | `503` `INGEST_UNAVAILABLE` with `Retry-After` |
+
+Events inside an otherwise valid Envelope can fail on their own. Those are left out, the rest are accepted, and the response is `207` with the rejected Event IDs. If every Event is rejected nothing is queued.
+
+A `202` or `207` means **Kafka has the Events**, not that they are queryable. The meaning of every code, and what the SDK does with each, is in [Ingest responses](/docs/reference/ingest-responses/).
+
+<Aside type="note" title="Why a full disk answers 202">
+  When ClickHouse reaches its hard-stop threshold, Ingest accepts requests and discards the Events,
+  setting `X-OpenRUM-Storage-Pressure: hard-stop`. Returning `429` or `503` would make every browser
+  retry and turn a full disk into a retry storm. See [Storage pressure](/docs/self-hosting/storage-pressure/).
+</Aside>
+
+## Half two: Consumer
+
+The Consumer reads queued Envelopes and processes each one in this order. The order is deliberate: work that depends on the stored result runs last, and discarded Events never pay for it.
+
+| Order | Stage | What happens |
+| --- | --- | --- |
+| 1 | Normalize | Turns the Envelope into canonical Events: scrubs user identifiers, titles, URLs, error text and log messages, parses the user agent into browser, OS and device, and resolves the country. Records [ingest flags](/docs/reference/ingest-flags/) such as `pii_scrubbed` and `bot` |
+| 2 | Inbound filters | Applies the Project's [inbound filters](/docs/product/inbound-filters/), for example dropping bot traffic |
+| 3 | Processing rules | Applies the Project's own redaction and rewriting rules |
+| 4 | Retention | Applies the Project's retention policy to each Event |
+| 5 | Fingerprint | Computes the Fingerprint that groups an error into an Issue, from the text that will be stored |
+| 6 | Write | Inserts the Events into ClickHouse in batches |
+| 7 | Commit | Commits the Kafka offset, only after the write succeeded |
+
+An Envelope or Event that cannot be normalized is written to the dead-letter topic with its reason, a hash and the source offset, not retried forever. A failed ClickHouse write is retried with backoff and the offset is held, so the Consumer pauses on that message instead of skipping it.
+
+Filtering runs before processing, and processing before fingerprinting. That is why an Issue is grouped on the redacted text, and why a filtered Event costs almost nothing.
+
+## After storage
+
+Several things read what the Consumer wrote, without touching the path above:
+
+- ClickHouse materialized views maintain the per-minute and per-hour aggregates that dashboards read, so they update as Events land. See [Data stores](/docs/self-hosting/data-stores/).
+- The Worker maps stack frames with Source Maps shortly after an error is stored.
+- The Worker evaluates alert rules against the aggregates and delivers notifications.
+- The API runs every Console query against ClickHouse.
+
+## When something is missing
+
+Match the symptom to the half that owns it:
+
+| Symptom | Look at |
+| --- | --- |
+| The SDK reports failures or `4xx` in the network tab | Ingest: [Ingest responses](/docs/reference/ingest-responses/), [Rate limits](/docs/product/rate-limits/) |
+| Requests succeed but nothing appears in the Console | Consumer lag and the dead-letter topic; then [Troubleshooting](/docs/self-hosting/troubleshooting/) |
+| Events appear minutes late | Consumer throughput or ClickHouse insert capacity; see [Capacity planning](/docs/self-hosting/capacity/) |
+| Only some Event types are missing | [Inbound filters](/docs/product/inbound-filters/), sampling in Project settings, or the Environment check |
+| Stack traces are not mapped | The Worker and the Release's [Source Maps](/docs/sdk/source-maps/) |

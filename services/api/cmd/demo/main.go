@@ -107,7 +107,7 @@ func ensureDemoControlPlane(ctx context.Context, database *sql.DB) (uuid.UUID, s
 		SDKPlatform:     metadata.SDKPlatformVue,
 		AllowedOrigins:  []string{"http://localhost:4173", "http://127.0.0.1:4173"},
 		Environment:     "production",
-		Environments:    []string{"production", "canary", "test", "development"},
+		Environments:    []string{"production", "staging", "test", "development"},
 		RetentionDays:   14,
 		EventSampleRate: 1,
 		APISampleRate:   1,

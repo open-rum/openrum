@@ -47,7 +47,11 @@ controls move into a Drawer on narrow screens. The team deliberately chose
 documentation and review rather than an automated rule forbidding page-level
 layout classes.
 
-## Analysis filter extension (2026-09-12)
+## Analysis filter extension (2026-09-12, retired 2026-10-02)
+
+Retired: the shared `AnalysisFilterSidebar` was removed on 2026-10-02 and its
+only consumer, Performance, no longer has a dimension sidebar. The text below is
+kept for history.
 
 For pages with multiple dimensions, a shared `AnalysisFilterSidebar` may sit on
 the right of the content instead of crowding the horizontal filter bar. It owns

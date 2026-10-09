@@ -5,7 +5,6 @@ import (
 	"math"
 	"net/http"
 	"net/url"
-	"regexp"
 	"strings"
 	"time"
 
@@ -18,7 +17,13 @@ import (
 	"openrum/internal/metadata"
 )
 
-var environmentPattern = regexp.MustCompile(`^[a-z][a-z0-9_-]{0,63}$`)
+const maxProjectEnvironments = 4
+
+// validProjectEnvironment accepts only the fixed set: development, test, staging and
+// production.
+func validProjectEnvironment(value string) bool {
+	return metadata.IsFixedEnvironment(value)
+}
 
 var validSDKPlatforms = map[metadata.SDKPlatform]struct{}{
 	metadata.SDKPlatformJavaScript: {}, metadata.SDKPlatformReact: {}, metadata.SDKPlatformVue: {},
@@ -317,6 +322,9 @@ func projectDataPurgeDTO(purge metadata.ProjectDataPurge) projectDataPurgeRespon
 func validateCreateProject(payload createProjectRequest, organizationID uuid.UUID) (metadata.CreateProjectInput, bool) {
 	payload.Name = strings.TrimSpace(payload.Name)
 	payload.Slug = strings.TrimSpace(payload.Slug)
+	if payload.Slug == "" && validName(payload.Name) {
+		payload.Slug = generatedProjectSlug(payload.Name)
+	}
 	payload.Environment = strings.TrimSpace(payload.Environment)
 	if payload.SDKPlatform == "" {
 		payload.SDKPlatform = metadata.SDKPlatformJavaScript
@@ -324,15 +332,16 @@ func validateCreateProject(payload createProjectRequest, organizationID uuid.UUI
 	if payload.Environment == "" {
 		payload.Environment = "production"
 	}
+	// Projects accept every fixed environment unless a caller narrows the list.
 	environments := payload.Environments
 	if len(environments) == 0 {
-		environments = []string{payload.Environment}
+		environments = append([]string(nil), metadata.FixedEnvironments...)
 	}
 	environments, environmentsOK := normalizeEnvironments(environments)
 	environments = ensureEnvironment(environments, payload.Environment)
 	origins, ok := normalizeOrigins(payload.AllowedOrigins)
-	if !validName(payload.Name) || !validSlug(payload.Slug) || !validSDKPlatform(payload.SDKPlatform) || !environmentPattern.MatchString(payload.Environment) ||
-		!environmentsOK || len(environments) > 16 || !ok {
+	if !validName(payload.Name) || !validSlug(payload.Slug) || !validSDKPlatform(payload.SDKPlatform) || !validProjectEnvironment(payload.Environment) ||
+		!environmentsOK || len(environments) > maxProjectEnvironments || !ok {
 		return metadata.CreateProjectInput{}, false
 	}
 	retentionDays, eventSampleRate, apiSampleRate, errorSampleRate := int16(14), 1.0, 0.2, 1.0
@@ -392,7 +401,7 @@ func validateUpdateProject(payload updateProjectRequest) (metadata.UpdateProject
 	if payload.Environment != nil {
 		trimmed := strings.TrimSpace(*payload.Environment)
 		payload.Environment = &trimmed
-		if !environmentPattern.MatchString(trimmed) {
+		if !validProjectEnvironment(trimmed) {
 			return metadata.UpdateProjectInput{}, false
 		}
 	}
@@ -404,7 +413,7 @@ func validateUpdateProject(payload updateProjectRequest) (metadata.UpdateProject
 		if payload.Environment != nil {
 			environments = ensureEnvironment(environments, *payload.Environment)
 		}
-		if len(environments) > 16 {
+		if len(environments) > maxProjectEnvironments {
 			return metadata.UpdateProjectInput{}, false
 		}
 		payload.Environments = &environments
@@ -462,14 +471,14 @@ func normalizeOrigins(values []string) ([]string, bool) {
 }
 
 func normalizeEnvironments(values []string) ([]string, bool) {
-	if len(values) == 0 || len(values) > 16 {
+	if len(values) == 0 || len(values) > maxProjectEnvironments {
 		return nil, false
 	}
 	result := make([]string, 0, len(values))
 	seen := make(map[string]struct{}, len(values))
 	for _, value := range values {
 		value = strings.TrimSpace(value)
-		if !environmentPattern.MatchString(value) {
+		if !validProjectEnvironment(value) {
 			return nil, false
 		}
 		if _, exists := seen[value]; exists {
@@ -522,4 +531,30 @@ func projectDTO(project metadata.Project, role metadata.OrganizationRole) projec
 		Status: project.Status,
 		Role:   role, CreatedAt: project.CreatedAt.UTC().Format(timeFormat), UpdatedAt: project.UpdatedAt.UTC().Format(timeFormat),
 	}
+}
+
+// generatedProjectSlug derives the internal identifier the Console no longer asks for:
+// the ASCII letters and digits of the name, then a random suffix so two projects with the
+// same (or a non-Latin) name never collide on the per-organization unique constraint.
+func generatedProjectSlug(name string) string {
+	var builder strings.Builder
+	dash := false
+	for _, character := range strings.ToLower(name) {
+		switch {
+		case character >= 'a' && character <= 'z', character >= '0' && character <= '9':
+			builder.WriteRune(character)
+			dash = false
+		case builder.Len() > 0 && !dash:
+			builder.WriteByte('-')
+			dash = true
+		}
+	}
+	base := strings.Trim(builder.String(), "-")
+	if len(base) > 48 {
+		base = strings.Trim(base[:48], "-")
+	}
+	if base == "" {
+		base = "project"
+	}
+	return base + "-" + strings.ReplaceAll(uuid.NewString(), "-", "")[:8]
 }

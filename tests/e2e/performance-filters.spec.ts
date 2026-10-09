@@ -26,9 +26,7 @@ async function expectCenteredScore(page: Page) {
   expect(alignment.labelsInside).toBe(true);
 }
 
-test("percentiles and shared dimension drafts survive collapse, reload and route navigation", async ({
-  page,
-}) => {
+test("percentiles survive reload and route drill-down navigation", async ({ page }) => {
   await page.setViewportSize({ width: 1600, height: 1080 });
   await mockOpenRUM(page, { projectExists: true });
   const errors: string[] = [];
@@ -57,42 +55,30 @@ test("percentiles and shared dimension drafts survive collapse, reload and route
   await page.getByRole("combobox", { name: "统计分位数" }).click();
   await page.getByRole("option", { name: "P95", exact: true }).click();
   await page.getByRole("button", { name: "CLS 趋势", exact: true }).click();
-  await page.getByRole("combobox", { name: "国家 / 地区", exact: true }).click();
-  await page.getByRole("option", { name: "中国 (CN)", exact: true }).click();
-  await page.getByRole("combobox", { name: "设备类型", exact: true }).click();
-  await page.getByRole("option", { name: "手机 / Mobile", exact: true }).click();
-  await page.getByLabel("路由", { exact: true }).fill("/checkout");
-  expect(new URL(page.url()).searchParams.has("country")).toBe(false);
+  await expect(page.getByRole("complementary", { name: "维度筛选侧栏" })).toHaveCount(0);
   const request = page.waitForRequest(
-    (r) => r.url().includes("/performance?") && r.url().includes("country=CN"),
+    (r) => r.url().includes("/performance?") && r.url().includes("route=%2Fcheckout"),
   );
-  await page.getByRole("button", { name: "应用筛选", exact: true }).click();
+  await page.getByRole("button", { name: "/checkout", exact: true }).click();
   const applied = new URL((await request).url()).searchParams;
-  expect(applied.get("deviceType")).toBe("mobile");
-  expect(applied.get("route")).toBe("/checkout");
   expect(applied.get("percentile")).toBe("p95");
   await expect(page.getByRole("heading", { name: "/checkout", exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "收起筛选侧栏" }).click();
   await page.reload();
-  await expect(page.getByRole("button", { name: "展开筛选 (3)", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "/checkout", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "返回 Route 列表" }).click();
-  expect(new URL(page.url()).searchParams.get("country")).toBe("CN");
   expect(new URL(page.url()).searchParams.has("route")).toBe(false);
   await page.goBack();
   await expect(page.getByRole("heading", { name: "/checkout", exact: true })).toBeVisible();
   expect(errors).toEqual([]);
 });
 
-test("mobile filter drawer applies a route without horizontal page overflow", async ({ page }) => {
+test("mobile route drill-down has no horizontal page overflow", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await mockOpenRUM(page, { projectExists: true });
   await page.goto("/performance");
   await expectCenteredScore(page);
-  await page.getByRole("button", { name: "筛选", exact: true }).click();
-  const drawer = page.getByRole("dialog", { name: "维度筛选" });
-  await drawer.getByLabel("路由", { exact: true }).fill("/checkout");
-  await drawer.getByRole("button", { name: "应用筛选", exact: true }).click();
-  await expect(drawer).not.toBeVisible();
+  await expect(page.getByRole("button", { name: "筛选", exact: true })).toHaveCount(0);
+  await page.getByRole("button", { name: "/checkout", exact: true }).click();
   await expect(page.getByRole("heading", { name: "/checkout", exact: true })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });

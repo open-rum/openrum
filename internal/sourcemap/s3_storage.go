@@ -89,10 +89,10 @@ func (storage *S3Storage) Probe(ctx context.Context) (result StorageProbeResult)
 		Bucket: aws.String(storage.bucket), Key: aws.String(key), Body: bytes.NewReader(body),
 		ContentLength: aws.Int64(int64(len(body))), ContentType: &contentType, IfNoneMatch: aws.String("*"),
 	})
-	result.Steps = append(result.Steps, probeStep("write", writeErr, stepStarted))
+	result.Steps = append(result.Steps, probeStep(ctx, "write", writeErr, stepStarted))
 	if writeErr != nil {
 		result.ErrorCode = classifyS3ProbeError(ctx, writeErr)
-		result.Steps = append(result.Steps, storage.cleanupProbeObject(key))
+		result.Steps = append(result.Steps, storage.cleanupProbeObject(ctx, key))
 		return result
 	}
 
@@ -106,27 +106,24 @@ func (storage *S3Storage) Probe(ctx context.Context) (result StorageProbeResult)
 			readErr = ErrObjectMismatch
 		}
 	}
-	result.Steps = append(result.Steps, probeStep("read", readErr, stepStarted))
-	cleanup := storage.cleanupProbeObject(key)
+	result.Steps = append(result.Steps, probeStep(ctx, "read", readErr, stepStarted))
+	cleanup := storage.cleanupProbeObject(ctx, key)
 	result.Steps = append(result.Steps, cleanup)
 	if readErr != nil {
 		result.ErrorCode = classifyS3ProbeError(ctx, readErr)
 		return result
 	}
-	if cleanup.Status != "passed" {
-		result.ErrorCode = "cleanup_failed"
-		return result
-	}
-	result.Success = true
+	finishProbe(&result, cleanup)
 	return result
 }
 
-func (storage *S3Storage) cleanupProbeObject(key string) StorageProbeStep {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+func (storage *S3Storage) cleanupProbeObject(parent context.Context, key string) StorageProbeStep {
+	// The delete must still run when the probe itself was cancelled or timed out.
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(parent), 5*time.Second)
 	defer cancel()
 	started := time.Now()
 	_, err := storage.client.DeleteObject(ctx, &s3.DeleteObjectInput{Bucket: aws.String(storage.bucket), Key: aws.String(key)})
-	return probeStep("delete", err, started)
+	return probeStep(ctx, "delete", err, started)
 }
 
 func classifyS3ProbeError(ctx context.Context, err error) string {

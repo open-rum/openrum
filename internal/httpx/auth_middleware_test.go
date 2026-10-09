@@ -60,6 +60,30 @@ func TestRequireSessionRejectsInvalidSession(t *testing.T) {
 	}
 }
 
+func TestRequireSessionLimitsPendingAccountsToStatusAndLogout(t *testing.T) {
+	handler := RequireSession(stubAuthenticator{principal: auth.Principal{UserID: uuid.New(), AccessStatus: "pending"}})(
+		http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) { writer.WriteHeader(http.StatusNoContent) }),
+	)
+	for _, scenario := range []struct {
+		path string
+		want int
+	}{
+		{"/api/v1/auth/me", http.StatusNoContent},
+		{"/api/v1/auth/logout", http.StatusNoContent},
+		{"/api/v1/auth/password/set", http.StatusForbidden},
+		{"/api/v1/organizations", http.StatusForbidden},
+		{"/api/v1/admin/authentication", http.StatusForbidden},
+	} {
+		request := httptest.NewRequestWithContext(context.Background(), http.MethodGet, scenario.path, nil)
+		request.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "token"})
+		response := httptest.NewRecorder()
+		handler.ServeHTTP(response, request)
+		if response.Code != scenario.want {
+			t.Fatalf("path=%s status=%d want=%d", scenario.path, response.Code, scenario.want)
+		}
+	}
+}
+
 func TestRequireCSRFValidatesOriginCookieAndHeader(t *testing.T) {
 	baseURL, err := url.Parse("https://rum.example.com")
 	if err != nil {

@@ -3,6 +3,7 @@ import { SessionClientMeta } from "@/features/sessions/SessionClientMeta";
 import { useChartMotion } from "@/lib/charts/useChartMotion";
 import { formatDetailedMetric, type PlotData } from "./adapters";
 import { donutShare } from "./donutData";
+import { catalogDimensionLabels } from "./model";
 
 export function CategoryRanking({
   data,
@@ -29,7 +30,8 @@ export function CategoryRanking({
     .sort((a, b) => (b.value ?? -1) - (a.value ?? -1));
   const total = rows.reduce((sum, row) => sum + (row.value ?? 0), 0);
   const maximum = rows[0]?.value ?? 0;
-  const sharesAvailable = total > 0 && rows.every((row) => row.value !== null);
+  const sharesAvailable =
+    data.distribution?.shareable !== false && total > 0 && rows.every((row) => row.value !== null);
   const visible = detailed ? rows : rows.slice(0, 10);
   const dimensionName =
     dimension === "country"
@@ -40,7 +42,7 @@ export function CategoryRanking({
           ? "设备"
           : dimension === "source"
             ? "来源"
-            : "分类";
+            : (catalogDimensionLabels[dimension ?? ""] ?? "分类");
 
   return (
     <div className="dashboard-ranking" data-category-ranking data-animate={animate || undefined}>
@@ -108,7 +110,11 @@ export function CategoryRanking({
           : ""}
         占比按已返回分组合计计算，条形按最大值比较。
         {data.distribution?.nonAdditive ? " 用户 / 会话可能跨分组重复。" : ""}
-        {!sharesAvailable && total > 0 ? " 部分数据缺失，暂不计算占比。" : ""}
+        {data.distribution?.shareable === false
+          ? " 该指标不能按分组相加，不计算占比。"
+          : !sharesAvailable && total > 0
+            ? " 部分数据缺失，暂不计算占比。"
+            : ""}
         {data.distribution?.limitReached
           ? ` 已达 ${data.distribution.rowLimit} 组查询上限，分布可能不完整。`
           : ""}

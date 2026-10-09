@@ -1,64 +1,140 @@
 ---
-title: Architecture
-description: How an Event travels from the browser to the Console, and which component owns each step.
+title: Architecture overview
+description: The services, dependencies, protocols and repository layout of an OpenRUM Instance, and the path an Event takes through them.
 appliesTo: Alpha
 ---
 
 import { Aside } from "@astrojs/starlight/components";
 import eventPath from "@/assets/diagrams/event-path.svg?raw";
 
-An OpenRUM Instance is four Go services, five dependencies and one browser SDK. Knowing
-which component owns which step is what makes a capacity estimate or an incident
-diagnosable rather than guesswork.
+An OpenRUM Instance is a Console web server and four Go services (API, Ingest, Consumer and Worker), backed by PostgreSQL, ClickHouse, Kafka and Redis, with the Browser SDK running in your users' pages. Object storage is optional and only needed for Source Maps. Events are accepted synchronously, buffered in Kafka, and stored and processed asynchronously.
 
-## The path an Event takes
+Knowing which component owns which step is what makes a capacity estimate or an incident diagnosable rather than guesswork.
+
+## System composition
+
+OpenRUM follows a "one image, several processes" layout: the five application services are built into a single container image and started with different commands. The Console, API, Ingest, Consumer and Worker scale and fail independently, and the dependencies below are shared between them.
+
+### Application services
+
+| Service | Command in the image | Port | Responsibility |
+| --- | --- | --- | --- |
+| Console web server | `/app/web` (nginx) | `8080` | Serves the Console static files and forwards `/api/` to the API and `/ingest/` to Ingest, so one public hostname is enough |
+| API | `/app/api` | `8080` | Console and control-plane operations: sign-in, sessions, roles, Projects, Releases, alerts and every analytical query |
+| Ingest | `/app/ingest` | `8081` | The public write endpoint for the Browser SDK: limits, key and Origin authentication, schema validation, and the durable write to Kafka |
+| Consumer | `/app/consumer` | `8082` | Reads Kafka, normalizes and scrubs, filters, fingerprints, and writes Events to ClickHouse |
+| Worker | `/app/worker` | `8083` | Background jobs: stack-frame mapping, alert evaluation, data lifecycle, emergency cleanup, Project deletion |
+
+Every Go service also answers `GET /health/live`, `GET /health/ready` and `GET /metrics` on its own port. The Console web server answers the two health paths as well. Two more commands ship in the same image and run to completion rather than serving traffic: `/app/migrate` applies database migrations, and `/app/demo` seeds the demo dataset when you ask for it with `openrum seed`.
+
+<Aside type="note" title="Schema changes are never applied at startup">
+  Application services only check that the schema version is compatible. Migrations run once, as a
+  separate job, before the services are deployed. See [Upgrades](/docs/self-hosting/upgrades/).
+</Aside>
+
+### Dependencies
+
+| Dependency | Default port | Holds | Losing it means |
+| --- | --- | --- | --- |
+| PostgreSQL | `5432` | Control plane: accounts, Organizations, Projects, Releases, alert rules and settings | The Console cannot authenticate or configure, and Ingest loses its Project keys; stored Events are unaffected |
+| ClickHouse | `9000` native, `8123` HTTP | Events and the aggregates built from them | Analysis and investigation stop; ingestion continues into Kafka |
+| Kafka | `9092` | The durable buffer between Ingest and Consumer | Ingest starts rejecting; this is the one dependency whose loss drops Events |
+| Redis | `6379` | Rate-limit counters, caches and short-lived status | Rate limiting degrades; nothing needs restoring |
+| Object storage | S3-compatible | Source Map Artifacts, optional | New Releases cannot be uploaded; existing mappings are unaffected |
+
+Kafka is the only dependency in that table whose failure is lossy, which is why [capacity planning](/docs/self-hosting/capacity/) starts with Kafka retention headroom rather than with ClickHouse disk. [Data stores](/docs/self-hosting/data-stores/) describes what each one holds.
+
+### Deployment shapes
+
+| Shape | Where it lives | Notes |
+| --- | --- | --- |
+| Local development | `deploy/compose/docker-compose.yml` | The whole stack on one machine, used by the `openrum` command; the demo dataset is optional. Not for production |
+| Single-host production | `deploy/compose/production.compose.yml` | The same services behind a Caddy edge that terminates TLS and routes `/api/*`, `/ingest/*` and everything else |
+| Kubernetes | `deploy/helm/openrum` | A Helm chart with Deployments, Services, Ingress, autoscaling, disruption budgets, a migration Job and Prometheus rules |
+
+See [Local development](/docs/getting-started/local-development/), [Docker production](/docs/self-hosting/docker-production/) and [Kubernetes and Helm](/docs/self-hosting/kubernetes/). The chart can run a bundled Redis for a quick start; PostgreSQL, ClickHouse and Kafka are expected to be provided by you.
+
+## Technology stack
+
+| Layer | Technology | Notes |
+| --- | --- | --- |
+| Backend language | Go 1.26 | One module, four service entry points under `services/` |
+| HTTP | `net/http` with the standard `ServeMux` | A small shared router in `internal/httpx` adds request IDs, logging and metrics |
+| PostgreSQL access | `pgx` v5 | Control plane; migrations are plain SQL files |
+| ClickHouse access | `clickhouse-go` v2 | Native protocol, batched inserts, SQL for queries |
+| Messaging | `segmentio/kafka-go` | Producer in Ingest, consumer group in Consumer |
+| Cache and counters | `go-redis` v9 | |
+| Sign-in | Local password, OpenID Connect, LDAP, Google and GitHub | `go-oidc`, `go-ldap` and `oauth2` |
+| Source Maps | `go-sourcemap`, `aws-sdk-go-v2` (S3) | Stack-frame mapping in the Worker, artifacts in object storage |
+| Logging and metrics | `zerolog`, Prometheus client | Structured JSON logs; `/metrics` on every service |
+| Console | React 19, Vite, TanStack Router and Query, Tailwind CSS 4, Recharts | `apps/web` |
+| Browser SDK | TypeScript | `packages/browser-sdk`, with a shared Event schema in `packages/protocol` |
+| Build plugin | TypeScript | `packages/vite-plugin` uploads Source Maps |
+| Documentation site | Astro and Starlight | `apps/site` |
+
+## Communication between components
+
+| Link | Protocol | Notes |
+| --- | --- | --- |
+| Browser SDK → Ingest | HTTPS `POST /ingest/v1/envelope`, JSON, optionally gzip | Authenticated by the `X-OpenRUM-Key` header. Pending batches are flushed with `sendBeacon` when the page is hidden. See [Ingest responses](/docs/reference/ingest-responses/) |
+| Browser → Console web server → API | HTTPS, REST under `/api/` | Session cookie plus a CSRF token on writes |
+| Edge → services | HTTP | `/api/*` to the API, `/ingest/*` to Ingest, everything else to the Console web server. Caddy in single-host production, Ingress on Kubernetes |
+| Ingest → Kafka | Kafka protocol | An acknowledgement from Kafka is what turns into the `202` |
+| Kafka → Consumer | Kafka consumer group | Offsets are committed only after the ClickHouse write succeeds. Failed items go to a dead-letter topic |
+| Consumer → ClickHouse | Native protocol, batched inserts | |
+| API → ClickHouse | Native protocol | Every Console query |
+| API, Worker, Consumer, Ingest → PostgreSQL | PostgreSQL wire protocol | Each service reads or writes the control-plane data it needs |
+| Ingest, Consumer, API → Redis | RESP | Rate limits, caches, onboarding status |
+| API → Kafka | Kafka protocol | **Send test Event** in the Console publishes a synthetic Event straight to the same topic, bypassing Ingest |
+| CI or Vite plugin → API → object storage | HTTPS | The plugin asks the API for a presigned URL with an Upload Token, uploads the file straight to the bucket, then confirms with the API |
+| Worker → Feishu/Lark or Webhook | HTTPS | Alert notifications |
+| API → identity provider | HTTPS or LDAP | Only for the sign-in methods an Instance Owner enabled |
+| Prometheus → every service | HTTP `GET /metrics` | Health probes use `/health/live` and `/health/ready` |
+
+## A typical flow: an Event reaches the Console
 
 <figure class="docs-diagram">
   <Fragment set:html={eventPath} />
   <figcaption>
-    Solid edges carry Events; the dashed edge is a quota check. Generated from
-    `docs/diagrams/event-path.mmd`.
+    Solid edges carry Events; the dashed edge is a quota check.
   </figcaption>
 </figure>
 
-Ingest acknowledges an Envelope once it is durably in Kafka, not once it is queryable.
-That is the single most useful thing to know when reading the diagram: a `202` means
-accepted, and everything downstream of Kafka is asynchronous. An Instance can therefore
-absorb a traffic spike or a ClickHouse restart without dropping Events, and Events can be
-briefly accepted but not yet visible in the Console.
+1. The Browser SDK captures an Event, scrubs it, queues it locally and sends a batch (an Envelope of up to 100 Events) to Ingest.
+2. Ingest runs its checks and produces the Envelope to Kafka. The `202` is returned only after Kafka acknowledges it.
+3. The Consumer reads the Envelope, normalizes and scrubs it, applies the Project's filters and rules, computes the error Fingerprint and inserts the Events into ClickHouse. Materialized views update the per-minute aggregates as rows land.
+4. The Worker maps stack frames with the Release's Source Maps and evaluates alert rules against the aggregates.
+5. The API answers Console queries from ClickHouse, using Redis for short caches. The Console web server sits in front and forwards `/api/` to it.
 
-## Components
-
-| Component            | Owns                                                                                                                    |
-| -------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| Browser SDK          | Capturing Page Views, interactions, errors, Web Vitals and API Requests, and scrubbing them before they leave the page  |
-| Vite plugin          | Uploading Source Map Artifacts for a Release at build time                                                              |
-| Ingest               | Authenticating the write key, validating against the Envelope schema, scrubbing, fingerprinting, and producing to Kafka |
-| Consumer             | Reading Kafka and writing Events and aggregates to ClickHouse                                                           |
-| Worker               | Background jobs: mapping stack frames, data lifecycle, notifications, Project deletion                                  |
-| API                  | Authenticated Console and control-plane operations                                                                      |
-| Console (`apps/web`) | The operator interface                                                                                                  |
+A `202` therefore means *accepted*, not *queryable*. An Instance can absorb a traffic spike or a ClickHouse restart without dropping Events, and an Event can be briefly accepted but not yet visible in the Console. The checks in step 2 and the stages in step 3 are listed in order on [Event pipeline](/docs/self-hosting/event-pipeline/).
 
 <Aside title="Mapped stack frames arrive late">
-  Symbolication is a Worker batch job that runs after an Error is already stored, so an Error is
-  visible with raw frames first and gains mapped frames a moment later. An Error whose Release was
-  never uploaded simply keeps its raw frames.
+  Mapping is a Worker batch job that runs after an Error is already stored, so an Error is visible
+  with raw frames first and gains mapped frames a moment later. An Error whose Release was never
+  uploaded simply keeps its raw frames.
 </Aside>
 
-## Dependencies and what each one is for
+## Repository layout
 
-| Dependency     | Holds                                            | Losing it means                                                             |
-| -------------- | ------------------------------------------------ | --------------------------------------------------------------------------- |
-| PostgreSQL     | Control plane: Projects, users, Alerts, Releases | The Console cannot authenticate or configure; stored Events are unaffected  |
-| ClickHouse     | Events and aggregates                            | Analysis and Investigation stop; ingestion continues into Kafka             |
-| Kafka          | The durable ingestion buffer                     | Ingest starts rejecting; this is the one dependency whose loss drops Events |
-| Redis          | Quotas, status and short-lived caches            | Quota enforcement degrades                                                  |
-| Object storage | Source Map Artifacts, optional                   | New Releases cannot be uploaded; existing mappings are unaffected           |
+| Directory | Contents |
+| --- | --- |
+| `services/api`, `services/ingest`, `services/consumer`, `services/worker` | The four Go services. `services/api` also holds the `migrate` and `demo` commands |
+| `internal/` | Shared Go packages: `auth`, `metadata` (PostgreSQL), `query` (ClickHouse), `ingest`, `event`, `fingerprint`, `privacy`, `processing`, `filter`, `sourcemap`, `notify`, `storagepressure`, `observability`, `config` and more |
+| `migrations/` | PostgreSQL and ClickHouse schema migrations, embedded into the `migrate` command |
+| `apps/web` | The Console (React) |
+| `apps/site` | This documentation site and the landing page |
+| `packages/browser-sdk`, `packages/vite-plugin`, `packages/protocol` | The Browser SDK, the Source Map upload plugin and the shared Event schema |
+| `packages/ui`, `packages/design-tokens` | Shared components and design tokens for the Console and the site |
+| `cmd/openrum` | The `openrum` command for starting and checking a local development stack. See [CLI](/docs/getting-started/local-development/cli/) |
+| `deploy/` | Compose files, the Helm chart, Prometheus rules, Grafana dashboards and the container image's nginx configuration |
+| `examples/` | A runnable React and Vite example |
+| `tests/` | End-to-end, integration, load, performance and security tests |
+| `scripts/` | Build, release, documentation and size-budget scripts |
+| `docs/` | Design notes, operating guides and decision records that back the public documentation |
 
-Kafka is the only dependency in that table whose failure is lossy, which is why
-[capacity planning](/docs/self-hosting/capacity/) starts with Kafka retention headroom
-rather than with ClickHouse disk.
+## Where to go next
 
-See [External dependencies](/docs/self-hosting/dependencies/) for versions and
-configuration, and the repository's `CONTEXT.md` for the domain language these names come
-from.
+- [Components and responsibilities](/docs/self-hosting/components/) covers each service in detail, including what stops working when it is down.
+- [Event pipeline](/docs/self-hosting/event-pipeline/) lists every check an Event passes, in order.
+- [Data stores](/docs/self-hosting/data-stores/) describes what lives in PostgreSQL, ClickHouse, Kafka, Redis and object storage.
+- [External dependencies](/docs/self-hosting/dependencies/) covers versions and configuration, and the repository's `CONTEXT.md` defines the domain language used here.

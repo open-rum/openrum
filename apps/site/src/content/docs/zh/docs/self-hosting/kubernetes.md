@@ -1,20 +1,20 @@
 ---
-title: Kubernetes 与 Helm
-description: 使用 Helm Chart 把 OpenRUM 部署到生产环境，从前置准备到首次登录。
+title: Kubernetes 与 Helm 参考
+description: 生产 Kubernetes 部署的 Chart 资源、路由、扩缩容、安全与升级参考。
 appliesTo: Alpha
 ---
 
-`deploy/helm/openrum` 下的 Chart 会部署 OpenRUM 的五个工作负载——`api`、`ingest`、`consumer`、`worker` 和 `web`——并带上滚动更新、健康探针、自动扩缩容和一个数据库迁移 Hook。
+`deploy/helm/openrum` 下的 Chart 会部署 OpenRUM 的五个工作负载——`api`、`ingest`、`consumer`、`worker` 和 `web`——并带上滚动更新、健康探针、自动扩缩容和一个数据库迁移 Hook。新建 Kubernetes 实例时，请先完成三步[部署生产](/zh/docs/getting-started/production-deployment/)教程；本页只作为配置、安全和日常运营细节的 Chart 参考。
 
-它**不会**帮你创建 PostgreSQL、ClickHouse、Kafka 或 Redis，不会创建 Kafka 主题，不会签发 TLS 证书，也不会创建它要读取的 Secret。这些都是前置条件。漏掉 Secret 或两个数据库会让安装直接失败；而漏掉 Kafka 主题则会安装成功、运行时才丢事件，这一种更难被发现。
+默认情况下它还会为这个 Release 运行一个单实例 Redis（见 [Redis：自带或外部](#redis自带或外部)）。它**不会**帮你创建 PostgreSQL、ClickHouse 或 Kafka，不会创建 Kafka 主题，不会签发 TLS 证书，也不会创建它要读取的 Secret。这些都是前置条件。漏掉 Secret 或两个数据库会让安装直接失败；而漏掉 Kafka 主题则会安装成功、运行时才丢事件，这一种更难被发现。
 
 ## 安装前的准备
 
-**自行准备四个必需依赖。** Compose 拓扑只用于评估。生产环境请使用托管版或高可用的 PostgreSQL、ClickHouse、Kafka 和 Redis，并在承接生产流量前用[容量规划](/zh/docs/self-hosting/capacity/)确定规格。各依赖分别存什么，见[外部依赖](/zh/docs/self-hosting/dependencies/)。
+**自行准备 PostgreSQL、ClickHouse 和 Kafka。** Compose 拓扑只用于本地开发。生产环境请使用托管版或高可用的服务，并决定 Redis 用 Chart 自带的还是你自己的。在承接生产流量前用[容量规划](/zh/docs/self-hosting/capacity/)确定规格。各依赖分别存什么，见[外部依赖](/zh/docs/self-hosting/dependencies/)。
 
 **Kafka 主题必须自己建。** 生产者和消费者都设置了 `AllowAutoTopicCreation: false`，所以主题不存在是一个运行时故障，不会自动恢复。默认主题名是 `rum-events-v1`，并且 ingest 只在 `acks=all` 之后才报告持久化接收成功。
 
-**确保集群能够拉取镜像。** Helm 负责安装 Chart，容器镜像由 Kubernetes 按 Chart 中的地址拉取。Chart 默认使用 `ghcr.io/openrum/openrum`；只有首个正式版本发布且软件包公开后，这个默认地址才可使用。在此之前，请自行构建并发布镜像，在自己的 values 文件里覆盖 `image.repository`，不要修改 Chart 源文件。
+**确保集群能够拉取镜像。** Helm 负责安装 Chart，容器镜像由 Kubernetes 按 Chart 中的地址拉取。Chart 默认使用 `ghcr.io/open-rum/openrum`；只有首个正式版本发布且软件包公开后，这个默认地址才可使用。在此之前，请自行构建并发布镜像，在自己的 values 文件里覆盖 `image.repository`，不要修改 Chart 源文件。
 
 **先定好域名和 TLS 证书。** `config.appEnv: production` 会让所有服务在启动时拒绝非 HTTPS 的 `PUBLIC_BASE_URL`，而 `ingress.tls` 默认是空的——见[路由与 TLS](#路由与-tls)。
 
@@ -55,8 +55,13 @@ config:
   appEnv: production
   publicBaseURL: https://rum.example.com
   kafkaBrokers: kafka-0.kafka:9092,kafka-1.kafka:9092
-  redisAddress: redis-master.data:6379
   existingSecret: openrum-runtime
+
+# 使用 Chart 自带的 Redis 时，删掉这一段即可。
+redis:
+  mode: external
+  external:
+    address: redis-master.data:6379
 
 ingress:
   enabled: true
@@ -67,7 +72,7 @@ ingress:
       secretName: openrum-tls
 ```
 
-如果使用内网镜像仓库，在这份文件中补上 `image.repository: registry.example.com/openrum` 和 `image.tag: "0.1.0"`，版本应与 Chart 匹配。如果仓库是私有的，先在同一命名空间创建镜像拉取 Secret，再添加 `imagePullSecrets: [{ name: your-registry-secret }]`。Chart 会将其传给业务 Deployment、安装前的迁移 Job 和 Helm 测试 Pod。如果集群也无法拉取默认的 `busybox:1.37` 测试镜像，还需覆盖 `smokeTest.image`。
+如果使用内网镜像仓库，在这份文件中补上 `image.repository: registry.example.com/openrum` 和 `image.tag: "0.1.1"`，版本应与 Chart 匹配。如果仓库是私有的，先在同一命名空间创建镜像拉取 Secret，再添加 `imagePullSecrets: [{ name: your-registry-secret }]`。Chart 会将其传给业务 Deployment、安装前的迁移 Job 和 Helm 测试 Pod。如果集群也无法拉取默认的 `busybox:1.37` 测试镜像，还需覆盖 `smokeTest.image`。
 
 `publicBaseURL` 必须是绝对的 `http(s)` URL，在 `appEnv: production` 下还必须是 HTTPS。它是 Console 和 SDK 被告知要使用的源，所以必须填用户真正访问的地址，而不是集群内部的 Service 名。
 
@@ -75,13 +80,33 @@ ingress:
 
 完整的带注释列表是 [Helm values 参考](/zh/docs/reference/helm-values/)，由 `values.yaml` 生成。
 
+### Redis：自带或外部
+
+`redis.mode` 决定 Redis 从哪里来。OpenRUM 在 Redis 里存限流计数、登录节流、大盘缓存和连接进度。这些都不是事实来源，但 Redis 连不上时 API 和 Ingest 会报告未就绪，所以 Redis 的可用性就是它们的可用性。
+
+| 模式 | Chart 做什么 | 适用场景 |
+| --- | --- | --- |
+| `bundled`（默认） | 以 StatefulSet 运行一个 Redis（`redis:7.2-alpine`），Service 名为 `<release>-openrum-redis`，并把 `REDIS_ADDR` 指向它 | 评估、小规模实例或首次安装 |
+| `external` | 不创建 Redis，使用 `redis.external.address`（`host:port`） | 需要高可用的生产环境：使用单一地址、后台自动切换的托管 Redis |
+
+自带 Redis 的默认设置：
+
+- `--maxmemory 192mb`，内存上限 256 MiB，满了按最近最少使用淘汰，与 Compose 拓扑一致。
+- 数据只在内存里，重启后为空。设置 `redis.bundled.persistence.enabled: true` 会加上 PersistentVolumeClaim 并开启 AOF 持久化。已有 StatefulSet 的卷模板不能修改，所以之后切换持久化需要先执行 `kubectl delete statefulset <release>-openrum-redis` 再升级；这些数据可以丢弃。
+- 一条只允许本 Release 的 Pod 访问的 NetworkPolicy。只有集群网络插件支持 NetworkPolicy 时才生效。
+- 使用私有镜像仓库时，同步镜像并设置 `redis.bundled.image.repository`。
+
+自带 Redis 重启时，API 和 Ingest 会有几秒不可用。需要不停机维护时请用 `external`。OpenRUM 目前连接 Redis 不带密码和 TLS，也不支持 Sentinel 或 Cluster 模式，所以外部 Redis 必须能通过一个私网地址访问。
+
+早期 Chart 版本的 `config.redisAddress` 已移除。values 文件里仍然设置它时，渲染会失败，并提示改用 `redis.external.address`。
+
 ## 3. 安装
 
-官方 `0.1.0` 版本发布后，可用 OCI Chart 和配套的默认镜像安装：
+官方 `0.1.1` 版本发布后，可用 OCI Chart 和配套的默认镜像安装：
 
 ```sh
-helm upgrade --install openrum oci://ghcr.io/openrum/charts/openrum \
-  --version 0.1.0 \
+helm upgrade --install openrum oci://ghcr.io/open-rum/charts/openrum \
+  --version 0.1.1 \
   --namespace openrum --create-namespace \
   --values values.production.yaml \
   --wait --timeout 15m
@@ -126,6 +151,7 @@ kubectl -n openrum get deploy,hpa,ingress -l app.kubernetes.io/instance=openrum
 | --- | --- |
 | 5 个 Deployment | `maxUnavailable: 0`、`maxSurge: 1`、`minReadySeconds: 5` |
 | 5 个 Service | 端口 `80`，转发到各容器端口 |
+| Redis 的 StatefulSet、Service 和 NetworkPolicy | 仅在 `redis.mode: bundled` 时创建 |
 | 1 个 ConfigMap | 非机密环境变量，其 checksum 会写进 Pod 注解 |
 | 1 个 Ingress | 单域名，三条路径规则 |
 | 3 个 HorizontalPodAutoscaler | 仅 `api`、`ingest`、`web` |
@@ -164,7 +190,7 @@ Chart 的写法带来两个值得知道的后果：
 
 ## 默认的安全加固
 
-所有 Pod 都以 `runAsNonRoot` 运行，根文件系统只读，丢弃全部 capabilities，`allowPrivilegeEscalation: false`，使用 `RuntimeDefault` seccomp 配置，`fsGroup: 65532`。镜像里唯一可写的路径是挂在 `/tmp` 的 128 MiB `emptyDir`，nginx 用它存放自己的临时目录。
+所有 Pod 都以 `runAsNonRoot` 运行，根文件系统只读，丢弃全部 capabilities，`allowPrivilegeEscalation: false`，使用 `RuntimeDefault` seccomp 配置，`fsGroup: 65532`。镜像里唯一可写的路径是挂在 `/tmp` 的 128 MiB `emptyDir`，nginx 用它存放自己的临时目录。自带的 Redis 遵守同样的限制，以镜像内的 `redis` 用户（UID 999）运行，只写 `/data`。
 
 正因为根文件系统只读，任何期望在 `/tmp` 之外写入的自定义镜像都会陷入崩溃重启。在把 ingest 暴露到公网之前，请先看[威胁模型](/zh/docs/self-hosting/security/threat-model/)和[隐私](/zh/docs/self-hosting/security/privacy/)。
 
@@ -187,7 +213,7 @@ config:
 
 - **无法注入任意环境变量。** ConfigMap 模板的键列表是固定的，因此二进制支持但 Chart 没有渲染的配置——`SHUTDOWN_TIMEOUT`、`INGEST_BASE_URL`——无法通过 values 设置。要设置它们只能手动补丁 ConfigMap 或扩展模板。
 - **`services.web.port` 实际上改不了。** Chart 把它接到了容器端口和探针上，但 Console 的 nginx 配置硬编码了 `listen 8080`。改了这个值会让 Pod 永远不就绪。
-- **不包含依赖子 Chart。** 有意不内置 PostgreSQL、ClickHouse、Kafka 和 Redis。
+- **只有 Redis 可以自带。** PostgreSQL、ClickHouse 和 Kafka 存放必须保留的数据，Chart 不运行它们。自带的 Redis 是单实例，不是高可用方案。
 - **监控集成需要手动开启，且依赖 Prometheus Operator。** `serviceMonitor` 和 `prometheusRules` 渲染的 CRD 必须已经存在于集群中。
 
 ## 升级与回滚

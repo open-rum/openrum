@@ -1,0 +1,50 @@
+---
+title: 登录 OpenRUM
+description: 选择控制台登录方式，并了解外部账号如何获得访问权限。
+appliesTo: Alpha
+---
+
+import { CardGrid, LinkCard, Aside } from "@astrojs/starlight/components";
+
+OpenRUM 始终提供邮箱与 OpenRUM 密码登录。Instance Owner 还可以启用 Google、GitHub、LDAP 和多个 OpenID Connect（OIDC）提供者。外部方式只有在配置完整并启用后才会显示在登录页。
+
+## 选择登录方式
+
+<CardGrid>
+  <LinkCard
+    title="邮箱与密码"
+    description="使用本地账号，或通过初始化时创建的 Owner 账号恢复访问。"
+    href="/zh/docs/getting-started/sign-in/email-password/"
+  />
+  <LinkCard
+    title="Google"
+    description="连接 Google OAuth Web 应用，使用 Google 或 Workspace 账号。"
+    href="/zh/docs/getting-started/sign-in/google/"
+  />
+  <LinkCard
+    title="GitHub"
+    description="连接 GitHub OAuth App，使用已验证的主邮箱。"
+    href="/zh/docs/getting-started/sign-in/github/"
+  />
+  <LinkCard
+    title="OpenID Connect"
+    description="通过 OIDC Issuer 连接企业身份提供者。"
+    href="/zh/docs/getting-started/sign-in/oidc/"
+  />
+  <LinkCard
+    title="LDAP"
+    description="通过 LDAPS 或 StartTLS 直接验证企业目录账号。"
+    href="/zh/docs/getting-started/sign-in/ldap/"
+  />
+</CardGrid>
+
+## 外部登录后的账号权限
+
+首次通过外部方式登录会创建**待授权**账号。用户只能查看访问状态和退出登录；组织管理员须按现有成员流程添加该邮箱并授予角色，用户才能进入控制台。需要 Instance 管理员角色的用户还须在 **Account** 设置独立的 OpenRUM 密码。
+
+**相同邮箱不会自动合并账号。** 如果你已有 OpenRUM 账号，先用当前方式登录，再到 **Account → 已连接的登录方式** 主动连接外部身份，然后才使用它登录。只要仍有另一种可用登录方式，就可以解除现有身份连接。
+
+<Aside type="note" title="供 Instance Owner 查看">
+  外部登录需要加密托管密钥和提供者配置。请保留本地 Owner
+  密码用于恢复访问。共同前置条件见[控制台认证部署指南](/zh/docs/self-hosting/authentication/)。
+</Aside>

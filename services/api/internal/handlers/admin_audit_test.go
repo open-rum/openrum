@@ -35,7 +35,7 @@ func TestAdminMutationAuditRecordsSuccessfulMutationWithoutBodySecrets(t *testin
 	handler := httpx.RequireSession(adminAuthenticator{principals: map[string]auth.Principal{
 		"session": {UserID: userID},
 	}})(AdminMutationAudit(audit, zerolog.Nop())(next))
-	request := httptest.NewRequest(
+	request := httptest.NewRequestWithContext(context.Background(),
 		http.MethodPut,
 		"/api/v1/admin/object-storage/managed",
 		strings.NewReader(`{"currentPassword":"password-value","secretAccessKey":"secret-value"}`),
@@ -61,7 +61,7 @@ func TestAdminMutationAuditSkipsRejectedMutation(t *testing.T) {
 	handler := AdminMutationAudit(audit, zerolog.Nop())(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		httpx.WriteError(writer, request, http.StatusUnauthorized, "REAUTHENTICATION_REQUIRED", "Re-authenticate.")
 	}))
-	request := httptest.NewRequest(http.MethodPatch, "/api/v1/admin/configuration", nil)
+	request := httptest.NewRequestWithContext(context.Background(), http.MethodPatch, "/api/v1/admin/configuration", nil)
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, request)
 	if response.Code != http.StatusUnauthorized || len(audit.entries) != 0 {

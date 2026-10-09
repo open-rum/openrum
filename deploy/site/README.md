@@ -4,7 +4,7 @@
 
 ```sh
 PUBLIC_SITE_URL=https://openrum.dev \
-PUBLIC_REPOSITORY_URL=https://github.com/openrum/openrum \
+PUBLIC_REPOSITORY_URL=https://github.com/open-rum/openrum \
 PUBLIC_OPENRUM_RELEASE=Alpha \
 PUBLIC_COMMIT_SHA=$(git rev-parse HEAD) \
 pnpm site:build

@@ -45,7 +45,7 @@ describe("Stat appearance contract", () => {
     ).toBeUndefined();
   });
   it("round-trips every supported appearance but rejects unknown or non-Stat options", () => {
-    expect(Object.keys(statAppearanceLabels)).toEqual(["plain", "line-right", "bar-right"]);
+    expect(Object.keys(statAppearanceLabels)).toEqual(["plain", "area-right"]);
     for (const statAppearance of Object.keys(statAppearanceLabels)) {
       const widget = { ...createWidget("stat"), statAppearance };
       expect(widgetSchema.parse(JSON.parse(JSON.stringify(widget)))).toEqual(widget);
@@ -59,10 +59,10 @@ describe("Stat appearance contract", () => {
       );
     }
   });
-  it("reads retired bottom appearances as right-side lines without modifying the stored record", () => {
-    for (const statAppearance of ["line-bottom", "area-bottom"]) {
+  it("reads retired line, bar and bottom appearances as the right-side area without modifying the stored record", () => {
+    for (const statAppearance of ["line-right", "bar-right", "line-bottom", "area-bottom"]) {
       const stored = { ...createWidget("stat"), statAppearance };
-      expect(readWidget(stored)?.statAppearance).toBe("line-right");
+      expect(readWidget(stored)?.statAppearance).toBe("area-right");
       expect(stored.statAppearance).toBe(statAppearance);
       expect(
         widgetSchema.safeParse({ ...createWidget("timeseries"), statAppearance }).success,
@@ -71,7 +71,7 @@ describe("Stat appearance contract", () => {
   });
   it("uses real time buckets without summing UV buckets into the range aggregate", () => {
     const widget = createWidget("stat", {
-      statAppearance: "line-right",
+      statAppearance: "area-right",
       data: { source: "events", metrics: ["uniqueUsers"], dimension: "country" },
     });
     const adapted = adaptStat(widget, data);

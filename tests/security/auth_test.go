@@ -1,6 +1,7 @@
 package security_test
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -16,7 +17,7 @@ func TestStateChangingRequestRequiresSameOriginCSRFToken(t *testing.T) {
 	called := false
 	handler := httpx.RequireCSRF(baseURL)(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { called = true }))
 
-	request := httptest.NewRequest(http.MethodPost, "https://rum.example.com/api/v1/projects", nil)
+	request := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "https://rum.example.com/api/v1/projects", nil)
 	request.Header.Set("Origin", "https://evil.example")
 	request.Header.Set(httpx.CSRFHeader, "token")
 	request.AddCookie(&http.Cookie{Name: auth.CSRFCookieName, Value: "token"})

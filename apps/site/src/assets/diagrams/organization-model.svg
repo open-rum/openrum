@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" width="100%" role="img" aria-labelledby="org-model-title org-model-desc" style="max-width: 760px">
+<title id="org-model-title">Instance, organization, project and environment</title>
+<desc id="org-model-desc">An Instance contains Organizations. Each Organization contains Projects. Each Project accepts four Environments. Instance roles apply to the Instance; Organization roles apply inside one Organization and its Projects.</desc>
+<rect x="10" y="10" width="740" height="380" rx="14" fill="var(--ds-canvas)" stroke="var(--ds-border)"/>
+<text x="30" y="40" font-size="15" font-weight="650" fill="var(--ds-text)">Instance</text>
+<g>
+<rect x="490" y="22" width="250" height="26" rx="13" fill="var(--ds-primary-soft)" stroke="var(--ds-primary-border)"/>
+<text x="615.0" y="39" text-anchor="middle" font-size="12" fill="var(--ds-primary-ink)">Instance Owner · Instance Admin</text>
+</g>
+<rect x="30" y="64" width="470" height="312" rx="12" fill="var(--ds-surface)" stroke="var(--ds-border)"/>
+<text x="50" y="92" font-size="14" font-weight="600" fill="var(--ds-text)">Organization</text>
+<rect x="244" y="74" width="240" height="24" rx="12" fill="var(--ds-primary-soft)" stroke="var(--ds-primary-border)"/>
+<text x="364.0" y="90" text-anchor="middle" font-size="12" fill="var(--ds-primary-ink)">Owner · Admin · Member · Viewer</text>
+<g>
+<rect x="50" y="108" width="430" height="108" rx="10" fill="var(--ds-surface-subtle)" stroke="var(--ds-border)"/>
+<text x="68" y="136" font-size="14" font-weight="600" fill="var(--ds-text)">Project</text>
+<text x="68" y="154" font-size="12" fill="var(--ds-text-muted)">One web product, one reporting boundary</text>
+<rect x="68" y="166" width="96" height="26" rx="13" fill="var(--ds-surface-subtle)" stroke="var(--ds-border)"/><text x="116" y="183" text-anchor="middle" font-size="12" fill="var(--ds-text-secondary)">development</text><rect x="170" y="166" width="96" height="26" rx="13" fill="var(--ds-surface-subtle)" stroke="var(--ds-border)"/><text x="218" y="183" text-anchor="middle" font-size="12" fill="var(--ds-text-secondary)">test</text><rect x="272" y="166" width="96" height="26" rx="13" fill="var(--ds-surface-subtle)" stroke="var(--ds-border)"/><text x="320" y="183" text-anchor="middle" font-size="12" fill="var(--ds-text-secondary)">staging</text><rect x="374" y="166" width="96" height="26" rx="13" fill="var(--ds-surface-subtle)" stroke="var(--ds-border)"/><text x="422" y="183" text-anchor="middle" font-size="12" fill="var(--ds-text-secondary)">production</text>
+<text x="68" y="208" font-size="11" fill="var(--ds-text-muted)">DSN keys · Upload tokens · Releases · Alert rules</text>
+</g>
+<g>
+<rect x="50" y="236" width="430" height="108" rx="10" fill="var(--ds-surface-subtle)" stroke="var(--ds-border)"/>
+<text x="68" y="264" font-size="14" font-weight="600" fill="var(--ds-text)">Project</text>
+<text x="68" y="282" font-size="12" fill="var(--ds-text-muted)">One web product, one reporting boundary</text>
+<rect x="68" y="294" width="96" height="26" rx="13" fill="var(--ds-surface-subtle)" stroke="var(--ds-border)"/><text x="116" y="311" text-anchor="middle" font-size="12" fill="var(--ds-text-secondary)">development</text><rect x="170" y="294" width="96" height="26" rx="13" fill="var(--ds-surface-subtle)" stroke="var(--ds-border)"/><text x="218" y="311" text-anchor="middle" font-size="12" fill="var(--ds-text-secondary)">test</text><rect x="272" y="294" width="96" height="26" rx="13" fill="var(--ds-surface-subtle)" stroke="var(--ds-border)"/><text x="320" y="311" text-anchor="middle" font-size="12" fill="var(--ds-text-secondary)">staging</text><rect x="374" y="294" width="96" height="26" rx="13" fill="var(--ds-surface-subtle)" stroke="var(--ds-border)"/><text x="422" y="311" text-anchor="middle" font-size="12" fill="var(--ds-text-secondary)">production</text>
+<text x="68" y="336" font-size="11" fill="var(--ds-text-muted)">DSN keys · Upload tokens · Releases · Alert rules</text>
+</g>
+<rect x="520" y="64" width="210" height="312" rx="12" fill="var(--ds-surface)" stroke="var(--ds-border)" stroke-dasharray="5 4"/>
+<text x="538" y="92" font-size="14" font-weight="600" fill="var(--ds-text)">Another Organization</text>
+<rect x="538" y="108" width="174" height="64" rx="10" fill="var(--ds-surface-subtle)" stroke="var(--ds-border)" stroke-dasharray="5 4"/>
+<text x="554" y="136" font-size="13" fill="var(--ds-text-secondary)">Project</text>
+<text x="538" y="204" font-size="12" fill="var(--ds-text-muted)">Separate members, Projects</text>
+<text x="538" y="222" font-size="12" fill="var(--ds-text-muted)">and notification channels.</text>
+<text x="538" y="240" font-size="12" fill="var(--ds-text-muted)">Roles do not carry over.</text>
+</svg>

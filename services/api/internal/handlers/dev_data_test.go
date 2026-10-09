@@ -184,10 +184,11 @@ func devDataFixture(t *testing.T, ingestURL *string) (*DevDataHandler, http.Hand
 		target = *ingestURL
 	}
 	handler := NewDevDataHandler("development", projects, target, zerolog.Nop(), devDataKeyStub{keys: []metadata.ProjectKey{{PublicKey: "orr_pk_local", IsDefault: true}}})
-	handler.now = func() time.Time { return time.Date(2026, 9, 22, 6, 0, 0, 0, time.UTC) }
 	if handler == nil {
 		t.Fatal("development produced no handler")
+		return nil, nil, uuid.Nil
 	}
+	handler.now = func() time.Time { return time.Date(2026, 9, 22, 6, 0, 0, 0, time.UTC) }
 	router := httpx.NewRouter(zerolog.Nop())
 	baseURL, _ := url.Parse("http://openrum.test")
 	authenticated := httpx.RequireSession(testEventAuthenticator{principal: auth.Principal{UserID: userID}})
@@ -330,4 +331,28 @@ func performDevDataRequest(router http.Handler, projectID uuid.UUID, body string
 	response := httptest.NewRecorder()
 	router.ServeHTTP(response, request)
 	return response
+}
+
+func TestDevDataBusinessUserIDsReachTheEnvelopes(t *testing.T) {
+	users := map[string]bool{}
+	ingest := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var batch struct {
+			Context struct {
+				UserID string `json:"user_id"`
+			} `json:"context"`
+			Events []json.RawMessage `json:"events"`
+		}
+		_ = json.NewDecoder(r.Body).Decode(&batch)
+		users[batch.Context.UserID] = true
+		writeJSON(w, http.StatusAccepted, map[string]any{"accepted": len(batch.Events), "rejected": []any{}})
+	}))
+	defer ingest.Close()
+	_, router, _ := devDataFixture(t, &ingest.URL)
+	response := performDevDataRequest(router, devDataProjectID, `{"sessions":40,"minutes":60,"users":{"ids":["vip-001"," vip-002 "],"signedIn":1}}`)
+	if response.Code != 202 {
+		t.Fatalf("response: %s", response.Body.String())
+	}
+	if len(users) != 2 || !users["vip-001"] || !users["vip-002"] {
+		t.Fatalf("user ids=%v", users)
+	}
 }

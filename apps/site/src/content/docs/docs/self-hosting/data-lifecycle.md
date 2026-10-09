@@ -1,9 +1,8 @@
 ---
 title: Data lifecycle
 description: Retention, expiry and controlled cleanup for raw and aggregate telemetry.
+appliesTo: Alpha
 ---
-
-**Applies to:** Alpha.
 
 OpenRUM retains raw Events and aggregates according to Project policy. Lifecycle jobs must support preview, audit and rate limits before historical cleanup.
 

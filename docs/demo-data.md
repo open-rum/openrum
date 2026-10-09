@@ -30,13 +30,19 @@ meant to answer:
 - **Endpoints below the sample threshold.** The three `/api/admin` and `/api/support` endpoints stay under 75 requests, so quantile ranking labels them as insufficient data.
 - **Every transport failure kind.** Status 0 appears with `network`, `timeout` and `abort`, alongside 500, 502, 503 and 504.
 
-## Automatic Compose seeding
+## Load the dataset
 
-The `demo-seed` job runs automatically after migrations on the first Compose startup:
+Seeding is a command of its own and never runs as part of a start. Start the stack, then load the dataset into it:
 
 ```sh
-docker compose --env-file deploy/compose/.env.example -f deploy/compose/docker-compose.yml up -d --build
-docker compose --env-file deploy/compose/.env.example -f deploy/compose/docker-compose.yml logs demo-seed
+pnpm openrum up    # or: pnpm openrum dev
+pnpm openrum seed
+```
+
+Without Go, run the same containerized job through Compose. The `demo-seed` service sits behind the `seed` profile, so a plain `up` ignores it:
+
+```sh
+docker compose --profile seed --env-file deploy/compose/.env.example -f deploy/compose/docker-compose.yml run --rm --no-deps demo-seed
 ```
 
 The generated account is:
@@ -46,15 +52,11 @@ Email: demo@openrum.local
 Password: OpenRUM-demo-2026!
 ```
 
-If the instance was initialized by another owner and the demo owner does not exist, the generator exits without modifying the instance.
+If the instance was initialized by another owner and the demo owner does not exist, the generator exits without modifying the instance. Seeding is therefore for a new or demo-only stack; on a stack you already set up yourself it does nothing.
 
 ## Run the generator again
 
-With the Compose dependencies already running, execute the containerized generator explicitly. `--no-deps` avoids restarting healthy database containers:
-
-```sh
-docker compose --env-file deploy/compose/.env.example -f deploy/compose/docker-compose.yml run --rm --no-deps --build demo-seed
-```
+`pnpm openrum seed` can be repeated at any time. It builds the generator image first and passes `--no-deps`, so healthy database containers are not restarted.
 
 To run it directly from source against the default local Compose databases:
 
@@ -92,9 +94,12 @@ The generator is intentionally scoped to the demo project. Do not point the exam
 For a completely fresh dataset, remove only this Compose project's volumes and start it again:
 
 ```sh
-docker compose --env-file deploy/compose/.env.example -f deploy/compose/docker-compose.yml down --volumes
-docker compose --env-file deploy/compose/.env.example -f deploy/compose/docker-compose.yml up -d --build
+pnpm openrum reset
+pnpm openrum up
+pnpm openrum seed
 ```
+
+`reset` asks for confirmation. The Compose equivalents are `down --volumes` followed by `up -d --build` and the seed command above.
 
 This permanently deletes the local PostgreSQL, ClickHouse, Kafka, Redis and object-storage data for the Compose project. It is not required for a normal generator rerun.
 

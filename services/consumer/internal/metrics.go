@@ -24,6 +24,9 @@ type Metrics struct {
 	insertRows      prometheus.Histogram
 	insertDuration  prometheus.Histogram
 	storageWritable prometheus.Gauge
+	// inactiveProjectEvents counts queued events dropped because their Project is
+	// deleting or stopped, so a deletion never blocks the shared pipeline.
+	inactiveProjectEvents prometheus.Counter
 }
 
 func NewMetrics(registerer interface {
@@ -91,14 +94,18 @@ func NewMetrics(registerer interface {
 		ConstLabels: prometheus.Labels{"backend": "clickhouse"},
 	})
 	storageWritable.Set(-1)
-	if err := registerer.Register(messages, events, deadLetters, filtered, rewritten, kafkaLag, kafkaHeadroom, dataFreshness, processingTime, insertBatches, insertRows, insertDuration, storageWritable); err != nil {
+	inactiveProjectEvents := prometheus.NewCounter(prometheus.CounterOpts{
+		Namespace: "openrum", Subsystem: "consumer", Name: "inactive_project_events_total",
+		Help: "Queued events dropped because their Project is deleting or stopped.",
+	})
+	if err := registerer.Register(messages, events, deadLetters, filtered, rewritten, kafkaLag, kafkaHeadroom, dataFreshness, processingTime, insertBatches, insertRows, insertDuration, storageWritable, inactiveProjectEvents); err != nil {
 		return nil, err
 	}
 	return &Metrics{
 		messages: messages, events: events, deadLetters: deadLetters, filtered: filtered, rewritten: rewritten,
 		kafkaLag: kafkaLag, kafkaHeadroom: kafkaHeadroom, kafkaRetention: kafkaRetention, dataFreshness: dataFreshness,
 		processingTime: processingTime, insertBatches: insertBatches, insertRows: insertRows, insertDuration: insertDuration,
-		storageWritable: storageWritable,
+		storageWritable: storageWritable, inactiveProjectEvents: inactiveProjectEvents,
 	}, nil
 }
 
@@ -139,6 +146,11 @@ func (metrics *Metrics) observeRewritten(stage string) {
 }
 
 func (metrics *Metrics) observeRetry() { metrics.messages.WithLabelValues("retry").Inc() }
+
+// observeInactiveProject counts events dropped because their Project is deleting or stopped.
+func (metrics *Metrics) observeInactiveProject(events int) {
+	metrics.inactiveProjectEvents.Add(float64(events))
+}
 
 func (metrics *Metrics) ObserveClickHouseBatch(rows int, duration time.Duration, err error) {
 	outcome := "success"

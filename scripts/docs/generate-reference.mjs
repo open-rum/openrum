@@ -156,6 +156,23 @@ ${helmSource.trimEnd()}
 \`\`\`
 `;
 
+const chineseHelmValues = `---
+title: Helm values 参考
+description: OpenRUM Helm Chart 的权威默认值。
+appliesTo: Alpha
+---
+
+<!-- GENERATED: scripts/docs/generate-reference.mjs -->
+
+本页逐字来源于 \`deploy/helm/openrum/values.yaml\`，请勿手工编辑。
+
+请为环境创建独立 values 文件，并把凭据放进 \`existingSecret\` 指向的 Kubernetes Secret。
+
+\`\`\`yaml
+${helmSource.trimEnd()}
+\`\`\`
+`;
+
 // Browser SDK options. Generated so that adding a field to `ClientOptions` without
 // documenting it fails `pnpm docs:check` rather than shipping an undocumented option.
 const sdkSource = await readFile(join(root, "packages/browser-sdk/src/client.ts"), "utf8");
@@ -270,6 +287,7 @@ await emit("event-schema.md", eventSchema);
 await emit("helm-values.md", helmValues);
 await emit("sdk-options.md", sdkOptionsReference);
 await emit("configuration.md", chineseConfiguration, chineseOutputDirectory);
+await emit("helm-values.md", chineseHelmValues, chineseOutputDirectory);
 
 async function emit(name, contents, directory = outputDirectory) {
   const target = join(directory, name);

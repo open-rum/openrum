@@ -34,7 +34,7 @@ func TestFunnelHandlerRejectsExpensiveQueryBeforeClickHouse(t *testing.T) {
 	to := time.Date(2026, 9, 3, 12, 0, 0, 0, time.UTC)
 	body, _ := json.Marshal(query.FunnelQuery{From: to.Add(-15 * 24 * time.Hour), To: to, WindowSeconds: 3600,
 		Steps: []query.FunnelStep{{Kind: "page_view"}, {Kind: "click"}, {Kind: "custom", Name: "signup"}}})
-	request := httptest.NewRequest(http.MethodPost, "/api/v1/projects/"+uuid.NewString()+"/analytics/funnels/query", bytes.NewReader(body))
+	request := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/api/v1/projects/"+uuid.NewString()+"/analytics/funnels/query", bytes.NewReader(body))
 	request.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "valid"})
 	response := httptest.NewRecorder()
 	router.ServeHTTP(response, request)
@@ -46,7 +46,7 @@ func TestFunnelHandlerRejectsExpensiveQueryBeforeClickHouse(t *testing.T) {
 func TestFunnelHandlerChecksProjectAccess(t *testing.T) {
 	queries := &fakeFunnelQueries{}
 	router := funnelTestRouter(NewFunnelHandler(fakeOverviewProjects{err: metadata.ErrNotFound}, queries, zerolog.Nop()), uuid.New())
-	request := httptest.NewRequest(http.MethodPost, "/api/v1/projects/"+uuid.NewString()+"/analytics/funnels/query", bytes.NewBufferString(`{}`))
+	request := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/api/v1/projects/"+uuid.NewString()+"/analytics/funnels/query", bytes.NewBufferString(`{}`))
 	request.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "valid"})
 	response := httptest.NewRecorder()
 	router.ServeHTTP(response, request)
@@ -61,7 +61,7 @@ func TestFunnelHandlerReturnsBoundedContract(t *testing.T) {
 	to := time.Date(2026, 9, 3, 12, 0, 0, 0, time.UTC)
 	body, _ := json.Marshal(query.FunnelQuery{From: to.Add(-time.Hour), To: to, Dimension: "country", WindowSeconds: 3600,
 		Steps: []query.FunnelStep{{Kind: "page_view"}, {Kind: "click"}}})
-	request := httptest.NewRequest(http.MethodPost, "/api/v1/projects/"+uuid.NewString()+"/analytics/funnels/query", bytes.NewReader(body))
+	request := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/api/v1/projects/"+uuid.NewString()+"/analytics/funnels/query", bytes.NewReader(body))
 	request.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "valid"})
 	response := httptest.NewRecorder()
 	router.ServeHTTP(response, request)

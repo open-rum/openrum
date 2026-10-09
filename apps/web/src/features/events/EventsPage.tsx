@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useParams } from "@tanstack/react-router";
 import { ListTreeIcon, RefreshCwIcon } from "lucide-react";
 import { AsyncError } from "@/components/ui/AsyncState";
@@ -37,7 +37,8 @@ export function EventsPage() {
         description="创建项目并上报行为事件后，即可浏览事件目录。"
       />
     );
-  return <ProjectEvents project={project} />;
+  // Keyed so a project switch starts clean instead of dimming the previous project's figures.
+  return <ProjectEvents key={project.id} project={project} />;
 }
 
 function ProjectEvents({ project }: { project: Project }) {
@@ -45,6 +46,9 @@ function ProjectEvents({ project }: { project: Project }) {
   const query = useQuery({
     queryKey: ["event-explorer", filters],
     queryFn: ({ signal }) => getBehaviorAnalytics(filters, signal),
+    // Changing a filter keeps the previous figures on screen, dimmed, instead of blanking
+    // the whole page to a skeleton on every click.
+    placeholderData: keepPreviousData,
   });
   return (
     <ConsolePage width="fluid">
@@ -59,7 +63,7 @@ function ProjectEvents({ project }: { project: Project }) {
             onClick={() => void query.refetch()}
             disabled={query.isFetching}
           >
-            <RefreshCwIcon />
+            <RefreshCwIcon className={query.isFetching ? "animate-spin" : undefined} />
           </Button>
         }
       />
@@ -80,8 +84,12 @@ function ProjectEvents({ project }: { project: Project }) {
           <EventExplorer
             data={query.data}
             filters={filters}
+            isFetching={query.isFetching}
             onSelectEvent={(eventKind, eventName) => update({ eventKind, eventName })}
-            onSelectProperty={(name) => update({ dimension: `property:${name}` })}
+            onSelectProperty={(name) =>
+              update({ dimension: name ? `property:${name}` : "country" })
+            }
+            onSelectMeasurement={(measurement) => update({ measurement })}
           />
         ) : null}
       </ConsolePageContent>

@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+
+	"openrum/internal/sourcemap"
 )
 
 type ProjectDataPurge struct {
@@ -78,7 +80,11 @@ func (job *ProjectDataPurgeJob) RunOne(ctx context.Context) (bool, error) {
 		return true, errors.Join(err, job.store.Retry(ctx, purge, err))
 	}
 	for _, key := range purge.OSSKeys {
-		if err := job.objects.Delete(ctx, key); err != nil {
+		err := job.objects.Delete(ctx, key)
+		// A credential without delete permission (403) can never succeed on retry;
+		// finishing the job and leaving the object in the bucket beats failing the
+		// whole deletion at its deadline. The Console warns that objects remain.
+		if err != nil && !sourcemap.IsForbidden(err) && !sourcemap.IsObjectNotFound(err) {
 			return true, errors.Join(err, job.store.Retry(ctx, purge, err))
 		}
 	}

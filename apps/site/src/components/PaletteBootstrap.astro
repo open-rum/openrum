@@ -7,10 +7,8 @@ const { manageTheme = false } = Astro.props;
     const params = new URLSearchParams(location.search);
     let storedTheme;
     try {
-      localStorage.removeItem("openrum-palette");
       storedTheme = localStorage.getItem("openrum-theme");
     } catch {}
-    document.documentElement.dataset.palette = "citrus";
     if (params.get("embed") === "1") document.documentElement.dataset.designEmbed = "true";
     if (manageTheme) {
       const requestedTheme = params.get("theme") || storedTheme;

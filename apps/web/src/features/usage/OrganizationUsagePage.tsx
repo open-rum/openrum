@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { RefreshCwIcon, ChartColumnIcon, FolderIcon } from "lucide-react";
-import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
+import { Bar, BarChart, BarStack, CartesianGrid, XAxis, YAxis } from "recharts";
 import { ConsolePage, ConsolePageHeader, ConsoleFilterBar } from "@/components/layout/ConsolePage";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import {
@@ -14,6 +14,7 @@ import {
   TableCell,
 } from "@/components/ui/table";
 import {
+  BAR_RADIUS_TOP,
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
@@ -285,15 +286,16 @@ export function OrganizationUsagePage() {
                       }
                     />
                     <ChartLegend content={<ChartLegendContent />} />
-                    {Object.entries(chartConfig).map(([key]) => (
-                      <Bar
-                        key={key}
-                        dataKey={key}
-                        stackId="outcomes"
-                        fill={`var(--color-${key})`}
-                        isAnimationActive={animate}
-                      />
-                    ))}
+                    <BarStack stackId="outcomes" radius={BAR_RADIUS_TOP}>
+                      {Object.entries(chartConfig).map(([key]) => (
+                        <Bar
+                          key={key}
+                          dataKey={key}
+                          fill={`var(--color-${key})`}
+                          isAnimationActive={animate}
+                        />
+                      ))}
+                    </BarStack>
                   </BarChart>
                 </ChartContainer>
               ) : (

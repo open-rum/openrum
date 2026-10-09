@@ -1,0 +1,86 @@
+---
+title: React（Vite）
+description: 在 Vite 构建的 React 应用中，用 @openrum/vite-plugin 在构建时上传 Source Map，并让 SDK 上报同一个 Release。
+appliesTo: Alpha
+---
+
+import { Aside, Steps } from "@astrojs/starlight/components";
+
+React 应用用 Vite 构建时，`@openrum/vite-plugin` 会在 `vite build` 结束时自动上传 Source Map，
+不需要额外的构建步骤。开始之前，先按[概览](/zh/docs/sdk/source-maps/#创建上传令牌)创建上传令牌，
+并把它保存为 CI Secret `OPENRUM_UPLOAD_TOKEN`。
+
+<Steps>
+
+1. ## 安装插件
+
+   Alpha 阶段插件尚未发布到 npm。在 OpenRUM 仓库中构建，再把该目录安装到你的应用：
+
+   ```sh
+   pnpm --filter @openrum/vite-plugin build
+   pnpm add -D /path/to/openrum/packages/vite-plugin
+   ```
+
+1. ## 在 Vite 配置中启用
+
+   ```ts title="vite.config.ts"
+   import { defineConfig } from "vite";
+   import { openRUMSourceMaps } from "@openrum/vite-plugin";
+
+   export default defineConfig({
+     build: { sourcemap: "hidden" },
+     plugins: [
+       openRUMSourceMaps({
+         baseUrl: process.env.OPENRUM_BASE_URL!,
+         projectId: process.env.OPENRUM_PROJECT_ID!,
+         release: process.env.OPENRUM_RELEASE!,
+         commitSha: process.env.GITHUB_SHA,
+         // token 默认读取 process.env.OPENRUM_UPLOAD_TOKEN
+       }),
+     ],
+   });
+   ```
+
+   `build.sourcemap: "hidden"` 让 Vite 生成 `.map` 文件，但不在产物中写入 `sourceMappingURL`
+   注释。若设置为 `true`，插件会替你删除这些注释。
+
+   插件在构建时做的事见[概览](/zh/docs/sdk/source-maps/#插件和命令行)。如果站点部署在子路径下，
+   例如 Vite 的 `base` 为 `/static/app/` 或一个 CDN URL，还需要设置 `urlPrefix: "static/app/"`，
+   见 [Artifact 命名](/zh/docs/sdk/source-maps/#artifact-命名与-urlprefix)。
+
+1. ## 让 SDK 上报同一个 Release
+
+   用同一个 CI 变量同时设置插件的 `release` 和 SDK 的 `release`：
+
+   ```ts title="src/monitoring.ts"
+   init({
+     dsn: import.meta.env.VITE_OPENRUM_DSN,
+     release: import.meta.env.VITE_APP_RELEASE, // 与 OPENRUM_RELEASE 相同
+   });
+   ```
+
+   ```yaml title=".github/workflows/deploy.yml"
+   - name: Build and upload Source Maps
+     run: pnpm build
+     env:
+       OPENRUM_BASE_URL: https://rum.example.com
+       OPENRUM_PROJECT_ID: <your-project-id>
+       OPENRUM_RELEASE: ${{ github.sha }}
+       VITE_APP_RELEASE: ${{ github.sha }}
+       OPENRUM_UPLOAD_TOKEN: ${{ secrets.OPENRUM_UPLOAD_TOKEN }}
+   ```
+
+   <Aside type="caution" title="值不一致不会报错">
+     没有 `release` 的事件无法还原。`dist` 不同，或只在一侧设置了 `dist`，都会查到另一个 Release，
+     结果是找不到 Artifact。
+   </Aside>
+
+1. ## 验证还原
+
+   部署后按[概览](/zh/docs/sdk/source-maps/#验证还原)验证：在 **发布** 页确认 Artifact 可用，用匹配测试器
+   检查一个真实的帧，再触发一个已知错误。栈帧没有还原时，对照
+   [栈帧没有还原的原因](/zh/docs/sdk/source-maps/#栈帧没有还原的原因)。
+
+</Steps>
+
+SDK 的初始化写法见 [Browser SDK](/zh/docs/sdk/browser/)。

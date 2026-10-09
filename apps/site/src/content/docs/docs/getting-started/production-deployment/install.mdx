@@ -82,9 +82,14 @@ Complete [Deployment preparation](/docs/getting-started/production-deployment/) 
      kafkaBrokers: kafka-0:9092,kafka-1:9092,kafka-2:9092
      kafkaEventTopic: rum-events-v1
      kafkaRetentionDuration: 168h
-     redisAddress: redis.example:6379
      # Replace with the actual Ingress proxy range you operate.
      ingestTrustedProxies: "10.42.0.0/16"
+
+   # The Chart runs its own Redis by default. To use yours instead:
+   # redis:
+   #   mode: external
+   #   external:
+   #     address: redis.example:6379
 
    ingress:
      enabled: true
@@ -97,7 +102,7 @@ Complete [Deployment preparation](/docs/getting-started/production-deployment/) 
 
    - `repository/tag`: the image from the image build step.
    - `publicBaseURL/host`: the domain browsers actually visit; production requires HTTPS.
-   - Kafka and Redis addresses: endpoints reachable from Pods, not your development machine's `localhost`.
+   - Kafka address, and Redis address if you use your own: endpoints reachable from Pods, not your development machine's `localhost`. The bundled Redis is a single instance; see [Redis: bundled or external](/docs/self-hosting/kubernetes/#redis-bundled-or-external).
    - `ingestTrustedProxies`: only proxy ranges you operate, allowing rate limits to identify the real caller IP.
    - `className`: your installed Ingress Controller.
 

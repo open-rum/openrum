@@ -5,13 +5,14 @@ package consumerservice
 import (
 	"context"
 	"encoding/json"
-	"github.com/google/uuid"
 	"openrum/internal/event"
 	"openrum/internal/migrate"
 	"openrum/internal/query"
 	"openrum/migrations"
 	"testing"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 // Runs the real normalizer -> native batch writer -> SQL log query in an isolated _test DB.

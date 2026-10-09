@@ -51,7 +51,7 @@ func TestBootstrapCreatesAuthenticatedSession(t *testing.T) {
 	router.HandleFunc("POST /api/v1/setup/bootstrap", setupHandler.Bootstrap)
 	router.Handle("GET /api/v1/auth/me", httpx.RequireSession(sessions)(http.HandlerFunc(authHandler.Me)))
 
-	request := httptest.NewRequest(http.MethodPost, "/api/v1/setup/bootstrap", strings.NewReader(
+	request := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/api/v1/setup/bootstrap", strings.NewReader(
 		`{"email":"bootstrap@example.com","displayName":"Bootstrap Owner","password":"a-production-password","organizationName":"Bootstrap Team"}`,
 	))
 	request.Header.Set("Content-Type", "application/json")
@@ -66,7 +66,7 @@ func TestBootstrapCreatesAuthenticatedSession(t *testing.T) {
 		t.Fatalf("bootstrap cookies=%+v", cookies)
 	}
 
-	meRequest := httptest.NewRequest(http.MethodGet, "/api/v1/auth/me", nil)
+	meRequest := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/api/v1/auth/me", nil)
 	for _, cookie := range cookies {
 		meRequest.AddCookie(cookie)
 	}
@@ -393,7 +393,7 @@ func controlPlaneTestRouter(organizations *metadata.OrganizationRepository, proj
 
 func performControlPlaneRequest(t *testing.T, handler http.Handler, token, method, path, body string, csrf bool) *httptest.ResponseRecorder {
 	t.Helper()
-	request := httptest.NewRequest(method, path, bytes.NewBufferString(body))
+	request := httptest.NewRequestWithContext(context.Background(), method, path, bytes.NewBufferString(body))
 	request.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: token})
 	request.AddCookie(&http.Cookie{Name: auth.CSRFCookieName, Value: "test-csrf-token"})
 	if body != "" {

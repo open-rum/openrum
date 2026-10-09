@@ -12,7 +12,7 @@ import {
 import { PersistentQueue, type QueueStats } from "./queue.ts";
 
 const SDK_NAME = "@openrum/browser";
-const SDK_VERSION = "0.1.0";
+const SDK_VERSION = "0.1.1";
 const DEFAULT_FLUSH_INTERVAL_MS = 5_000;
 const MAX_RETRY_DELAY_MS = 60_000;
 

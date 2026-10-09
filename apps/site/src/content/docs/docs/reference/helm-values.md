@@ -16,8 +16,8 @@ nameOverride: ""
 fullnameOverride: ""
 
 image:
-  repository: ghcr.io/openrum/openrum
-  tag: "0.1.0"
+  repository: ghcr.io/open-rum/openrum
+  tag: "0.1.1"
   pullPolicy: IfNotPresent
 
 services:
@@ -94,7 +94,6 @@ config:
   kafkaEventTopic: rum-events-v1
   # Must match the broker topic retention used to calculate remaining drain time.
   kafkaRetentionDuration: 168h
-  redisAddress: redis.example.svc:6379
   storagePressure:
     # Disable only when a managed ClickHouse provider does not expose system.disks.
     guardEnabled: true
@@ -136,6 +135,41 @@ config:
     awsSecretAccessKey: AWS_SECRET_ACCESS_KEY
     awsSessionToken: AWS_SESSION_TOKEN
     managedSecretsMasterKey: OPENRUM_MASTER_KEY
+
+# Redis holds rate-limit counters, login throttling, dashboard caches and short-lived
+# connection state. None of it is a source of truth, but API and Ingest report not
+# ready while Redis is unreachable.
+redis:
+  # "bundled" runs one Redis instance inside this release and points OpenRUM at it.
+  # It is the quickest start, but a Redis restart briefly takes API and Ingest out of
+  # service. "external" uses a Redis you run (for example a managed instance with
+  # automatic failover behind one address) and is recommended for high availability.
+  mode: bundled
+  external:
+    # host:port of your Redis. Required when mode is "external". OpenRUM connects
+    # without a password or TLS today, so keep it on a private network.
+    address: ""
+  bundled:
+    image:
+      repository: redis
+      tag: "7.2-alpine"
+      pullPolicy: IfNotPresent
+    # Cap Redis below the memory limit and evict least-recently-used keys when full,
+    # matching the Compose topology.
+    maxMemory: 192mb
+    resources:
+      requests: { cpu: 50m, memory: 64Mi }
+      limits: { memory: 256Mi }
+    # Redis data is disposable, so it lives in memory by default and a restart starts
+    # empty. Enable a PersistentVolumeClaim to keep it across restarts.
+    persistence:
+      enabled: false
+      size: 1Gi
+      storageClassName: ""
+    # Only pods of this release may connect. Takes effect when the cluster's network
+    # plugin enforces NetworkPolicy.
+    networkPolicy:
+      enabled: true
 
 ingress:
   enabled: true

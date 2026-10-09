@@ -9,7 +9,7 @@ import {
   useSyncExternalStore,
   type ReactNode,
 } from "react";
-import { ArrowLeftIcon, CalendarRangeIcon } from "lucide-react";
+import { ArrowLeftIcon, CalendarRangeIcon, CheckIcon, ChevronRightIcon } from "lucide-react";
 import type { DateRange } from "react-day-picker";
 import { zhCN } from "react-day-picker/locale";
 import { Button } from "@/components/ui/button";
@@ -51,20 +51,47 @@ export const analysisRangePresets = [
 ] as const;
 
 type AnalysisRangePreset = (typeof analysisRangePresets)[number];
+type AnalysisRangePresetValue = AnalysisRangePreset["value"];
+
+const calendarOrder = [
+  "today",
+  "yesterday",
+  "day-before-yesterday",
+  "same-day-last-week",
+  "last-week",
+  "month-to-date",
+];
+// Rolling windows and calendar periods answer different questions, so the picker lists
+// them in two labelled columns, the way the Console's other menus group options.
+const presetGroups = [
+  {
+    label: "相对时间",
+    items: analysisRangePresets.filter((item) => "duration" in item),
+  },
+  {
+    label: "日历",
+    items: analysisRangePresets
+      .filter((item) => "calendar" in item)
+      .sort((a, b) => calendarOrder.indexOf(a.value) - calendarOrder.indexOf(b.value)),
+  },
+];
 
 type AnalysisContextValue = {
   projectId: string;
   from: Date;
   to: Date;
+  timePreset?: AnalysisRangePresetValue;
   environment?: string;
-  update: (patch: Partial<Pick<AnalysisContextValue, "from" | "to" | "environment">>) => void;
+  update: (
+    patch: Partial<Pick<AnalysisContextValue, "from" | "to" | "timePreset" | "environment">>,
+  ) => void;
 };
 
 const AnalysisContext = createContext<AnalysisContextValue | null>(null);
 
 export function isAnalysisRoute(pathname: string) {
   return (
-    /^\/projects\/[^/]+\/(?:analytics(?:\/(?:funnels|paths|retention))?|overview|issues(?:\/[^/]+)?|performance|events|logs|apis|sessions)\/?$/.test(
+    /^\/projects\/[^/]+\/(?:analytics(?:\/(?:funnels|paths|retention))?|overview(?:\/[^/]+)?|issues(?:\/[^/]+)?|performance|events|logs|apis|sessions)\/?$/.test(
       pathname,
     ) || /^\/(?:funnels|paths|retention|sessions|events|issues|performance|apis)\/?$/.test(pathname)
   );
@@ -75,9 +102,18 @@ export function useAnalysisContextState(project: Project | undefined, active: bo
   const value = useMemo(() => resolveContext(project, new URL(href)), [href, project]);
 
   const update = useCallback(
-    (patch: Partial<Pick<AnalysisContextValue, "from" | "to" | "environment">>) => {
+    (patch: Partial<Pick<AnalysisContextValue, "from" | "to" | "timePreset" | "environment">>) => {
       if (!project || !value) return;
-      const next = { ...value, ...patch };
+      const rangeChanged = patch.from !== undefined || patch.to !== undefined;
+      const timePreset = patch.timePreset ?? (rangeChanged ? undefined : value.timePreset);
+      const next = { ...value, ...patch, timePreset };
+      if (timePreset) {
+        const preset = findPreset(timePreset);
+        if (!preset) return;
+        const range = resolvePresetRange(preset, roundedMinute(new Date()));
+        next.from = range.from;
+        next.to = range.to;
+      }
       if (!validRange(next.from, next.to)) return;
       persistContext(next);
       writeContextToURL(next, "push");
@@ -89,8 +125,50 @@ export function useAnalysisContextState(project: Project | undefined, active: bo
     if (!active || !value) return;
     persistContext(value);
     const url = new URL(window.location.href);
-    if (validURLRange(url.searchParams)) return;
+    if (urlMatchesContext(url.searchParams, value)) return;
     writeContextToURL(value, "replace");
+  }, [active, value]);
+
+  useEffect(() => {
+    if (!active || !value?.timePreset) return;
+    const preset = findPreset(value.timePreset);
+    if (!preset) return;
+    let timer: number;
+    let stopped = false;
+    const refresh = () => {
+      if (document.visibilityState === "hidden") return;
+      const range = resolvePresetRange(preset, roundedMinute(new Date()));
+      const next = validRange(range.from, range.to)
+        ? { ...value, ...range }
+        : { ...value, timePreset: undefined };
+      if (
+        next.timePreset === value.timePreset &&
+        next.from.getTime() === value.from.getTime() &&
+        next.to.getTime() === value.to.getTime()
+      )
+        return;
+      persistContext(next);
+      writeContextToURL(next, "replace");
+    };
+    const schedule = () => {
+      timer = window.setTimeout(
+        () => {
+          if (stopped) return;
+          refresh();
+          schedule();
+        },
+        60_000 - (Date.now() % 60_000) + 50,
+      );
+    };
+    schedule();
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refresh);
+    return () => {
+      stopped = true;
+      window.clearTimeout(timer);
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refresh);
+    };
   }, [active, value]);
 
   return value ? { ...value, update } : null;
@@ -124,7 +202,7 @@ export function AnalysisContextControls({ context }: { context: AnalysisContextV
   }));
   const [fromTimeDraft, setFromTimeDraft] = useState(() => toTimeInput(context.from));
   const [toTimeDraft, setToTimeDraft] = useState(() => toTimeInput(context.to));
-  const preset = matchingPreset(context.from, context.to);
+  const preset = findPreset(context.timePreset);
   const draftFrom = combineDateAndTime(dateDraft.from, fromTimeDraft);
   const draftTo = combineDateAndTime(dateDraft.to, toTimeDraft);
   const customError = validateDraft(draftFrom, draftTo);
@@ -136,9 +214,8 @@ export function AnalysisContextControls({ context }: { context: AnalysisContextV
   };
 
   const applyPreset = (item: AnalysisRangePreset) => {
-    const range = resolvePresetRange(item, roundedMinute(new Date()));
-    if (!validRange(range.from, range.to)) return;
-    context.update(range);
+    if (!validRangeForPreset(item)) return;
+    context.update({ timePreset: item.value });
     setPopoverOpen(false);
   };
 
@@ -175,39 +252,61 @@ export function AnalysisContextControls({ context }: { context: AnalysisContextV
             sideOffset={8}
           >
             {view === "presets" ? (
-              <div
-                className="analysis-time-popover__preset-grid"
-                role="group"
-                aria-label="快捷时间范围"
-              >
-                {analysisRangePresets.map((item) => {
-                  const available = validRangeForPreset(item);
-                  return (
-                    <Button
-                      key={item.value}
-                      type="button"
-                      variant={preset?.value === item.value ? "secondary" : "ghost"}
-                      disabled={!available}
-                      title={
-                        available ? undefined : "当前月份已超过 30 天，请改用最近 30 天或自定义范围"
-                      }
-                      onClick={() => applyPreset(item)}
-                    >
-                      {item.label}
-                    </Button>
-                  );
-                })}
-                <Button
-                  type="button"
-                  variant={preset ? "ghost" : "secondary"}
-                  onClick={() => {
-                    resetDraft();
-                    setView("custom");
-                  }}
+              <>
+                <div
+                  className="analysis-time-popover__presets"
+                  role="group"
+                  aria-label="快捷时间范围"
                 >
-                  自定义
-                </Button>
-              </div>
+                  {presetGroups.map((group) => (
+                    <div key={group.label} className="analysis-time-popover__column">
+                      <p className="analysis-time-popover__label">{group.label}</p>
+                      {group.items.map((item) => {
+                        const available = validRangeForPreset(item);
+                        const selected = preset?.value === item.value;
+                        return (
+                          <button
+                            key={item.value}
+                            type="button"
+                            className="analysis-time-popover__item"
+                            aria-pressed={selected}
+                            disabled={!available}
+                            title={
+                              available
+                                ? undefined
+                                : "当前月份已超过 30 天，请改用最近 30 天或自定义范围"
+                            }
+                            onClick={() => applyPreset(item)}
+                          >
+                            <span>{item.label}</span>
+                            {selected ? <CheckIcon aria-hidden="true" /> : null}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ))}
+                </div>
+                <Separator />
+                <div className="analysis-time-popover__custom">
+                  <button
+                    type="button"
+                    className="analysis-time-popover__item"
+                    aria-pressed={!preset}
+                    onClick={() => {
+                      resetDraft();
+                      setView("custom");
+                    }}
+                  >
+                    <span>自定义</span>
+                    {!preset ? (
+                      <span className="analysis-time-popover__current" aria-hidden="true">
+                        {formatCompactRange(context.from, context.to)}
+                      </span>
+                    ) : null}
+                    <ChevronRightIcon aria-hidden="true" />
+                  </button>
+                </div>
+              </>
             ) : (
               <>
                 <PopoverHeader className="analysis-time-popover__header">
@@ -296,6 +395,14 @@ function resolveContext(
   url: URL,
 ): Omit<AnalysisContextValue, "update"> | null {
   if (!project) return null;
+  const timePreset = findPreset(url.searchParams.get("timePreset"));
+  const environment = cleanEnvironment(url.searchParams.get("environment"));
+  if (timePreset) {
+    const range = resolvePresetRange(timePreset, roundedMinute(new Date()));
+    if (validRange(range.from, range.to)) {
+      return { projectId: project.id, ...range, timePreset: timePreset.value, environment };
+    }
+  }
   const from = parseDate(url.searchParams.get("from"));
   const to = parseDate(url.searchParams.get("to"));
   if (from && to && validRange(from, to)) {
@@ -303,7 +410,7 @@ function resolveContext(
       projectId: project.id,
       from,
       to,
-      environment: cleanEnvironment(url.searchParams.get("environment")),
+      environment,
     };
   }
   const stored = readStoredContext(project.id);
@@ -313,7 +420,9 @@ function resolveContext(
     projectId: project.id,
     from: new Date(defaultTo.getTime() - DAY),
     to: defaultTo,
-    environment: project.environment,
+    timePreset: "24h",
+    // All environments until the user picks one from the switcher.
+    environment: undefined,
   };
 }
 
@@ -324,6 +433,8 @@ function writeContextToURL(
   const url = new URL(window.location.href);
   url.searchParams.set("from", context.from.toISOString());
   url.searchParams.set("to", context.to.toISOString());
+  if (context.timePreset) url.searchParams.set("timePreset", context.timePreset);
+  else url.searchParams.delete("timePreset");
   if (context.environment) url.searchParams.set("environment", context.environment);
   else url.searchParams.delete("environment");
   url.searchParams.delete("cursor");
@@ -360,6 +471,7 @@ function persistContext(context: Omit<AnalysisContextValue, "update">) {
       JSON.stringify({
         from: context.from.toISOString(),
         to: context.to.toISOString(),
+        timePreset: context.timePreset,
         environment: context.environment,
       }),
     );
@@ -372,7 +484,24 @@ function readStoredContext(projectId: string): Omit<AnalysisContextValue, "updat
   try {
     const raw = window.localStorage.getItem(`${STORAGE_PREFIX}${projectId}`);
     if (!raw) return null;
-    const candidate = JSON.parse(raw) as { from?: string; to?: string; environment?: string };
+    const candidate = JSON.parse(raw) as {
+      from?: string;
+      to?: string;
+      timePreset?: string;
+      environment?: string;
+    };
+    const timePreset = findPreset(candidate.timePreset);
+    if (timePreset) {
+      const range = resolvePresetRange(timePreset, roundedMinute(new Date()));
+      if (validRange(range.from, range.to)) {
+        return {
+          projectId,
+          ...range,
+          timePreset: timePreset.value,
+          environment: cleanEnvironment(candidate.environment ?? null),
+        };
+      }
+    }
     const from = parseDate(candidate.from ?? null);
     const to = parseDate(candidate.to ?? null);
     if (!from || !to || !validRange(from, to)) return null;
@@ -400,10 +529,15 @@ function currentURL() {
   return window.location.href;
 }
 
-function validURLRange(search: URLSearchParams) {
+function urlMatchesContext(search: URLSearchParams, context: Omit<AnalysisContextValue, "update">) {
   const from = parseDate(search.get("from"));
   const to = parseDate(search.get("to"));
-  return Boolean(from && to && validRange(from, to));
+  return (
+    from?.getTime() === context.from.getTime() &&
+    to?.getTime() === context.to.getTime() &&
+    search.get("timePreset") === (context.timePreset ?? null) &&
+    cleanEnvironment(search.get("environment")) === context.environment
+  );
 }
 
 function validRange(from: Date, to: Date) {
@@ -422,19 +556,8 @@ function cleanEnvironment(value: string | null) {
   return trimmed && /^[a-z][a-z0-9_-]{0,63}$/.test(trimmed) ? trimmed : undefined;
 }
 
-function matchingPreset(from: Date, to: Date) {
-  const now = roundedMinute(new Date());
-  return analysisRangePresets.find((item) => {
-    if ("duration" in item) {
-      const duration = to.getTime() - from.getTime();
-      return item.duration === duration && nearInstant(now, to);
-    }
-    const range = resolvePresetRange(item, now);
-    const endsNow = item.calendar === "today" || item.calendar === "month-to-date";
-    return (
-      sameInstant(range.from, from) && (endsNow ? nearInstant(now, to) : sameInstant(range.to, to))
-    );
-  });
+function findPreset(value: string | null | undefined) {
+  return analysisRangePresets.find((item) => item.value === value);
 }
 
 function validRangeForPreset(item: AnalysisRangePreset) {
@@ -473,14 +596,6 @@ function addLocalDays(value: Date, days: number) {
   const result = new Date(value);
   result.setDate(result.getDate() + days);
   return result;
-}
-
-function sameInstant(left: Date, right: Date) {
-  return Math.abs(left.getTime() - right.getTime()) < 1000;
-}
-
-function nearInstant(left: Date, right: Date) {
-  return Math.abs(left.getTime() - right.getTime()) <= 2 * 60 * 1000;
 }
 
 function roundedMinute(value: Date) {

@@ -32,6 +32,7 @@ import {
 import { getProject, listOrganizations } from "@/lib/api/projects";
 import { recordProductEvent } from "@/lib/telemetry/productEvents";
 import { ProjectCreatePage } from "@/features/projects/ProjectCreatePage";
+import { UploadTokensSection } from "@/features/settings/UploadTokensSection";
 import { getProjectPlatform } from "@/features/projects/projectPlatforms";
 import { ConnectionStatus } from "./ConnectionStatus";
 import { rejectGuidance } from "./guidance";
@@ -229,6 +230,8 @@ function ProjectOnboarding({
         </CardContent>
       </Card>
 
+      <UploadTokensSection projectId={project.id} />
+
       <Separator />
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -253,11 +256,11 @@ function ProjectOnboarding({
           {status?.lastEventQueryableAt ? (
             <Button asChild>
               <Link to="/projects/$projectId/overview" params={{ projectId: project.id }}>
-                进入数据大盘
+                进入仪表盘
               </Link>
             </Button>
           ) : (
-            <Button disabled>进入数据大盘</Button>
+            <Button disabled>进入仪表盘</Button>
           )}
         </div>
       </div>

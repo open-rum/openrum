@@ -1,7 +1,7 @@
 ---
 title: SDK options
 description: Generated reference for every @openrum/browser initialization option.
-appliesTo: "@openrum/browser 0.1.0"
+appliesTo: "@openrum/browser 0.1.1"
 ---
 
 <!-- GENERATED: scripts/docs/generate-reference.mjs -->
@@ -12,7 +12,7 @@ Generated from `packages/browser-sdk/src/client.ts`; do not edit by hand. Pass t
 | Option | Type | Default | Notes |
 | --- | --- | --- | --- |
 | `dsn` | `string` | required | Public Project connection string containing the Ingest URL and write-only client key. |
-| `environment` | `string` | `"production"` | Separates Events from staging and production. |
+| `environment` | `Environment` | `"production"` | Separates Events from staging and production. |
 | `release` | `string` | unset | Required for mapped stack frames. Must match the uploaded Release. |
 | `dist` | `string` | unset | Distinguishes builds that share one Release. |
 | `eventSampleRate` | `number` | `1` | Page Views, interactions, Custom Events and opted-in Logs. |

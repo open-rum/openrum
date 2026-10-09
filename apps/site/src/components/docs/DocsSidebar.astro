@@ -25,12 +25,6 @@ const entries = active ? active.entries : sidebar;
   }
 </nav>
 
-{
-  /* The sidebar no longer shows the whole tree, so it says which tab it is scoped to
-     rather than presenting a handful of links with no anchor. */
-  active && <p class="docs-sidebar-topic">{active.label}</p>
-}
-
 <SidebarPersister>
   <SidebarSublist sublist={entries} />
 </SidebarPersister>
@@ -40,16 +34,6 @@ const entries = active ? active.entries : sidebar;
 </div>
 
 <style>
-  .docs-sidebar-topic {
-    margin: 0 0 0.75rem;
-    padding-inline: 0.5rem;
-    color: var(--ds-text-muted);
-    font-size: 0.75rem;
-    font-weight: 600;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-  }
-
   /* The header hides its tab row at this width, so the drawer has to carry it. */
   .docs-mobile-tabs {
     display: grid;
@@ -60,7 +44,7 @@ const entries = active ? active.entries : sidebar;
   }
   .docs-mobile-tabs a {
     padding: 0.4rem 0.5rem;
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-field);
     color: var(--ds-text-muted);
     text-decoration: none;
     font-size: 0.9375rem;

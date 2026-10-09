@@ -1,0 +1,115 @@
+---
+title: The openrum command
+description: Start, inspect and reset the local OpenRUM development stack with one command.
+appliesTo: Alpha
+---
+
+import { Aside } from "@astrojs/starlight/components";
+
+`openrum` is the development-stack tool in the source repository. It starts the containers and the host processes together, waits until each one is ready rather than merely launched, and reports both halves in one place. It is for working on OpenRUM or evaluating it from a checkout. It is not a production tool and is not shipped with the SDK.
+
+Run it from the repository root through pnpm:
+
+```sh
+pnpm openrum <command>
+```
+
+The `openrum` script runs `go run ./cmd/openrum`, so Go must be installed for every command, including `up`. Commands also need Docker with Compose v2 and a running Docker daemon. `dev` additionally needs `pnpm` on the path for the host Console. The command checks these first and names what is missing.
+
+On macOS and Linux it runs directly. On Windows, use WSL.
+
+## Commands
+
+| Command                       | Effect                                                                  |
+| ----------------------------- | ----------------------------------------------------------------------- |
+| `pnpm openrum dev`            | API and Console from source, everything else in containers              |
+| `pnpm openrum up`             | Every service in a container                                            |
+| `pnpm openrum status`         | What is running, and what is not ready yet                              |
+| `pnpm openrum logs [service]` | Follow logs; a host service tails its own file                          |
+| `pnpm openrum restart <name>` | Restart one service and wait for it to come back                        |
+| `pnpm openrum seed`           | Load the demo account and dataset into a running stack                  |
+| `pnpm openrum stop`           | Stop everything, keeping the containers and their data                  |
+| `pnpm openrum down`           | Remove the containers, keeping the volumes                              |
+| `pnpm openrum reset`          | Remove the containers and delete every local database, after confirming |
+
+Run `pnpm openrum help` for the same list in the terminal.
+
+## Load the demo dataset
+
+`pnpm openrum seed` loads a repeatable ecommerce dataset into a running stack: a demo owner, an Organization, a Project and about 30,000 Sessions across 14 days. Run it after `up` or `dev` has reported the stack ready. It is optional, and running it again does not duplicate data.
+
+Nothing seeds on start, so a fresh stack is empty and its first visit opens the setup page. The command does nothing on an Instance whose owner you created yourself. For small amounts of data while you work, use **造数据** in the Console instead.
+
+## Choose a mode
+
+`dev` and `up` are the two ways to start the stack.
+
+| | `dev` | `up` |
+| --- | --- | --- |
+| API and Console | Run from source on the host, with Console hot reload and fast Go restarts | Run in containers, as a deployment does |
+| Infrastructure and pipeline | Containers | Containers |
+| Use it to | Change OpenRUM code | Evaluate the product, or check a build behaves like a deployment |
+
+Both modes serve the Console at `http://127.0.0.1:4173`. Because they share that address, they never run at the same time. Entering one stops the other's half: `dev` stops the API and proxy containers, and `up` stops the host processes. Two stacks against one database would mean two APIs and two consumers, and the half-processed data that results looks like a bug in the product.
+
+`dev` also builds the Browser SDK before it starts, so the examples can import it.
+
+## Read the status
+
+`status` asks Compose and the host supervisor, then prints one row per service:
+
+```text
+mode dev, environment deploy/compose/.env.example
+
+SERVICE     WHERE      STATE    DETAIL
+postgres    container  ready    127.0.0.1:5433
+clickhouse  container  ready    127.0.0.1:9000
+kafka       container  ready    127.0.0.1:9092
+redis       container  ready    127.0.0.1:6379
+ingest      container  ready    127.0.0.1:8081
+consumer    container  ready
+worker      container  ready
+api         host       ready    pid 22424, 127.0.0.1:8080
+web         host       running  http://127.0.0.1:4173
+```
+
+When something is not ready, a final line lists what is blocking, for example `not ready yet: …`. Start and `status` both wait on readiness, so a successful `dev` or `up` means the Console answers, not only that the processes launched.
+
+## Logs and restarts
+
+```sh
+pnpm openrum logs api
+pnpm openrum logs ingest consumer worker
+pnpm openrum restart api
+```
+
+In `dev` mode `api` and `web` run on the host, so `logs api` tails their own log file under `.openrum/`. Everything else is a container and uses Compose logs. `restart` stops a host service and starts it again, which recompiles the Go API, or restarts a container and waits for it to return. A container restart does not rebuild its image; rerun `pnpm openrum dev` after changing Ingest, Consumer, Worker or migrations.
+
+## Stop, remove and reset
+
+The last three commands differ in how much they keep.
+
+| Command | Containers | Volumes and data |
+| --- | --- | --- |
+| `stop` | Kept, so the next start is quick | Kept |
+| `down` | Removed | Kept |
+| `reset` | Removed | Deleted |
+
+<Aside type="caution" title="reset deletes every local database">
+  `pnpm openrum reset` removes all local PostgreSQL, ClickHouse, Kafka and Redis volumes and asks
+  for confirmation first. Pass `--yes` to skip the prompt. The next start applies migrations and
+  begins empty; run `pnpm openrum seed` to load the demo dataset again.
+</Aside>
+
+## Ports, credentials and state
+
+Ports and credentials come from `deploy/compose/.env`, falling back to the committed `deploy/compose/.env.example`. Both halves of the stack read that one file, so changing `CONSOLE_PORT` there moves the Console in both modes.
+
+If a port is already taken, `openrum` names the process holding it and stops instead of starting a second copy. Stop that process or choose another port in the env file.
+
+Host processes are detached from the terminal that started them, so closing the terminal does not stop the stack. Their process IDs and logs live in `.openrum/`, which git ignores.
+
+## Next
+
+- [Environment and startup](/docs/getting-started/local-development/) for the first run and demo sign-in
+- [Development and troubleshooting](/docs/getting-started/local-development/workflow/) for what to restart after each kind of change

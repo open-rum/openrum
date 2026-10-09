@@ -77,9 +77,10 @@ func (handler *AuthHandler) Login(writer http.ResponseWriter, request *http.Requ
 	}
 	handler.setCookies(writer, credentials)
 	writeJSON(writer, http.StatusOK, map[string]string{
-		"userId":      user.ID.String(),
-		"email":       user.Email,
-		"displayName": user.DisplayName,
+		"userId":       user.ID.String(),
+		"email":        user.Email,
+		"displayName":  user.DisplayName,
+		"accessStatus": "approved",
 	})
 }
 
@@ -94,7 +95,36 @@ func (handler *AuthHandler) Me(writer http.ResponseWriter, request *http.Request
 		Email        string `json:"email"`
 		DisplayName  string `json:"displayName"`
 		InstanceRole string `json:"instanceRole,omitempty"`
-	}{principal.UserID.String(), principal.Email, principal.DisplayName, principal.InstanceRole})
+		AccessStatus string `json:"accessStatus"`
+		HasPassword  bool   `json:"hasPassword"`
+	}{principal.UserID.String(), principal.Email, principal.DisplayName, principal.InstanceRole, principal.AccessStatus, principal.HasPassword})
+}
+
+func (handler *AuthHandler) SetInitialPassword(writer http.ResponseWriter, request *http.Request) {
+	principal, ok := httpx.PrincipalFromContext(request.Context())
+	if !ok {
+		httpx.WriteError(writer, request, http.StatusUnauthorized, "UNAUTHENTICATED", "Authentication is required.")
+		return
+	}
+	var payload struct {
+		Password string `json:"password"`
+	}
+	if !decodeJSONBody(writer, request, &payload) {
+		return
+	}
+	if err := handler.sessions.SetInitialPassword(request.Context(), principal, payload.Password); err != nil {
+		var validation *auth.ValidationError
+		switch {
+		case errors.As(err, &validation):
+			httpx.WriteError(writer, request, http.StatusBadRequest, "VALIDATION_ERROR", "Password must contain at least 12 characters.")
+		case errors.Is(err, auth.ErrReauthenticationRequired):
+			httpx.WriteError(writer, request, http.StatusUnauthorized, "REAUTHENTICATION_REQUIRED", "Sign in again before setting a password.")
+		default:
+			handler.internalError(writer, request, err)
+		}
+		return
+	}
+	writer.WriteHeader(http.StatusNoContent)
 }
 
 func (handler *AuthHandler) Logout(writer http.ResponseWriter, request *http.Request) {

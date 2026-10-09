@@ -10,6 +10,7 @@ export {
   OpenRUMClient,
   type CapturedEvent,
   type ClientOptions,
+  type Environment,
   type EventInput,
   type EventSink,
   type Integration,

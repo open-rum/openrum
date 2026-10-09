@@ -18,12 +18,21 @@ export function describeComparison(data: ScalarData, widget: Widget) {
   const rounded = Number(change.toFixed(comparison.unit === "points" ? 2 : 1));
   const label = `${rounded > 0 ? "+" : ""}${rounded.toFixed(comparison.unit === "points" ? 2 : 1)}${comparison.unit === "points" ? "pp" : "%"}`;
   if (rounded === 0) return { ...neutral, label };
-  const lowerIsBetter =
-    widget.data.source === "overview" &&
-    ["errorRate", "apiFailureRate", "lcp", "inp", "cls"].includes(widget.data.metrics[0]);
+  const direction = rounded > 0 ? ("up" as const) : ("down" as const);
+  // Catalog metrics say which way is better; a neutral one (a revenue figure, say) shows its
+  // change without calling it good or bad. Classic metrics keep their fixed list.
+  const better =
+    widget.data.source === "catalog" && widget.data.direction
+      ? widget.data.direction
+      : data.direction;
+  if (better === "neutral") return { label, direction, tone: "neutral" as const };
+  const lowerIsBetter = better
+    ? better === "down"
+    : widget.data.source === "overview" &&
+      ["errorRate", "apiFailureRate", "lcp", "inp", "cls"].includes(widget.data.metrics[0]);
   return {
     label,
-    direction: rounded > 0 ? ("up" as const) : ("down" as const),
+    direction,
     tone: (lowerIsBetter ? rounded < 0 : rounded > 0)
       ? ("positive" as const)
       : ("negative" as const),

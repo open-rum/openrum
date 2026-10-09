@@ -147,7 +147,8 @@ func TestAdminMemberMutationRejectsExpiredElevation(t *testing.T) {
 func newFakeInstanceMembers(ownerID, adminID uuid.UUID) *fakeInstanceMembers {
 	now := time.Now().UTC()
 	newAdminID := uuid.New()
-	newAdmin := metadata.User{ID: newAdminID, Email: "new-admin@example.com", DisplayName: "New Admin"}
+	passwordHash := "existing-local-password-hash"
+	newAdmin := metadata.User{ID: newAdminID, Email: "new-admin@example.com", DisplayName: "New Admin", PasswordHash: &passwordHash}
 	return &fakeInstanceMembers{
 		roles: map[uuid.UUID]metadata.InstanceRole{ownerID: metadata.InstanceRoleOwner, adminID: metadata.InstanceRoleAdmin},
 		users: map[string]metadata.User{newAdmin.Email: newAdmin},
@@ -184,7 +185,7 @@ func adminMemberTestRouterWithElevation(
 }
 
 func performAdminRequest(handler http.Handler, token, method, path, body string, csrf bool) *httptest.ResponseRecorder {
-	request := httptest.NewRequest(method, path, strings.NewReader(body))
+	request := httptest.NewRequestWithContext(context.Background(), method, path, strings.NewReader(body))
 	request.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: token})
 	request.AddCookie(&http.Cookie{Name: auth.CSRFCookieName, Value: "test-csrf-token"})
 	if body != "" {

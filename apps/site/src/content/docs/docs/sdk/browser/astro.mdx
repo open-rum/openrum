@@ -1,0 +1,122 @@
+---
+title: Astro
+description: Initialize the OpenRUM browser SDK from an Astro client script or island.
+appliesTo: "@openrum/browser 0.1.1"
+---
+
+import { Aside, Tabs, TabItem } from "@astrojs/starlight/components";
+
+Astro renders to HTML on the server and ships JavaScript only where you ask for it. That
+makes placement explicit: `@openrum/browser` belongs in a client script or a hydrated
+island, never in a component's frontmatter.
+
+<Aside type="danger" title="Frontmatter runs on the server">
+  Code between the `---` fences in a `.astro` file executes during the build or the request, where
+  there is no `window`. `init()` there returns a client with no transport and counts every Event as
+  dropped, without throwing or logging.
+</Aside>
+
+## Initialize
+
+<Tabs syncKey="astro-style">
+  <TabItem label="Client script">
+
+A `<script>` tag in a layout is the smallest option — Astro bundles it and it runs only in
+the browser.
+
+```astro
+---
+// src/layouts/Base.astro
+---
+
+<html lang="en">
+  <body>
+    <slot />
+    <script>
+      import { init } from "@openrum/browser";
+
+      init({
+        dsn: import.meta.env.PUBLIC_OPENRUM_DSN,
+        environment: import.meta.env.MODE,
+        release: import.meta.env.PUBLIC_APP_RELEASE,
+      });
+    </script>
+  </body>
+</html>
+```
+
+The `PUBLIC_` prefix is what makes a value reachable from browser code. A DSN contains a
+browser-public credential that only authorizes appending Events to one Project.
+
+  </TabItem>
+  <TabItem label="Island">
+
+If your project already hydrates a framework component, initialize from it and mount the
+island once with `client:load`.
+
+```tsx
+// src/components/Monitoring.tsx
+import { init } from "@openrum/browser";
+import { useEffect } from "react";
+
+export function Monitoring() {
+  useEffect(() => {
+    init({
+      dsn: import.meta.env.PUBLIC_OPENRUM_DSN,
+      environment: import.meta.env.MODE,
+      release: import.meta.env.PUBLIC_APP_RELEASE,
+    });
+  }, []);
+
+  return null;
+}
+```
+
+```astro
+---
+// src/layouts/Base.astro
+import { Monitoring } from "../components/Monitoring";
+---
+
+<Monitoring client:load />
+```
+
+`client:idle` or `client:visible` would defer initialization past the first paint, so early
+Errors and Web Vitals would be missed. Use `client:load`.
+
+  </TabItem>
+</Tabs>
+
+## Islands share one client
+
+`init()` returns the running client when one already exists, and it is that client the
+top-level `captureEvent()` and `setUser()` helpers talk to. So every island on the page
+reports into the same Session as long as one of them has initialized. Islands that only
+report do not need their own `init()`:
+
+```tsx
+import { captureEvent } from "@openrum/browser";
+
+captureEvent("newsletter_subscribed", { attributes: { placement: "footer" } });
+```
+
+Before any `init()` runs, those helpers are no-ops — they do not queue. An island hydrated
+with `client:visible` above your `client:load` monitoring island can therefore lose its
+first Events.
+
+## Navigations
+
+A static Astro site does a full document load per navigation, so each one is its own Page
+View and its own Page. With
+[client-side routing](https://docs.astro.build/en/guides/view-transitions/) enabled, Astro
+navigates through `history.pushState`, which the SDK observes — but the script that called
+`init()` is not re-executed, so no extra guard is needed.
+
+## What is not covered
+
+| Concern                        | State                                                                                       |
+| ------------------------------ | ------------------------------------------------------------------------------------------- |
+| Errors during SSR or the build | Not captured. The SDK observes the browser only.                                            |
+| Astro endpoints and actions    | Not captured directly. Their failures appear as failed fetch Requests from the browser.     |
+| Route patterns                 | Not recorded. See [Route patterns](/docs/sdk/browser/#route-patterns-are-not-recorded-yet). |
+| Source Maps                    | Upload per Release after the build. See [Source Maps](/docs/sdk/source-maps/).              |

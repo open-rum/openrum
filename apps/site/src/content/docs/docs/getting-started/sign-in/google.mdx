@@ -1,0 +1,43 @@
+---
+title: Sign in with Google
+description: Register a Google OAuth web client, configure it in OpenRUM, and sign in.
+appliesTo: Alpha
+---
+
+import { Aside, Steps, LinkCard } from "@astrojs/starlight/components";
+
+Google sign-in uses an OpenID Connect authorization-code flow. OpenRUM checks the ID token and requires a verified email. It works with eligible Google and Google Workspace accounts; your Google application's audience determines who can authorize it.
+
+Before starting, deploy OpenRUM at its canonical HTTPS `PUBLIC_BASE_URL`, sign in as Instance Owner, and [enable encrypted secret storage](/docs/self-hosting/authentication/). Without the master key, you can inspect the Google card but cannot save or enable it.
+
+<Steps>
+
+1. ## Create a Google OAuth client
+
+   In the [Google Cloud Console](https://console.cloud.google.com/apis/credentials), prepare the application's branding and audience, then create an OAuth client of type **Web application**. Add this exact **Authorized redirect URI** for the default provider ID `google`:
+
+   ```text
+   https://rum.example.com/api/v1/auth/providers/google/callback
+   ```
+
+   Replace `rum.example.com` with your `PUBLIC_BASE_URL` host. If you choose a different provider ID, use it in the path. Copy the Client ID and Client Secret. OpenRUM requests only `openid`, `profile`, and `email` scopes; make sure the account you will test can use the Google application.
+
+1. ## Configure and test OpenRUM
+
+   Open **System Settings → Authentication**, select the **Google** card, and enter the provider ID, display name, Client ID, and Client Secret. Leave **Enable and show on login** unchecked, then select **Save configuration**. Re-enter the Owner's OpenRUM password when prompted. Select **Test connection** and finish Google's consent flow. A successful test returns to the settings page without creating a user account.
+
+1. ## Enable and sign in
+
+   Check **Enable and show on login** and save again. In a separate browser session, open the login page and select **Sign in with Google**. If this is a new external account, an Organization administrator must grant it access. If you already have an OpenRUM account, [connect Google in Account](/docs/getting-started/sign-in/) before using the login button.
+
+</Steps>
+
+<Aside type="tip" title="If sign-in fails">
+  Check that the registered redirect URI exactly matches the address shown in the Google card,
+  including scheme and path. Check the application's audience and the test account, then retry
+  **Test connection**. A pending account needs an Organization role before it can use the Console.
+</Aside>
+
+Google's [OpenID Connect setup guide](https://developers.google.com/identity/openid-connect/openid-connect) describes its OAuth client, redirect URI, consent screen, and scopes.
+
+<LinkCard title="Other sign-in methods" href="/docs/getting-started/sign-in/" />

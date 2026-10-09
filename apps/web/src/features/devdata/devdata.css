@@ -46,7 +46,7 @@
   gap: var(--space-2);
   padding: var(--space-3);
   border: 1px solid var(--ds-border);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-surface);
   background: var(--ds-surface);
 }
 .devdata-field > legend,
@@ -58,9 +58,9 @@
 .devdata-field input,
 .devdata-advanced textarea {
   width: 100%;
-  padding: 6px var(--space-2);
+  padding: 6px var(--space-3);
   border: 1px solid var(--ds-border);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-control);
   background: var(--ds-surface);
   color: var(--ds-text);
   font-size: var(--text-table);
@@ -79,7 +79,7 @@
 .devdata-windows button {
   padding: 4px var(--space-2);
   border: 1px solid var(--ds-border);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-control);
   background: var(--ds-surface);
   color: var(--ds-text-muted);
   font-size: var(--text-caption);
@@ -112,6 +112,7 @@
   font-size: var(--text-table);
 }
 .devdata-advanced textarea {
+  border-radius: var(--radius-field);
   font-family: var(--font-mono, ui-monospace, monospace);
   font-size: var(--text-caption);
   line-height: 1.6;
@@ -128,7 +129,7 @@
   gap: var(--space-3);
   padding: var(--space-3);
   border: 1px solid var(--ds-border);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-surface);
   background: var(--ds-surface);
 }
 .devdata-result-cards {

@@ -1,11 +1,23 @@
+import SiAndroid from "@icons-pack/react-simple-icons/icons/SiAndroid";
+import SiApple from "@icons-pack/react-simple-icons/icons/SiApple";
 import SiArc from "@icons-pack/react-simple-icons/icons/SiArc";
 import SiBrave from "@icons-pack/react-simple-icons/icons/SiBrave";
 import SiDuckduckgo from "@icons-pack/react-simple-icons/icons/SiDuckduckgo";
 import SiFirefoxbrowser from "@icons-pack/react-simple-icons/icons/SiFirefoxbrowser";
+import SiHarmonyos from "@icons-pack/react-simple-icons/icons/SiHarmonyos";
+import SiLinux from "@icons-pack/react-simple-icons/icons/SiLinux";
 import SiOpera from "@icons-pack/react-simple-icons/icons/SiOpera";
 import SiSamsung from "@icons-pack/react-simple-icons/icons/SiSamsung";
+import SiUbuntu from "@icons-pack/react-simple-icons/icons/SiUbuntu";
 import SiVivaldi from "@icons-pack/react-simple-icons/icons/SiVivaldi";
-import { AppWindowIcon, CpuIcon, MonitorIcon, SmartphoneIcon, TabletIcon } from "lucide-react";
+import {
+  AppWindowIcon,
+  CpuIcon,
+  LayoutGridIcon,
+  MonitorIcon,
+  SmartphoneIcon,
+  TabletIcon,
+} from "lucide-react";
 import type { ReactNode } from "react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
@@ -52,7 +64,7 @@ export function SessionClientMeta({
         ) : null}
         {os ? (
           <MetaTooltip label={`操作系统：${os}`}>
-            <CpuIcon className="size-4" aria-hidden="true" />
+            <OsBrandIcon os={os} />
           </MetaTooltip>
         ) : null}
       </span>
@@ -71,7 +83,7 @@ function MetaTooltip({ label, children }: { label: string; children: ReactNode }
   );
 }
 
-function DeviceTypeIcon({ deviceType }: { deviceType: string }) {
+export function DeviceTypeIcon({ deviceType }: { deviceType: string }) {
   const normalized = deviceType.toLowerCase();
   if (normalized === "mobile" || normalized === "phone") {
     return <SmartphoneIcon className="size-4" aria-hidden="true" />;
@@ -82,7 +94,7 @@ function DeviceTypeIcon({ deviceType }: { deviceType: string }) {
   return <MonitorIcon className="size-4" aria-hidden="true" />;
 }
 
-function BrowserBrandIcon({ browser }: { browser: string }) {
+export function BrowserBrandIcon({ browser }: { browser: string }) {
   const normalized = browser.toLowerCase();
   const properties = { className: "size-4", color: "default", "aria-hidden": true } as const;
   if (normalized.includes("chrome") || normalized.includes("chromium")) {
@@ -99,6 +111,22 @@ function BrowserBrandIcon({ browser }: { browser: string }) {
   }
   if (normalized.includes("duckduckgo")) return <SiDuckduckgo {...properties} />;
   return <AppWindowIcon className="size-4" aria-hidden="true" />;
+}
+
+/** Operating-system mark; Windows uses a neutral four-pane glyph, unknown systems a chip. */
+export function OsBrandIcon({ os, className = "size-4" }: { os: string; className?: string }) {
+  const normalized = os.toLowerCase();
+  const properties = { className, color: "default", "aria-hidden": true } as const;
+  if (normalized.includes("android")) return <SiAndroid {...properties} />;
+  if (/ios|ipados|iphone|ipad|mac ?os|os x|darwin/.test(normalized))
+    return <SiApple className={className} aria-hidden="true" />;
+  if (normalized.includes("harmony"))
+    return <SiHarmonyos className={className} aria-hidden="true" />;
+  if (normalized.includes("ubuntu")) return <SiUbuntu {...properties} />;
+  if (normalized.includes("linux")) return <SiLinux className={className} aria-hidden="true" />;
+  if (normalized.includes("windows"))
+    return <LayoutGridIcon className={className} aria-hidden="true" />;
+  return <CpuIcon className={className} aria-hidden="true" />;
 }
 
 function DeviconBrowserIcon({ name }: { name: "chrome" | "safari" }) {

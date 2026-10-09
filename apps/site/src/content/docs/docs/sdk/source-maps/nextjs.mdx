@@ -1,0 +1,120 @@
+---
+title: Next.js
+description: Have Next.js emit browser Source Maps, upload them with openrum-sourcemaps after next build, and make the SDK report the same Release.
+appliesTo: Alpha
+---
+
+import { Aside, Steps } from "@astrojs/starlight/components";
+
+Next.js has its own build pipeline with no place for a Vite plugin. Have Next emit browser Source
+Maps, then run `openrum-sourcemaps` after `next build`. Before you start, [create an upload
+token](/docs/sdk/source-maps/#create-an-upload-token) and store it as the CI secret
+`OPENRUM_UPLOAD_TOKEN`.
+
+<Steps>
+
+1. ## Install the command line
+
+   `openrum-sourcemaps` ships in the `@openrum/vite-plugin` package. It is not published to npm in the
+   Alpha; build it from an OpenRUM checkout and install the directory into your application:
+
+   ```sh
+   pnpm --filter @openrum/vite-plugin build
+   pnpm add -D /path/to/openrum/packages/vite-plugin
+   ```
+
+   Run `pnpm exec openrum-sourcemaps --help` to confirm the command is available. The package pulls
+   in Vite as a dependency, but a Next.js project only uses its command line.
+
+1. ## Emit Source Maps and upload after the build
+
+   ```ts title="next.config.ts"
+   import type { NextConfig } from "next";
+
+   const config: NextConfig = {
+     productionBrowserSourceMaps: true,
+   };
+
+   export default config;
+   ```
+
+   ```json title="package.json"
+   {
+     "scripts": {
+       "build": "next build && openrum-sourcemaps --out-dir .next/static --url-prefix _next/static/"
+     }
+   }
+   ```
+
+   The CLI reads `OPENRUM_BASE_URL`, `OPENRUM_PROJECT_ID`, `OPENRUM_RELEASE` and
+   `OPENRUM_UPLOAD_TOKEN` from the environment; see
+   [Plugin and CLI options](/docs/sdk/source-maps/#plugin-and-cli-options) for the full list.
+
+   - `--out-dir .next/static`: Next writes browser chunks and their `.map` files here. Server code
+     lives in `.next/server` and is not uploaded.
+   - `--url-prefix _next/static/`: browsers request scripts at `/_next/static/chunks/…`, but paths
+     below `.next/static` do not include `_next/static/`. Without the prefix, Artifact names do not
+     match stack frame URLs.
+
+   With `basePath: "/app"`, scripts are served from `/app/_next/static/…`, so use
+   `app/_next/static/`. With an `assetPrefix` CDN URL, take that URL's path and append
+   `_next/static/`.
+
+   <Aside type="caution" title="Without the CLI, your Source Maps are public">
+     `productionBrowserSourceMaps: true` makes Next put `.map` files in `.next/static` and append
+     `sourceMappingURL` to each chunk, so they are served with your site and anyone can download your
+     source. The CLI deletes the `.map` files from the build directory before uploading and strips
+     those comments, so it must run before you package an image or deploy. With
+     `output: "standalone"`, run it before copying `.next/static`.
+   </Aside>
+
+1. ## Make the SDK report the same Release
+
+   Set the CLI's `release` and the SDK's `release` from one CI variable:
+
+   ```tsx title="app/monitoring.tsx"
+   "use client";
+
+   import { init } from "@openrum/browser";
+   import { useEffect } from "react";
+
+   export function Monitoring() {
+     useEffect(() => {
+       init({
+         dsn: process.env.NEXT_PUBLIC_OPENRUM_DSN!,
+         release: process.env.NEXT_PUBLIC_APP_RELEASE, // same as OPENRUM_RELEASE
+       });
+     }, []);
+
+     return null;
+   }
+   ```
+
+   `NEXT_PUBLIC_` variables are inlined into the browser bundle during `next build`, so set it in the
+   build step. `init()` must run in the browser; see [Next.js SDK](/docs/sdk/browser/nextjs/) for the full
+   setup.
+
+   ```yaml title=".github/workflows/deploy.yml"
+   - name: Build and upload Source Maps
+     run: pnpm build
+     env:
+       OPENRUM_BASE_URL: https://rum.example.com
+       OPENRUM_PROJECT_ID: <your-project-id>
+       OPENRUM_RELEASE: ${{ github.sha }}
+       NEXT_PUBLIC_APP_RELEASE: ${{ github.sha }}
+       OPENRUM_UPLOAD_TOKEN: ${{ secrets.OPENRUM_UPLOAD_TOKEN }}
+   ```
+
+   <Aside type="caution" title="Mismatched values do not raise an error">
+     Events without a `release` cannot be mapped. A different `dist`, or a `dist` set on only one side,
+     resolves to a different Release and no Artifact is found.
+   </Aside>
+
+1. ## Verify mapping
+
+   After deploying, follow [Verify mapping](/docs/sdk/source-maps/#verify-mapping): confirm the
+   Artifacts are ready on **Releases**, check a real frame with the match tester, then trigger a
+   known error. If a frame is not mapped, first compare the frame URL's path with the Artifact names;
+   see [Why a frame is not mapped](/docs/sdk/source-maps/#why-a-frame-is-not-mapped).
+
+</Steps>

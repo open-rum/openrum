@@ -12,6 +12,7 @@ import (
 
 	"openrum/internal/event"
 	"openrum/internal/fingerprint"
+	"openrum/internal/metadata"
 )
 
 const DeadLetterSchemaVersion = "1.0"
@@ -164,29 +165,43 @@ func (consumer *Consumer) processMessage(ctx context.Context, message kafka.Mess
 	// events do not pay for work whose only consumer is storage.
 	if len(normalized) > 0 && consumer.filters != nil {
 		compiled, err := consumer.filters.Get(ctx, normalized[0].ProjectID)
-		if err != nil {
+		switch {
+		case errors.Is(err, metadata.ErrNotFound):
+			normalized = consumer.dropInactiveProject(normalized)
+		case err != nil:
 			return fmt.Errorf("resolve inbound filters: %w", err)
+		default:
+			normalized = applyInboundFilters(normalized, compiled, consumer.metrics)
 		}
-		normalized = applyInboundFilters(normalized, compiled, consumer.metrics)
 	}
 	// Rewriting runs after filtering, so a discarded event pays for none of it,
 	// and before fingerprinting, so an issue is grouped on the text that will
 	// actually be stored rather than on the copy the project asked to redact.
 	if len(normalized) > 0 && consumer.processing != nil {
 		compiled, err := consumer.processing.Get(ctx, normalized[0].ProjectID)
-		if err != nil {
+		switch {
+		case errors.Is(err, metadata.ErrNotFound):
+			normalized = consumer.dropInactiveProject(normalized)
+		case err != nil:
 			return fmt.Errorf("resolve processing rules: %w", err)
+		default:
+			applyProcessingRules(normalized, compiled, consumer.metrics)
 		}
-		applyProcessingRules(normalized, compiled, consumer.metrics)
 	}
+	var policy metadata.ProjectRetentionPolicy
 	if len(normalized) > 0 {
 		if consumer.retention == nil {
 			return fmt.Errorf("resolve event retention: no retention policy provider configured")
 		}
-		policy, err := consumer.retention.Get(ctx, normalized[0].ProjectID)
-		if err != nil {
+		var err error
+		policy, err = consumer.retention.Get(ctx, normalized[0].ProjectID)
+		if errors.Is(err, metadata.ErrNotFound) {
+			normalized = consumer.dropInactiveProject(normalized)
+		} else if err != nil {
 			return fmt.Errorf("resolve event retention: %w", err)
 		}
+	}
+	if len(normalized) > 0 {
 		if err := applyRetentionPolicy(normalized, policy); err != nil {
 			return fmt.Errorf("apply event retention: %w", err)
 		}
@@ -205,6 +220,16 @@ func (consumer *Consumer) processMessage(ctx context.Context, message kafka.Mess
 	}
 	if consumer.metrics != nil {
 		consumer.metrics.observeProcessed(normalized, deadLetters, started)
+	}
+	return nil
+}
+
+// dropInactiveProject discards a message's events when their Project is no longer
+// active (deleting or stopped). Queued events of such a Project can never be stored,
+// and retrying them would block every other Project behind this partition offset.
+func (consumer *Consumer) dropInactiveProject(events []event.CanonicalEvent) []event.CanonicalEvent {
+	if consumer.metrics != nil {
+		consumer.metrics.observeInactiveProject(len(events))
 	}
 	return nil
 }

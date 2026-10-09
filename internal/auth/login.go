@@ -66,11 +66,12 @@ func (manager *LoginManager) Authenticate(ctx context.Context, email, password, 
 	}
 
 	var user AuthenticatedUser
-	var passwordHash, status, authSource string
+	var passwordHash sql.NullString
+	var status, accessStatus string
 	err := manager.database.QueryRowContext(ctx,
-		"SELECT id, email, display_name, password_hash, status, auth_source FROM users WHERE email=$1",
+		"SELECT id, email, display_name, password_hash, status, access_status FROM users WHERE email=$1",
 		email,
-	).Scan(&user.ID, &user.Email, &user.DisplayName, &passwordHash, &status, &authSource)
+	).Scan(&user.ID, &user.Email, &user.DisplayName, &passwordHash, &status, &accessStatus)
 	if errors.Is(err, sql.ErrNoRows) {
 		_, _ = manager.verifyPassword(password, manager.dummyHash)
 		manager.limiter.Failed(ctx, ipAddress, email)
@@ -79,11 +80,16 @@ func (manager *LoginManager) Authenticate(ctx context.Context, email, password, 
 	if err != nil {
 		return AuthenticatedUser{}, fmt.Errorf("load local login user: %w", err)
 	}
-	valid, err := manager.verifyPassword(password, passwordHash)
+	if !passwordHash.Valid {
+		_, _ = manager.verifyPassword(password, manager.dummyHash)
+		manager.limiter.Failed(ctx, ipAddress, email)
+		return AuthenticatedUser{}, ErrInvalidCredentials
+	}
+	valid, err := manager.verifyPassword(password, passwordHash.String)
 	if err != nil {
 		return AuthenticatedUser{}, err
 	}
-	if !valid || status != "active" || authSource != "local" {
+	if !valid || status != "active" || accessStatus != "approved" {
 		manager.limiter.Failed(ctx, ipAddress, email)
 		return AuthenticatedUser{}, ErrInvalidCredentials
 	}

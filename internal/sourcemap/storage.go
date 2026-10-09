@@ -62,6 +62,7 @@ type ossObjectClient interface {
 type StorageProbeStep struct {
 	Name      string `json:"name"`
 	Status    string `json:"status"`
+	ErrorCode string `json:"errorCode,omitempty"`
 	LatencyMS int64  `json:"latencyMs"`
 }
 
@@ -71,6 +72,9 @@ type StorageProbeResult struct {
 	StartedAt  time.Time          `json:"startedAt"`
 	DurationMS int64              `json:"durationMs"`
 	Steps      []StorageProbeStep `json:"steps"`
+	// Warnings describe limits that do not stop storage from working, such as
+	// "delete_forbidden": uploads and symbolication work, deletions leave objects.
+	Warnings []string `json:"warnings,omitempty"`
 }
 
 func NewOSSStorage(region, endpoint, bucket string) (*OSSStorage, error) {
@@ -132,10 +136,10 @@ func (storage *OSSStorage) Probe(ctx context.Context) (result StorageProbeResult
 		Bucket: oss.Ptr(storage.bucket), Key: oss.Ptr(key), Body: bytes.NewReader(body),
 		ContentLength: oss.Ptr(int64(len(body))), ContentType: &contentType, ForbidOverwrite: oss.Ptr("true"),
 	})
-	result.Steps = append(result.Steps, probeStep("write", writeErr, stepStarted))
+	result.Steps = append(result.Steps, probeStep(ctx, "write", writeErr, stepStarted))
 	if writeErr != nil {
 		result.ErrorCode = classifyStorageProbeError(ctx, writeErr)
-		result.Steps = append(result.Steps, storage.cleanupProbeObject(key))
+		result.Steps = append(result.Steps, storage.cleanupProbeObject(ctx, key))
 		return result
 	}
 
@@ -149,35 +153,55 @@ func (storage *OSSStorage) Probe(ctx context.Context) (result StorageProbeResult
 			readErr = ErrObjectMismatch
 		}
 	}
-	result.Steps = append(result.Steps, probeStep("read", readErr, stepStarted))
-	cleanup := storage.cleanupProbeObject(key)
+	result.Steps = append(result.Steps, probeStep(ctx, "read", readErr, stepStarted))
+	cleanup := storage.cleanupProbeObject(ctx, key)
 	result.Steps = append(result.Steps, cleanup)
 	if readErr != nil {
 		result.ErrorCode = classifyStorageProbeError(ctx, readErr)
 		return result
 	}
-	if cleanup.Status != "passed" {
-		result.ErrorCode = "cleanup_failed"
-		return result
-	}
-	result.Success = true
+	finishProbe(&result, cleanup)
 	return result
 }
 
-func (storage *OSSStorage) cleanupProbeObject(key string) StorageProbeStep {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+func (storage *OSSStorage) cleanupProbeObject(parent context.Context, key string) StorageProbeStep {
+	// The delete must still run when the probe itself was cancelled or timed out.
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(parent), 5*time.Second)
 	defer cancel()
 	started := time.Now()
 	_, err := storage.probeClient.DeleteObject(ctx, &oss.DeleteObjectRequest{Bucket: oss.Ptr(storage.bucket), Key: oss.Ptr(key)})
-	return probeStep("delete", err, started)
+	return probeStep(ctx, "delete", err, started)
 }
 
-func probeStep(name string, err error, started time.Time) StorageProbeStep {
-	status := "passed"
+func probeStep(ctx context.Context, name string, err error, started time.Time) StorageProbeStep {
+	step := StorageProbeStep{Name: name, Status: "passed", LatencyMS: time.Since(started).Milliseconds()}
 	if err != nil {
-		status = "failed"
+		step.Status = "failed"
+		step.ErrorCode = classifyStorageProbeError(ctx, err)
 	}
-	return StorageProbeStep{Name: name, Status: status, LatencyMS: time.Since(started).Milliseconds()}
+	return step
+}
+
+// finishProbe settles a probe whose write and read passed. A failed delete does
+// not make storage unusable — uploads and symbolication only write and read — so
+// it is a warning: deletions will leave objects behind and the probe object
+// itself may remain under openrum-diagnostics/.
+func finishProbe(result *StorageProbeResult, cleanup StorageProbeStep) {
+	result.Success = true
+	if cleanup.Status == "passed" {
+		return
+	}
+	if cleanup.ErrorCode == "forbidden" || cleanup.ErrorCode == "credentials" {
+		result.Warnings = append(result.Warnings, "delete_forbidden")
+		return
+	}
+	result.Warnings = append(result.Warnings, "cleanup_failed")
+}
+
+// IsForbidden reports a provider refusal (HTTP 403), for example a credential
+// that may write and read objects but not delete them.
+func IsForbidden(err error) bool {
+	return storageHTTPStatus(err) == 403
 }
 
 func classifyStorageProbeError(ctx context.Context, err error) string {
@@ -204,6 +228,15 @@ func classifyStorageProbeError(ctx context.Context, err error) string {
 		case 404:
 			return "bucket_not_found"
 		}
+	}
+	// The S3 SDK exposes the status as HTTPStatusCode rather than HttpStatusCode.
+	switch storageHTTPStatus(err) {
+	case 401:
+		return "credentials"
+	case 403:
+		return "forbidden"
+	case 404:
+		return "bucket_not_found"
 	}
 	message := strings.ToLower(err.Error())
 	if strings.Contains(message, "credential") || strings.Contains(message, "accesskey") {

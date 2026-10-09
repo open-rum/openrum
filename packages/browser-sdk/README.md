@@ -35,7 +35,7 @@ Without a bundler, load the immutable IIFE build from the OpenRUM Instance that 
 Synchronous loading initializes as early as possible, but blocks HTML parsing while the bundle downloads:
 
 ```html
-<script src="https://rum.example.com/sdk/browser/0.1.0/openrum.min.js"></script>
+<script src="https://rum.example.com/sdk/browser/0.1.1/openrum.min.js"></script>
 <script>
   OpenRUM.init({
     dsn: "https://YOUR_PUBLIC_DSN@rum.example.com/ingest/v1/envelope",
@@ -50,7 +50,7 @@ Asynchronous loading is recommended for most pages because it does not block HTM
 <script>
   (function () {
     var script = document.createElement("script");
-    script.src = "https://rum.example.com/sdk/browser/0.1.0/openrum.min.js";
+    script.src = "https://rum.example.com/sdk/browser/0.1.1/openrum.min.js";
     script.async = true;
     script.onload = function () {
       OpenRUM.init({

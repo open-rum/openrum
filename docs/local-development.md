@@ -1,6 +1,6 @@
 # Local development
 
-This is the contributor reference for developing OpenRUM from source. For a step-by-step first run, use the [local development tutorial](/docs/getting-started/local-development/). To evaluate the product without running host development processes, use [Compose deployment](/docs/self-hosting/compose/).
+This is the contributor reference for developing OpenRUM from source. For a step-by-step first run, use the [local development tutorial](/docs/getting-started/local-development/).
 
 ## Toolchain
 
@@ -23,7 +23,7 @@ Run the stack through `openrum`, which manages the containers and the host proce
 pnpm openrum dev
 ```
 
-`dev` keeps the infrastructure and pipeline services in Docker and runs the API and the console from source, which gives frontend hot reload and fast Go restarts without a locally installed PostgreSQL, ClickHouse, Kafka or Redis. The command builds the images, applies migrations, loads the demo dataset, waits until every healthcheck passes, starts the API and the dev server, waits for those too, and then reports where everything is:
+`dev` keeps the infrastructure and pipeline services in Docker and runs the API and the console from source, which gives frontend hot reload and fast Go restarts without a locally installed PostgreSQL, ClickHouse, Kafka or Redis. The command builds the images, applies migrations, waits until every healthcheck passes, starts the API and the dev server, waits for those too, and then reports where everything is:
 
 ```text
 mode dev, environment deploy/compose/.env.example
@@ -53,6 +53,7 @@ The two modes share that address and therefore do not run at the same time. Ente
 | `pnpm openrum status`         | What is running, and what is not ready yet                              |
 | `pnpm openrum logs [service]` | Follow logs; a host service tails its own file                          |
 | `pnpm openrum restart <name>` | Restart one service and wait for it to come back                        |
+| `pnpm openrum seed`           | Load the demo account and dataset into a running stack                  |
 | `pnpm openrum stop`           | Stop everything, keeping the containers and their data                  |
 | `pnpm openrum down`           | Remove the containers, keeping the volumes                              |
 | `pnpm openrum reset`          | Remove the containers and delete every local database, after confirming |
@@ -61,7 +62,13 @@ Ports and credentials come from `deploy/compose/.env`, falling back to the commi
 
 Supervised host processes are detached from the terminal that started them, so closing it does not take the stack down. Their process identifiers and logs live in `.openrum/`, which git ignores. Process supervision uses sessions and process groups, so the command runs on macOS and Linux; on Windows, use WSL.
 
-The underlying Compose commands remain available; see [Compose deployment](/docs/self-hosting/compose/). `openrum` adds the parts Compose cannot express: waiting for readiness rather than for launch, supervising the host half, deriving that half's environment from the same file, naming the process behind a port conflict, and reporting both halves in one place.
+The underlying Compose commands remain available through `deploy/compose/docker-compose.yml`. `openrum` adds the parts Compose cannot express: waiting for readiness rather than for launch, supervising the host half, deriving that half's environment from the same file, naming the process behind a port conflict, and reporting both halves in one place.
+
+Load the demo account and dataset once the stack is up. The step is optional and safe to run again; without it the first visit opens the setup page:
+
+```sh
+pnpm openrum seed
+```
 
 Use the development account:
 
@@ -135,7 +142,7 @@ Run `pnpm run check` before opening a pull request. It includes formatting, lint
 
 ## Migrations and service logs
 
-Migrations and the demo seed run on every start. Both are idempotent, and both run from the locally built image, so adding a migration rebuilds that image, which recreates the job, which applies the new file. There is nothing to rerun by hand.
+Migrations run on every start. They are idempotent and run from the locally built image, so adding a migration rebuilds that image, which recreates the job, which applies the new file. There is nothing to rerun by hand. The demo seed does not run on start; load it with `pnpm openrum seed`.
 
 Inspect health and logs with:
 
@@ -165,8 +172,6 @@ Run `site:check` before requesting review for public-site or documentation chang
 - If a host service fails to start, read `.openrum/log/api.log` or `.openrum/log/web.log`, which is where its output goes.
 - If charts are initially empty, wait for ClickHouse materialized views and refresh.
 - If generated or installed dependencies drift, run `pnpm install --frozen-lockfile` from the repository root.
-
-See [demo data](demo-data.md) for reseeding and dataset details.
 
 To generate traffic on demand while working on a query or a page, use the
 [development data generator](dev-data.md). It is available in the console at

@@ -1,0 +1,114 @@
+---
+title: Next.js
+description: Initialize the OpenRUM browser SDK in a Next.js application without running it on the server.
+appliesTo: "@openrum/browser 0.1.1"
+---
+
+import { Aside, Steps } from "@astrojs/starlight/components";
+
+Next.js renders on the server and `@openrum/browser` is a browser SDK, so the only real
+question is placement: `init()` must run in the browser and nowhere else.
+
+<Aside type="danger" title="Server-side initialization fails quietly">
+  There is no `window` under Node, so `init()` builds a client with no transport, returns normally,
+  and counts every later Event as dropped. Nothing throws and nothing is logged, so a misplaced
+  `init()` looks exactly like a working integration that happens to receive no traffic.
+</Aside>
+
+`"use client"` is not on its own a guard. A Client Component is still evaluated once on the
+server during rendering, so a module-level `init()` inside one runs under Node — and because
+`activeClient` is a module singleton, that dead client is reused for every subsequent
+request the server handles. Initialize from an effect instead, which only ever runs in the
+browser.
+
+## App Router
+
+<Steps>
+
+1. Write a Client Component whose only job is to initialize.
+
+   ```tsx
+   // app/monitoring.tsx
+   "use client";
+
+   import { init } from "@openrum/browser";
+   import { useEffect } from "react";
+
+   export function Monitoring() {
+     useEffect(() => {
+       init({
+         dsn: process.env.NEXT_PUBLIC_OPENRUM_DSN!,
+         environment: process.env.NODE_ENV,
+         release: process.env.NEXT_PUBLIC_APP_RELEASE,
+       });
+     }, []);
+
+     return null;
+   }
+   ```
+
+   `init()` returns the running client when one already exists, so Strict Mode firing the
+   effect twice in development does not create two clients or two Sessions.
+
+2. Render it once, in the root layout.
+
+   ```tsx
+   // app/layout.tsx
+   import { Monitoring } from "./monitoring";
+
+   export default function RootLayout({ children }: { children: React.ReactNode }) {
+     return (
+       <html lang="en">
+         <body>
+           <Monitoring />
+           {children}
+         </body>
+       </html>
+     );
+   }
+   ```
+
+3. Expose the DSN with the `NEXT_PUBLIC_` prefix. It contains a browser-public, write-only
+   credential, so it has to reach the browser bundle; the prefix is what puts it there.
+
+</Steps>
+
+## Pages Router
+
+Same call, from `_app`:
+
+```tsx
+// pages/_app.tsx
+import { init } from "@openrum/browser";
+import type { AppProps } from "next/app";
+import { useEffect } from "react";
+
+export default function App({ Component, pageProps }: AppProps) {
+  useEffect(() => {
+    init({
+      dsn: process.env.NEXT_PUBLIC_OPENRUM_DSN!,
+      environment: process.env.NODE_ENV,
+      release: process.env.NEXT_PUBLIC_APP_RELEASE,
+    });
+  }, []);
+
+  return <Component {...pageProps} />;
+}
+```
+
+## Navigations
+
+Both routers change the URL through `history.pushState`, so client-side navigations produce
+Page Views with no router hook. The recorded Route is the resolved pathname, which means a
+dynamic segment such as `app/orders/[id]` is stored as `/orders/8fc1`, not `/orders/[id]`.
+See [Route patterns](/docs/sdk/browser/#route-patterns-are-not-recorded-yet) for how this
+affects Analysis.
+
+## What is not covered
+
+| Concern                           | State                                                                                          |
+| --------------------------------- | ---------------------------------------------------------------------------------------------- |
+| Errors during server rendering    | Not captured. The SDK observes the browser only; these stay in the Next.js server logs.        |
+| Route Handlers and Server Actions | Not captured directly. Their failures appear as failed fetch or XHR Requests from the browser. |
+| Middleware and the Edge runtime   | Not supported. Neither `window` nor `localStorage` exists there.                               |
+| Source Maps                       | Upload per Release after the build. See [Source Maps](/docs/sdk/source-maps/).                 |
