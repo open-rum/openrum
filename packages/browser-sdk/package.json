@@ -1,6 +1,14 @@
 {
   "name": "@openrum/browser",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/open-rum/openrum.git",
+    "directory": "packages/browser-sdk"
+  },
+  "bugs": {
+    "url": "https://github.com/open-rum/openrum/issues"
+  },
   "version": "0.1.1",
   "type": "module",
   "sideEffects": false,
