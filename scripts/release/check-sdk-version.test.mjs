@@ -12,7 +12,15 @@ const real = JSON.parse(readFileSync(join(root, "packages/browser-sdk/package.js
 
 function manifest(fields) {
   const path = join(mkdtempSync(join(tmpdir(), "openrum-sdk-")), "package.json");
-  writeFileSync(path, JSON.stringify({ name: "@openrum/browser", version: "1.2.3", ...fields }));
+  writeFileSync(
+    path,
+    JSON.stringify({
+      name: "@openrum/browser",
+      version: "1.2.3",
+      repository: { type: "git", url: "git+https://github.com/open-rum/openrum.git" },
+      ...fields,
+    }),
+  );
   return path;
 }
 
@@ -57,4 +65,19 @@ test("rejects product tags, moving tags and a private package", () => {
   const result = check("browser-v1.2.3", { SDK_MANIFEST: manifest({ private: true }) });
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /is private/);
+});
+
+test("requires the package to name the repository npm signs provenance for", () => {
+  for (const repository of [
+    undefined,
+    { type: "git", url: "" },
+    "https://github.com/someone/else",
+  ]) {
+    const result = check("browser-v1.2.3", { SDK_MANIFEST: manifest({ repository }) });
+    assert.notEqual(result.status, 0, JSON.stringify(repository));
+    assert.match(
+      result.stderr,
+      /must set repository\.url to https:\/\/github\.com\/open-rum\/openrum/,
+    );
+  }
 });

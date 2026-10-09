@@ -27,6 +27,16 @@ const manifest = JSON.parse(
 if (manifest.name !== "@openrum/browser") throw new Error(`Unexpected package ${manifest.name}`);
 if (manifest.private) throw new Error(`${manifest.name} is private and cannot be published to npm`);
 
+// npm signs provenance for a public repository and rejects the upload unless the package
+// names that repository, which a dry run cannot otherwise discover.
+const repositoryUrl = String(manifest.repository?.url ?? manifest.repository ?? "")
+  .replace(/^git\+/, "")
+  .replace(/\.git$/, "");
+if (repositoryUrl !== "https://github.com/open-rum/openrum")
+  throw new Error(
+    `${manifest.name} must set repository.url to https://github.com/open-rum/openrum; received ${JSON.stringify(repositoryUrl)}`,
+  );
+
 const version = tag.slice("browser-v".length);
 if (manifest.version !== version)
   throw new Error(`${manifest.name} is ${manifest.version}; expected ${version} from ${tag}`);
