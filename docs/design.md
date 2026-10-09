@@ -386,12 +386,11 @@ rest of the accessibility suite only ever loaded the light theme.
 
 Any new global element rule in `global.css` carries the same hazard.
 
-Documentation diagrams are Mermaid sources in `docs/diagrams/`, rendered to SVG
-by `pnpm docs:generate` and committed. Mermaid rejects CSS variables in its
-theme configuration, so the generator feeds it sentinel colours and swaps them
-for design tokens in the output; the inlined SVG then follows the reader's
-theme, costs no client JavaScript, and keeps the site build free of a headless
-browser. `pnpm docs:check` fails when a source and its SVG have drifted.
+Documentation diagrams are committed SVG assets under `apps/site/src/assets/diagrams/`,
+inlined into the page. They must colour strokes, fills and labels with design tokens
+(`var(--ds-*)`) rather than raw colour literals, so the inlined SVG follows the
+reader's theme, costs no client JavaScript, and keeps the site build free of a
+headless browser. There is no diagram generator; edit the SVG directly.
 
 ## Landing page
 
@@ -618,8 +617,10 @@ aggregate retention windows. A selected date range beyond raw-event retention
 may be incomplete. Trends and overall values are independently calculated;
 histogram overflow buckets must be labelled as unbounded, not as closed ranges.
 
-`AnalysisFilterSidebar` is the reusable right-side dimension-filter surface,
-initially shared by Performance and Issues. Each page supplies only dimensions
+`AnalysisFilterSidebar` was retired and removed on 2026-10-02; Performance no
+longer offers dimension filters beyond the shared time/environment and the route
+drill-down. The rest of this paragraph is historical. It was the right-side
+dimension-filter surface, initially shared by Performance and Issues. Each page supplies only dimensions
 its backend supports. At 1280px and above it is collapsible and persists the
 presentation preference locally; below that it becomes a Sheet. Draft changes
 apply together, combined dimensions use AND, and active chips remain visible

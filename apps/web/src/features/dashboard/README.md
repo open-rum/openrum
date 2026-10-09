@@ -66,13 +66,13 @@ remote module URLs, raw SQL, or arbitrary property aggregation.
 
 - `stat`: one range-wide aggregate, with backend comparisons where available.
   Optional `statAppearance`: `plain` (also the default when omitted),
-  `line-right` or `bar-right`. Configure it through the card's
-  hover menu → Configure → Card appearance, then Apply and Save the dashboard.
-  The right layout pairs the number with a small smooth line or rounded bar chart.
-  Retired `line-bottom` / `area-bottom` records normalize to `line-right` during
-  validation/read, without rewriting storage automatically. The Go allowlist
-  retains those old values for existing records and rolling upgrades, but the
-  editor only offers the three current appearances.
+  or `area-right`. Configure it through the card's hover menu → Configure → Card
+  appearance, then Apply and Save the dashboard. The right layout pairs the number
+  with a small smooth area (line over a fading fill). Retired `line-right`,
+  `bar-right`, `line-bottom` and `area-bottom` records normalize to `area-right`
+  during validation/read, without rewriting storage automatically. The Go
+  allowlist retains those old values for existing records and rolling upgrades,
+  but the editor only offers the two current appearances.
   `StatTrend.tsx` renders the same real
   Overview/Events buckets as details, without additional requests or fake data.
   Missing points remain gaps, a single valid point stays visible, and empty
@@ -253,3 +253,16 @@ Catalog modules and named dashboards:
   mobile layout, both themes, keyboard movement and accessible chart tables.
 - Follow issue/API links and legacy filtered overview links. Check that event
   modules never claim to apply release or route filters.
+
+## Sizes and tabbed cards
+
+Module sizes are `compact` (stat cards), `third`, `half` and `full`; on screens 1280px and
+wider they span 3, 4, 6 and 12 of 12 columns. The dashboard is fluid up to 1920px and then
+centred, and from 1680px gaps and chart heights grow a little instead of stretching cards.
+
+A tabbed card is two or three adjacent chart or table modules sharing one `groupId`. The
+saved config stays flat (`groups.ts` turns it into cards), every member keeps its own
+validation and query, and only the visible tab is queried. Members share the card's size.
+The card menu merges a card into another (`合并到…`), takes the current tab out
+(`移出为独立卡片`) or removes it; a card left with one module dissolves. Stat cards never
+join. The Go allowlist (`validateDashboardGroups`) enforces the same rules on save.

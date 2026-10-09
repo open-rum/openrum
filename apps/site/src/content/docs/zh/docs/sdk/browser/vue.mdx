@@ -1,0 +1,33 @@
+---
+title: Vue
+description: 在用 Vite 构建的 Vue 应用中只初始化一次 OpenRUM browser SDK。
+appliesTo: "@openrum/browser 0.1.0"
+---
+
+开始之前，先按 [Browser SDK 概览](/zh/docs/sdk/browser/#初始化)安装 SDK 并复制 Project 的 DSN，
+再把应用的 origin 加入该 Project 的允许列表。
+
+## 初始化
+
+```ts title="src/monitoring.ts"
+import { init } from "@openrum/browser";
+
+init({
+  dsn: import.meta.env.VITE_OPENRUM_DSN,
+  environment: import.meta.env.MODE,
+  release: import.meta.env.VITE_APP_RELEASE,
+});
+```
+
+```ts title="src/main.ts"
+import "./monitoring.ts";
+import { createApp } from "vue";
+```
+
+Vue Router 的 HTML5 history 模式通过 `history.pushState` 跳转，因此不需要路由钩子即可采集
+Page View。hash 模式不会被采集，见[支持矩阵](/zh/docs/sdk/browser/#支持矩阵)。
+
+## 下一步
+
+- [验证](/zh/docs/sdk/browser/#验证)采集、ingest 和聚合是否一致。
+- Vite 构建的插件配置与 [React（Vite）的 Source Map 页面](/zh/docs/sdk/source-maps/react/)相同。

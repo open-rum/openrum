@@ -21,9 +21,13 @@ export function describeComparison(data: ScalarData, widget: Widget) {
   const direction = rounded > 0 ? ("up" as const) : ("down" as const);
   // Catalog metrics say which way is better; a neutral one (a revenue figure, say) shows its
   // change without calling it good or bad. Classic metrics keep their fixed list.
-  if (data.direction === "neutral") return { label, direction, tone: "neutral" as const };
-  const lowerIsBetter = data.direction
-    ? data.direction === "down"
+  const better =
+    widget.data.source === "catalog" && widget.data.direction
+      ? widget.data.direction
+      : data.direction;
+  if (better === "neutral") return { label, direction, tone: "neutral" as const };
+  const lowerIsBetter = better
+    ? better === "down"
     : widget.data.source === "overview" &&
       ["errorRate", "apiFailureRate", "lcp", "inp", "cls"].includes(widget.data.metrics[0]);
   return {

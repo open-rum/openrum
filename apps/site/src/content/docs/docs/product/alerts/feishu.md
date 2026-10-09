@@ -1,9 +1,8 @@
 ---
 title: Send alerts to Feishu
 description: Connect a Feishu (or Lark) group bot so alerts arrive as cards with a link back to the Console.
+appliesTo: Alpha
 ---
-
-**Applies to:** Alpha. Status: Alpha implemented.
 
 Alerts arrive in the group as a card with the Project, Environment, metric, value, threshold and window, plus an **Open diagnosis** button.
 

@@ -18,7 +18,7 @@ Use this page as a daily reference. For a first run, complete [Environment and s
 | Browser SDK                            | `pnpm --filter @openrum/browser build`, then refresh or restart the example |
 | Documentation site                     | Run `pnpm site:dev` separately                                              |
 
-Restarting a container does not rebuild its image. Use `pnpm openrum up` for an all-container stack; it shares ports and data with `dev`, and the command switches modes for you.
+Restarting a container does not rebuild its image. Use `pnpm openrum up` for an all-container stack; it shares ports and data with `dev`, and the command switches modes for you. The [openrum command](/docs/getting-started/local-development/cli/) page lists every command and what each one keeps or deletes.
 
 ```sh
 pnpm openrum logs api
@@ -34,7 +34,6 @@ pnpm openrum dev
 
 Use the floating flask button at the bottom-right of the local Console. Select Project, Environment and time range, generate a small batch, then inspect the query verification result before increasing volume.
 
-See [Demo data](/docs/getting-started/demo-data/) for scenarios.
 
 <Aside type="danger" title="Reset deletes data">
   For a complete reset, `pnpm openrum reset` asks for confirmation and deletes all local databases.

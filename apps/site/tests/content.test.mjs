@@ -75,14 +75,14 @@ test("published local benchmark gates agree with retained k6 evidence", async ()
   assert.ok(evidence.attempts.some((attempt) => attempt.query.failurePercent > 1));
 });
 
-test("public landing page keeps Quickstart/GitHub adoption and avoids SaaS funnel claims", async () => {
+test("public landing page keeps deployment/GitHub adoption and avoids SaaS funnel claims", async () => {
   const source = await readFile(new URL("../src/pages/index.astro", import.meta.url), "utf8");
   assert.doesNotMatch(source, /pricing|start free trial|hosted demo/i);
   const landing = await readFile(
     new URL("../src/components/landing/LandingPage.astro", import.meta.url),
     "utf8",
   );
-  assert.match(landing, /getting-started\/quickstart\//);
+  assert.match(landing, /self-hosting\/overview\//);
   assert.match(landing, /GitHub/);
 });
 
@@ -100,9 +100,9 @@ test("docs header uses compact public labels", async () => {
   assert.doesNotMatch(header, /BrandWordmark|OpenRUM 文档/);
   assert.match(header, /DocsThemeMenu|DocsLanguageMenu/);
   assert.doesNotMatch(sidebar, /docs-sidebar-topic/);
-  assert.match(config, /label: "Start"/);
-  assert.match(config, /translations: \{ zh: "开始", "zh-CN": "开始" \}/);
-  assert.match(config, /label: "Deploy production"/);
+  assert.match(config, /label: "Get started"/);
+  assert.match(config, /translations: \{ zh: "快速开始", "zh-CN": "快速开始" \}/);
+  assert.match(config, /label: "Deploy"/);
 });
 
 test("robots and Open Graph asset are static and privacy-safe", async () => {

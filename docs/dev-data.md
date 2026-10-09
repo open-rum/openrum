@@ -7,8 +7,8 @@ any Console page), the legacy `/projects/{id}/dev-data` route, and over the API 
 `POST /api/v1/projects/{id}/dev-data`.
 
 This is separate from the [demo data generator](demo-data.md). The demo
-generator seeds one large fixed dataset at startup by writing ClickHouse
-directly. This one produces small datasets repeatedly while you work, and sends
+generator seeds one large fixed dataset, on demand through `openrum seed`, by
+writing ClickHouse directly. This one produces small datasets repeatedly while you work, and sends
 them through the real ingest endpoint.
 
 ## Why it posts to ingest instead of writing ClickHouse
@@ -53,8 +53,13 @@ belonging to the requested Project. A stopped Project cannot generate data.
 2. Confirm the Project, write Environment and data window. The current analysis
    range and specific Environment are selected by default; “all environments”
    falls back to the Project's default Environment for writes.
-3. Choose a preset and session count: 100 for a quick check, 300 for fuller
-   charts, up to 5,000. Large runs are synchronous and can take time; start small.
+3. Choose a preset and session count: 300 for trends, 1,000+ for realistic
+   volume, up to 5,000. Large runs are synchronous and can take time.
+   Optionally list business user IDs (one per line or comma separated) and the
+   signed-in share; signed-in visitors keep one of those IDs across sessions, so
+   sessions, errors and logs can be found by `user.id`. Leaving the list empty
+   generates `cust_10001`-style IDs. The SDK and protocol carry a user ID only;
+   there is no user name field.
 4. Generate. The form locks during delivery to prevent duplicate submissions.
 5. Inspect accepted/rejected/failed/unsent counts. The Console checks a unique
    session sample every two seconds for up to roughly 30 seconds, then refreshes
@@ -80,13 +85,13 @@ filtering. All other filters, rate limits, and storage-pressure guards still app
 
 The `logs` preset (**结构化应用日志**) generates trace/debug/info/warn/error/fatal logs with payment attributes and Session/Trace context. Use it to validate the Logs explorer after deploying ClickHouse migration `0008_logs` and updated ingest/consumer services.
 
-| Preset            | What it is for                                                                                                         |
-| ----------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| `storefront`      | A broad mix across browse and checkout: page views, vitals, a wide API surface, errors and funnel events. The default. |
-| `api-surface`     | Every endpoint in one journey, including the planted browser and release regressions.                                  |
-| `failing-release` | Checkout only, where the newest release fails far more often.                                                          |
-| `web-vitals`      | Page views and vitals only, spread across all three rating bands.                                                      |
-| `error-burst`     | A narrow window dominated by a few recurring exceptions, for issue grouping.                                           |
+| Preset            | What it is for                                                                                                                                                                                                                                                                                                  |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `storefront`      | Full coverage in one run (the default): browse, search, purchase, account and support journeys with page views, all five vitals, APIs, errors, logs, `ui.click` behavior and business events; returning visitors with signed-in users, traffic sources, a daily rhythm, funnel drop-off and a payment incident. |
+| `api-surface`     | Every endpoint in one journey, including the planted browser and release regressions.                                                                                                                                                                                                                           |
+| `failing-release` | Checkout only, where the newest release fails far more often.                                                                                                                                                                                                                                                   |
+| `web-vitals`      | Page views and vitals only, spread across all three rating bands.                                                                                                                                                                                                                                               |
+| `error-burst`     | A narrow window dominated by a few recurring exceptions, for issue grouping.                                                                                                                                                                                                                                    |
 
 Presets deliberately plant findings rather than only producing volume:
 
@@ -103,6 +108,21 @@ Presets deliberately plant findings rather than only producing volume:
   client-error count without moving the failure rate.
 - Latency and response size are drawn independently, so "slow because large" is
   a question the data can actually answer.
+
+The storefront preset also shapes traffic the way a real store sees it:
+
+- **Returning visitors.** About 0.6 visitors per session, skewed so a few loyal
+  visitors come back often. About 45% are signed in with a stable business user ID.
+- **Sources.** The first page carries a weighted referrer (search engines, WeChat,
+  Xiaohongshu, ads, email or direct), which the pipeline turns into the source
+  dimension.
+- **Daily rhythm.** Session starts follow an Asia/Shanghai curve: a night trough,
+  a lunch bump and an evening peak.
+- **Funnel.** Pages carry an exit probability, so home → product → cart →
+  checkout → order complete loses visitors step by step; product and order pages
+  draw from several concrete URLs per route, and order amounts (the `amount` measurement on `purchase`) vary.
+- **Incident.** Errors and failing API responses spike between 71% and 75% of the
+  window, so error trends, failure rates and alerts have a real event to show.
 
 ## Time windows
 
@@ -173,11 +193,28 @@ is the same structure the API accepts. Its shape:
             },
           ],
           "errors": [{ "name": "TypeError", "message": "...", "stack": "...", "odds": 0.04 }],
-          "custom": [{ "name": "add_to_cart", "odds": 0.35, "measurements": { "price": 129.9 } }],
+          "custom": [
+            {
+              "name": "add_to_cart",
+              "odds": 0.35,
+              "measurementRanges": { "price": { "min": 39, "max": 899 } },
+            },
+          ],
+          "clicks": [{ "name": "add-to-cart", "element": "button", "odds": 0.4 }],
+          "paths": ["/products/runner-pro-2", "/products/trail-x-gtx"], // alternatives for this route
+          "exit": 0.2, // chance the session ends after this page
         },
       ],
     },
   ],
+  // Optional traffic shape; omitted fields keep the old even, anonymous behavior.
+  "users": { "visitors": 700, "signedIn": 0.45, "prefix": "cust_", "ids": [] },
+  "referrers": [
+    { "value": "", "weight": 30 },
+    { "value": "https://www.google.com/", "weight": 20 },
+  ],
+  "dailyRhythm": { "timeZone": "Asia/Shanghai", "hourly": [0.45, 0.28, "… 24 weights"] },
+  "incidents": [{ "start": 0.71, "end": 0.75, "errorMultiplier": 5, "failureMultiplier": 7 }],
 }
 ```
 

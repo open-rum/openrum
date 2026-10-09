@@ -1,9 +1,10 @@
 ---
 title: HTTP API
 description: Alpha 阶段 Console、Ingest、SDK 分发和健康检查的 HTTP 接口概览。
+appliesTo: Alpha
 ---
 
-**适用版本：** Alpha。
+OpenRUM 对外提供四类 HTTP 接口：
 
 | 接口面 | 常见路径 | 使用方 |
 | --- | --- | --- |

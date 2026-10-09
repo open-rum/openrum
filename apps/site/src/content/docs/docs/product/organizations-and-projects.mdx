@@ -1,0 +1,65 @@
+---
+title: Organizations, Projects and roles
+description: How an Instance, its Organizations, Projects and Environments fit together, and where each kind of role applies.
+appliesTo: Alpha
+---
+
+import organizationModel from "@/assets/diagrams/organization-model.svg?raw";
+
+OpenRUM has two separate permission scopes. Most of what you do day to day happens inside an **Organization**. A small set of operator tasks happens at the **Instance** level. Knowing which scope a setting lives in tells you who can change it.
+
+<figure class="docs-diagram">
+  <Fragment set:html={organizationModel} />
+  <figcaption>
+    An Instance holds Organizations, an Organization holds Projects, and a Project reports one or
+    more Environments. The Environment names are examples.
+  </figcaption>
+</figure>
+
+## The four levels
+
+| Level | What it is | Who it belongs to |
+| --- | --- | --- |
+| Instance | One self-hosted OpenRUM installation and its global policy: sign-in methods, data lifecycle, storage and maintenance | Instance Owner and Instance Admin |
+| Organization | A team boundary that owns Projects, members and notification channels | Its members, each with an Organization role |
+| Project | One web product, and the reporting boundary for its Events, Issues, Releases and alert rules | Inherited from its Organization |
+| Environment | A deployment scope inside a Project, such as `production` or `staging` | Inherited from its Project |
+
+## Roles come from the Organization
+
+A person's role is attached to an **Organization**, not to a Project. If you can see an Organization, the same role applies to every Project in it. There are no per-Project roles in this version, so to give someone different access to one product, put that product in a separate Organization.
+
+The four Organization roles are **Owner**, **Admin**, **Member** and **Viewer**. What each one can do is in [Roles and permissions](/docs/product/roles-permissions/).
+
+A few rules follow from this:
+
+- A person can belong to several Organizations with a different role in each. Roles do not carry over between Organizations.
+- Whoever creates an Organization becomes its first Owner.
+- An Organization always keeps at least one Owner. The last Owner cannot be demoted or removed.
+- Members only see the Projects of Organizations they belong to.
+
+## Instance roles are separate
+
+**Instance Owner** and **Instance Admin** manage the installation itself rather than any team's data. The person who completes first-run setup becomes the first Instance Owner and also the first Owner of an Organization. After that the two scopes are independent: an Organization role does not grant an Instance role, and an Instance role does not grant access to an Organization's Projects.
+
+This separation is deliberate. The person who runs the servers does not automatically see every team's errors, and a team Owner cannot change the sign-in policy for the whole Instance. See [Roles and permissions](/docs/product/roles-permissions/#instance-roles) for what each Instance role can do.
+
+## Where things are configured
+
+The Console groups settings by scope, and the same grouping tells you who can see them.
+
+| Scope | Console location | Examples |
+| --- | --- | --- |
+| Account | **Settings → Profile** (个人资料) | Your name, password and connected sign-in methods |
+| Organization | **Settings → Members and permissions** (成员与权限), **Notification channels** | Members, roles, where alerts are sent |
+| Project | **Settings → Project** | Keys, allowed Origins, sampling, rate limit, filters, usage |
+| Instance | **System settings** (系统设置) | Sign-in providers, data lifecycle, object storage, audit |
+
+Project and Organization settings are visible to anyone who can see that Project, but changing them depends on the role. Instance settings are absent for people without an Instance role, instead of being shown and refused.
+
+## Related
+
+- [Roles and permissions](/docs/product/roles-permissions/) lists exactly which actions each role can take.
+- [Members and accounts](/docs/product/members-and-accounts/) covers adding people and what a pending account is.
+- [Project settings](/docs/product/project-settings/) describes the Project-scoped controls.
+- [Glossary and core concepts](/docs/reference/glossary/) defines these terms.

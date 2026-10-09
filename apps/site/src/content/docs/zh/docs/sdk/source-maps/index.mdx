@@ -1,0 +1,159 @@
+---
+title: Source Map
+description: 概览：OpenRUM 如何用私有 Source Map 把压缩代码中的错误还原到源码位置，以及上传令牌、Release 匹配、选项和排查。
+appliesTo: Alpha
+---
+
+import { Aside, CardGrid, LinkCard } from "@astrojs/starlight/components";
+
+Source Map Artifact 可以把 `index-abc.js:1:48213` 这样的压缩栈帧还原成
+`src/checkout/cart.ts:42:7`。OpenRUM 中的 Source Map 始终是私有的：由 CI 上传到 Instance
+的对象存储，不会随站点一起部署。
+
+## 选择你的框架
+
+接入分三件事：在 CI 里用上传令牌上传 Source Map，让 SDK 上报同一个 Release，再验证一个已还原的
+错误。上传方式取决于构建工具：
+
+<CardGrid>
+  <LinkCard
+    title="React（Vite）"
+    description="在 vite build 中用 @openrum/vite-plugin 插件自动上传。"
+    href="/zh/docs/sdk/source-maps/react/"
+  />
+  <LinkCard
+    title="Next.js"
+    description="让 Next 生成 Source Map，在 next build 之后运行 openrum-sourcemaps。"
+    href="/zh/docs/sdk/source-maps/nextjs/"
+  />
+</CardGrid>
+
+其他构建工具（webpack、Rollup 等）可以参照 Next.js 页面，用命令行工具上传。
+
+<Aside type="note" title="需要对象存储">
+  核心监控不依赖对象存储。Source Map 的上传和还原需要 Instance 配置 OSS 或 S3 兼容 Bucket，参见
+  [对象存储](/zh/docs/self-hosting/object-storage/)。存储未配置或不可用时，Console
+  的「发布」页会显示提示横幅。
+</Aside>
+
+## 创建上传令牌
+
+所有框架都先做这一步。
+
+1. 在 Console 中打开 **设置 → 项目 → 接入指引**（`/projects/<id>/onboarding`）。
+2. 在 **Source Map 上传令牌** 区块新建令牌，名称建议写明使用它的流水线，例如
+   `github-actions-storefront`。只有 Owner 和 Admin 可以创建或吊销令牌，其他成员可以查看列表。
+3. 立即复制明文（`orut_…`），它只显示一次。把它保存为名为 `OPENRUM_UPLOAD_TOKEN` 的 CI Secret。
+
+令牌只属于一个项目，只能创建 Release、上传和列出 Artifact，不能删除 Release 或 Artifact，
+吊销后立即失效。令牌列表会显示每个令牌的最近使用时间，便于吊销闲置或泄露的令牌。
+
+## 插件和命令行
+
+两种上传方式来自同一个包 `@openrum/vite-plugin`，行为相同：
+
+- **插件** `openRUMSourceMaps`：只用于 Vite，在 `vite build` 结束时自动运行。
+- **命令行** `openrum-sourcemaps`：包的 `bin`，安装后用 `pnpm exec openrum-sourcemaps` 运行，
+  `--help` 可以查看全部参数。适用于不经过 Vite 的构建，例如 Next.js。
+
+`openrum-sourcemaps` 和本地开发用的 `openrum` 命令（`openrum up`、`openrum seed` 等）是两个独立的
+工具，目前没有并入 `openrum`。
+
+<Aside type="note" title="Alpha 阶段需要从仓库安装">
+  `@openrum/vite-plugin` 尚未发布到 npm。在 OpenRUM 仓库中构建，再把该目录安装到你的应用：
+
+```sh
+pnpm --filter @openrum/vite-plugin build
+pnpm add -D /path/to/openrum/packages/vite-plugin
+```
+
+</Aside>
+
+每次构建，插件和命令行会：
+
+- 把构建产物下所有 `.map` 文件读入内存，并在发起第一个网络请求前从产物中删除，因此上传失败
+  也不会在可部署目录中留下 Source Map。同时删除产物 `.js`、`.mjs`、`.cjs` 和 `.css` 文件中的
+  `sourceMappingURL` 注释。
+- 创建 Release；相同版本和 dist 已存在时直接复用。
+- 通过短期有效的预签名 URL 上传，最多同时上传 4 个文件。网络错误、`5xx` 和 `429` 响应会以指数
+  退避重试 2 次，校验错误不会重试。
+- 输出汇总，例如 `3 uploaded, 12 skipped (unchanged), 0 failed`；任一文件失败时构建失败。
+
+## Release 必须一致
+
+还原时按每个错误事件上的 `release` 和 `dist` 查找 Artifact，所以上传和 Browser SDK 必须传入
+完全相同的值。从同一个 CI 变量同时设置两边，可以避免不一致。
+
+<Aside type="caution" title="值不一致不会报错">
+  没有 `release` 的事件无法还原。`dist` 不同，或只在一侧设置了 `dist`，都会查到另一个 Release，
+  结果是找不到 Artifact。
+</Aside>
+
+## 验证还原
+
+- 在主导航打开 **发布**，选择对应 Release。徽标显示已上传文件中可用的数量。
+- 使用匹配测试器：填入生产错误中生成代码的帧 URL、行和列，确认能还原到预期的源文件和行号。
+- 在已部署的构建中触发一个已知错误，从 **错误** 打开它。还原后的堆栈保留生成代码帧，并补充
+  源文件路径、行和列；无法还原的帧会显示原因，参见[栈帧没有还原的原因](#栈帧没有还原的原因)。
+
+## 插件与 CLI 选项
+
+插件接收选项；CLI 用命令行参数或环境变量传入相同的值。令牌建议用环境变量传入，避免出现在进程列表里。
+
+| 插件选项      | CLI 参数       | CLI 环境变量           | 说明                                                           |
+| ------------- | -------------- | ---------------------- | -------------------------------------------------------------- |
+| `baseUrl`     | `--base-url`   | `OPENRUM_BASE_URL`     | OpenRUM API 地址，例如 `https://rum.example.com`。必填         |
+| `projectId`   | `--project-id` | `OPENRUM_PROJECT_ID`   | 必填                                                           |
+| `release`     | `--release`    | `OPENRUM_RELEASE`      | 必须与 SDK 的 `release` 相同。必填                             |
+| `dist`        | `--dist`       | `OPENRUM_DIST`         | 使用 `dist` 时，必须与 SDK 的 `dist` 相同                      |
+| `commitSha`   | `--commit-sha` | `OPENRUM_COMMIT_SHA`   | 记录在 Release 上                                              |
+| `outDir`      | `--out-dir`    | `OPENRUM_OUT_DIR`      | 插件默认取 Vite 的 `build.outDir`，CLI 默认为 `dist`           |
+| `urlPrefix`   | `--url-prefix` | `OPENRUM_URL_PREFIX`   | 加在每个文件名之前的路径，见[下文](#artifact-命名与-urlprefix) |
+| `token`       | `--token`      | `OPENRUM_UPLOAD_TOKEN` | 未设置 `token` 时，插件读取 `OPENRUM_UPLOAD_TOKEN`             |
+| `replace`     | `--replace`    | `OPENRUM_REPLACE=true` | 覆盖内容已变化的可用 Artifact                                  |
+| `concurrency` | 无             | 无                     | 并行上传数，默认 4                                             |
+| `retries`     | 无             | 无                     | 网络错误、`5xx` 和 `429` 的重试次数，默认 2                    |
+
+## Artifact 命名与 `urlPrefix`
+
+Artifact 按名称匹配。名称是脚本 URL 的路径，去掉协议、域名、查询参数、片段和开头的 `/`，再加上
+`.map`。上传时用 `urlPrefix` 加上文件相对构建产物目录的路径生成名称。
+
+| 堆栈中的脚本 URL                                          | 构建产物中的文件                     | `urlPrefix`     | Artifact 名称                        |
+| --------------------------------------------------------- | ------------------------------------ | --------------- | ------------------------------------ |
+| `https://shop.example.com/assets/index-abc.js`            | `dist/assets/index-abc.js.map`       | 不设置          | `assets/index-abc.js.map`            |
+| `https://cdn.example.com/static/app/assets/index-abc.js`  | `dist/assets/index-abc.js.map`       | `static/app/`   | `static/app/assets/index-abc.js.map` |
+| `https://shop.example.com/_next/static/chunks/app-abc.js` | `.next/static/chunks/app-abc.js.map` | `_next/static/` | `_next/static/chunks/app-abc.js.map` |
+
+站点部署在子路径下，或资源托管在 CDN 上时，需要设置 `urlPrefix`。前缀会规范化斜杠，传入完整 URL
+时只取其路径部分。框架相关的写法见 [React（Vite）](/zh/docs/sdk/source-maps/react/) 和
+[Next.js](/zh/docs/sdk/source-maps/nextjs/)。栈帧显示 `missing_artifact` 时，先对比栈帧 URL 的路径
+和已上传的名称。
+
+## 重复构建与迟到上传
+
+- **同一 Release 可以安全地重复构建。** Release 会被复用，名称和 SHA-256 都相同的文件直接跳过，
+  不会重复上传。
+- **内容变化的文件应使用新 Release。** 名称相同但内容不同的文件会以 `ARTIFACT_EXISTS` 失败。
+  确实需要覆盖时，设置 `replace: true` 或传入 `--replace`。
+- **迟到上传会补还原近期错误。** Artifact 变为可用后，该 Release 与 dist 下近 7 天内未完全还原
+  的错误会自动重新还原。更早的事件保留生成代码位置。
+
+单个 Source Map 最大 64 MiB。上传前会拒绝更大的文件，请把产物拆分成更小的 chunk。
+
+## 栈帧没有还原的原因
+
+**错误** 和匹配测试器里，未还原的栈帧会显示下列原因之一：
+
+| 原因                    | 含义                                    | 检查什么                                                         |
+| ----------------------- | --------------------------------------- | ---------------------------------------------------------------- |
+| `missing_release`       | 事件没有 `release`                      | 在 SDK 的 `init()` 中设置 `release`                              |
+| `missing_artifact`      | 没有与脚本地址匹配的 Artifact           | 对比栈帧 URL 路径和该 Release 的 Artifact 名称，设置 `urlPrefix` |
+| `ambiguous_artifact`    | 匹配到多个 Artifact                     | SDK 的 `release` 和 `dist` 必须与上传时使用的值完全一致          |
+| `invalid_map`           | Source Map 为空、格式错误或版本不受支持 | 重新构建并上传；确认 CI 中没有任何步骤改写过 map                 |
+| `unsupported_index_url` | indexed map 的分段指向了外部 URL        | 生成扁平 map，或分段内联的 indexed map                           |
+| `no_mapping`            | map 中没有该行列对应的映射              | 确认 map 来自产生该栈帧的同一个产物                              |
+| `resource_limit`        | 堆栈或 Source Map 超出了安全限制        | 把产物拆分成更小的 chunk                                         |
+
+上传失败，或检查过上面这些之后栈帧仍未还原，参见
+[故障排查](/zh/docs/self-hosting/troubleshooting/#source-map-上传失败)。

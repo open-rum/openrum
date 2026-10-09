@@ -62,12 +62,6 @@ const publicGuides = [
     "Work on OpenRUM services, SDK, console and public site.",
     "docs/local-development.md",
   ],
-  [
-    "getting-started/demo-data",
-    "Deterministic Demo data",
-    "Reproduce the local ecommerce investigation dataset safely.",
-    "docs/demo-data.md",
-  ],
 ];
 
 function stripLeadingHeading(body) {

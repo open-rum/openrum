@@ -80,6 +80,14 @@ type devDataRequest struct {
 	From        time.Time         `json:"from"`
 	To          time.Time         `json:"to"`
 	Environment string            `json:"environment"`
+	// Users overrides who signs in: explicit business user IDs and/or the signed-in
+	// share. Visitors keep returning across sessions either way.
+	Users *devDataUsers `json:"users"`
+}
+
+type devDataUsers struct {
+	IDs      []string `json:"ids"`
+	SignedIn *float64 `json:"signedIn"`
 }
 
 type devDataResponse struct {
@@ -222,6 +230,31 @@ func (handler *DevDataHandler) resolveScenario(payload devDataRequest, project m
 	}
 	if payload.Seed != 0 {
 		scenario.Seed = payload.Seed
+	}
+	if payload.Users != nil {
+		users := devdata.UserPool{Prefix: "cust_"}
+		if scenario.Users != nil {
+			users = *scenario.Users
+		}
+		if users.Visitors <= 0 || users.Visitors > scenario.Sessions {
+			// About 0.6 visitors per session gives a realistic returning share.
+			users.Visitors = max(1, scenario.Sessions*3/5)
+		}
+		ids := make([]string, 0, len(payload.Users.IDs))
+		for _, id := range payload.Users.IDs {
+			if trimmed := strings.TrimSpace(id); trimmed != "" {
+				ids = append(ids, trimmed)
+			}
+		}
+		if len(ids) > 0 {
+			users.IDs = ids
+		}
+		if payload.Users.SignedIn != nil {
+			users.SignedIn = *payload.Users.SignedIn
+		} else if users.SignedIn == 0 && len(ids) > 0 {
+			users.SignedIn = 0.5
+		}
+		scenario.Users = &users
 	}
 	scenario.Environment = project.Environment
 	if payload.Environment != "" {

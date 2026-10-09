@@ -20,7 +20,7 @@ describe("catalog module queries", () => {
     const stat = createCatalogWidget("stat", { metrics: ["traffic.sessions"] });
     const params = catalogQueryParams(stat, filters, 30);
     expect(params).toMatchObject({ shape: "series", compare: true, maxPoints: 30 });
-    const withTrend = catalogQueryParams({ ...stat, statAppearance: "bar-right" }, filters, 30);
+    const withTrend = catalogQueryParams({ ...stat, statAppearance: "area-right" }, filters, 30);
     expect(metricsQueryString(withTrend)).toBe(metricsQueryString(params));
   });
 

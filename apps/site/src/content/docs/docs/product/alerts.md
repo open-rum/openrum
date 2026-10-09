@@ -1,9 +1,8 @@
 ---
 title: Alerts
 description: Rules that watch a Project's error, API and performance metrics and notify a Feishu group or your own service when a threshold is crossed.
+appliesTo: Alpha
 ---
-
-**Applies to:** Alpha. Status: Alpha implemented.
 
 An alert rule watches one metric of a Project. When the metric crosses its threshold, OpenRUM records the breach and notifies the rule's channels, with a link back to the page that explains it.
 

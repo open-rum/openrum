@@ -553,7 +553,7 @@ func (repository *APIRepository) endpointAggregate(ctx context.Context, filters 
 
 func (repository *APIRepository) trend(ctx context.Context, filters APIFilters, endpoint bool) ([]APITrendPoint, error) {
 	where, arguments := apiAggregateWhere(filters, endpoint)
-	interval := performanceInterval(filters.To.Sub(filters.From))
+	interval := legacySeriesInterval(filters.To.Sub(filters.From))
 	rows, err := repository.database.QueryContext(ctx, `SELECT toStartOfInterval(bucket, INTERVAL `+interval+`) AS point,
 		uniqCombined64Merge(requests),coalesce(uniqCombined64Merge(failures),0),
 		coalesce(uniqCombined64Merge(client_errors),0),quantileTDigestMerge(0.95)(duration_p95)

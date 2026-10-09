@@ -1,0 +1,113 @@
+---
+title: openrum 命令
+description: 用一条命令启动、查看和重置本地 OpenRUM 开发栈。
+appliesTo: Alpha
+---
+
+import { Aside } from "@astrojs/starlight/components";
+
+`openrum` 是源码仓库里的开发栈工具。它同时启动容器和宿主机进程，等每个服务真正就绪，而不是只等进程启动，并把两部分的状态汇总在一起。它用于开发 OpenRUM，或者在检出的源码里评估产品。它不是生产工具，也不随 SDK 发布。
+
+在仓库根目录通过 pnpm 运行：
+
+```sh
+pnpm openrum <command>
+```
+
+`openrum` 脚本执行的是 `go run ./cmd/openrum`，所以所有命令都需要安装 Go，包括 `up`。命令还需要带 Compose v2 的 Docker，且 Docker 守护进程已启动。`dev` 另外需要 `pnpm` 在 PATH 里，用来在宿主机运行控制台。命令会先做这些检查，并指出缺什么。
+
+macOS 和 Linux 可以直接运行；Windows 请使用 WSL。
+
+## 命令
+
+| 命令                          | 作用                                           |
+| ----------------------------- | ---------------------------------------------- |
+| `pnpm openrum dev`            | API 和控制台从源码运行，其余服务在容器里       |
+| `pnpm openrum up`             | 所有服务都在容器里                             |
+| `pnpm openrum status`         | 哪些在运行，哪些还没就绪                       |
+| `pnpm openrum logs [service]` | 跟随日志；宿主机服务读取自己的日志文件         |
+| `pnpm openrum restart <name>` | 重启一个服务，并等它恢复                       |
+| `pnpm openrum seed`           | 向运行中的服务栈加载演示账号和数据             |
+| `pnpm openrum stop`           | 停止全部服务，保留容器和数据                   |
+| `pnpm openrum down`           | 删除容器，保留数据卷                           |
+| `pnpm openrum reset`          | 删除容器并清空所有本地数据库，会先要求确认     |
+
+`pnpm openrum help` 会在终端打印同样的列表。
+
+## 加载演示数据
+
+`pnpm openrum seed` 向运行中的服务栈加载一份可重复的电商数据集：一个演示所有者、一个组织、一个项目，以及 14 天内约 30,000 个会话。请在 `up` 或 `dev` 报告服务就绪后执行。这一步可选，重复执行不会产生重复数据。
+
+启动时不会自动写入数据，全新的服务栈是空的，首次访问会进入初始化页面。如果实例的所有者是你自己创建的，该命令不会做任何改动。工作中需要少量数据时，使用控制台里的 **造数据**。
+
+## 选择模式
+
+`dev` 和 `up` 是启动栈的两种方式。
+
+| | `dev` | `up` |
+| --- | --- | --- |
+| API 和控制台 | 在宿主机从源码运行，控制台热更新，Go 重启很快 | 在容器里运行，和部署方式一致 |
+| 基础设施和数据管道 | 容器 | 容器 |
+| 适用场景 | 修改 OpenRUM 代码 | 评估产品，或确认构建结果与部署一致 |
+
+两种模式都在 `http://127.0.0.1:4173` 提供控制台。它们共用这个地址，所以不会同时运行。进入一种模式会停掉另一种模式的那一半：`dev` 停掉 API 和代理容器，`up` 停掉宿主机进程。如果两套栈同时连一个数据库，就会有两个 API 和两个 Consumer，处理到一半的数据会看起来像产品缺陷。
+
+`dev` 启动前还会先构建 Browser SDK，这样示例应用可以直接引用它。
+
+## 读懂 status
+
+`status` 会向 Compose 和宿主机进程管理器询问状态，每个服务输出一行：
+
+```text
+mode dev, environment deploy/compose/.env.example
+
+SERVICE     WHERE      STATE    DETAIL
+postgres    container  ready    127.0.0.1:5433
+clickhouse  container  ready    127.0.0.1:9000
+kafka       container  ready    127.0.0.1:9092
+redis       container  ready    127.0.0.1:6379
+ingest      container  ready    127.0.0.1:8081
+consumer    container  ready
+worker      container  ready
+api         host       ready    pid 22424, 127.0.0.1:8080
+web         host       running  http://127.0.0.1:4173
+```
+
+有服务没就绪时，最后一行会列出阻塞项，格式类似 `not ready yet: …`。启动和 `status` 都以就绪为准，所以 `dev` 或 `up` 成功表示控制台已经能响应，而不只是进程启动了。
+
+## 日志与重启
+
+```sh
+pnpm openrum logs api
+pnpm openrum logs ingest consumer worker
+pnpm openrum restart api
+```
+
+`dev` 模式下，`api` 和 `web` 运行在宿主机，`logs api` 读取它们在 `.openrum/` 下的日志文件；其余服务都是容器，使用 Compose 日志。`restart` 对宿主机服务是先停止再启动，所以会重新编译 Go API；对容器则是重启并等它恢复。容器重启不会重建镜像，修改 Ingest、Consumer、Worker 或数据库迁移后，需要重新执行 `pnpm openrum dev`。
+
+## 停止、删除与重置
+
+最后三个命令保留的内容不同。
+
+| 命令 | 容器 | 数据卷和数据 |
+| --- | --- | --- |
+| `stop` | 保留，下次启动很快 | 保留 |
+| `down` | 删除 | 保留 |
+| `reset` | 删除 | 删除 |
+
+<Aside type="caution" title="reset 会清空所有本地数据库">
+  `pnpm openrum reset` 会删除全部本地 PostgreSQL、ClickHouse、Kafka 和 Redis 数据卷，执行前会要求确认；加上 `--yes` 可跳过确认。下次启动会重新执行迁移，数据为空；需要演示数据时再执行 `pnpm openrum seed`。
+</Aside>
+
+## 端口、凭据与状态
+
+端口和凭据来自 `deploy/compose/.env`，不存在时回退到仓库里的 `deploy/compose/.env.example`。两部分栈都读取这同一个文件，所以修改其中的 `CONSOLE_PORT`，两种模式下的控制台端口都会变。
+
+如果端口已被占用，`openrum` 会指出占用它的进程并停止，不会再启动第二份。停掉那个进程，或者在 env 文件里换一个端口。
+
+宿主机进程与启动它的终端脱离，关闭终端不会停掉整个栈。它们的进程 ID 和日志放在 `.openrum/`，git 会忽略这个目录。
+
+## 下一步
+
+- [环境与启动](/zh/docs/getting-started/local-development/)：第一次运行和演示账号登录
+- [日常开发与排查](/zh/docs/getting-started/local-development/workflow/)：每种改动之后需要重启什么

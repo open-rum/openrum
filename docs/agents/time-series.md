@@ -67,7 +67,7 @@
 | 仪表盘兼容导出和 Context | `apps/web/src/features/dashboard/chartDensity.ts`、`DashboardDensity.tsx` |
 | 仪表盘后端 | `internal/query/overview.go`、`analytics.go`；显式 `maxPoints` 分支 |
 | 错误概览和详情后端 | `internal/query/issues.go`：`Overview`、`Trend`；`services/api/internal/handlers/issues.go` |
-| 错误前端响应与图表 | `apps/web/src/lib/api/issues.ts`；`features/issues/IssueOverviewCharts.tsx`、`IssueTrend.tsx` |
+| 错误前端响应与图表 | `apps/web/src/lib/api/issues.ts`；`features/issues/IssueOverview.tsx`、`IssueTrend.tsx`；列表行趋势 `fillRowDetails` 用 `ConsoleSeriesInterval(range, 5m)` |
 
 新功能直接使用公共入口，不从 `features/dashboard` 引用工具，也不复制一套间隔表。
 前后端的 30 点常量必须保持一致。

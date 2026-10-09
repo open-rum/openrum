@@ -98,13 +98,15 @@ type PerformanceDetail struct {
 }
 
 type PerformanceResult struct {
-	From    time.Time                            `json:"from"`
-	To      time.Time                            `json:"to"`
-	Routes  []RoutePerformance                   `json:"routes"`
-	Trend   []PerformanceTrendPoint              `json:"trend"`
-	Detail  *PerformanceDetail                   `json:"detail,omitempty"`
-	Summary RoutePerformance                     `json:"summary"`
-	Facets  map[string][]PerformanceFilterOption `json:"facets"`
+	From time.Time `json:"from"`
+	To   time.Time `json:"to"`
+	// IntervalSeconds is the bucket width shared by the overview and route trends.
+	IntervalSeconds int                                  `json:"intervalSeconds"`
+	Routes          []RoutePerformance                   `json:"routes"`
+	Trend           []PerformanceTrendPoint              `json:"trend"`
+	Detail          *PerformanceDetail                   `json:"detail,omitempty"`
+	Summary         RoutePerformance                     `json:"summary"`
+	Facets          map[string][]PerformanceFilterOption `json:"facets"`
 }
 
 type PerformanceFilterOption struct {
@@ -153,7 +155,10 @@ func (repository *PerformanceRepository) Get(ctx context.Context, requested Perf
 	if err != nil {
 		return PerformanceResult{}, err
 	}
-	result := PerformanceResult{From: filters.From, To: filters.To, Routes: routes, Trend: []PerformanceTrendPoint{}}
+	result := PerformanceResult{
+		From: filters.From, To: filters.To, Routes: routes, Trend: []PerformanceTrendPoint{},
+		IntervalSeconds: int(performanceInterval(filters.To.Sub(filters.From)) / time.Second),
+	}
 	result.Summary, err = repository.summary(ctx, filters)
 	if err != nil {
 		return PerformanceResult{}, err
@@ -180,7 +185,7 @@ func (repository *PerformanceRepository) Get(ctx context.Context, requested Perf
 
 func (repository *PerformanceRepository) overviewTrend(ctx context.Context, filters PerformanceFilters) ([]PerformanceTrendPoint, error) {
 	where, arguments := performanceAggregateWhere(filters, false)
-	interval := performanceInterval(filters.To.Sub(filters.From))
+	interval := performanceIntervalSQL(performanceInterval(filters.To.Sub(filters.From)))
 	rows, err := repository.database.QueryContext(ctx, `SELECT toStartOfInterval(timestamp, INTERVAL `+interval+`) AS point,
 		`+performanceMetricSelect("LCP")+`,`+performanceMetricSelect("INP")+`,`+performanceMetricSelect("CLS")+`,`+performanceMetricSelect("FCP")+`,`+performanceMetricSelect("TTFB")+`
 		FROM rum_events WHERE `+where+` GROUP BY point ORDER BY point`, arguments...)
@@ -248,7 +253,7 @@ func (repository *PerformanceRepository) detail(ctx context.Context, filters Per
 
 func (repository *PerformanceRepository) trend(ctx context.Context, filters PerformanceFilters) ([]PerformancePoint, error) {
 	where, arguments := performanceAggregateWhere(filters, true)
-	interval := performanceInterval(filters.To.Sub(filters.From))
+	interval := performanceIntervalSQL(performanceInterval(filters.To.Sub(filters.From)))
 	rows, err := repository.database.QueryContext(ctx, `SELECT toStartOfInterval(timestamp, INTERVAL `+interval+`) AS point,
 		`+performanceMetricSelect(filters.Metric)+`
 		FROM rum_events WHERE `+where+` GROUP BY point ORDER BY point`, arguments...)
@@ -392,7 +397,15 @@ func metricBucketWidth(metric string) float64 {
 	return 250
 }
 
-func performanceInterval(window time.Duration) string {
+// performanceInterval follows the Console's ~30-bucket policy (docs/agents/time-series.md)
+// over raw events, whose finest resolution is one minute.
+func performanceInterval(window time.Duration) time.Duration {
+	return ConsoleSeriesInterval(window, time.Minute)
+}
+
+// legacySeriesInterval is the pre-policy density still used by the analytics and API
+// trends when the caller passes no point budget; see docs/agents/time-series.md.
+func legacySeriesInterval(window time.Duration) string {
 	switch {
 	case window <= 6*time.Hour:
 		return "1 MINUTE"
@@ -403,6 +416,10 @@ func performanceInterval(window time.Duration) string {
 	default:
 		return "6 HOUR"
 	}
+}
+
+func performanceIntervalSQL(interval time.Duration) string {
+	return fmt.Sprintf("%d MINUTE", int(interval/time.Minute))
 }
 
 func finalizeMetric(value float64, samples uint64) PerformanceMetric {

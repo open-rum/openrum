@@ -34,6 +34,7 @@ jobs:
           pnpm run typecheck
           pnpm run test
           pnpm run site:check
+          node scripts/release/verify-sdk-package.mjs
 
   publish:
     needs: verify

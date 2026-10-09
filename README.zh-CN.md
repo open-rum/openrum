@@ -11,7 +11,7 @@
 
 <p align="center">
   <a href="https://openrum.netlify.app/zh/">官网</a> ·
-  <a href="https://openrum.netlify.app/zh/docs/getting-started/quickstart/">文档</a> ·
+  <a href="https://openrum.netlify.app/zh/docs/introduction/">文档</a> ·
   <a href="#快速启动">快速启动</a> ·
   <a href="https://github.com/eijil/openrum/issues">反馈问题</a>
 </p>
@@ -53,20 +53,27 @@ docker compose --env-file deploy/compose/.env.example \
   -f deploy/compose/docker-compose.yml up -d --build
 ```
 
-首次启动会构建服务、执行数据库迁移，并加载覆盖 **14 天、约 30,000 个会话**的电商演示数据。等待常驻服务进入健康状态：
+首次启动会构建服务并执行数据库迁移。等待常驻服务进入健康状态：
 
 ```sh
 docker compose --env-file deploy/compose/.env.example \
   -f deploy/compose/docker-compose.yml ps
 ```
 
-打开 **[http://127.0.0.1:4173](http://127.0.0.1:4173)**，使用以下账号登录：
+然后加载演示数据：覆盖 **14 天、约 30,000 个会话**的电商数据集。这一步可选，重复执行也是安全的：
+
+```sh
+docker compose --profile seed --env-file deploy/compose/.env.example \
+  -f deploy/compose/docker-compose.yml run --rm --no-deps demo-seed
+```
+
+如果本地克隆并安装了 Go，也可以执行 `pnpm openrum up` 再执行 `pnpm openrum seed`。打开 **[http://127.0.0.1:4173](http://127.0.0.1:4173)**，使用以下账号登录：
 
 | 邮箱                 | 密码                 |
 | -------------------- | -------------------- |
 | `demo@openrum.local` | `OpenRUM-demo-2026!` |
 
-通过演示数据体验仪表盘、错误、性能和会话排查。对象存储是可选依赖，需要上传 Source Map 产物时再配置。
+通过演示数据体验仪表盘、错误、性能和会话排查。跳过加载步骤则得到一个空实例，首次访问时创建你自己的所有者账号。对象存储是可选依赖，需要上传 Source Map 产物时再配置。
 
 停止服务并保留数据：
 
@@ -75,7 +82,7 @@ docker compose --env-file deploy/compose/.env.example \
   -f deploy/compose/docker-compose.yml down
 ```
 
-这套配置使用示例凭据和单节点依赖，仅用于本地体验。实际部署请使用[单机 Docker](https://openrum.netlify.app/zh/docs/self-hosting/docker-production/) 或 [Kubernetes / Helm](https://openrum.netlify.app/zh/docs/getting-started/production-deployment/) 指南。遇到端口占用或启动失败时，查看 [Compose 排错说明](https://openrum.netlify.app/zh/docs/self-hosting/compose/)。
+这套配置使用示例凭据和单节点依赖，仅用于本地体验。实际部署请使用[单机 Docker](https://openrum.netlify.app/zh/docs/self-hosting/docker-production/) 或 [Kubernetes / Helm](https://openrum.netlify.app/zh/docs/getting-started/production-deployment/) 指南。遇到端口占用或启动失败时，查看[故障排查](https://openrum.netlify.app/zh/docs/self-hosting/troubleshooting/)。
 
 ## 接入第一个项目
 
@@ -97,8 +104,8 @@ docker compose --env-file deploy/compose/.env.example \
 
 | 你想做什么          | 对应文档                                                                                                                                                                              |
 | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 选择安装方式        | [开始使用](https://openrum.netlify.app/zh/docs/getting-started/quickstart/)                                                                                                           |
-| 接入前端项目        | [浏览器 SDK](https://openrum.netlify.app/zh/docs/sdk/browser/) · [Next.js](https://openrum.netlify.app/zh/docs/sdk/nextjs/) · [Astro](https://openrum.netlify.app/zh/docs/sdk/astro/) |
+| 选择安装方式        | [开始使用](https://openrum.netlify.app/zh/docs/introduction/)                                                                                                           |
+| 接入前端项目        | [浏览器 SDK](https://openrum.netlify.app/zh/docs/sdk/browser/) · [Next.js](https://openrum.netlify.app/zh/docs/sdk/browser/nextjs/) · [Astro](https://openrum.netlify.app/zh/docs/sdk/browser/astro/) |
 | 配置登录            | [邮箱、Google、GitHub、LDAP 与 OIDC（仓库指南）](apps/site/src/content/docs/zh/docs/getting-started/sign-in/index.mdx)                                                                |
 | 部署与维护实例      | [自托管概览](https://openrum.netlify.app/zh/docs/self-hosting/overview/) · [备份与恢复](https://openrum.netlify.app/zh/docs/self-hosting/backup-restore/)                             |
 | 上传 Source Map     | [Source Map 接入](https://openrum.netlify.app/zh/docs/sdk/source-maps/)                                                                                                               |

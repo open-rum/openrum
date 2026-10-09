@@ -16,6 +16,9 @@ const (
 	IssueStatusUnresolved IssueStatus = "unresolved"
 	IssueStatusResolved   IssueStatus = "resolved"
 	IssueStatusIgnored    IssueStatus = "ignored"
+	// IssueStatusRegressed is derived, never stored: a resolved Issue that failed again after
+	// it was resolved. Only reads and filters use it; writes accept the three stored states.
+	IssueStatusRegressed IssueStatus = "regressed"
 
 	ArtifactStatusPending SourceMapArtifactStatus = "pending"
 	ArtifactStatusReady   SourceMapArtifactStatus = "ready"
@@ -57,8 +60,11 @@ type IssueState struct {
 	Status             IssueStatus `json:"status"`
 	AssigneeUserID     *uuid.UUID  `json:"assigneeUserId,omitempty"`
 	ResolvedInRelease  *uuid.UUID  `json:"resolvedInReleaseId,omitempty"`
-	CreatedAt          time.Time   `json:"createdAt"`
-	UpdatedAt          time.Time   `json:"updatedAt"`
+	// ResolvedAt is when the Issue was last marked resolved; nil on a write that resolves
+	// lets the database use now(), and it is nil for every other status.
+	ResolvedAt *time.Time `json:"resolvedAt,omitempty"`
+	CreatedAt  time.Time  `json:"createdAt"`
+	UpdatedAt  time.Time  `json:"updatedAt"`
 }
 
 type IssueRepository struct{ database *sql.DB }
@@ -236,16 +242,17 @@ func (repository *IssueRepository) PutIssueState(ctx context.Context, state Issu
 	}
 	err := repository.database.QueryRowContext(ctx,
 		`INSERT INTO issue_states
-		 (project_id, fingerprint, fingerprint_version, status, assignee_user_id, resolved_in_release_id)
-		 VALUES ($1,$2,$3,$4,$5,$6)
+		 (project_id, fingerprint, fingerprint_version, status, assignee_user_id, resolved_in_release_id, resolved_at)
+		 VALUES ($1,$2,$3,$4,$5,$6, CASE WHEN $8::boolean THEN COALESCE($7::timestamptz, now()) END)
 		 ON CONFLICT (project_id, fingerprint) DO UPDATE SET
 		   fingerprint_version=EXCLUDED.fingerprint_version, status=EXCLUDED.status,
 		   assignee_user_id=EXCLUDED.assignee_user_id,
-		   resolved_in_release_id=EXCLUDED.resolved_in_release_id, updated_at=now()
-		 RETURNING created_at, updated_at`,
+		   resolved_in_release_id=EXCLUDED.resolved_in_release_id,
+		   resolved_at=EXCLUDED.resolved_at, updated_at=now()
+		 RETURNING resolved_at, created_at, updated_at`,
 		state.ProjectID, state.Fingerprint, state.FingerprintVersion, state.Status,
-		state.AssigneeUserID, state.ResolvedInRelease,
-	).Scan(&state.CreatedAt, &state.UpdatedAt)
+		state.AssigneeUserID, state.ResolvedInRelease, state.ResolvedAt, state.Status == IssueStatusResolved,
+	).Scan(&state.ResolvedAt, &state.CreatedAt, &state.UpdatedAt)
 	if err != nil {
 		return IssueState{}, translateConstraintError(err)
 	}
@@ -256,10 +263,10 @@ func (repository *IssueRepository) GetIssueState(ctx context.Context, projectID 
 	var state IssueState
 	err := repository.database.QueryRowContext(ctx,
 		`SELECT project_id, fingerprint, fingerprint_version, status, assignee_user_id,
-		        resolved_in_release_id, created_at, updated_at
+		        resolved_in_release_id, resolved_at, created_at, updated_at
 		 FROM issue_states WHERE project_id=$1 AND fingerprint=$2`, projectID, fingerprint,
 	).Scan(&state.ProjectID, &state.Fingerprint, &state.FingerprintVersion, &state.Status,
-		&state.AssigneeUserID, &state.ResolvedInRelease, &state.CreatedAt, &state.UpdatedAt)
+		&state.AssigneeUserID, &state.ResolvedInRelease, &state.ResolvedAt, &state.CreatedAt, &state.UpdatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return IssueState{}, ErrNotFound
 	}
@@ -273,7 +280,7 @@ func (repository *IssueRepository) ListIssueStates(ctx context.Context, projectI
 	}
 	rows, err := repository.database.QueryContext(ctx,
 		`SELECT project_id, fingerprint, fingerprint_version, status, assignee_user_id,
-		        resolved_in_release_id, created_at, updated_at
+		        resolved_in_release_id, resolved_at, created_at, updated_at
 		 FROM issue_states WHERE project_id=$1 AND fingerprint=ANY($2)`, projectID, fingerprints)
 	if err != nil {
 		return nil, err
@@ -282,7 +289,7 @@ func (repository *IssueRepository) ListIssueStates(ctx context.Context, projectI
 	for rows.Next() {
 		var state IssueState
 		if err := rows.Scan(&state.ProjectID, &state.Fingerprint, &state.FingerprintVersion, &state.Status,
-			&state.AssigneeUserID, &state.ResolvedInRelease, &state.CreatedAt, &state.UpdatedAt); err != nil {
+			&state.AssigneeUserID, &state.ResolvedInRelease, &state.ResolvedAt, &state.CreatedAt, &state.UpdatedAt); err != nil {
 			return nil, err
 		}
 		states[state.Fingerprint] = state
@@ -326,16 +333,17 @@ func (repository *IssueRepository) MutateIssueState(ctx context.Context, actorID
 	}
 	err = transaction.QueryRowContext(ctx,
 		`INSERT INTO issue_states
-		 (project_id, fingerprint, fingerprint_version, status, assignee_user_id, resolved_in_release_id)
-		 VALUES ($1,$2,$3,$4,$5,$6)
+		 (project_id, fingerprint, fingerprint_version, status, assignee_user_id, resolved_in_release_id, resolved_at)
+		 VALUES ($1,$2,$3,$4,$5,$6, CASE WHEN $8::boolean THEN COALESCE($7::timestamptz, now()) END)
 		 ON CONFLICT (project_id, fingerprint) DO UPDATE SET
 		   fingerprint_version=EXCLUDED.fingerprint_version, status=EXCLUDED.status,
 		   assignee_user_id=EXCLUDED.assignee_user_id,
-		   resolved_in_release_id=EXCLUDED.resolved_in_release_id, updated_at=now()
-		 RETURNING created_at, updated_at`,
+		   resolved_in_release_id=EXCLUDED.resolved_in_release_id,
+		   resolved_at=EXCLUDED.resolved_at, updated_at=now()
+		 RETURNING resolved_at, created_at, updated_at`,
 		state.ProjectID, state.Fingerprint, state.FingerprintVersion, state.Status,
-		state.AssigneeUserID, state.ResolvedInRelease,
-	).Scan(&state.CreatedAt, &state.UpdatedAt)
+		state.AssigneeUserID, state.ResolvedInRelease, state.ResolvedAt, state.Status == IssueStatusResolved,
+	).Scan(&state.ResolvedAt, &state.CreatedAt, &state.UpdatedAt)
 	if err != nil {
 		return IssueState{}, translateConstraintError(err)
 	}
@@ -346,6 +354,77 @@ func (repository *IssueRepository) MutateIssueState(ctx context.Context, actorID
 		return IssueState{}, err
 	}
 	return state, nil
+}
+
+// IssueRef names one Issue of a project by fingerprint.
+type IssueRef struct {
+	Fingerprint        string
+	FingerprintVersion int16
+}
+
+// IssueStatePatch is the part of an Issue's state a batch changes; fields left unset are kept.
+type IssueStatePatch struct {
+	Status *IssueStatus
+	// SetAssignee distinguishes "clear the assignee" (true, nil) from "leave it" (false).
+	SetAssignee    bool
+	AssigneeUserID *uuid.UUID
+}
+
+// BatchMutateIssueStates applies one patch to several Issues in a single transaction and
+// records one audit entry. Issues without a stored state get one.
+func (repository *IssueRepository) BatchMutateIssueStates(ctx context.Context, actorID, projectID uuid.UUID, refs []IssueRef, patch IssueStatePatch) (int, error) {
+	transaction, err := repository.database.BeginTx(ctx, nil)
+	if err != nil {
+		return 0, err
+	}
+	defer func() { _ = transaction.Rollback() }()
+	var organizationID uuid.UUID
+	if err := transaction.QueryRowContext(ctx, "SELECT organization_id FROM projects WHERE id=$1 FOR UPDATE", projectID).Scan(&organizationID); errors.Is(err, sql.ErrNoRows) {
+		return 0, ErrNotFound
+	} else if err != nil {
+		return 0, err
+	}
+	if patch.AssigneeUserID != nil {
+		var member bool
+		if err := transaction.QueryRowContext(ctx,
+			"SELECT EXISTS(SELECT 1 FROM organization_members WHERE organization_id=$1 AND user_id=$2)",
+			organizationID, *patch.AssigneeUserID).Scan(&member); err != nil {
+			return 0, err
+		}
+		if !member {
+			return 0, ErrNotFound
+		}
+	}
+	status, setStatus := IssueStatusUnresolved, patch.Status != nil
+	if setStatus {
+		status = *patch.Status
+	}
+	statement, err := transaction.PrepareContext(ctx,
+		`INSERT INTO issue_states
+		 (project_id, fingerprint, fingerprint_version, status, assignee_user_id, resolved_at)
+		 VALUES ($1,$2,$3,$4,$5, CASE WHEN $8::boolean THEN now() END)
+		 ON CONFLICT (project_id, fingerprint) DO UPDATE SET
+		   status = CASE WHEN $6::boolean THEN EXCLUDED.status ELSE issue_states.status END,
+		   resolved_at = CASE WHEN $6::boolean THEN EXCLUDED.resolved_at ELSE issue_states.resolved_at END,
+		   assignee_user_id = CASE WHEN $7::boolean THEN EXCLUDED.assignee_user_id ELSE issue_states.assignee_user_id END,
+		   updated_at = now()`)
+	if err != nil {
+		return 0, err
+	}
+	defer func() { _ = statement.Close() }()
+	for _, ref := range refs {
+		if _, err := statement.ExecContext(ctx, projectID, ref.Fingerprint, ref.FingerprintVersion,
+			status, patch.AssigneeUserID, setStatus, patch.SetAssignee, status == IssueStatusResolved); err != nil {
+			return 0, translateConstraintError(err)
+		}
+	}
+	if err := insertAudit(ctx, transaction, organizationID, actorID, "issue.states_updated", "project", projectID); err != nil {
+		return 0, err
+	}
+	if err := transaction.Commit(); err != nil {
+		return 0, err
+	}
+	return len(refs), nil
 }
 
 // ArtifactStorageUsage totals ready Source Map objects across the Instance.

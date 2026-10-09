@@ -1,9 +1,8 @@
 ---
 title: API 监控
 description: 在会话和问题上下文中观察浏览器发起的网络请求。
+appliesTo: Alpha
 ---
-
-**适用版本：** Alpha。状态：Alpha 已实现。
 
 API Request Event 记录浏览器 `fetch`/XHR 的耗时和失败信号，但不保存请求体、响应体、Header 或 Cookie。
 

@@ -16,7 +16,7 @@ const data: ScalarData = {
 };
 
 describe("stat card hierarchy", () => {
-  it.each(["line-right", "bar-right"] as const)(
+  it.each(["area-right"] as const)(
     "does not fabricate %s when there is no trend data",
     (appearance) => {
       const { container, getByRole } = render(

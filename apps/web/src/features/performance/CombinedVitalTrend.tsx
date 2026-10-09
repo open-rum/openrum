@@ -5,6 +5,8 @@ import { ChartContainer, ChartTooltip, type ChartConfig } from "@/components/ui/
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useChartMotion } from "@/lib/charts/useChartMotion";
 import { smoothCurve } from "@/lib/charts/smoothCurve";
+import { isolatedDot } from "@/lib/charts/isolatedDot";
+import { intervalLabel, type TimeSeriesRow } from "@/lib/charts/timeSeries";
 import {
   formatPerformanceMetric,
   type PerformancePercentile,
@@ -20,16 +22,20 @@ const config = Object.fromEntries(
 
 export function CombinedVitalTrend({
   trend,
+  range,
   percentile,
   onPercentileChange,
 }: {
   trend: PerformanceResponse["trend"];
+  range?: { from?: string; to?: string; intervalSeconds?: number };
   percentile: PerformancePercentile;
   onPercentileChange: (value: PerformancePercentile) => void;
 }) {
   const animate = useChartMotion();
-  const [visible, setVisible] = useState<string[]>(() => vitalSeries.map(({ key }) => key));
-  const data = combinedTrend(trend, percentile);
+  const [visible, setVisible] = useState<string[]>(() =>
+    vitalSeries.filter(({ core }) => core).map(({ key }) => key),
+  );
+  const data = combinedTrend(trend, percentile, range);
   const series = vitalSeries.filter(({ key }) => visible.includes(key));
   const hasData = data.some((point) => series.some(({ key }) => point[key] !== null));
   const hasTiming = series.some(({ key }) => key !== "cls");
@@ -42,7 +48,10 @@ export function CombinedVitalTrend({
       <CardHeader>
         <div>
           <CardTitle>性能趋势</CardTitle>
-          <CardDescription>真实指标值 · 越低越好</CardDescription>
+          <CardDescription>
+            真实指标值 · 越低越好
+            {range?.intervalSeconds ? ` · 自动 · ${intervalLabel(range.intervalSeconds)}` : ""}
+          </CardDescription>
         </div>
         <PercentileSelect value={percentile} onChange={onPercentileChange} />
       </CardHeader>
@@ -127,7 +136,11 @@ export function CombinedVitalTrend({
                   stroke={`var(--color-${key})`}
                   strokeDasharray={dash}
                   strokeWidth={2}
-                  dot={data.length === 1}
+                  dot={isolatedDot(
+                    { rows: data as unknown as TimeSeriesRow[] },
+                    key,
+                    `var(--color-${key})`,
+                  )}
                   activeDot={{ r: 4 }}
                   connectNulls={false}
                   isAnimationActive={animate}

@@ -1,0 +1,80 @@
+---
+title: 事件链路
+description: 一个 Event 从浏览器到 ClickHouse 经过的每一道检查，按顺序列出，以及某一步失败时调用方看到什么。
+appliesTo: Alpha
+---
+
+import { Aside } from "@astrojs/starlight/components";
+
+一个 Event 分两半到达存储，中间隔着 Kafka。**Ingest** 是同步的：它给浏览器应答。**Consumer** 是异步的：它处理并保存 Ingest 排进队列的数据。知道一条规则属于哪一半，数据缺失时就知道去哪里找。
+
+```text
+Browser SDK ──► Ingest ──► Kafka ──► Consumer ──► ClickHouse
+   批次         检查并      可靠       处理并        已存储的
+                接收        缓冲       保存          Event
+```
+
+## 前一半：Ingest
+
+SDK 一次 `POST` 发送一个批次，称为 Envelope，包含 1 到 100 个 Event。Ingest 按下面的顺序做检查，遇到第一个失败就停止。顺序很重要：便宜的检查排在读取请求体之前。
+
+| 顺序 | 检查 | 失败时 |
+| --- | --- | --- |
+| 1 | 存储压力硬停止 | 返回 `202` 但不存储，见下方说明 |
+| 2 | 按 IP 的请求限流，此时还不知道 key | `429`，范围 `ip` |
+| 3 | `X-OpenRUM-Key` 对应一个有效的 Project key | `401` `INVALID_KEY` |
+| 4 | 请求的 `Origin` 在 Project 允许范围内 | `403` `ORIGIN_REJECTED` |
+| 5 | Project Rate Limit | `429`，范围 `project` |
+| 6 | 请求体是 JSON，明文或 gzip，且在大小限制内 | `413`、`415` 或 `400` |
+| 7 | Envelope 符合 schema，且包含 1 到 100 个 Event | `400` `INVALID_ENVELOPE` |
+| 8 | Envelope 的 Environment 已在该 Project 注册 | `400` `ENVIRONMENT_MISMATCH` |
+| 9 | Kafka 确认写入 | `503` `INGEST_UNAVAILABLE`，带 `Retry-After` |
+
+一个整体有效的 Envelope 里，个别 Event 仍可能单独失败。这些 Event 会被剔除，其余的照常接收，响应是 `207`，并列出被拒绝的 Event ID。如果所有 Event 都被拒绝，就不会有任何东西进入队列。
+
+`202` 或 `207` 表示 **Kafka 已经拿到这些 Event**，不代表它们已经可查询。每个状态码的含义，以及 SDK 对它们的处理，见 [Ingest 响应码](/zh/docs/reference/ingest-responses/)。
+
+<Aside type="note" title="为什么磁盘满了反而返回 202">
+  ClickHouse 达到硬停止阈值时，Ingest 仍会接收请求但丢弃 Event，并设置
+  `X-OpenRUM-Storage-Pressure: hard-stop`。如果返回 `429` 或 `503`，每个浏览器都会重试，
+  磁盘写满就会演变成重试风暴。见[存储压力](/zh/docs/self-hosting/storage-pressure/)。
+</Aside>
+
+## 后一半：Consumer
+
+Consumer 读取队列里的 Envelope，并按下面的顺序逐个处理。顺序是刻意安排的：依赖最终存储结果的工作放在最后，被丢弃的 Event 不需要为它们付出代价。
+
+| 顺序 | 阶段 | 做什么 |
+| --- | --- | --- |
+| 1 | 规范化 | 把 Envelope 变成规范 Event：清洗用户标识、标题、URL、错误文本和日志消息，把 User-Agent 解析成浏览器、操作系统和设备，并解析国家。同时记录 [ingest 标记](/zh/docs/reference/ingest-flags/)，如 `pii_scrubbed` 和 `bot` |
+| 2 | 入站过滤 | 应用 Project 的[入站过滤](/zh/docs/product/inbound-filters/)，例如丢弃机器人流量 |
+| 3 | 处理规则 | 应用 Project 自己的脱敏与改写规则 |
+| 4 | 保留策略 | 对每个 Event 应用 Project 的保留策略 |
+| 5 | 指纹 | 基于最终会被存储的文本，计算把错误归入某个 Issue 的 Fingerprint |
+| 6 | 写入 | 分批把 Event 插入 ClickHouse |
+| 7 | 提交 | 提交 Kafka offset，且只在写入成功之后 |
+
+无法规范化的 Envelope 或 Event，会连同原因、哈希和来源 offset 写入死信主题，而不是无限重试。ClickHouse 写入失败则会退避重试并保持 offset，所以 Consumer 会停在那条消息上，而不是跳过它。
+
+过滤先于处理，处理先于指纹，所以 Issue 是按脱敏之后的文本分组的，被过滤的 Event 也几乎没有开销。
+
+## 存储之后
+
+有几项工作读取 Consumer 写入的数据，而不经过上面的链路：
+
+- ClickHouse 物化视图在 Event 落库时维护按分钟和按小时的聚合，仪表盘读的就是它们。见[数据存储](/zh/docs/self-hosting/data-stores/)。
+- Worker 在错误入库后不久，用 Source Map 映射堆栈帧。
+- Worker 基于聚合数据评估告警规则，并发送通知。
+- API 的每个 Console 查询都在 ClickHouse 上执行。
+
+## 数据缺失时
+
+按症状找到负责的那一半：
+
+| 症状 | 去看 |
+| --- | --- |
+| SDK 报错，或者网络面板里出现 `4xx` | Ingest：[Ingest 响应码](/zh/docs/reference/ingest-responses/)、[速率限制](/zh/docs/product/rate-limits/) |
+| 请求成功，但 Console 里什么都没有 | Consumer 的积压和死信主题；然后看[故障排查](/zh/docs/self-hosting/troubleshooting/) |
+| Event 晚了几分钟才出现 | Consumer 吞吐或 ClickHouse 写入能力，见[容量规划](/zh/docs/self-hosting/capacity/) |
+| 只缺某些类型的 Event | [入站过滤](/zh/docs/product/inbound-filters/)、Project 设置里的采样，或 Environment 检查 |
+| 堆栈没有被映射 | Worker 和对应 Release 的 [Source Map](/zh/docs/sdk/source-maps/) |

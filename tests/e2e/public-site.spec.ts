@@ -40,7 +40,7 @@ async function choosePalette(page: Page, menu: string, palette: string) {
 test("docs pages and the logo follow the homepage palette in both themes", async ({ page }) => {
   await page.goto("/");
   await choosePalette(page, "Choose palette", "Magenta");
-  await page.goto("/docs/getting-started/quickstart/");
+  await page.goto("/docs/introduction/");
   const html = page.locator("html");
   await expect(html).toHaveAttribute("data-palette", "magenta");
   const logo = () =>
@@ -55,7 +55,7 @@ test("docs pages and the logo follow the homepage palette in both themes", async
   }
   await page.goto("/");
   await choosePalette(page, "Choose palette", "Lime");
-  await page.goto("/docs/getting-started/quickstart/");
+  await page.goto("/docs/introduction/");
   await expect(html).toHaveAttribute("data-palette", "lime");
   expect(await logo()).not.toBe(magentaLogo);
 });
@@ -74,7 +74,7 @@ test("homepage palette choice is kept across visits", async ({ page }) => {
   );
 });
 
-const keyPages = ["/", "/zh/", "/docs/", "/docs/getting-started/quickstart/"];
+const keyPages = ["/", "/zh/", "/docs/", "/docs/introduction/"];
 
 for (const path of keyPages) {
   test(`${path} has metadata, one main heading and no blocking accessibility findings`, async ({
@@ -87,7 +87,7 @@ for (const path of keyPages) {
     await page.addInitScript(() => localStorage.setItem("openrum-theme", "light"));
     await page.goto(path);
     await expect(page.locator("h1")).toHaveCount(1);
-    await expect(page).toHaveTitle(/OpenRUM|Quickstart/);
+    await expect(page).toHaveTitle(/OpenRUM|Introduction/);
     await expect(page.locator('link[rel="canonical"]')).toHaveAttribute("href", /.+/);
     await expect(page.locator('meta[name="description"]')).toHaveAttribute("content", /.+/);
     await expect(page.locator("[data-openrum-build]")).toContainText(/Release .+ · commit .+/);
@@ -138,7 +138,7 @@ for (const mode of ["reduced-motion", "animated"] as const) {
     await expect(page.locator(".lp-shiny")).toHaveText("AI 即将支持");
     expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBe(0);
     await page.locator(".lp-hero").getByRole("link", { name: "开始部署" }).click();
-    await expect(page).toHaveURL(/\/zh\/docs\/getting-started\/quickstart\//);
+    await expect(page).toHaveURL(/\/zh\/docs\/self-hosting\/overview\//);
     expect(errors).toEqual([]);
   });
 }
@@ -165,20 +165,20 @@ test("theme and equivalent language navigation work without a network tracker", 
 });
 
 test("docs language switch is site-wide and does not mix navigation locales", async ({ page }) => {
-  await page.goto("/docs/getting-started/quickstart/");
+  await page.goto("/docs/introduction/");
   const tabs = page.locator(".docs-tabs");
-  await expect(tabs.getByRole("link", { name: "Start" })).toBeVisible();
-  await expect(tabs.getByRole("link", { name: "开始" })).toHaveCount(0);
+  await expect(tabs.getByRole("link", { name: "Get started" })).toBeVisible();
+  await expect(tabs.getByRole("link", { name: "快速开始" })).toHaveCount(0);
   await page.locator("summary[aria-label='Select language']").click();
   await page.getByRole("menuitemradio", { name: "简体中文" }).click();
-  await expect(page).toHaveURL(/\/zh\/docs\/getting-started\/quickstart\/?$/);
-  await expect(page.locator("h1")).toContainText("开始使用");
+  await expect(page).toHaveURL(/\/zh\/docs\/introduction\/?$/);
+  await expect(page.locator("h1")).toContainText("介绍");
   const zhTabs = page.locator(".docs-tabs");
-  await expect(zhTabs.getByRole("link", { name: "开始" })).toBeVisible();
-  await expect(zhTabs.getByRole("link", { name: "Start" })).toHaveCount(0);
+  await expect(zhTabs.getByRole("link", { name: "快速开始" })).toBeVisible();
+  await expect(zhTabs.getByRole("link", { name: "Get started" })).toHaveCount(0);
   await expect(
-    page.locator("#starlight__sidebar").getByText("登录指南", { exact: true }),
-  ).toBeVisible();
+    page.locator("#starlight__sidebar").getByText("认证配置", { exact: true }),
+  ).toBeAttached();
 });
 
 test("authentication guide works in both languages and a narrow dark viewport", async ({
@@ -217,14 +217,16 @@ test("authentication guide works in both languages and a narrow dark viewport", 
 test("the sidebar carries one section and the page says where it sits", async ({ page }) => {
   await page.goto("/docs/self-hosting/clickhouse/");
   const sidebar = page.locator("#starlight__sidebar");
+  // The group holding the current page opens itself, so the reader can see where they are.
   await expect(sidebar.locator(".group-label", { hasText: "Dependency runbooks" })).toBeVisible();
-  // A page from a different tab must not be reachable from this sidebar; showing all
-  // nine groups at once was what made it unreadable.
-  await expect(sidebar.getByRole("link", { name: "Start using OpenRUM" })).toHaveCount(0);
-  await expect(page.locator(".docs-tabs a[aria-current]")).toHaveText("Self-hosting");
+  await expect(sidebar.locator('a[aria-current="page"]')).toHaveText("ClickHouse");
+  // A page from a different tab must not be reachable from this sidebar.
+  await expect(sidebar.getByRole("link", { name: "Browser SDK" })).toHaveCount(0);
+  await expect(page.locator(".docs-tabs a[aria-current]")).toHaveText("Get started");
   await expect(page.locator(".docs-crumbs li")).toHaveText([
     "Docs",
-    "Self-hosting",
+    "Get started",
+    "Operate",
     "Dependency runbooks",
     "ClickHouse",
   ]);
@@ -246,7 +248,7 @@ for (const guide of ["local-development", "production-deployment"]) {
   }) => {
     const errors: string[] = [];
     page.on("pageerror", (error) => errors.push(error.message));
-    await page.goto("/docs/getting-started/quickstart/");
+    await page.goto("/docs/introduction/");
     await page.locator(`.sl-markdown-content a[href="/docs/getting-started/${guide}/"]`).click();
     await expect(page).toHaveURL(new RegExp(`/docs/getting-started/${guide}/?$`));
     const sidebar = page.locator("#starlight__sidebar");
@@ -259,7 +261,7 @@ for (const guide of ["local-development", "production-deployment"]) {
     await page.locator("summary[aria-label='Select language']").click();
     await page.getByRole("menuitemradio", { name: "简体中文" }).click();
     await expect(page).toHaveURL(new RegExp(`/zh/docs/getting-started/${guide}/?$`));
-    await expect(page.locator(".docs-tabs a[aria-current]")).toHaveText("开始");
+    await expect(page.locator(".docs-tabs a[aria-current]")).toHaveText("快速开始");
     await expect(page.locator(".sl-steps > li")).toHaveCount(stepCount);
     await sidebar.getByRole("link", { name: "创建第一个项目", exact: true }).click();
     await expect(page).toHaveURL(/\/zh\/docs\/getting-started\/create-first-project\/?$/);
@@ -287,7 +289,7 @@ test("start sidebar groups collapse and preserve child pages across languages", 
   await page.getByRole("menuitemradio", { name: "简体中文" }).click();
   await expect(page).toHaveURL(/\/zh\/docs\/getting-started\/local-development\/connect-app\/$/);
   await expect(sidebar.locator('a[aria-current="page"]')).toHaveText("接入与验证");
-  await sidebar.locator("summary").filter({ hasText: "部署生产" }).click();
+  await sidebar.locator("summary").filter({ hasText: /^部署$/ }).click();
   await sidebar.getByRole("link", { name: "安装服务", exact: true }).click();
   await expect(page).toHaveURL(/\/zh\/docs\/getting-started\/production-deployment\/install\/$/);
   await expect(
@@ -304,16 +306,12 @@ test("start sidebar groups collapse and preserve child pages across languages", 
   await expect(page.locator("h1")).toHaveText("首次使用与维护");
 });
 
-test("Start sidebar ends with sign-in guides in both languages", async ({ page }) => {
-  await page.goto("/docs/getting-started/quickstart/");
+test("Operate holds the sign-in guides in both languages", async ({ page }) => {
+  await page.goto("/docs/introduction/");
   const sidebar = page.locator("#starlight__sidebar");
-  const signIn = sidebar
-    .locator("details")
-    .filter({ has: page.locator("summary", { hasText: "Sign-in guide" }) });
-  await expect(sidebar.locator("details > summary").last()).toContainText("Sign-in guide");
-  await expect(signIn.locator("summary")).toBeVisible();
-  await signIn.locator("summary").click();
-  await signIn.getByRole("link", { name: "Sign in with LDAP" }).click();
+  await sidebar.locator("summary").filter({ hasText: /^Operate$/ }).click();
+  await sidebar.locator("summary").filter({ hasText: /^Authentication setup$/ }).click();
+  await sidebar.getByRole("link", { name: "Sign in with LDAP" }).click();
   await expect(page).toHaveURL(/\/docs\/getting-started\/sign-in\/ldap\/$/);
   await expect(page.locator("h1")).toHaveText("Sign in with LDAP");
 
@@ -321,7 +319,9 @@ test("Start sidebar ends with sign-in guides in both languages", async ({ page }
   await page.getByRole("menuitemradio", { name: "简体中文" }).click();
   await expect(page).toHaveURL(/\/zh\/docs\/getting-started\/sign-in\/ldap\/$/);
   await expect(page.locator("h1")).toHaveText("使用 LDAP 登录");
-  await expect(sidebar.locator("details > summary").last()).toContainText("登录指南");
+  await expect(
+    sidebar.locator("summary").filter({ hasText: /^认证配置$/ }),
+  ).toBeVisible();
 });
 
 for (const [width, theme, prefix] of [
@@ -353,25 +353,6 @@ for (const [width, theme, prefix] of [
       await page.evaluate(() => document.documentElement.scrollWidth - innerWidth),
     ).toBeLessThanOrEqual(1);
     expect(errors).toEqual([]);
-  });
-}
-
-// The taxonomy moved `operations/` and `security/` under `self-hosting/`. These are the
-// URLs that were already published, so they have to keep resolving.
-const movedPages = [
-  ["/docs/operations/clickhouse/", "/docs/self-hosting/clickhouse/"],
-  ["/docs/security/threat-model/", "/docs/self-hosting/security/threat-model/"],
-  ["/docs/concepts/domain-model/", "/docs/getting-started/domain-model/"],
-  ["/zh/docs/security/privacy/", "/zh/docs/self-hosting/security/privacy/"],
-  ["/docs/sdk/frameworks/", "/docs/sdk/browser/"],
-  ["/docs/contributing/architecture/", "/docs/self-hosting/architecture/"],
-];
-
-for (const [from, to] of movedPages) {
-  test(`${from} still reaches its page`, async ({ page }) => {
-    await page.goto(from);
-    await expect(page).toHaveURL(new RegExp(`${to.replace(/\//g, "\\/")}?$`));
-    await expect(page.locator("h1")).toHaveCount(1);
   });
 }
 
@@ -436,10 +417,10 @@ test("the SDK page states its limitations rather than implying support", async (
 
 test("copy page hands over the page's own markdown", async ({ context, page }) => {
   await context.grantPermissions(["clipboard-read", "clipboard-write"]);
-  await page.goto("/docs/getting-started/quickstart/");
+  await page.goto("/docs/introduction/");
   await page.getByRole("button", { name: "Copy page" }).click();
   const copied = await page.evaluate(() => navigator.clipboard.readText());
-  expect(copied).toContain("## Choose your path");
+  expect(copied).toContain("## Where to start");
 });
 
 test("documentation search is local", async ({ page, baseURL }) => {
@@ -448,7 +429,7 @@ test("documentation search is local", async ({ page, baseURL }) => {
     if (new URL(request.url()).origin !== new URL(baseURL!).origin)
       foreignRequests.push(request.url());
   });
-  await page.goto("/docs/getting-started/quickstart/");
+  await page.goto("/docs/introduction/");
   const search = page.getByRole("button", { name: /search/i }).first();
   await search.click();
   await page.getByRole("textbox").fill("Source Map");

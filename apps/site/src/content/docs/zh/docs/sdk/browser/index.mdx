@@ -1,0 +1,345 @@
+---
+title: Browser SDK
+description: 安装 @openrum/browser、只初始化一次，并了解它采集什么、不采集什么。
+appliesTo: "@openrum/browser 0.1.0"
+---
+
+import { Aside, CardGrid, LinkCard, Steps, Tabs, TabItem } from "@astrojs/starlight/components";
+
+`@openrum/browser` 把 Event 发送到一个 OpenRUM Instance。一次 `init()` 调用即开启 Page
+View、交互描述、JavaScript 错误、未处理的 Promise 拒绝、fetch 与 XHR 时序，以及 Core Web
+Vitals。
+
+## 安装
+
+<Tabs syncKey="pkg">
+  <TabItem label="pnpm">
+
+```sh
+pnpm add @openrum/browser
+```
+
+  </TabItem>
+  <TabItem label="npm">
+
+```sh
+npm install @openrum/browser
+```
+
+  </TabItem>
+  <TabItem label="yarn">
+
+```sh
+yarn add @openrum/browser
+```
+
+  </TabItem>
+  <TabItem label="CDN 脚本">
+
+异步加载（推荐）不会阻塞 HTML 解析，并在 SDK 加载完成后初始化：
+
+```html
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.src = "https://rum.example.com/sdk/browser/0.1.0/openrum.min.js";
+    script.async = true;
+    script.onload = function () {
+      OpenRUM.init({
+        dsn: "https://YOUR_PUBLIC_DSN@rum.example.com/ingest/v1/envelope",
+        environment: "production",
+      });
+    };
+    document.head.appendChild(script);
+  })();
+</script>
+```
+
+同步加载可更早开始采集，但下载期间会阻塞 HTML 解析：
+
+```html
+<script src="https://rum.example.com/sdk/browser/0.1.0/openrum.min.js"></script>
+<script>
+  OpenRUM.init({
+    dsn: "https://YOUR_PUBLIC_DSN@rum.example.com/ingest/v1/envelope",
+    environment: "production",
+  });
+</script>
+```
+
+  </TabItem>
+</Tabs>
+
+不要只给外部脚本增加 `async` 后立即调用 `OpenRUM.init()`；两段脚本存在执行竞态。异步方案必须在
+`onload` 中初始化。异步加载前发生的极早事件可能无法采集，需要完整覆盖首屏早期错误时可选择同步方案。
+
+<Aside type="note" title="脚本由 Instance 提供">
+  请把 `rum.example.com` 换成你的 OpenRUM Instance。版本化地址可不可变缓存一年；升级时需要修改 URL
+  中的版本。这是 Instance 自托管脚本，不依赖第三方公共 CDN。
+</Aside>
+
+## 初始化
+
+<Steps>
+
+1. 创建一个 Project 并复制它的客户端 DSN，见[创建第一个项目](/zh/docs/getting-started/create-first-project/)。
+
+2. 把应用的 origin 加入该 Project 的允许列表。SDK 以 `mode: "cors"` 和
+   `credentials: "omit"` 发送请求，未被 Instance 允许的 origin 会在浏览器侧就被拒绝。
+
+3. 在需要观测的代码之前，调用一次 `init()`。
+
+</Steps>
+
+`init()` 放在哪里取决于框架。选择你的框架查看具体写法：
+
+<CardGrid>
+  <LinkCard
+    title="React"
+    description="通过带副作用的模块导入完成初始化。"
+    href="/zh/docs/sdk/browser/react/"
+  />
+  <LinkCard
+    title="Vue"
+    description="在 createApp 之前初始化，history 模式的路由会被采集。"
+    href="/zh/docs/sdk/browser/vue/"
+  />
+  <LinkCard
+    title="TanStack Router"
+    description="在 createRouter 之前初始化，每次导航产生一个 Page View。"
+    href="/zh/docs/sdk/browser/tanstack-router/"
+  />
+  <LinkCard
+    title="Next.js"
+    description="在 Client Component 的 effect 里初始化，不要在服务端渲染期间执行。"
+    href="/zh/docs/sdk/browser/nextjs/"
+  />
+  <LinkCard
+    title="Astro"
+    description="在客户端脚本或 island 里初始化，不要放在 frontmatter。"
+    href="/zh/docs/sdk/browser/astro/"
+  />
+</CardGrid>
+
+全部选项见生成的 [SDK 选项](/zh/docs/reference/sdk-options/)参考。
+
+## 验证
+
+加载一个页面，点击一些内容，再让一个请求失败。然后在 Console 中打开 **事件**、**API**、
+**错误** 和 **会话**，确认四个视图显示的是同一个 `session_id`。共享同一个 Session，说明采集、
+ingest 和聚合彼此一致；如果四个视图都有数据但 Session ID 不同，说明有东西被初始化了多次。
+
+## 自动采集的内容
+
+| 信号            | 说明                                                                                     |
+| --------------- | ---------------------------------------------------------------------------------------- |
+| Page View       | 首次加载，以及每一次 `pushState`、`replaceState`、`popstate` 和从缓存恢复的 `pageshow`。 |
+| 交互            | 交互元素的受限描述。用 `captureClicks: false` 关闭。                                     |
+| 错误            | 未捕获错误和未处理的 Promise 拒绝，附带最多 50 条前置面包屑。                            |
+| API Request     | fetch 与 XHR 时序，排除 OpenRUM 自身的 ingest 和配置地址。                               |
+| Core Web Vitals | 通过打包进来的 `web-vitals` 采集。                                                       |
+
+query、URL fragment、请求与响应 body、header、输入框原始值，都会在 Event 入队之前于浏览器侧
+清除。
+
+## 结构化日志
+
+日志不会自动采集：仅调用 `init()` 不会产生应用日志。可以导入单例 `logger`，也可以使用
+`init()` 返回的 client，在业务事件发生的位置主动调用对应级别的方法。
+
+```ts
+import { init, logger, setUser } from "@openrum/browser";
+
+init({ dsn: import.meta.env.VITE_OPENRUM_DSN });
+
+setUser("customer-123"); // 业务中的不透明用户 ID，不要传邮箱。
+logger.info("checkout started", {
+  "order.id": "order-123",
+  items: 3,
+});
+logger.error("payment failed", {
+  "error.code": "UPSTREAM_TIMEOUT",
+});
+
+// 用户退出登录时清除身份。
+setUser(undefined);
+```
+
+支持 `trace`、`debug`、`info`、`warn`、`error`、`fatal`。属性最多 20 项，值可以是
+string、number 或 boolean。error/fatal 日志仍是诊断 Log，不会创建 Issue。
+
+### 转发指定的 console 方法
+
+`captureConsole` 是独立的显式配置，只转发列出的方法，同时保留浏览器原本的控制台输出。
+
+```ts
+init({
+  dsn: import.meta.env.VITE_OPENRUM_DSN,
+  captureConsole: ["warn", "error"],
+  beforeSendLog: (log) => (log.message.includes("ResizeObserver loop") ? null : log),
+});
+```
+
+不配置 `captureConsole` 时，全部 console 输出只留在本地。对象参数只记录为 `[Object]`，不会
+序列化。旧的 `enableLogs` 已废弃并被忽略；现有配置可以暂时保留，等待未来破坏性版本再删除。
+
+<Aside type="caution" title="日志文本仍可能包含敏感信息">
+  不要记录凭证、个人信息、请求 body 或访问令牌。OpenRUM 会在客户端和服务端做限长与脱敏，
+  但模式匹配无法保证完全匿名化。
+</Aside>
+
+验证接入时，可临时发送 `logger.info("openrum setup check")`，然后在同一 Project、Environment
+和时间范围的 Console「日志」页面搜索 `message:"openrum setup check"`。按用户排查时搜索
+`user.id:"customer-123"`。完整搜索字段、限制、Session/Trace 关联与隐私边界见
+[日志](/zh/docs/product/logs/)。
+
+## 支持矩阵
+
+以下针对 `@openrum/browser 0.1.0`。表格描述当前行为，不会因为某个框架流行就推断它受支持。
+
+| 目标                                                     | 状态               | 含义                                                                                      |
+| -------------------------------------------------------- | ------------------ | ----------------------------------------------------------------------------------------- |
+| React、Vue、Solid、Svelte、原生 JavaScript               | 可用               | 任何支持 ES Module 的打包器。                                                             |
+| React Router、history 模式的 Vue Router、TanStack Router | 可用               | 导航都走 `history.pushState`，SDK 能观测到。                                              |
+| Next.js                                                  | 可用，但有位置要求 | `init()` 不能在服务端渲染期间执行，见 [Next.js](/zh/docs/sdk/browser/nextjs/)。                   |
+| Astro                                                    | 可用，但有位置要求 | 要放在客户端 island 里，而不是 `.astro` 的 frontmatter 中，见 [Astro](/zh/docs/sdk/browser/astro/)。 |
+| 基于 hash 的路由                                         | 不采集             | SDK 不监听 `hashchange`，只会记录首个 Page View。                                         |
+| 用路由模式代替解析后的路径                               | 不记录             | 见下文。                                                                                  |
+| CDN `<script>` 标签                                      | 可用               | Instance 在 `/sdk/browser/0.1.0/openrum.min.js` 提供版本化 IIFE 构建。                    |
+| React Native 及其他非浏览器运行时                        | 不支持             | SDK 会读取 `window`，并把队列存在 `localStorage` 里。                                     |
+
+### 服务端渲染会静默丢弃 Event
+
+在 Node 下没有 `window`，于是 `init()` 会构造一个没有传输层的 client。它正常返回，之后每一次
+`captureEvent()` 都会被计为丢弃，而不是抛错。这个计数可以通过 `getClient()?.diagnostics()`
+读到，但不会有任何日志，也不会有任何数据发出。请只在客户端初始化。
+
+### 路由模式暂未被记录
+
+记录下来的 Route 是 `location.pathname`。在 `/orders/$orderId` 这样的路由上，这意味着每个订单
+都是一个不同的 Route，会把同一个页面的数据摊到 Analysis 里成千上万行中。
+
+`getClient()?.startPage({ route: "/orders/:orderId" })` 确实能设置 Route，但那次导航的自动
+Page View 已经带着解析后的路径发出去了，而 `startPage` 又会开启一个新的 Page —— 于是 Page View
+和它之后的 Event 会落在不同的 `page_id` 上。当前 SDK 无法让自动 Page View 正确记录路由模式。
+
+### DSN 被拒绝会让整个页面停止上报
+
+ingest 返回 `401` 或 `403` 会被当作永久失败：SDK 清空队列，并在该页面剩余生命周期内停止发送，
+且不打日志。收不到 Event 时，请在 Console 里检查 DSN 和该 Project 的允许 origin。
+
+## 自定义事件
+
+```ts
+import { captureEvent } from "@openrum/browser";
+
+captureEvent("checkout_started", {
+  attributes: { plan: "standard", channel: "organic" },
+  measurements: { cart_value: 249.9 },
+});
+```
+
+一个自定义事件由一个名称和两个可选的数据袋组成。只有这两个，它们的区别在于结果在 Analysis 里能
+怎么用：**attributes 是用来分组和过滤的维度，measurements 是用来聚合的数值。** `plan` 属于
+attributes，因为你想看按套餐拆分；`cart_value` 属于 measurements，因为你想看它的求和与分位数。
+
+| 参数           | 类型                     | 约束                                                                                |
+| -------------- | ------------------------ | ----------------------------------------------------------------------------------- |
+| `name`         | `string`，必填           | 1 到 80 个字符。不能以 `openrum.` 开头。                                            |
+| `attributes`   | `Record<string, string>` | 最多 20 项。键 1 到 64 个字符，值最长 512 个字符。**取值只接受字符串。**            |
+| `measurements` | `Record<string, number>` | 最多 20 项。键 1 到 64 个字符。**只接受有限数值** —— `NaN` 和 `Infinity` 会被拒绝。 |
+
+两个数据袋各有独立的 20 项额度，并且 ingest 侧的 Envelope schema 会再校验一遍同样的边界，所以
+这些限制不是建议值。
+
+### 类型是严格的，类型不对就会被丢掉
+
+这是最值得知道的一个坑：把数字放进 `attributes`、或把数字字符串放进 `measurements`，两者都会被
+静默丢弃。
+
+```ts
+captureEvent("checkout_started", {
+  attributes: { items: 3 }, // 被丢弃：不是字符串
+  measurements: { cart_value: "249.9" }, // 被丢弃：不是数值
+});
+```
+
+应该写成 `{ items: "3" }` 和 `{ cart_value: 249.9 }`。传入任何不是普通对象的值 —— 数组、
+字符串、`null` —— 会让整个数据袋被丢弃。
+
+### 会被直接拒绝的键
+
+以下情况的键会被丢弃，而不是清洗：
+
+- 与 Envelope 字段冲突，例如 `session_id`、`user_id`、`release`、`timestamp`、`type`、
+  `page_id`
+- 看起来携带密钥或不该出现在这里的标识：命中 `authorization`、`cookie`、`csrf`、`cvv`、
+  `email`、`password`、`passphrase`、`phone`、`secret`、`session`、`token`、`credit card`
+  之一
+- 是 `__proto__`、`constructor` 或 `prototype`
+- 以 `openrum.` 开头，这是 SDK 自身事件的保留前缀
+
+键的匹配不区分大小写，因此 `Email` 和 `X-Auth-Token` 同样会被拒绝。
+
+### 会被清洗而不是丢弃的取值
+
+attributes 的取值仍会经过与其他数据相同的脱敏：邮箱变成 `[REDACTED_EMAIL]`，`Bearer` 和
+`Basic` 凭据变成 `[REDACTED_TOKEN]`，13 到 19 位连续数字变成 `[REDACTED_NUMBER]`。看起来是
+`http` 或 `https` URL 的取值会先被去掉 query 和 fragment。
+
+但这些都不构成"可以发送此类数据"的理由。脱敏是为了兜住个别漏出去的字符串，而不是一个可以依赖的
+清洗器，见[安全与隐私](/zh/docs/self-hosting/security/privacy/)。
+
+### 所有拒绝都是静默的
+
+上面这些都不会抛错，也不会打日志。被拒绝的名称会让丢弃事件计数加一，被拒绝的键或取值会让丢弃属性
+计数加一，开发时可以读到：
+
+```ts
+import { getClient } from "@openrum/browser";
+
+console.log(getClient()?.diagnostics());
+```
+
+自定义事件受 `eventSampleRate` 采样，因此一个没出现的事件也可能只是被采样排除了。
+
+### 自定义事件同时会成为面包屑
+
+每个自定义事件都会追加一条带有名称和 attributes 的面包屑，因此一个 Error 之前最近 50 件事里会
+包含你自己的业务节点，而不只有点击和请求。你也可以直接添加面包屑，`data` 适用同样的键与取值规则：
+
+```ts
+import { addBreadcrumb } from "@openrum/browser";
+
+addBreadcrumb({
+  category: "checkout",
+  message: "coupon rejected",
+  level: "warning",
+  data: { reason: "expired" },
+});
+```
+
+`category` 必填且最长 64 个字符，`message` 必填且最长 512 个字符，`level` 取
+`debug`、`info`、`warning`、`error` 之一，`timestamp` 默认为当前时间、若传入则必须能被解析为
+日期。任何一项不满足的面包屑都会被丢弃并计数。
+
+## 身份
+
+```ts
+import { setTag, setUser } from "@openrum/browser";
+
+setUser("account_opaque_id");
+setTag("plan", "enterprise");
+```
+
+请优先使用内部不透明 ID；看起来像邮箱的取值会被拒绝，并计入被丢弃的属性。`setUser(undefined)`
+可清除身份。Session 是活动窗口，会独立于身份续期。最多保留 20 个 tag。
+
+## 采样
+
+错误、API Request 和其他事件各自独立采样，而同一个 Session 内的判定是确定的 —— 被采样命中的
+Session 会一直命中，因此一个 Session 不会只被记录一半。默认值和取值范围见
+[SDK 选项](/zh/docs/reference/sdk-options/)。
+
+Instance 可以通过 `/api/v1/sdk/config` 远端下调这些比例。SDK 的刷新间隔最短 10 秒、最长 5
+分钟，会缓存最近一次有效响应，并在响应无效时回退到本地配置的值。

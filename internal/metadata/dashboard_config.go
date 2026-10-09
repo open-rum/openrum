@@ -17,6 +17,9 @@ import (
 
 const MaxDashboardWidgets = 24
 
+// MaxDashboardGroupTabs bounds a tabbed card: adjacent modules sharing a groupId.
+const MaxDashboardGroupTabs = 3
+
 type DashboardConfig struct {
 	SchemaVersion int               `json:"schemaVersion"`
 	Widgets       []json.RawMessage `json:"widgets"`
@@ -30,6 +33,7 @@ type dashboardWidget struct {
 	Size           string          `json:"size"`
 	View           string          `json:"view"`
 	StatAppearance json.RawMessage `json:"statAppearance,omitempty"`
+	GroupID        string          `json:"groupId,omitempty"`
 	Data           struct {
 		Source    string   `json:"source"`
 		Metrics   []string `json:"metrics"`
@@ -54,16 +58,20 @@ func ValidateDashboardConfig(raw, previous json.RawMessage) error {
 	var old DashboardConfig
 	_ = json.Unmarshal(previous, &old)
 	seen := map[string]bool{}
+	members := make([]dashboardGroupMember, 0, len(config.Widgets))
 	for _, rawWidget := range config.Widgets {
 		var identity struct {
 			ID      string `json:"id"`
 			Type    string `json:"type"`
 			Version int    `json:"version"`
+			Size    string `json:"size"`
+			GroupID string `json:"groupId"`
 		}
 		if json.Unmarshal(rawWidget, &identity) != nil || !dashboardID.MatchString(identity.ID) || seen[identity.ID] {
 			return fmt.Errorf("module IDs must be valid and unique")
 		}
 		seen[identity.ID] = true
+		members = append(members, dashboardGroupMember{groupID: identity.GroupID, moduleType: identity.Type, size: identity.Size})
 		switch {
 		case identity.Version == 1 && slices.Contains(classicWidgetTypes, identity.Type):
 			var widget dashboardWidget
@@ -87,6 +95,37 @@ func ValidateDashboardConfig(raw, previous json.RawMessage) error {
 			}
 		}
 	}
+	return validateDashboardGroups(members)
+}
+
+type dashboardGroupMember struct{ groupID, moduleType, size string }
+
+// validateDashboardGroups checks tabbed cards: the modules of one group are adjacent, there
+// are two or three of them, they share one size, and stat cards never join a group.
+func validateDashboardGroups(members []dashboardGroupMember) error {
+	closed := map[string]bool{}
+	for start := 0; start < len(members); {
+		id := members[start].groupID
+		end := start + 1
+		for end < len(members) && id != "" && members[end].groupID == id {
+			end++
+		}
+		if id != "" {
+			if !dashboardID.MatchString(id) || closed[id] {
+				return fmt.Errorf("a tabbed card must keep its modules together")
+			}
+			closed[id] = true
+			if count := end - start; count < 2 || count > MaxDashboardGroupTabs {
+				return fmt.Errorf("a tabbed card holds two or three modules")
+			}
+			for _, member := range members[start:end] {
+				if member.moduleType == "stat" || member.size != members[start].size {
+					return fmt.Errorf("tabbed cards combine charts and tables of one size")
+				}
+			}
+		}
+		start = end
+	}
 	return nil
 }
 
@@ -105,6 +144,7 @@ type catalogWidget struct {
 	Size           string          `json:"size"`
 	View           string          `json:"view"`
 	StatAppearance json.RawMessage `json:"statAppearance,omitempty"`
+	GroupID        string          `json:"groupId,omitempty"`
 	Data           struct {
 		Source      string   `json:"source"`
 		Metrics     []string `json:"metrics"`
@@ -123,6 +163,7 @@ type catalogWidget struct {
 		} `json:"filters"`
 		Groups    []string `json:"groups,omitempty"`
 		Compare   string   `json:"compare,omitempty"`
+		Direction string   `json:"direction,omitempty"`
 		TopN      int      `json:"topN,omitempty"`
 		Sort      string   `json:"sort,omitempty"`
 		Order     string   `json:"order,omitempty"`
@@ -141,22 +182,23 @@ var catalogViews = map[string][]string{
 // validateCatalogWidget checks layout rules here and hands the data question to the same
 // catalog.Validate the query endpoint uses, so a module that saves is a module that runs.
 func validateCatalogWidget(w catalogWidget) error {
-	if !dashboardText(w.Title, 80) || strings.TrimSpace(w.Title) == "" || !slices.Contains([]string{"compact", "half", "full"}, w.Size) {
+	if !dashboardText(w.Title, 80) || strings.TrimSpace(w.Title) == "" || !slices.Contains([]string{"compact", "third", "half", "full"}, w.Size) {
 		return fmt.Errorf("module title or size is invalid")
 	}
 	if !slices.Contains(catalogViews[w.Type], w.View) {
 		return fmt.Errorf("this view is not available for the module type")
 	}
 	if w.Type == "stat" {
-		if w.Size == "full" {
+		if w.Size == "full" || w.Size == "third" {
 			return fmt.Errorf("stat modules require a compact or half-width number view")
 		}
 	} else if w.Size == "compact" {
-		return fmt.Errorf("chart and table modules require half or full width")
+		return fmt.Errorf("chart and table modules require third, half or full width")
 	}
 	if len(w.StatAppearance) > 0 {
 		var appearance string
-		if w.Type != "stat" || json.Unmarshal(w.StatAppearance, &appearance) != nil || !slices.Contains([]string{"plain", "line-right", "bar-right"}, appearance) {
+		// area-right is current; line-right and bar-right are legacy values the Console reads as area-right.
+		if w.Type != "stat" || json.Unmarshal(w.StatAppearance, &appearance) != nil || !slices.Contains([]string{"plain", "area-right", "line-right", "bar-right"}, appearance) {
 			return fmt.Errorf("invalid stat card appearance")
 		}
 	}
@@ -166,6 +208,9 @@ func validateCatalogWidget(w catalogWidget) error {
 	}
 	if d.Compare != "" && d.Compare != "previous" {
 		return fmt.Errorf("compare must be previous or empty")
+	}
+	if d.Direction != "" && d.Direction != "up" && d.Direction != "down" {
+		return fmt.Errorf("direction must be up, down or empty")
 	}
 	switch w.Type {
 	case "stat", "ranked-table":
@@ -221,19 +266,19 @@ func validateDashboardWidget(w dashboardWidget) error {
 	if len(w.StatAppearance) > 0 {
 		var appearance string
 		// Retain legacy bottom variants for existing records and rolling upgrades.
-		if w.Type != "stat" || json.Unmarshal(w.StatAppearance, &appearance) != nil || !slices.Contains([]string{"plain", "line-right", "bar-right", "line-bottom", "area-bottom"}, appearance) {
+		if w.Type != "stat" || json.Unmarshal(w.StatAppearance, &appearance) != nil || !slices.Contains([]string{"plain", "area-right", "line-right", "bar-right", "line-bottom", "area-bottom"}, appearance) {
 			return fmt.Errorf("invalid stat card appearance")
 		}
 	}
-	if !dashboardText(w.Title, 80) || strings.TrimSpace(w.Title) == "" || !slices.Contains([]string{"compact", "half", "full"}, w.Size) {
+	if !dashboardText(w.Title, 80) || strings.TrimSpace(w.Title) == "" || !slices.Contains([]string{"compact", "third", "half", "full"}, w.Size) {
 		return fmt.Errorf("module title or size is invalid")
 	}
 	if w.Type == "stat" {
-		if w.Size == "full" || w.View != "number" {
+		if w.Size == "full" || w.Size == "third" || w.View != "number" {
 			return fmt.Errorf("stat modules require a compact or half-width number view")
 		}
 	} else if w.Size == "compact" {
-		return fmt.Errorf("chart and list modules require half or full width")
+		return fmt.Errorf("chart and list modules require third, half or full width")
 	}
 	switch w.Type {
 	case "timeseries":

@@ -1,9 +1,8 @@
 ---
 title: HTTP API
 description: Overview of Console, ingest and control-plane HTTP surfaces in Alpha.
+appliesTo: Alpha
 ---
-
-**Applies to:** Alpha. Status: skeleton for Alpha.
 
 OpenRUM exposes four HTTP surfaces:
 
@@ -43,7 +42,7 @@ Console workflow described in [Storage pressure](/docs/self-hosting/storage-pres
 
 ## Health endpoints
 
-Use readiness probes before sending traffic or declaring a local Quickstart successful:
+Use readiness probes before sending traffic or declaring a local start successful:
 
 ```sh
 curl --fail http://127.0.0.1:4173/health/ready

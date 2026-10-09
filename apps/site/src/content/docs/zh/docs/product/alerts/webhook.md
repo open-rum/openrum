@@ -1,9 +1,8 @@
 ---
 title: 用 Webhook 接收告警
 description: 在你自己的 HTTPS 服务上接收签名 JSON 格式的告警，并验证请求确实来自 OpenRUM。
+appliesTo: Alpha
 ---
-
-**适用版本：** Alpha。状态：Alpha 已实现。
 
 Webhook 渠道会把每条告警以 JSON 格式 POST 到你的 HTTPS 服务。可以用它建工单、呼叫值班工具，或者转发到 OpenRUM 还没有原生支持的聊天工具。
 

@@ -383,14 +383,27 @@ WHERE project_id=? AND event_id=? ORDER BY mapped_at DESC LIMIT 1`, projectID, e
 	return &mapped, nil
 }
 
-func (repository *EventRepository) ListIssueEvents(ctx context.Context, projectID uuid.UUID, fingerprint string, from, to time.Time, limit int, cursorValue string) (EventPage, error) {
+// ListIssueEvents pages an Issue's error events newest first, narrowed by the same
+// Environment and dimension filters as the Issue's aggregates so samples match its counts.
+func (repository *EventRepository) ListIssueEvents(ctx context.Context, filters IssueFilters, fingerprint string) (EventPage, error) {
+	projectID, from, to, limit := filters.ProjectID, filters.From, filters.To, filters.Limit
 	if projectID == uuid.Nil || fingerprint == "" || len(fingerprint) > 128 || from.IsZero() || !from.Before(to) || to.Sub(from) > 30*24*time.Hour || limit < 1 || limit > 100 {
 		return EventPage{}, ErrInvalidIssueFilters
 	}
 	query := `SELECT ` + eventColumns + ` FROM rum_events FINAL
 WHERE project_id=? AND event_type='error' AND fingerprint=? AND timestamp>=? AND timestamp<?`
 	arguments := []any{projectID, fingerprint, from.UTC(), to.UTC()}
-	cursor, err := decodeEventCursor(cursorValue)
+	for _, filter := range []struct{ column, value string }{
+		{"environment", filters.Environment}, {"release", filters.Release}, {"route", filters.Route},
+		{"browser", filters.Browser}, {"device_type", filters.DeviceType}, {"country", filters.Country},
+		{"user_id", filters.UserID},
+	} {
+		if filter.value != "" {
+			query += ` AND ` + filter.column + `=?`
+			arguments = append(arguments, filter.value)
+		}
+	}
+	cursor, err := decodeEventCursor(filters.Cursor)
 	if err != nil {
 		return EventPage{}, err
 	}

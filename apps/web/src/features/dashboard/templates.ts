@@ -1,5 +1,6 @@
 import type { MetricCatalog } from "@/lib/api/metricsQuery";
 import { defaultDashboard, defaultDashboardMetrics } from "./builtIn";
+import { ecommerceDashboard, ecommerceMetrics } from "./ecommerce";
 import { libraryEntry } from "./library";
 import type { DashboardConfig } from "./model";
 
@@ -46,6 +47,14 @@ export const dashboardTemplates: DashboardTemplate[] = [
     description: "与内置默认仪表盘相同：核心指标、趋势、Top 页面、问题与慢 API",
     metrics: defaultDashboardMetrics(),
     build: defaultDashboard,
+  },
+  {
+    id: "ecommerce",
+    name: "电商经营概览",
+    description:
+      "收入、订单、客单价与购买漏斗，加来源、渠道收入和健康指标；需要 purchase 等事件和 amount 数值",
+    metrics: ecommerceMetrics(),
+    build: ecommerceDashboard,
   },
   fromEntries("traffic", "流量与会话", "会话、PV 与 UV，按页面、设备和国家拆分", [
     "sessions-stat",

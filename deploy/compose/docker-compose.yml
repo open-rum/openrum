@@ -129,8 +129,11 @@ services:
       clickhouse:
         condition: service_healthy
 
+  # Not part of a plain `up`: run it on demand with `openrum seed`, or
+  # `docker compose --profile seed run --rm --no-deps demo-seed`.
   demo-seed:
     image: openrum-local:dev
+    profiles: ["seed"]
     restart: "no"
     command: ["/app/demo"]
     environment: *database-environment
@@ -181,7 +184,7 @@ services:
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
       AWS_SESSION_TOKEN: ${AWS_SESSION_TOKEN:-}
     depends_on:
-      demo-seed:
+      migrate:
         condition: service_completed_successfully
       kafka-init:
         condition: service_completed_successfully
@@ -239,7 +242,7 @@ services:
     command: ["/app/worker"]
     environment: *application-environment
     depends_on:
-      demo-seed:
+      migrate:
         condition: service_completed_successfully
     healthcheck:
       test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:8083/health/ready"]

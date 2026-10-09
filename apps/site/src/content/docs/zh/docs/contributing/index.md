@@ -9,7 +9,7 @@ description: 如何提出、验证、评审和交付 OpenRUM 的改动。
 
 1. 先搜索已有的 GitHub Issue 和未合并的 Pull Request，避免重复工作。行为变更应先创建或参与 Issue；简单的错别字、失效链接修复可以直接提交 Pull Request。
 2. 新功能、公开 API 或 SDK 契约、事件 Schema、存储行为和部署方式的改动，应先在 Issue 中讨论。说明用户问题、预期行为、备选方案，以及兼容和上线风险。不要等到写完代码才发现需求不在项目范围内。
-3. 修改共享术语或架构前，阅读[领域模型](/zh/docs/getting-started/domain-model/)、仓库根目录的 `CONTEXT.md` 和相关 `docs/adr/` 决策。若方案与已有决策冲突，在 Issue 中明确说明。
+3. 修改共享术语或架构前，阅读[术语与核心概念](/zh/docs/reference/glossary/)、仓库根目录的 `CONTEXT.md` 和相关 `docs/adr/` 决策。若方案与已有决策冲突，在 Issue 中明确说明。
 4. 疑似安全漏洞请按[漏洞报告指南](/zh/docs/self-hosting/security/vulnerability-reporting/)私下报告。不要在公开 Issue 或 Pull Request 中附上可利用细节、凭证或客户数据。
 
 报告 Bug 时，请提供受影响的版本或 Commit、运行环境、最小复现步骤、预期与实际结果，以及已脱敏的日志或截图。如有 Request ID，也请附上。提出新功能时，先描述使用场景和验收标准，不要只给出 UI 或实现方案。

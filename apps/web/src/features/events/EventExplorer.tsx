@@ -1,19 +1,7 @@
-import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { BracesIcon, MousePointerClickIcon, XIcon } from "lucide-react";
-import { AsyncError } from "@/components/ui/AsyncState";
+import { BracesIcon, ListTreeIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Drawer,
-  DrawerClose,
-  DrawerContent,
-  DrawerDescription,
-  DrawerHeader,
-  DrawerTitle,
-} from "@/components/ui/drawer";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
   TableBody,
@@ -22,87 +10,84 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { BehaviorMetric } from "@/features/analytics/BehaviorMetric";
 import { BehaviorTrendChart } from "@/features/analytics/BehaviorTrendChart";
-import { eventLabel } from "@/features/analytics/labels";
 import {
-  getBehaviorSamples,
-  type BehaviorAnalyticsResponse,
-  type BehaviorFilters,
-  type BehaviorKind,
-  type BehaviorSample,
-} from "@/lib/api/analytics";
-import { getSessionTimeline } from "@/lib/api/issues";
-import { sessionEventHref } from "@/lib/api/sessions";
-import { BehaviorTimeline } from "./BehaviorTimeline";
-import { sessionTimelineRange } from "./timeline";
+  dimensionLabel,
+  displayDimension,
+  formatCompact,
+  formatPercent,
+  formatRelative,
+} from "@/features/analytics/format";
+import { eventLabel } from "@/features/analytics/labels";
+import type { BehaviorAnalyticsResponse, BehaviorFilters, BehaviorKind } from "@/lib/api/analytics";
+import { kindLabel } from "./catalog";
+import { EventCatalog } from "./EventCatalog";
+import { EventSamples } from "./EventSamples";
 
 export function EventExplorer({
   data,
   filters,
+  isFetching = false,
   onSelectEvent,
   onSelectProperty,
+  onSelectMeasurement,
 }: {
   data: BehaviorAnalyticsResponse;
   filters: BehaviorFilters;
+  /** True while a refetch is in flight; the previous figures stay on screen, dimmed. */
+  isFetching?: boolean;
   onSelectEvent: (kind?: BehaviorKind, name?: string) => void;
-  onSelectProperty: (name: string) => void;
+  /** Pass undefined to return to the default country breakdown. */
+  onSelectProperty: (name?: string) => void;
+  onSelectMeasurement: (name?: string) => void;
 }) {
-  const [selectedSample, setSelectedSample] = useState<BehaviorSample>();
-  const hasSelectedEvent = Boolean(filters.eventKind || filters.eventName);
-  const samples = useQuery({
-    queryKey: ["behavior-samples", filters],
-    queryFn: ({ signal }) => getBehaviorSamples(filters, signal),
-    enabled: hasSelectedEvent,
-  });
+  if (!data.catalog.length && data.totals.events === 0) {
+    return <NoEvents projectId={filters.projectId} />;
+  }
+  const activeProperty = filters.dimension.startsWith("property:")
+    ? filters.dimension.slice("property:".length)
+    : undefined;
   return (
-    <div className="event-explorer">
-      <section className="behavior-panel event-catalog" aria-labelledby="event-catalog-title">
-        <div className="behavior-panel__header">
-          <div>
-            <h2 id="event-catalog-title">事件目录</h2>
-            <p>{data.catalog.length} 个活跃事件</p>
-          </div>
-          {hasSelectedEvent ? (
-            <Button variant="ghost" size="sm" onClick={() => onSelectEvent()}>
-              清除筛选
-            </Button>
-          ) : null}
-        </div>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>事件</TableHead>
-              <TableHead>次数</TableHead>
-              <TableHead>用户</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {data.catalog.map((event) => {
-              const selected = event.kind === filters.eventKind && event.name === filters.eventName;
-              return (
-                <TableRow
-                  key={`${event.kind}:${event.name}`}
-                  tabIndex={0}
-                  data-state={selected ? "selected" : undefined}
-                  className="cursor-pointer"
-                  onClick={() => onSelectEvent(event.kind as BehaviorKind, event.name)}
-                  onKeyDown={(key) => {
-                    if (key.key === "Enter") onSelectEvent(event.kind as BehaviorKind, event.name);
-                  }}
-                >
-                  <TableCell>
-                    <strong>{eventLabel(event.kind, event.name)}</strong>
-                    <small>{kindLabel(event.kind)}</small>
-                  </TableCell>
-                  <TableCell>{event.metric.events.toLocaleString()}</TableCell>
-                  <TableCell>{event.metric.uniqueUsers.toLocaleString()}</TableCell>
-                </TableRow>
-              );
-            })}
-          </TableBody>
-        </Table>
-      </section>
+    <div className="event-explorer" data-fetching={isFetching || undefined}>
+      <EventCatalog
+        catalog={data.catalog}
+        selectedKind={filters.eventKind}
+        selectedName={filters.eventName}
+        onSelect={onSelectEvent}
+        onClear={() => onSelectEvent()}
+      />
       <div className="event-explorer__main">
+        <div className="behavior-freshness" data-stale={data.freshness.stale || undefined}>
+          {isFetching
+            ? "正在更新…"
+            : data.freshness.latestReceivedAt
+              ? `数据更新于 ${formatRelative(data.freshness.ageSeconds)}`
+              : "暂无新鲜度信息"}
+          <span>统计为近似去重，采样估算已单独标记</span>
+        </div>
+        <section className="behavior-kpis" aria-label="所选事件的核心指标">
+          <BehaviorMetric
+            label="事件"
+            value={formatCompact(data.totals.events)}
+            note={`${data.sampleCount.toLocaleString()} 个采集样本`}
+          />
+          <BehaviorMetric
+            label="估算事件"
+            value={formatCompact(data.totals.estimated)}
+            note="按事件采样率还原"
+          />
+          <BehaviorMetric
+            label="用户"
+            value={formatCompact(data.totals.uniqueUsers)}
+            note="匿名用户近似去重"
+          />
+          <BehaviorMetric
+            label="会话"
+            value={formatCompact(data.totals.uniqueSessions)}
+            note="会话 ID 近似去重"
+          />
+        </section>
         <section
           className="behavior-panel behavior-panel--chart"
           aria-labelledby="event-trend-title"
@@ -116,12 +101,27 @@ export function EventExplorer({
           </div>
           <BehaviorTrendChart data={data.trend} />
         </section>
+        <div className={data.measurements.length ? "behavior-grid" : undefined}>
+          <BreakdownPanel data={data} />
+          {data.measurements.length ? (
+            <MeasurementPanel
+              data={data}
+              selected={filters.measurement}
+              onSelect={onSelectMeasurement}
+            />
+          ) : null}
+        </div>
         <section className="behavior-panel" aria-labelledby="property-catalog-title">
           <div className="behavior-panel__header">
             <div>
               <h2 id="property-catalog-title">受控属性</h2>
-              <p>服务端脱敏后可用于分群的属性键。</p>
+              <p>服务端脱敏后可用于分群的属性键。再次点击可取消。</p>
             </div>
+            {activeProperty ? (
+              <Button variant="ghost" size="sm" onClick={() => onSelectProperty(undefined)}>
+                恢复国家分布
+              </Button>
+            ) : null}
           </div>
           {data.properties.length ? (
             <div className="event-properties">
@@ -129,7 +129,10 @@ export function EventExplorer({
                 <button
                   key={property.name}
                   type="button"
-                  onClick={() => onSelectProperty(property.name)}
+                  aria-pressed={property.name === activeProperty}
+                  onClick={() =>
+                    onSelectProperty(property.name === activeProperty ? undefined : property.name)
+                  }
                 >
                   <BracesIcon />
                   <span>
@@ -146,192 +149,167 @@ export function EventExplorer({
             <p className="behavior-empty-copy">当前事件没有可用于分群的自定义属性。</p>
           )}
         </section>
-        <section className="behavior-panel" aria-labelledby="event-samples-title">
-          <div className="behavior-panel__header">
-            <div>
-              <h2 id="event-samples-title">原始样本</h2>
-              <p>为控制扫描成本，仅展示选中事件最近 24 小时的 50 条样本。</p>
-            </div>
-          </div>
-          {!hasSelectedEvent ? (
-            <EmptyState
-              icon={MousePointerClickIcon}
-              title="选择一个事件"
-              description="从左侧事件目录选择后，可检查脱敏属性与前序行为时间线。"
-            />
-          ) : null}
-          {samples.isLoading ? <Skeleton className="h-56" /> : null}
-          {samples.error ? (
-            <AsyncError
-              error={samples.error}
-              title="样本加载失败"
-              remediation="样本查询最多支持 24 小时；请稍后重试。"
-              onRetry={() => void samples.refetch()}
-            />
-          ) : null}
-          {samples.data?.samples.length ? (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>时间</TableHead>
-                  <TableHead>页面 / 路由</TableHead>
-                  <TableHead>环境</TableHead>
-                  <TableHead>会话</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {samples.data.samples.map((sample) => (
-                  <TableRow
-                    key={sample.eventId}
-                    tabIndex={0}
-                    className="cursor-pointer"
-                    onClick={() => setSelectedSample(sample)}
-                    onKeyDown={(key) => {
-                      if (key.key === "Enter") setSelectedSample(sample);
-                    }}
-                  >
-                    <TableCell>{new Date(sample.timestamp).toLocaleString("zh-CN")}</TableCell>
-                    <TableCell>
-                      <strong>{sample.route || sample.pageUrl || "未知页面"}</strong>
-                      <small>
-                        {sample.browser} · {sample.device} · {sample.country}
-                      </small>
-                    </TableCell>
-                    <TableCell>
-                      {Object.keys(sample.attributes).length
-                        ? `${Object.keys(sample.attributes).length} 个属性`
-                        : "无属性"}
-                    </TableCell>
-                    <TableCell>
-                      <code>{shortID(sample.sessionId)}</code>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          ) : null}
-          {samples.data && !samples.data.samples.length ? (
-            <p className="behavior-empty-copy">最近 24 小时没有该事件的原始样本。</p>
-          ) : null}
-        </section>
+        <EventSamples filters={filters} />
       </div>
-      {selectedSample ? (
-        <SampleDetail
-          projectId={filters.projectId}
-          sample={selectedSample}
-          onClose={() => setSelectedSample(undefined)}
-        />
-      ) : null}
     </div>
   );
 }
 
-function SampleDetail({
-  projectId,
-  sample,
-  onClose,
-}: {
-  projectId: string;
-  sample: BehaviorSample;
-  onClose: () => void;
-}) {
-  const range = sessionTimelineRange(sample.timestamp);
-  const timeline = useQuery({
-    queryKey: ["session-timeline", projectId, sample.sessionId, range.from, range.to],
-    queryFn: ({ signal }) =>
-      getSessionTimeline(projectId, sample.sessionId, range.from, range.to, signal),
-  });
+function NoEvents({ projectId }: { projectId: string }) {
   return (
-    <Drawer open direction="right" onOpenChange={(open) => !open && onClose()}>
-      <DrawerContent className="event-sample-detail w-[min(520px,calc(100vw-1rem))] sm:max-w-none">
-        <DrawerHeader className="event-sample-detail__header">
-          <div>
-            <span>{kindLabel(sample.kind)}</span>
-            <DrawerTitle>{eventLabel(sample.kind, sample.name)}</DrawerTitle>
-            <DrawerDescription>
-              {new Date(sample.timestamp).toLocaleString("zh-CN")}
-            </DrawerDescription>
-          </div>
-          <DrawerClose asChild>
-            <Button variant="ghost" size="icon" aria-label="关闭样本详情">
-              <XIcon />
+    <section className="behavior-panel" aria-label="没有事件">
+      <EmptyState
+        icon={ListTreeIcon}
+        title="当前范围没有事件"
+        description="放宽时间范围或清除筛选后重试；如果项目还没有上报，先接入 SDK，或在本地用「造数据」生成一批。"
+        action={
+          <div className="event-empty-actions">
+            <Button asChild variant="outline" size="sm">
+              <a href={`/projects/${encodeURIComponent(projectId)}/onboarding`}>接入 SDK</a>
             </Button>
-          </DrawerClose>
-        </DrawerHeader>
-        <dl className="event-sample-facts">
-          <div>
-            <dt>路由</dt>
-            <dd>{sample.route || "—"}</dd>
+            <Button asChild variant="ghost" size="sm">
+              <a href={`/projects/${encodeURIComponent(projectId)}/dev-data`}>造数据</a>
+            </Button>
           </div>
-          <div>
-            <dt>浏览器</dt>
-            <dd>{sample.browser || "—"}</dd>
-          </div>
-          <div>
-            <dt>设备</dt>
-            <dd>{sample.device || "—"}</dd>
-          </div>
-          <div>
-            <dt>国家</dt>
-            <dd>{sample.country || "—"}</dd>
-          </div>
-          <div>
-            <dt>会话</dt>
-            <dd>
-              <code>{sample.sessionId}</code>
-            </dd>
-          </div>
-        </dl>
-        {Object.keys(sample.attributes).length ? (
-          <section>
-            <h3>事件属性</h3>
-            <dl className="event-sample-attributes">
-              {Object.entries(sample.attributes).map(([key, value]) => (
-                <div key={key}>
-                  <dt>{key}</dt>
-                  <dd>{value}</dd>
-                </div>
-              ))}
-            </dl>
-          </section>
-        ) : null}
-        <section>
-          <div className="event-sample-session-header">
-            <div>
-              <h3>完整会话时间线</h3>
-              <p>页面、点击、自定义事件、API 与错误按发生顺序排列。</p>
-            </div>
-            {timeline.data ? <span>{timeline.data.events.length} 个事件</span> : null}
-          </div>
-          <Button asChild variant="outline" size="sm">
-            <a
-              href={sessionEventHref(projectId, sample.sessionId, sample.timestamp, sample.eventId)}
-            >
-              打开完整会话详情
-            </a>
-          </Button>
-          {timeline.isLoading ? <Skeleton className="h-64" /> : null}
-          {timeline.error ? (
-            <AsyncError
-              error={timeline.error}
-              title="完整会话暂不可用"
-              remediation="已保留事件随附的前序行为；可重新请求完整时间线。"
-              onRetry={() => void timeline.refetch()}
-            />
-          ) : null}
-          {!timeline.isLoading ? (
-            <BehaviorTimeline
-              breadcrumbs={sample.breadcrumbs}
-              sessionTimeline={timeline.data}
-              anchorEventId={sample.eventId}
-              projectId={projectId}
-              from={range.from.toISOString()}
-              to={range.to.toISOString()}
-            />
-          ) : null}
-        </section>
-      </DrawerContent>
-    </Drawer>
+        }
+      />
+    </section>
+  );
+}
+
+function BreakdownPanel({ data }: { data: BehaviorAnalyticsResponse }) {
+  if (!data.breakdown.length) return null;
+  const label = dimensionLabel(data.dimension);
+  const peak = Math.max(1, ...data.breakdown.map((item) => item.metric.events));
+  return (
+    <section className="behavior-panel" aria-labelledby="event-breakdown-title">
+      <div className="behavior-panel__header">
+        <div>
+          <h2 id="event-breakdown-title">{label} 分布</h2>
+          <p>
+            按事件量排序的前 {Math.min(12, data.breakdown.length)}{" "}
+            个值；通过筛选栏的「分群维度」切换。
+          </p>
+        </div>
+      </div>
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>{label}</TableHead>
+            <TableHead>事件</TableHead>
+            <TableHead>用户</TableHead>
+            <TableHead>占比</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {data.breakdown.slice(0, 12).map((item) => (
+            <TableRow key={item.value}>
+              <TableCell>
+                <strong>{displayDimension(item.value, data.dimension)}</strong>
+              </TableCell>
+              <TableCell>
+                {item.metric.events.toLocaleString()}
+                <span className="event-bar" aria-hidden="true">
+                  <i style={{ width: `${Math.max(2, (item.metric.events / peak) * 100)}%` }} />
+                </span>
+              </TableCell>
+              <TableCell>{item.metric.uniqueUsers.toLocaleString()}</TableCell>
+              <TableCell>{formatPercent(item.metric.events, data.totals.events)}</TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </section>
+  );
+}
+
+// Numeric Custom Event measurements. Hidden when the selection carries none, so a Project
+// that never sends them does not get an empty panel that reads as broken.
+function MeasurementPanel({
+  data,
+  selected,
+  onSelect,
+}: {
+  data: BehaviorAnalyticsResponse;
+  selected?: string;
+  onSelect: (name?: string) => void;
+}) {
+  const breakdown = data.measurementBreakdown ?? [];
+  return (
+    <section className="behavior-panel" aria-labelledby="event-measurements-title">
+      <div className="behavior-panel__header">
+        <div>
+          <h2 id="event-measurements-title">数值指标</h2>
+          <p>自定义事件 measurements 的汇总。点击一行按{dimensionLabel(data.dimension)}拆分。</p>
+        </div>
+      </div>
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>指标</TableHead>
+            <TableHead>样本</TableHead>
+            <TableHead>平均</TableHead>
+            <TableHead>中位数</TableHead>
+            <TableHead>P90</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {data.measurements.map((item) => {
+            const toggle = () => onSelect(item.name === selected ? undefined : item.name);
+            return (
+              <TableRow
+                key={item.name}
+                tabIndex={0}
+                aria-selected={item.name === selected}
+                data-state={item.name === selected ? "selected" : undefined}
+                className="cursor-pointer"
+                onClick={toggle}
+                onKeyDown={(key) => {
+                  if (key.key === "Enter" || key.key === " ") {
+                    key.preventDefault();
+                    toggle();
+                  }
+                }}
+              >
+                <TableCell>
+                  <strong>{item.name}</strong>
+                </TableCell>
+                <TableCell>{item.samples.toLocaleString()}</TableCell>
+                <TableCell>{formatCompact(item.average)}</TableCell>
+                <TableCell>{formatCompact(item.p50)}</TableCell>
+                <TableCell>{formatCompact(item.p90)}</TableCell>
+              </TableRow>
+            );
+          })}
+        </TableBody>
+      </Table>
+      {selected && breakdown.length ? (
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>
+                {selected} · {dimensionLabel(data.dimension)}
+              </TableHead>
+              <TableHead>样本</TableHead>
+              <TableHead>总和</TableHead>
+              <TableHead>平均</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {breakdown.slice(0, 12).map((row) => (
+              <TableRow key={row.value}>
+                <TableCell>
+                  <strong>{displayDimension(row.value, data.dimension)}</strong>
+                </TableCell>
+                <TableCell>{row.samples.toLocaleString()}</TableCell>
+                <TableCell>{formatCompact(row.total)}</TableCell>
+                <TableCell>{formatCompact(row.average)}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      ) : null}
+    </section>
   );
 }
 
@@ -341,19 +319,4 @@ function selectedEventTitle(filters: BehaviorFilters) {
     : filters.eventKind
       ? `${kindLabel(filters.eventKind)}趋势`
       : "全部事件趋势";
-}
-function kindLabel(value: string) {
-  return (
-    (
-      {
-        page_view: "页面访问",
-        navigation: "页面导航",
-        click: "元素点击",
-        custom: "自定义事件",
-      } as Record<string, string>
-    )[value] ?? value
-  );
-}
-function shortID(value: string) {
-  return `${value.slice(0, 8)}…`;
 }

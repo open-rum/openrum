@@ -1,0 +1,71 @@
+---
+title: Introduction
+description: What OpenRUM is, what it covers, where to start and how to find things in the documentation.
+appliesTo: Alpha
+---
+
+import { Aside, CardGrid, LinkCard } from "@astrojs/starlight/components";
+
+OpenRUM is an open-source, self-hosted frontend monitoring platform. You run an **Instance** on your own infrastructure, add the Browser SDK to a web application, and investigate user behavior, errors, performance and API requests in the **Console**. Telemetry never leaves infrastructure you operate.
+
+It is built around one investigation path: start from a change in behavior or a failed Session, follow it to the **Issue** behind it, and reach the stack frame that needs a fix, without copying IDs between tools.
+
+## What it covers
+
+| Capability               | What you get                                                                                         | Read                                                                  |
+| ------------------------ | ---------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| Errors and investigation | JavaScript errors grouped into Issues, optional Source Map frames, the Session timeline around each. | [Investigate an issue](/docs/product/investigation/)                  |
+| Performance and APIs     | Core Web Vitals, route performance, request latency and failures.                                    | [Performance](/docs/product/performance/)                             |
+| Behavior analytics       | Page Views, visitors, Custom Events, funnels, paths and retention.                                   | [Behavior analytics](/docs/product/analytics/)                        |
+| Logs                     | Structured browser logs searchable by severity, user and Session.                                    | [Logs](/docs/product/logs/)                                           |
+| Dashboards and alerts    | Project dashboards and metric alerts delivered to Feishu/Lark or a Webhook.                          | [Alerts](/docs/product/alerts/)                                       |
+| Privacy by default       | No raw input values, request or response bodies or headers in automatic capture.                     | [Privacy](/docs/self-hosting/security/privacy/)                       |
+
+## Where to start
+
+<CardGrid>
+  <LinkCard
+    title="Run it locally"
+    description="Start the full stack with the demo dataset, or work on OpenRUM from source."
+    href="/docs/getting-started/local-development/"
+  />
+  <LinkCard
+    title="Deploy to production"
+    description="Kubernetes with Helm, or one Linux host with Docker, plus the data services they need."
+    href="/docs/self-hosting/overview/"
+  />
+  <LinkCard
+    title="Instrument an application"
+    description="Create a Project, install the Browser SDK and see the first Event arrive."
+    href="/docs/getting-started/create-first-project/"
+  />
+  <LinkCard
+    title="Look something up"
+    description="Environment variables, SDK options, the Event schema and the HTTP API."
+    href="/docs/reference/configuration/"
+  />
+</CardGrid>
+
+## Find your way around
+
+| I want to…                                  | Go to                                                                   |
+| ------------------------------------------- | ----------------------------------------------------------------------- |
+| Try OpenRUM on my machine                   | [Local development](/docs/getting-started/local-development/)           |
+| Deploy for my team                          | [Deployment preparation](/docs/getting-started/production-deployment/)  |
+| Upgrade, back up or troubleshoot an Instance | [Operate](/docs/self-hosting/upgrades/)                                 |
+| Set up Google, GitHub, OIDC or LDAP sign-in | [Authentication setup](/docs/self-hosting/authentication/)              |
+| Install the SDK in Next.js or Astro         | [Next.js](/docs/sdk/browser/nextjs/) · [Astro](/docs/sdk/browser/astro/)                |
+| Get readable stack traces                   | [Source Maps](/docs/sdk/source-maps/)                                   |
+| Understand how the pieces fit together      | [Architecture](/docs/self-hosting/architecture/)                        |
+| Check how a term is used                    | [Glossary and core concepts](/docs/reference/glossary/)                     |
+| Change OpenRUM itself                       | [Contributing](/docs/contributing/)                                     |
+
+## What runs
+
+An Instance has five application services: the Console web server, API, Ingest, Consumer and Worker. They use four required dependencies, PostgreSQL for accounts, projects and settings, ClickHouse for events and analysis queries, Kafka as the ingestion buffer, and Redis for caching and rate limits. Object storage is optional and only needed for Source Map uploads. [Architecture](/docs/self-hosting/architecture/) shows how an event moves through them.
+
+<Aside type="caution" title="Alpha stage">
+  OpenRUM is Alpha. Expect schema and API changes before the first stable release, and complete the
+  deployment guide's capacity, backup and access checks before accepting production traffic. Local
+  benchmark results are not production capacity guarantees.
+</Aside>

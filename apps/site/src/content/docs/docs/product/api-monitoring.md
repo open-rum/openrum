@@ -1,9 +1,8 @@
 ---
 title: API monitoring
 description: Observe browser-originated network operations in Session and Issue context.
+appliesTo: Alpha
 ---
-
-**Applies to:** Alpha. Status: Alpha implemented.
 
 API Request events capture browser fetch/XHR timing and failure signals without storing bodies, headers or cookies.
 

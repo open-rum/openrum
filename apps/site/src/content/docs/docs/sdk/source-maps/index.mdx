@@ -1,0 +1,175 @@
+---
+title: Source Maps
+description: Overview of how OpenRUM maps minified errors back to source with private Source Maps, including upload tokens, Release matching, options and troubleshooting.
+appliesTo: Alpha
+---
+
+import { Aside, CardGrid, LinkCard } from "@astrojs/starlight/components";
+
+A Source Map Artifact turns a minified stack frame such as `index-abc.js:1:48213` back into
+`src/checkout/cart.ts:42:7`. OpenRUM keeps maps private: they are uploaded from CI to the
+Instance's object storage and never deployed with your site.
+
+## Choose your framework
+
+Setup is three things: upload Source Maps from CI with an upload token, make the SDK report the same
+Release, and verify one mapped error. How you upload depends on the build tool:
+
+<CardGrid>
+  <LinkCard
+    title="React (Vite)"
+    description="Upload automatically during vite build with the @openrum/vite-plugin plugin."
+    href="/docs/sdk/source-maps/react/"
+  />
+  <LinkCard
+    title="Next.js"
+    description="Have Next emit Source Maps, then run openrum-sourcemaps after next build."
+    href="/docs/sdk/source-maps/nextjs/"
+  />
+</CardGrid>
+
+Other build tools (webpack, Rollup and so on) can follow the Next.js page and upload with the
+command line.
+
+<Aside type="note" title="Object storage is required">
+  Core monitoring works without object storage. Source Map upload and mapping need an OSS or
+  S3-compatible Bucket configured on the Instance; see [Object
+  storage](/docs/self-hosting/object-storage/). The Console's **Releases** page shows a banner when
+  storage is not configured or unavailable.
+</Aside>
+
+## Create an upload token
+
+Every framework starts here.
+
+1. In the Console, open **Settings → Project → Onboarding** (`/projects/<id>/onboarding`).
+2. In **Source Map upload tokens**, create a token named after the pipeline that uses it, such as
+   `github-actions-storefront`. Only Owners and Admins can create or revoke tokens; other members
+   can see the list.
+3. Copy the secret (`orut_…`) immediately; it is shown only once. Store it as a CI secret named
+   `OPENRUM_UPLOAD_TOKEN`.
+
+A token belongs to one Project. It can create Releases, upload Artifacts and list them; it cannot
+delete Releases or Artifacts, and it stops working as soon as it is revoked. The token list shows
+when each token was last used, so an unused or leaked token is easy to revoke.
+
+## The plugin and the command line
+
+Both ways to upload come from one package, `@openrum/vite-plugin`, and behave the same:
+
+- **Plugin** `openRUMSourceMaps`: Vite only. It runs automatically at the end of `vite build`.
+- **Command line** `openrum-sourcemaps`: the package's `bin`. After installing, run it with
+  `pnpm exec openrum-sourcemaps`; `--help` lists every flag. Use it for builds that do not go
+  through Vite, such as Next.js.
+
+`openrum-sourcemaps` is a separate tool from the `openrum` command used for local development
+(`openrum up`, `openrum seed` and so on), and is not part of `openrum` today.
+
+<Aside type="note" title="Install from the repository in the Alpha">
+  `@openrum/vite-plugin` is not published to npm yet. Build it from an OpenRUM checkout and install
+  the directory into your application:
+
+```sh
+pnpm --filter @openrum/vite-plugin build
+pnpm add -D /path/to/openrum/packages/vite-plugin
+```
+
+</Aside>
+
+On each build the plugin and the command line:
+
+- Read every `.map` file under the build output into memory and delete it from the output before
+  the first network request, so a failed upload never leaves a Source Map in a deployable
+  directory. They also remove `sourceMappingURL` comments from emitted `.js`, `.mjs`, `.cjs` and
+  `.css` files.
+- Create the Release; an existing version and dist are reused.
+- Upload through short-lived presigned URLs, up to four files at a time. Network errors, `5xx` and
+  `429` responses are retried twice with exponential backoff; validation errors are not retried.
+- Print a summary such as `3 uploaded, 12 skipped (unchanged), 0 failed` and fail the build when
+  any file fails.
+
+## Releases must match
+
+Mapping looks up Artifacts by the `release` and `dist` on each error event, so the upload and the
+Browser SDK must receive exactly the same values. Set both from one CI variable to avoid drift.
+
+<Aside type="caution" title="Mismatched values do not raise an error">
+  Events without a `release` cannot be mapped. A different `dist`, or a `dist` set on only one side,
+  resolves to a different Release and no Artifact is found.
+</Aside>
+
+## Verify mapping
+
+- Open **Releases** in the main navigation and select the Release. The badge shows how many of the
+  uploaded files are ready.
+- Use the match tester: enter a generated-code frame URL, line and column from a production error
+  and confirm it maps to the expected source file and line.
+- Trigger a known error in a deployed build and open it from **Errors**. The mapped stack keeps the
+  generated frame and adds the source path, line and column; frames that cannot be mapped show a
+  reason, see [Why a frame is not mapped](#why-a-frame-is-not-mapped).
+
+## Plugin and CLI options
+
+The plugin takes options; the CLI takes the same values as flags or environment variables. Pass the
+token through the environment so it stays out of process lists.
+
+| Plugin option | CLI flag       | CLI environment variable | Notes                                                                         |
+| ------------- | -------------- | ------------------------ | ----------------------------------------------------------------------------- |
+| `baseUrl`     | `--base-url`   | `OPENRUM_BASE_URL`       | OpenRUM API origin, for example `https://rum.example.com`. Required           |
+| `projectId`   | `--project-id` | `OPENRUM_PROJECT_ID`     | Required                                                                      |
+| `release`     | `--release`    | `OPENRUM_RELEASE`        | Must equal the SDK's `release`. Required                                      |
+| `dist`        | `--dist`       | `OPENRUM_DIST`           | When used, must equal the SDK's `dist`                                        |
+| `commitSha`   | `--commit-sha` | `OPENRUM_COMMIT_SHA`     | Recorded on the Release                                                       |
+| `outDir`      | `--out-dir`    | `OPENRUM_OUT_DIR`        | The plugin defaults to Vite's `build.outDir`; the CLI defaults to `dist`      |
+| `urlPrefix`   | `--url-prefix` | `OPENRUM_URL_PREFIX`     | Path placed before each file name, see [below](#artifact-names-and-urlprefix) |
+| `token`       | `--token`      | `OPENRUM_UPLOAD_TOKEN`   | The plugin reads `OPENRUM_UPLOAD_TOKEN` when `token` is unset                 |
+| `replace`     | `--replace`    | `OPENRUM_REPLACE=true`   | Overwrite a ready Artifact whose contents changed                             |
+| `concurrency` | none           | none                     | Parallel uploads, default 4                                                   |
+| `retries`     | none           | none                     | Retries for network errors, `5xx` and `429`, default 2                        |
+
+## Artifact names and `urlPrefix`
+
+Artifacts are matched by name. The name is the script URL's path without scheme, host, query,
+fragment or leading `/`, plus `.map`. The upload builds it from `urlPrefix` plus the file's path
+relative to the build output directory.
+
+| Script URL in the stack                                   | File in the build output             | `urlPrefix`     | Artifact name                        |
+| --------------------------------------------------------- | ------------------------------------ | --------------- | ------------------------------------ |
+| `https://shop.example.com/assets/index-abc.js`            | `dist/assets/index-abc.js.map`       | not set         | `assets/index-abc.js.map`            |
+| `https://cdn.example.com/static/app/assets/index-abc.js`  | `dist/assets/index-abc.js.map`       | `static/app/`   | `static/app/assets/index-abc.js.map` |
+| `https://shop.example.com/_next/static/chunks/app-abc.js` | `.next/static/chunks/app-abc.js.map` | `_next/static/` | `_next/static/chunks/app-abc.js.map` |
+
+Set `urlPrefix` when the site is served from a sub-path or its assets live on a CDN. Slashes are
+normalized, and only the path of a full URL is kept. Framework-specific values are on the
+[React (Vite)](/docs/sdk/source-maps/react/) and [Next.js](/docs/sdk/source-maps/nextjs/) pages. When
+a frame shows `missing_artifact`, first compare the frame URL's path with the uploaded names.
+
+## Re-run builds and upload late
+
+- **Rebuilding the same Release is safe.** The Release is reused, and files with the same name and
+  SHA-256 are skipped instead of uploaded again.
+- **Use a new Release for changed files.** A file with the same name but different contents fails
+  with `ARTIFACT_EXISTS`. To overwrite deliberately, set `replace: true` or pass `--replace`.
+- **Late uploads re-map recent errors.** When an Artifact becomes ready, errors from the last seven
+  days under that Release and dist that were not fully mapped are re-mapped automatically. Older
+  events keep their generated-code locations.
+
+A single Source Map can be at most 64 MiB. Larger files are rejected before upload; split the
+bundle into smaller chunks.
+
+## Why a frame is not mapped
+
+In **Errors** and the match tester, an unmapped frame shows one of these reasons:
+
+| Reason                  | Meaning                                           | What to check                                                                 |
+| ----------------------- | ------------------------------------------------- | ----------------------------------------------------------------------------- |
+| `missing_release`       | The event has no `release`                        | Set `release` in the SDK's `init()`                                           |
+| `missing_artifact`      | No Artifact matches the script URL                | Compare the frame URL path with the Release's Artifact names, set `urlPrefix` |
+| `ambiguous_artifact`    | More than one Artifact matches                    | The SDK's `release` and `dist` must equal the values used for the upload      |
+| `invalid_map`           | The Source Map is empty, malformed or unsupported | Rebuild and upload again; make sure no CI step rewrites the map               |
+| `unsupported_index_url` | An indexed map section points at an external URL  | Emit a flat map, or an indexed map with inline sections                       |
+| `no_mapping`            | The map has no mapping for that line and column   | Confirm the map came from the same output that produced the frame             |
+| `resource_limit`        | The stack or Source Map exceeds a safety limit    | Split the bundle into smaller chunks                                          |
+
+If an upload fails, or a frame is still not mapped after these checks, see
+[Troubleshooting](/docs/self-hosting/troubleshooting/#source-map-upload-fails).

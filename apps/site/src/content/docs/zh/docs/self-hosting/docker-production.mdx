@@ -6,7 +6,7 @@ appliesTo: Alpha
 
 import { Aside, LinkCard, Steps } from "@astrojs/starlight/components";
 
-这条路径在**一台 Linux 服务器**上运行 OpenRUM 和四个数据服务。它与[本地评估配置](/zh/docs/self-hosting/compose/)分离：不生成演示数据，使用 `APP_ENV=production`，强制设置私有凭据，不开放数据库端口，并由 Caddy 自动配置 HTTPS。需要多节点应用服务或计划扩容时，[Kubernetes/Helm](/zh/docs/getting-started/production-deployment/)仍是推荐路径。
+这条路径在**一台 Linux 服务器**上运行 OpenRUM 和四个数据服务。它与本地开发使用的 Compose 配置分离：不生成演示数据，使用 `APP_ENV=production`，强制设置私有凭据，不开放数据库端口，并由 Caddy 自动配置 HTTPS。需要多节点应用服务或计划扩容时，[Kubernetes/Helm](/zh/docs/getting-started/production-deployment/)仍是推荐路径。
 
 <Aside type="caution" title="单一故障点，不是高可用">
   Docker

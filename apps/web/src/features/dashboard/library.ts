@@ -38,8 +38,12 @@ const stat = (metric: string, title: string, measurement?: string) =>
   createCatalogWidget(
     "stat",
     { metrics: [metric], measurement },
-    { title, statAppearance: "line-right" },
+    { title, statAppearance: "area-right" },
   );
+
+/** Mark which way a change is good for a card whose metric is neutral in the catalog. */
+const withDirection = (widget: Widget, direction: "up" | "down"): Widget =>
+  widget.data.source === "catalog" ? { ...widget, data: { ...widget.data, direction } } : widget;
 
 export const library: LibraryEntry[] = [
   // Traffic and Sessions
@@ -289,7 +293,7 @@ export const library: LibraryEntry[] = [
       createCatalogWidget(
         "stat",
         { metrics: ["issues.newIssues"] },
-        { title: "新增 Issue", statAppearance: "bar-right" },
+        { title: "新增 Issue", statAppearance: "area-right" },
       ),
   },
   {
@@ -353,7 +357,7 @@ export const library: LibraryEntry[] = [
     domain: "business",
     preview: "stat",
     requires: ["measurement.sum"],
-    create: () => stat("measurement.sum", "收入总和", "amount"),
+    create: () => withDirection(stat("measurement.sum", "收入总和", "amount"), "up"),
   },
   {
     id: "order-value-stat",
@@ -362,7 +366,7 @@ export const library: LibraryEntry[] = [
     domain: "business",
     preview: "stat",
     requires: ["measurement.avg"],
-    create: () => stat("measurement.avg", "客单价", "amount"),
+    create: () => withDirection(stat("measurement.avg", "客单价", "amount"), "up"),
   },
   {
     id: "revenue-trend",
@@ -454,7 +458,7 @@ export const library: LibraryEntry[] = [
       createCatalogWidget(
         "stat",
         { metrics: ["behavior.events"], filters: { eventKind: "custom" } },
-        { title: "自定义事件", statAppearance: "line-right" },
+        { title: "自定义事件", statAppearance: "area-right" },
       ),
   },
   {

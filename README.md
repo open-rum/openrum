@@ -11,7 +11,7 @@
 
 <p align="center">
   <a href="https://openrum.netlify.app/">Website</a> ·
-  <a href="https://openrum.netlify.app/docs/getting-started/quickstart/">Documentation</a> ·
+  <a href="https://openrum.netlify.app/docs/introduction/">Documentation</a> ·
   <a href="#quickstart">Quickstart</a> ·
   <a href="https://github.com/eijil/openrum/issues">Report an issue</a>
 </p>
@@ -53,20 +53,27 @@ docker compose --env-file deploy/compose/.env.example \
   -f deploy/compose/docker-compose.yml up -d --build
 ```
 
-The first start builds the services, applies database migrations and loads a repeatable ecommerce demo with approximately **30,000 Sessions across 14 days**. Wait for the long-running services to become healthy:
+The first start builds the services and applies database migrations. Wait for the long-running services to become healthy:
 
 ```sh
 docker compose --env-file deploy/compose/.env.example \
   -f deploy/compose/docker-compose.yml ps
 ```
 
-Open **[http://127.0.0.1:4173](http://127.0.0.1:4173)** and sign in:
+Then load the demo, a repeatable ecommerce dataset with approximately **30,000 Sessions across 14 days**. It is optional and safe to run again:
+
+```sh
+docker compose --profile seed --env-file deploy/compose/.env.example \
+  -f deploy/compose/docker-compose.yml run --rm --no-deps demo-seed
+```
+
+If you work from a clone with Go installed, `pnpm openrum up` followed by `pnpm openrum seed` does the same. Open **[http://127.0.0.1:4173](http://127.0.0.1:4173)** and sign in:
 
 | Email                | Password             |
 | -------------------- | -------------------- |
 | `demo@openrum.local` | `OpenRUM-demo-2026!` |
 
-Explore the dashboards, errors, performance and Sessions using the demo data. Object storage is optional; enable it when you need to upload Source Map artifacts.
+Explore the dashboards, errors, performance and Sessions using the demo data. Skip the seed step to start from an empty Instance and create your own owner on the first visit. Object storage is optional; enable it when you need to upload Source Map artifacts.
 
 To stop the stack while keeping its data:
 
@@ -97,8 +104,8 @@ Replace the DSN with the value from your Project. For a deployed website, use yo
 
 | Task                               | Guide                                                                                                                                                                         |
 | ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Choose an installation path        | [Getting started](https://openrum.netlify.app/docs/getting-started/quickstart/)                                                                                               |
-| Connect your frontend              | [Browser SDK](https://openrum.netlify.app/docs/sdk/browser/) · [Next.js](https://openrum.netlify.app/docs/sdk/nextjs/) · [Astro](https://openrum.netlify.app/docs/sdk/astro/) |
+| Choose an installation path        | [Getting started](https://openrum.netlify.app/docs/introduction/)                                                                                               |
+| Connect your frontend              | [Browser SDK](https://openrum.netlify.app/docs/sdk/browser/) · [Next.js](https://openrum.netlify.app/docs/sdk/browser/nextjs/) · [Astro](https://openrum.netlify.app/docs/sdk/browser/astro/) |
 | Configure login                    | [Email, Google, GitHub, LDAP and OIDC (repository guide)](apps/site/src/content/docs/docs/getting-started/sign-in/index.mdx)                                                  |
 | Deploy and operate an Instance     | [Self-hosting](https://openrum.netlify.app/docs/self-hosting/overview/) · [Backup and restore](https://openrum.netlify.app/docs/self-hosting/backup-restore/)                 |
 | Upload Source Maps                 | [Source Map integration](https://openrum.netlify.app/docs/sdk/source-maps/)                                                                                                   |

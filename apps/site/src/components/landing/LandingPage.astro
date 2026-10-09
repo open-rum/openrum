@@ -15,7 +15,7 @@ const release = import.meta.env.PUBLIC_OPENRUM_RELEASE || "Alpha";
 const commit = import.meta.env.PUBLIC_COMMIT_SHA || "local";
 const docs = docsBase(zh ? "zh" : "en");
 const home = zh ? "/zh/" : "/";
-const quickstart = `${docs}/getting-started/quickstart/`;
+const quickstart = `${docs}/self-hosting/overview/`;
 const contributing = `${docs}/contributing/`;
 const benchmark = `${repository}/blob/main/docs/benchmarks/local-capacity-2026-09-18.md`;
 const otherLanguage = equivalentPath(Astro.url.pathname, zh ? "zh" : "en");
@@ -30,6 +30,8 @@ const copy = zh
       heroTitle: "看清每一次真实访问",
       heroLead: "开源、可自托管的前端监控平台。",
       heroDocs: "阅读文档",
+      heroShotAlt:
+        "OpenRUM 控制台的默认仪表盘：会话、PV、UV、错误率、API 失败率与 Web Vitals 指标卡，以及会话趋势和访问量图表。",
       tourTitle: "一个控制台，看全整个前端",
       tabs: [
         ["errors", "错误", "哪里坏了，影响了谁。"],
@@ -98,6 +100,8 @@ const copy = zh
       heroTitle: "See every real visit.",
       heroLead: "Open-source, self-hostable frontend monitoring.",
       heroDocs: "Read the docs",
+      heroShotAlt:
+        "The OpenRUM Console default dashboard: stat cards for sessions, page views, users, error rate, API failure rate and Web Vitals, above session and traffic trends.",
       tourTitle: "Your whole frontend, in one console.",
       tabs: [
         ["errors", "Errors", "What broke, and who it hit."],
@@ -214,7 +218,17 @@ const copy = zh
           </div>
         </div>
         <div class="lp-wrap lp-hero-shot lp-reveal">
-          <ProductMock kind="overview" lang={lang} />
+          <img
+            class="lp-hero-screenshot"
+            src="/screenshots/dashboard-dark-1440.webp"
+            srcset="/screenshots/dashboard-dark-1440.webp 1440w, /screenshots/dashboard-dark-2880.webp 2880w"
+            sizes="(min-width: 1212px) 1180px, calc(100vw - 32px)"
+            width="1440"
+            height="810"
+            alt={copy.heroShotAlt}
+            fetchpriority="high"
+            decoding="async"
+          />
         </div>
       </section>
 
@@ -222,6 +236,7 @@ const copy = zh
         <div class="lp-wrap">
           <h2 id="lp-tour-title" class="lp-title">{copy.tourTitle}</h2>
           <div class="lp-tabs" role="tablist" aria-label={copy.tourTitle}>
+            <span class="lp-tabs-indicator" aria-hidden="true"></span>
             {
               copy.tabs.map(([id, label], index) => (
                 <button
@@ -419,7 +434,15 @@ const copy = zh
 
   <script>
     const tabs = [...document.querySelectorAll<HTMLButtonElement>(".lp-tabs [role=tab]")];
+    const indicator = document.querySelector<HTMLElement>(".lp-tabs-indicator");
+    // The selection is one pill that slides to the chosen tab rather than a recoloured tab.
+    const place = (tab: HTMLButtonElement) => {
+      if (!indicator) return;
+      indicator.style.width = `${tab.offsetWidth}px`;
+      indicator.style.transform = `translateX(${tab.offsetLeft}px)`;
+    };
     const select = (next: HTMLButtonElement) => {
+      place(next);
       for (const tab of tabs) {
         const active = tab === next;
         tab.setAttribute("aria-selected", String(active));
@@ -432,6 +455,16 @@ const copy = zh
       if (list && list.scrollWidth > list.clientWidth)
         list.scrollTo({ left: next.offsetLeft - (list.clientWidth - next.offsetWidth) / 2 });
     };
+    const current = () => tabs.find((tab) => tab.getAttribute("aria-selected") === "true");
+    const initial = current();
+    if (initial && indicator) {
+      place(initial);
+      requestAnimationFrame(() => indicator.classList.add("is-ready"));
+    }
+    window.addEventListener("resize", () => {
+      const tab = current();
+      if (tab) place(tab);
+    });
     tabs.forEach((tab, index) => {
       tab.addEventListener("click", () => select(tab));
       tab.addEventListener("keydown", (event) => {

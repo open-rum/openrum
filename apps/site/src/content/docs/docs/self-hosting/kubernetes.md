@@ -10,7 +10,7 @@ By default it also runs a single Redis instance for the release ([Redis: bundled
 
 ## Before you install
 
-**Provision PostgreSQL, ClickHouse and Kafka.** The Compose topology is for evaluation only. Use managed or HA services, and decide whether Redis is bundled or your own. Size them with [Capacity planning](/docs/self-hosting/capacity/) before you take production traffic. See [External dependencies](/docs/self-hosting/dependencies/) for what each one holds.
+**Provision PostgreSQL, ClickHouse and Kafka.** The Compose topology is for local development only. Use managed or HA services, and decide whether Redis is bundled or your own. Size them with [Capacity planning](/docs/self-hosting/capacity/) before you take production traffic. See [External dependencies](/docs/self-hosting/dependencies/) for what each one holds.
 
 **Create the Kafka topic yourself.** Both the producer and the consumer set `AllowAutoTopicCreation: false`, so a missing topic is a runtime failure rather than a self-healing condition. The default topic name is `rum-events-v1`, and ingest only reports durable acceptance after `acks=all`.
 

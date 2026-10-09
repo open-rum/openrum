@@ -1,0 +1,90 @@
+---
+title: React (Vite)
+description: Upload Source Maps during the build of a Vite-built React app with @openrum/vite-plugin, and make the SDK report the same Release.
+appliesTo: Alpha
+---
+
+import { Aside, Steps } from "@astrojs/starlight/components";
+
+When a React app builds with Vite, `@openrum/vite-plugin` uploads Source Maps automatically at the
+end of `vite build`, with no extra build step. Before you start, [create an upload
+token](/docs/sdk/source-maps/#create-an-upload-token) and store it as the CI secret
+`OPENRUM_UPLOAD_TOKEN`.
+
+<Steps>
+
+1. ## Install the plugin
+
+   The plugin is not published to npm in the Alpha. Build it from an OpenRUM checkout and install the
+   directory into your application:
+
+   ```sh
+   pnpm --filter @openrum/vite-plugin build
+   pnpm add -D /path/to/openrum/packages/vite-plugin
+   ```
+
+1. ## Enable it in the Vite config
+
+   ```ts title="vite.config.ts"
+   import { defineConfig } from "vite";
+   import { openRUMSourceMaps } from "@openrum/vite-plugin";
+
+   export default defineConfig({
+     build: { sourcemap: "hidden" },
+     plugins: [
+       openRUMSourceMaps({
+         baseUrl: process.env.OPENRUM_BASE_URL!,
+         projectId: process.env.OPENRUM_PROJECT_ID!,
+         release: process.env.OPENRUM_RELEASE!,
+         commitSha: process.env.GITHUB_SHA,
+         // token defaults to process.env.OPENRUM_UPLOAD_TOKEN
+       }),
+     ],
+   });
+   ```
+
+   `build.sourcemap: "hidden"` makes Vite write `.map` files without adding `sourceMappingURL`
+   comments to the output. If you set it to `true`, the plugin removes those comments for you.
+
+   What the plugin does during a build is described in the
+   [overview](/docs/sdk/source-maps/#the-plugin-and-the-command-line). If the site is served from a
+   sub-path, for example a Vite `base` of `/static/app/` or a CDN URL, also set
+   `urlPrefix: "static/app/"`; see [Artifact names](/docs/sdk/source-maps/#artifact-names-and-urlprefix).
+
+1. ## Make the SDK report the same Release
+
+   Set the plugin's `release` and the SDK's `release` from one CI variable:
+
+   ```ts title="src/monitoring.ts"
+   init({
+     dsn: import.meta.env.VITE_OPENRUM_DSN,
+     release: import.meta.env.VITE_APP_RELEASE, // same as OPENRUM_RELEASE
+   });
+   ```
+
+   ```yaml title=".github/workflows/deploy.yml"
+   - name: Build and upload Source Maps
+     run: pnpm build
+     env:
+       OPENRUM_BASE_URL: https://rum.example.com
+       OPENRUM_PROJECT_ID: <your-project-id>
+       OPENRUM_RELEASE: ${{ github.sha }}
+       VITE_APP_RELEASE: ${{ github.sha }}
+       OPENRUM_UPLOAD_TOKEN: ${{ secrets.OPENRUM_UPLOAD_TOKEN }}
+   ```
+
+   <Aside type="caution" title="Mismatched values do not raise an error">
+     Events without a `release` cannot be mapped. A different `dist`, or a `dist` set on only one side,
+     resolves to a different Release and no Artifact is found.
+   </Aside>
+
+1. ## Verify mapping
+
+   After deploying, follow [Verify mapping](/docs/sdk/source-maps/#verify-mapping): confirm the
+   Artifacts are ready on **Releases**, check a real frame with the match tester, then trigger a
+   known error. If a frame is not mapped, see
+   [Why a frame is not mapped](/docs/sdk/source-maps/#why-a-frame-is-not-mapped).
+
+</Steps>
+
+For how to initialize the SDK, see [Browser SDK](/docs/sdk/browser/).

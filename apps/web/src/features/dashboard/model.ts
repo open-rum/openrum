@@ -1,13 +1,19 @@
 import { z } from "zod";
 
 export const MAX_WIDGETS = 24;
+/** A tabbed card holds two or three modules. */
+export const MAX_GROUP_TABS = 3;
 export const statAppearanceLabels = {
   plain: "简洁数值",
-  "line-right": "右侧折线",
-  "bar-right": "右侧柱状图",
+  "area-right": "右侧面积图",
 } as const;
 export type StatAppearance = keyof typeof statAppearanceLabels;
-export const sizeLabels = { compact: "紧凑", half: "半宽", full: "整宽" } as const;
+export const sizeLabels = {
+  compact: "紧凑",
+  third: "三分之一",
+  half: "半宽",
+  full: "整宽",
+} as const;
 export const viewLabels = {
   number: "Stat",
   area: "Area",
@@ -141,6 +147,9 @@ const dataSchema = z.discriminatedUnion("source", [
     measurement: z.string().regex(measurementKey).optional(),
     filters: catalogFiltersSchema,
     compare: z.literal("previous").optional(),
+    // Which way a change is good for this card, overriding a metric that is neutral in the
+    // catalog (a measurement sum can be revenue or a latency; only the card knows).
+    direction: z.enum(["up", "down"]).optional(),
     topN: z.number().int().min(1).max(250).optional(),
     sort: catalogMetricId.optional(),
     order: z.enum(["asc", "desc"]).optional(),
@@ -169,7 +178,7 @@ export const widgetSchema = z
     // rejecting the whole dashboard.
     version: z.union([z.literal(1), z.literal(2)]),
     title: boundedText(80).min(1),
-    size: z.enum(["compact", "half", "full"]),
+    size: z.enum(["compact", "third", "half", "full"]),
     view: z
       .enum([
         "number",
@@ -185,11 +194,15 @@ export const widgetSchema = z
       // The world map view was retired. A saved one reads as ranked bars and saves as bars.
       .transform((value) => (value === "map" ? "bar" : value)),
     statAppearance: z
-      .enum(["plain", "line-right", "bar-right", "line-bottom", "area-bottom"])
-      // Keep saved bottom variants readable without continuing to render them.
-      .transform((value): StatAppearance =>
-        value === "line-bottom" || value === "area-bottom" ? "line-right" : value,
-      )
+      .enum(["plain", "area-right", "line-right", "bar-right", "line-bottom", "area-bottom"])
+      // Every trend appearance is now the right-side area; retired line, bar and bottom
+      // variants stay readable and save back as area-right.
+      .transform((value): StatAppearance => (value === "plain" ? "plain" : "area-right"))
+      .optional(),
+    // Adjacent modules sharing a groupId render as one card with tabs (see groups.ts).
+    groupId: z
+      .string()
+      .regex(/^[A-Za-z0-9_-]{1,80}$/)
       .optional(),
     data: dataSchema,
   })
@@ -200,10 +213,16 @@ export const widgetSchema = z
     if ((w.type === "ranked-table" || w.type === "metric-table") && !catalog)
       fail("排行表和指标表读取指标目录。");
     if (w.type !== "stat" && w.statAppearance !== undefined) fail("卡片外观仅适用于指标卡。");
+    if (w.type === "stat" && w.groupId !== undefined) fail("指标卡不能合并为标签页卡片。");
     if (w.type === "stat") {
-      if (w.size === "full" || w.view !== "number" || w.data.metrics.length !== 1)
+      if (
+        w.size === "full" ||
+        w.size === "third" ||
+        w.view !== "number" ||
+        w.data.metrics.length !== 1
+      )
         fail("指标卡使用紧凑或半宽布局，选择一个指标。");
-    } else if (w.size === "compact") fail("图表和列表至少使用半宽布局。");
+    } else if (w.size === "compact") fail("图表和列表至少使用三分之一宽度。");
     if (w.type === "timeseries") {
       const views = catalog
         ? ["area", "line", "bar", "stacked-area", "stacked-bar"]

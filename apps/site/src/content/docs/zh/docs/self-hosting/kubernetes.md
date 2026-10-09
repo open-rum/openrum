@@ -10,7 +10,7 @@ appliesTo: Alpha
 
 ## 安装前的准备
 
-**自行准备 PostgreSQL、ClickHouse 和 Kafka。** Compose 拓扑只用于评估。生产环境请使用托管版或高可用的服务，并决定 Redis 用 Chart 自带的还是你自己的。在承接生产流量前用[容量规划](/zh/docs/self-hosting/capacity/)确定规格。各依赖分别存什么，见[外部依赖](/zh/docs/self-hosting/dependencies/)。
+**自行准备 PostgreSQL、ClickHouse 和 Kafka。** Compose 拓扑只用于本地开发。生产环境请使用托管版或高可用的服务，并决定 Redis 用 Chart 自带的还是你自己的。在承接生产流量前用[容量规划](/zh/docs/self-hosting/capacity/)确定规格。各依赖分别存什么，见[外部依赖](/zh/docs/self-hosting/dependencies/)。
 
 **Kafka 主题必须自己建。** 生产者和消费者都设置了 `AllowAutoTopicCreation: false`，所以主题不存在是一个运行时故障，不会自动恢复。默认主题名是 `rum-events-v1`，并且 ingest 只在 `acks=all` 之后才报告持久化接收成功。
 

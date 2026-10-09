@@ -1,9 +1,8 @@
 ---
 title: Dashboards
 description: The built-in default dashboard and personal Project dashboards built from a curated metric catalog — metrics, chart types, breakdowns and the rules that keep the numbers honest.
+appliesTo: Alpha
 ---
-
-**Applies to:** Alpha. Status: Alpha implemented.
 
 Every Project opens on a built-in default dashboard. Everyone sees the same default, and
 nobody can change it. Each member can also keep several named personal dashboards per
@@ -34,9 +33,12 @@ you and for everyone else.
 Open the dashboard name at the top of the page to switch between the default and your own
 dashboards, create one, rename it, reorder the list or delete the current one.
 
-- A new dashboard can start blank, from the default layout, from a template (traffic and
-  Sessions, performance, API health, error analysis, business metrics) or as a copy of the
-  current one.
+- A new dashboard can start blank, from the default layout, from a template (e-commerce
+  overview, traffic and Sessions, performance, API health, error analysis, business metrics)
+  or as a copy of the current one. The e-commerce overview shows revenue, orders, average
+  order value and the purchase funnel; it expects `view_item`, `add_to_cart`, `begin_checkout`
+  and `purchase` Custom Events, with the order total in a `purchase` measurement named
+  `amount`.
 - Each dashboard keeps its own draft and saves independently. Saving one that changed on
   another device is refused rather than overwritten; reload it and edit again.
 - The plain dashboard address opens the dashboard you last used on this device. Each

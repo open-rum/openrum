@@ -68,6 +68,7 @@ import {
 import { DashboardSwitcher } from "./DashboardSwitcher";
 import { useDashboardQueries } from "./queries";
 import { DashboardGrid } from "./DashboardGrid";
+import { normalizeGroups, toBlocks } from "./groups";
 import { DashboardDensity } from "./DashboardDensity";
 
 const ModuleEditor = lazy(() => import("./ModuleEditor"));
@@ -254,8 +255,14 @@ function PersonalDashboard({
     config.schemaVersion === 1 &&
     config.widgets.length <= MAX_WIDGETS &&
     new Set(config.widgets.map((w) => w.id)).size === config.widgets.length;
+  // Tabbed cards load only the tab on screen; another tab loads when it is opened.
+  const [activeTabs, setActiveTabs] = useState<Record<string, string>>({});
+  const visibleWidgets = toBlocks(config.widgets).map(
+    (block) =>
+      block.records.find((record) => record.id === activeTabs[block.key]) ?? block.records[0],
+  );
   const queries = useDashboardQueries(
-    saved.data && compatible ? config.widgets : [],
+    saved.data && compatible ? visibleWidgets : [],
     filters,
     userId,
   );
@@ -302,7 +309,7 @@ function PersonalDashboard({
     setDraft((current) => ({
       baseline: current?.baseline ?? baseline,
       revision: current?.revision ?? revision,
-      config: { ...(current?.config ?? baseline), widgets },
+      config: { ...(current?.config ?? baseline), widgets: normalizeGroups(widgets) },
     }));
   }
   // Adding from outside edit mode starts a draft first, exactly like the empty state does.
@@ -534,6 +541,10 @@ function PersonalDashboard({
             filters={filters}
             editing={editing}
             disabled={busy}
+            activeTabs={activeTabs}
+            onActiveTabChange={(blockKey, moduleId) =>
+              setActiveTabs((current) => ({ ...current, [blockKey]: moduleId }))
+            }
             onChange={changeWidgets}
             onConfigure={(initial) => setEditor({ initial })}
           />

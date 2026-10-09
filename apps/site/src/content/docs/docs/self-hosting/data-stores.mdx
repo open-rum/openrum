@@ -1,0 +1,65 @@
+---
+title: Data stores
+description: What PostgreSQL, ClickHouse, Kafka, Redis and object storage each hold, and which of them is the source of truth.
+appliesTo: Alpha
+---
+
+OpenRUM keeps control data and telemetry in different stores on purpose. Control data is small, relational and must never be lost. Telemetry is large, append-only and queried in aggregate. Each store below has one job, and only two of them are a source of truth.
+
+| Store | Holds | Source of truth |
+| --- | --- | --- |
+| PostgreSQL | Accounts, organizations, Projects, settings and workflow state | Yes, for control data |
+| ClickHouse | Events and the aggregates built from them | Yes, for telemetry |
+| Kafka | Accepted Envelopes waiting for the Consumer, plus a dead-letter topic | No, a buffer |
+| Redis | Rate-limit counters, caches and connection status | No, rebuildable |
+| Object storage | Source Map Artifacts, optional | For the artifact files |
+
+## PostgreSQL
+
+PostgreSQL is the control plane. The tables fall into a few groups:
+
+| Group | Examples |
+| --- | --- |
+| Identity and access | `users`, `sessions`, `auth_providers`, `auth_identities`, `organizations`, `organization_members`, `instance_members` |
+| Projects | `projects`, `project_keys`, `project_environments`, `project_upload_tokens` |
+| Delivery and issues | `releases`, `sourcemap_artifacts`, `issue_states` |
+| Alerts | `alert_rules`, `notification_channels`, `alert_evaluations`, `alert_deliveries` |
+| Instance operations | `instance_settings`, `instance_secrets`, `maintenance_jobs`, `emergency_cleanup_jobs`, `project_deletions`, `project_data_purges` |
+| Audit | `audit_logs`, `instance_audit_logs` |
+
+Losing PostgreSQL means nobody can sign in or change configuration, and Ingest loses the source of its Project keys and settings. Events already in ClickHouse are untouched. The [PostgreSQL runbook](/docs/self-hosting/postgres/) covers operations and recovery.
+
+## ClickHouse
+
+ClickHouse holds every stored Event in one raw table, `rum_events`, and a set of aggregate tables kept up to date by materialized views as Events are inserted. Dashboards and the Console read the aggregates; investigation reads the raw Events.
+
+| Table | Used for |
+| --- | --- |
+| `rum_events` | Every Event, with its `ingest_flags` array and Fingerprint |
+| `project_metrics_1m` | Per-minute Project metrics |
+| `behavior_metrics_1m` | Page views, visitors and custom Event aggregates |
+| `measurement_metrics_1m` | Web Vitals and other measurements |
+| `api_metrics_1m` | API request volume, latency and failures |
+| `issue_metrics_5m` | Issue occurrence counts |
+| `usage_records`, `usage_metrics_1h` | Per-Project volume shown under Usage |
+| `event_stack_mappings` | Mapped stack frames for errors |
+
+Events expire by the Project's retention policy, and aggregates by their own, so raw data can be shorter-lived than the charts built from it. See [Data lifecycle](/docs/self-hosting/data-lifecycle/) and [ClickHouse runbook](/docs/self-hosting/clickhouse/).
+
+## Kafka
+
+Ingest writes accepted Envelopes to the event topic, `rum-events-v1` by default, and the Consumer reads them as a consumer group. Failed items go to a second topic with the same name plus `.dlq`. The default Compose setup creates both with 12 partitions.
+
+Kafka is the one store where loss means losing accepted Events, because Ingest has already answered `202`. It is also the buffer that lets the Consumer fall behind safely, so its retention must outlast your longest expected ClickHouse outage. [Capacity planning](/docs/self-hosting/capacity/) starts there, and the [Kafka runbook](/docs/self-hosting/kafka/) covers lag and recovery.
+
+## Redis
+
+Redis holds short-lived state that is safe to lose: the fixed-window counters behind [rate limits](/docs/product/rate-limits/), query caches, sign-in throttling and each Project's last-seen SDK status shown during onboarding. When Redis is unavailable, each Ingest process enforces half the configured limit locally, so rate limiting degrades rather than failing open. Nothing in Redis needs a backup. See the [Redis runbook](/docs/self-hosting/redis/).
+
+## Object storage
+
+Object storage is optional. It holds the Source Map files uploaded for each Release; PostgreSQL keeps their metadata. Without it, every other feature works, but new Source Maps cannot be uploaded and minified stack frames stay unmapped. Use an OSS or S3-compatible bucket and give it its own lifecycle rules, because artifacts do not follow Event retention. See the [object storage runbook](/docs/self-hosting/object-storage/).
+
+## Which stores a backup must cover
+
+Back up PostgreSQL, ClickHouse and the artifact bucket as one recovery set. Kafka and Redis are not restored from a backup; Kafka only matters for the events that were accepted but not yet stored. [Backup and restore](/docs/self-hosting/backup-restore/) gives the procedure.

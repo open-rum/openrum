@@ -1,6 +1,6 @@
 # Prototype Instructions
 
-Local development data generation uses a fixed bottom-right, icon-only “造数据” quick entry and a shadcn Dialog, not a status bar or settings navigation item. Keep its accessible label and hover title. Default to the current Project, Environment and analysis range; automatically use the Project's default public DSN. Report Ingest acceptance separately from queryable sample verification. Keep both UI and API development-only. See `docs/dev-data.md` for the code map and troubleshooting.
+Local development data generation uses a fixed bottom-right, icon-only “造数据” quick entry and a shadcn Dialog, not a status bar or settings navigation item. Keep its accessible label and hover title. Default to the current Project, Environment and analysis range; automatically use the Project's default public DSN. The 综合电商旅程 preset covers every event type in one run (returning visitors, optional business user IDs and signed-in share, sources, daily rhythm, funnel drop-off, an incident); the SDK carries a user ID only, so never offer a user name field. Report Ingest acceptance separately from queryable sample verification. Keep both UI and API development-only. See `docs/dev-data.md` for the code map and troubleshooting.
 
 Run the local server yourself and open the preview in the browser available to this environment. Do not give the user server-start instructions when you can run it.
 
@@ -51,6 +51,43 @@ When implementing from a selected generated mock, treat that image as the source
   Shared search field discovery matches technical keys and common aliases, so
   short input such as `u` can suggest a supported `user.id` field; never suggest
   a field that the current page query API cannot execute.
+- The Issues page opens with one compact overview strip (a short column chart with an
+  事件/会话/用户 switch beside a ranked 错误分布 with a 类型/页面/国家 switch) so the list
+  starts on the first screen; do not bring back tall stacked charts. Each row leads with
+  the title (「新」 when first seen inside the range) and a quiet `类型 · 函数 · 文件` line
+  from the backend `culprit`; the status label shows only when it is not unresolved. A
+  per-row sparkline uses the backend `trend` (`RowDetails`, shared ~30-bucket policy).
+  Triage lives on the list itself: 「新问题」/「未分配」/「分配给我」 quick-filter toggles
+  (URL `new=1`, `assignee=none|me`), a status filter that includes 「已回归」, and row
+  checkboxes (hidden for Viewers) whose selection bar replaces the list heading and applies
+  one status or assignee change through `POST /issues/batch`; selection never survives a
+  filter, sort or page change. 「已回归」 is derived by the server (resolved, then failed
+  again after `resolvedAt`); the UI can show and filter it but never writes it.
+  Never show the Fingerprint hash in rows. Events, users and last seen sort from the
+  column headers; there is no 首次发生 column. Times are relative with the absolute time
+  on hover. `firstSeenAt` is the earliest sighting up to 30 days before the range (the
+  new-issues horizon), narrowed only by Environment.
+- The Issue detail page follows Sentry's Issue Details (user request and reference
+  screenshot, 2026-10-02). Header: error type plus culprit (innermost application
+  frame, short path), message, status/新问题/last seen. A workflow row holds
+  标记解决/忽略 (or 重新打开), assignee and a 更多 menu (copy link, copy Fingerprint).
+  The main column shows removable 只看 tag tokens, then one compact trends strip:
+  event/user totals that switch the series, a short column chart on the shared
+  time buckets, and a tag preview (top browser values with shares that filter on
+  click, plus 全部标签 opening every tag in a Sheet). Below it, one 本问题的事件 card:
+  a header with newer/older, 最新 and the 全部事件 Sheet; an event row with the
+  12-character event ID (click to copy), relative time and 跳转到 links; a client
+  row of icon chips (visitor, browser, system, device, country, release, page);
+  then sections separated by dividers, each folding from a right-hand chevron:
+  堆栈追踪, 行为时间线 (without web vitals; the Session page keeps them), 相关请求,
+  标签与上下文 (folded). Frames read
+  「file 中的 function 位于 line:col」 with the chevron on the right, expand inline to
+  numbered source with the error line marked, open the innermost restored
+  application frame, sort 最近调用在前/最早调用在前, keep 原始文本, and offer
+  应用代码/完整堆栈 only when the stack mixes application and dependency frames.
+  The right sidebar shows first/last seen, sessions, assignee and the Fingerprint.
+  Never add activity, comments, similar issues or replay without real data behind
+  them. Issue filter edits keep the shared `timePreset`.
 - Category Bar breakdowns use the `CategoryRanking` list: labels/metadata icons,
   exact values and shares are always visible above thin horizontal bars; no
   numeric axes or hover-only values. Rank by value and scale bars to the largest
@@ -85,7 +122,7 @@ When implementing from a selected generated mock, treat that image as the source
   address is `/projects/:projectId/overview/default`. Editing it is allowed, but saving
   creates a new personal dashboard (「我的仪表盘」, numbered if taken) and opens it; the
   default itself never changes for anyone. The default must show every module kind at
-  least once (all three stat styles; line with previous period, area, bar, stacked-bar
+  least once (both stat styles; line with previous period, area, bar, stacked-bar
   and stacked-area trends; breakdown bar, table and donut; ranked table, metric table
   and the Top Issues list), with half-width modules in pairs; `builtIn.test.ts`
   enforces this.
@@ -96,6 +133,18 @@ When implementing from a selected generated mock, treat that image as the source
   `/projects/:projectId/overview/:dashboardId`; the bare overview address opens the
   last-used one on this device (else the first personal one, else the default) and
   never redirects. Duplicate on the server so unknown modules survive.
+- Dashboards are fluid up to 1920px and then centred; from 1680px grid gaps and chart
+  heights grow. Sizes are compact (stat only), third, half and full (3/4/6/12 of 12
+  columns). Tabbed cards (user request, 2026-10-02) combine two or three adjacent
+  chart/table modules sharing a `groupId`: a sliding switch at the card's top-right,
+  only the visible tab queried, one shared size, merge via the card menu's 合并到…,
+  split with 移出为独立卡片. Stat cards never join; Go validates the same rules.
+- The e-commerce overview (收入、订单数、客单价、购买漏斗、来源、渠道收入) is a dashboard
+  template in `ecommerce.ts`, offered under 新建仪表盘 → 从哪里开始, not part of the
+  built-in default (user request, 2026-10-08): the default is shown to every Project,
+  and most would see empty revenue cards. Do not add it to the default unless the
+  Project has purchase events. It reads the `purchase`, `view_item`, `add_to_cart` and
+  `begin_checkout` Custom Events and the purchase `amount` measurement.
 - The module library is organized by data domain: 推荐 / 流量与会话 / 性能 / API /
   错误 / 业务指标 / 用户行为, with blank module types under 自定义. Each concrete module
   appears once, in one domain (`library.ts`); "推荐" filters flagged entries and search
@@ -134,15 +183,16 @@ When implementing from a selected generated mock, treat that image as the source
   comparisons beside it. Use positive/negative semantic colors based on the metric:
   rising PV/UV is positive, while rising errors, failures and vital timings is
   negative. Missing comparisons, rounded zero and insufficient samples stay neutral.
-  Stat configuration includes optional `statAppearance`: plain (legacy default),
-  line-right or bar-right. Retired line-bottom/area-bottom values normalize to
-  line-right when read; do not offer or render bottom variants. Keep range-wide aggregates unchanged;
-  mini charts reuse the existing Overview/Events time buckets, preserve null gaps
-  and show an empty message rather than synthetic data. Use smooth monotone
-  curves for mini Line charts without changing samples or connecting gaps. Right-side
-  Bars keep the same buckets, with narrow rounded columns and visible gaps. Mini charts
-  remain display-only inside cards: no tooltip, active dot, pointer or keyboard
-  interaction. Both trend appearances sit to the right of the number/comparison.
+  Stat configuration includes optional `statAppearance`: plain (legacy default) or
+  area-right (user request, 2026-10-02: the mini line became an Area and the bar
+  option was removed). Retired line-right, bar-right, line-bottom and area-bottom
+  values normalize to area-right when read; do not offer or render line, bar or
+  bottom variants. Keep range-wide aggregates unchanged; mini charts reuse the
+  existing Overview/Events time buckets, preserve null gaps and show an empty
+  message rather than synthetic data. The mini Area uses a smooth monotone curve
+  over a fill fading to the baseline, without changing samples or connecting gaps.
+  Mini charts remain display-only inside cards: no tooltip, active dot, pointer or
+  keyboard interaction. The trend sits to the right of the number/comparison.
   Keep full-chart interaction and accessible tables inside enlarge/details.
   Appearance changes must
   not create extra data queries. Respect reduced motion and both themes. Update
@@ -171,7 +221,9 @@ When implementing from a selected generated mock, treat that image as the source
 - Authentication pages use a simple, centered single column: shared brand mark,
   concise copy, and a narrow form on a plain theme-aware background. Avoid split
   screens, promotional side panels, and decorative glows. Login actions use
-  black/white contrast tokens and retain the compact theme toggle.
+  black/white contrast tokens and retain the compact theme toggle. A notice that
+  explains why the person is on the page (an expired session) uses the warning Alert with
+  an icon and a single line; the default Alert is nearly invisible on the plain background.
 - The accepted layout target is `../../output/imagegen/openrum-dashboard-stripe.png`.
 - Use the shadcn theme on the shared four-color card: neutral white/graphite surfaces,
   amber primary by default (lime and magenta are user-selectable palettes), lime, sky
@@ -210,6 +262,12 @@ When implementing from a selected generated mock, treat that image as the source
   Round only the outer contour of stacked columns with Recharts `BarStack`;
   compact Stat bars use 4px top corners and horizontal bars use 6px trailing
   corners. Keep chart data, buckets, axes, legends and tooltips intact.
+- Segmented controls slide (user request, 2026-10-02): a horizontal single-select
+  `ToggleGroup` with `variant="outline"` (or `segmented`) and default-variant `Tabs`
+  render one pill track whose selection is the shared `SlidingIndicator`, moving
+  between options; reduced motion disables the slide. Do not hand-roll segmented
+  buttons. `selection` chips, multi-select legends and line tabs keep their own
+  styles. The public landing tour tabs use the same sliding pill.
 - Shared Select menus open below the trigger with their left edges aligned.
   Preserve a usable scrollable list for long option sets and let collision
   handling reposition a menu at the viewport edge.
@@ -341,7 +399,9 @@ When implementing from a selected generated mock, treat that image as the source
   percentages or plot score contributions: timing metrics share a millisecond
   left axis and CLS uses a clearly labeled unitless right axis; cross-axis height
   is not comparable. Put P50/P75/P95 in one compact dropdown at the chart's top
-  right. Keep small, muted metric visibility toggles inside the card content
+  right. The combined trend follows the shared ~30-bucket policy with null gaps,
+  shows LCP, INP and CLS by default (FCP/TTFB opt-in), and draws timing series solid
+  with only the right-axis CLS dashed. Keep small, muted metric visibility toggles inside the card content
   below the plot, without a separate gray footer, divider or outlined pills.
   Preserve visible off and keyboard-focus states. Remove the page-wide metric toolbar; put
   route sorting in the route table and detail controls in the detail. Keep the OpenRUM 0–100 score,
@@ -354,11 +414,9 @@ When implementing from a selected generated mock, treat that image as the source
   as reference. It is separate
   from CWV status and unaffected by chart visibility or P50/P75/P95
   selection. Compute overall values from matching samples, never route averages.
-  Use the reusable, collapsible right-side `AnalysisFilterSidebar` for country,
-  device, route, browser, and release where the API supports them. Pages own the
-  dimensions; apply drafts together, keep applied filters in URLs, retain them
-  when collapsed, and use a Sheet on narrow screens. Time/environment remain
-  in the shared app context. Performance and Issues are the first consumers.
+  The right-side `AnalysisFilterSidebar` dimension filter was retired and removed
+  (user decision, 2026-10-02); do not reintroduce it. Performance narrows only by
+  the shared time/environment and the route drill-down from the route table.
 - Treat each project card as an operational health summary. Lead with the last
   24 hours of PV, UV, error events, a real PV trend, and reporting freshness;
   keep sampling, retention, role, and other configuration details secondary.

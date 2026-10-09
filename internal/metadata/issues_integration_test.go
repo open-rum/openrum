@@ -114,3 +114,53 @@ func seedIssueProject(t *testing.T, database *sql.DB) (uuid.UUID, uuid.UUID) {
 	})
 	return ownerID, projectID
 }
+
+func TestBatchMutateIssueStatesKeepsUntouchedFieldsAndRestartsRegressionClock(t *testing.T) {
+	database := integrationDatabase(t)
+	ctx := context.Background()
+	ownerID, projectID := seedIssueProject(t, database)
+	repository := NewIssueRepository(database)
+	refs := []IssueRef{{Fingerprint: "v1:a", FingerprintVersion: 1}, {Fingerprint: "v1:b", FingerprintVersion: 1}}
+
+	assign := IssueStatePatch{SetAssignee: true, AssigneeUserID: &ownerID}
+	if updated, err := repository.BatchMutateIssueStates(ctx, ownerID, projectID, refs, assign); err != nil || updated != 2 {
+		t.Fatalf("assign updated=%d err=%v", updated, err)
+	}
+	resolved := IssueStatusResolved
+	if _, err := repository.BatchMutateIssueStates(ctx, ownerID, projectID, refs[:1], IssueStatePatch{Status: &resolved}); err != nil {
+		t.Fatal(err)
+	}
+	first, err := repository.GetIssueState(ctx, projectID, "v1:a")
+	if err != nil || first.Status != IssueStatusResolved || first.ResolvedAt == nil || first.AssigneeUserID == nil || *first.AssigneeUserID != ownerID {
+		t.Fatalf("resolving keeps the assignee and stamps the time: %+v err=%v", first, err)
+	}
+	second, err := repository.GetIssueState(ctx, projectID, "v1:b")
+	if err != nil || second.Status != IssueStatusUnresolved || second.ResolvedAt != nil {
+		t.Fatalf("an Issue outside the batch keeps its state: %+v err=%v", second, err)
+	}
+	// Clearing the assignee is different from leaving it.
+	if _, err := repository.BatchMutateIssueStates(ctx, ownerID, projectID, refs, IssueStatePatch{SetAssignee: true}); err != nil {
+		t.Fatal(err)
+	}
+	cleared, err := repository.GetIssueState(ctx, projectID, "v1:a")
+	if err != nil || cleared.AssigneeUserID != nil || cleared.Status != IssueStatusResolved {
+		t.Fatalf("cleared assignee, status kept: %+v err=%v", cleared, err)
+	}
+	reopened := IssueStatusUnresolved
+	if _, err := repository.BatchMutateIssueStates(ctx, ownerID, projectID, refs, IssueStatePatch{Status: &reopened}); err != nil {
+		t.Fatal(err)
+	}
+	reopenedState, err := repository.GetIssueState(ctx, projectID, "v1:a")
+	if err != nil || reopenedState.Status != IssueStatusUnresolved || reopenedState.ResolvedAt != nil {
+		t.Fatalf("reopening forgets the resolution time: %+v err=%v", reopenedState, err)
+	}
+	stranger := uuid.New()
+	if _, err := repository.BatchMutateIssueStates(ctx, ownerID, projectID, refs, IssueStatePatch{SetAssignee: true, AssigneeUserID: &stranger}); err != ErrNotFound {
+		t.Fatalf("assigning outside the organization must fail, got %v", err)
+	}
+	var audits int
+	if err := database.QueryRowContext(ctx,
+		"SELECT count(*) FROM audit_logs WHERE actor_user_id=$1 AND action='issue.states_updated'", ownerID).Scan(&audits); err != nil || audits != 4 {
+		t.Fatalf("one audit entry per applied batch: audits=%d err=%v", audits, err)
+	}
+}
