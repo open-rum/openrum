@@ -371,22 +371,6 @@ func performanceRawWhere(filters PerformanceFilters) (string, []any) {
 	return where, arguments
 }
 
-func metricColumns(metric string) (string, string) {
-	switch metric {
-	case "INP":
-		return "inp_p75", "inp_samples"
-	case "CLS":
-		return "cls_p75", "cls_samples"
-	default:
-		return "lcp_p75", "lcp_samples"
-	}
-}
-
-func metricQuantileColumn(metric string) string {
-	column, _ := metricColumns(metric)
-	return "quantileTDigestMerge(0.75)(" + column + ")"
-}
-
 func metricBucketWidth(metric string) float64 {
 	if metric == "CLS" {
 		return 0.05
@@ -428,13 +412,6 @@ func finalizeMetric(value float64, samples uint64) PerformanceMetric {
 		metric.P75 = &value
 	}
 	return metric
-}
-
-func finalizeNullableMetric(value sql.NullFloat64, samples uint64) PerformanceMetric {
-	if !value.Valid {
-		return PerformanceMetric{Samples: samples, Sufficient: samples >= minimumPerformanceSamples}
-	}
-	return finalizeMetric(value.Float64, samples)
 }
 
 func containsControl(value string) bool {
@@ -548,13 +525,13 @@ func (repository *PerformanceRepository) filterOptions(ctx context.Context, filt
 		for rows.Next() {
 			var option PerformanceFilterOption
 			if err := rows.Scan(&option.Value, &option.Samples); err != nil {
-				rows.Close()
+				_ = rows.Close()
 				return nil, err
 			}
 			options = append(options, option)
 		}
 		err = rows.Err()
-		rows.Close()
+		_ = rows.Close()
 		if err != nil {
 			return nil, err
 		}

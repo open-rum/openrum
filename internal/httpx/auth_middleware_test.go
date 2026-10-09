@@ -74,7 +74,7 @@ func TestRequireSessionLimitsPendingAccountsToStatusAndLogout(t *testing.T) {
 		{"/api/v1/organizations", http.StatusForbidden},
 		{"/api/v1/admin/authentication", http.StatusForbidden},
 	} {
-		request := httptest.NewRequest(http.MethodGet, scenario.path, nil)
+		request := httptest.NewRequestWithContext(context.Background(), http.MethodGet, scenario.path, nil)
 		request.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "token"})
 		response := httptest.NewRecorder()
 		handler.ServeHTTP(response, request)

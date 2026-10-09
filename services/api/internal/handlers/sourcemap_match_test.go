@@ -30,7 +30,7 @@ func TestSourceMapMatchTesterAuthorizesAndBoundsInput(t *testing.T) {
 	router := httpx.NewRouter(zerolog.Nop())
 	authenticated := httpx.RequireSession(connectionFixtureAuthenticator{principal: auth.Principal{UserID: userID}})
 	router.Handle("POST /api/v1/projects/{projectId}/sourcemaps/test", authenticated(http.HandlerFunc(handler.Test)))
-	request := httptest.NewRequest(http.MethodPost, "/api/v1/projects/"+projectID.String()+"/sourcemaps/test", strings.NewReader(`{"release":"web@1","stack":"at run (https://cdn.example/app.js:1:0)"}`))
+	request := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/api/v1/projects/"+projectID.String()+"/sourcemaps/test", strings.NewReader(`{"release":"web@1","stack":"at run (https://cdn.example/app.js:1:0)"}`))
 	request.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "valid"})
 	response := httptest.NewRecorder()
 	router.ServeHTTP(response, request)
@@ -39,7 +39,7 @@ func TestSourceMapMatchTesterAuthorizesAndBoundsInput(t *testing.T) {
 	}
 
 	tooLarge := `{"release":"web@1","stack":"` + strings.Repeat("x", sourcemap.MaxStackBytes+1) + `"}`
-	request = httptest.NewRequest(http.MethodPost, "/api/v1/projects/"+projectID.String()+"/sourcemaps/test", strings.NewReader(tooLarge))
+	request = httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/api/v1/projects/"+projectID.String()+"/sourcemaps/test", strings.NewReader(tooLarge))
 	request.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "valid"})
 	response = httptest.NewRecorder()
 	router.ServeHTTP(response, request)
@@ -63,7 +63,7 @@ func TestSourceMapMatchTesterReportsStorageInsteadOfFrameFailures(t *testing.T) 
 	authenticated := httpx.RequireSession(connectionFixtureAuthenticator{principal: auth.Principal{UserID: userID}})
 	router.Handle("POST /api/v1/projects/{projectId}/sourcemaps/test", authenticated(http.HandlerFunc(handler.Test)))
 	perform := func() *httptest.ResponseRecorder {
-		request := httptest.NewRequest(http.MethodPost, "/api/v1/projects/"+projectID.String()+"/sourcemaps/test", strings.NewReader(`{"release":"web@1","stack":"at run (https://cdn.example/app.js:1:0)"}`))
+		request := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/api/v1/projects/"+projectID.String()+"/sourcemaps/test", strings.NewReader(`{"release":"web@1","stack":"at run (https://cdn.example/app.js:1:0)"}`))
 		request.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "valid"})
 		response := httptest.NewRecorder()
 		router.ServeHTTP(response, request)

@@ -37,7 +37,6 @@ func main() {
 
 var (
 	version   = "development"
-	commit    = "unknown"
 	startedAt = time.Now().UTC()
 )
 

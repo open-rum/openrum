@@ -74,7 +74,7 @@ func TestOIDCExchangeVerifiesSignedTokenNonceAndEmail(t *testing.T) {
 		case "/jwks":
 			_ = json.NewEncoder(writer).Encode(map[string]any{"keys": []any{map[string]string{
 				"kty": "RSA", "kid": "test-key", "alg": "RS256", "use": "sig",
-				"n": base64.RawURLEncoding.EncodeToString(privateKey.PublicKey.N.Bytes()),
+				"n": base64.RawURLEncoding.EncodeToString(privateKey.N.Bytes()),
 				"e": "AQAB",
 			}}})
 		case "/token":
@@ -166,7 +166,7 @@ func TestLDAPSAuthenticatesAgainstVerifiedDirectoryAndRejectsBadCertificate(t *t
 	certificate := certificateSource.TLS.Certificates[0]
 	caPEM := string(pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: certificate.Certificate[0]}))
 	certificateSource.Close()
-	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	listener, err := (&net.ListenConfig{}).Listen(context.Background(), "tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -202,7 +202,7 @@ func TestLDAPSAuthenticatesAgainstVerifiedDirectoryAndRejectsBadCertificate(t *t
 	if _, err := AuthenticateLDAP(provider, "alice", "user-password"); err == nil {
 		t.Fatal("untrusted LDAP certificate was accepted")
 	}
-	plainListener, err := net.Listen("tcp", "127.0.0.1:0")
+	plainListener, err := (&net.ListenConfig{}).Listen(context.Background(), "tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -243,7 +243,7 @@ func serveMockLDAP(connection net.Conn, certificate *tls.Certificate) {
 			}
 			writeMockLDAPResponse(connection, id, ldapResult(ldap.ApplicationExtendedResponse, ldap.LDAPResultSuccess))
 			upgraded := tls.Server(connection, &tls.Config{Certificates: []tls.Certificate{*certificate}, MinVersion: tls.VersionTLS12})
-			if err := upgraded.Handshake(); err != nil {
+			if err := upgraded.HandshakeContext(context.Background()); err != nil {
 				return
 			}
 			connection = upgraded
@@ -252,7 +252,7 @@ func serveMockLDAP(connection net.Conn, certificate *tls.Certificate) {
 				return
 			}
 			dn, _ := operation.Children[1].Value.(string)
-			password := string(operation.Children[2].Data.Bytes())
+			password := operation.Children[2].Data.String()
 			code := uint64(ldap.LDAPResultInvalidCredentials)
 			if dn == "cn=reader,dc=example,dc=test" && password == "reader-password" ||
 				dn == "uid=alice,dc=example,dc=test" && password == "user-password" {

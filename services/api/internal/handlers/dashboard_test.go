@@ -75,7 +75,7 @@ func dashboardTestRouter(handler *DashboardHandler, userID uuid.UUID) http.Handl
 }
 
 func dashboardRequest(method, path, body string) *http.Request {
-	request := httptest.NewRequest(method, path, strings.NewReader(body))
+	request := httptest.NewRequestWithContext(context.Background(), method, path, strings.NewReader(body))
 	request.Header.Set("Content-Type", "application/json")
 	request.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "valid"})
 	return request

@@ -122,6 +122,7 @@ func (handler *MetricsHandler) Query(writer http.ResponseWriter, request *http.R
 	}
 	// Identical modules on one page, and identical pages in several tabs, share a single
 	// ClickHouse query. The shared call must outlive any one caller's cancellation.
+	//nolint:contextcheck // The shared call deliberately detaches from the caller (see above).
 	shared, err, _ := handler.flight.Do(key, func() (any, error) {
 		queryCtx, cancel := context.WithTimeout(context.WithoutCancel(request.Context()), query.OverviewQueryTimeout())
 		defer cancel()

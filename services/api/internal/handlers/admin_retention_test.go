@@ -168,7 +168,7 @@ func adminRetentionTestRouter(
 }
 
 func performRetentionRequest(router http.Handler, method, path, body string, csrf bool) *httptest.ResponseRecorder {
-	request := httptest.NewRequest(method, path, strings.NewReader(body))
+	request := httptest.NewRequestWithContext(context.Background(), method, path, strings.NewReader(body))
 	request.Host = "openrum.test"
 	request.Header.Set("Content-Type", "application/json")
 	request.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "session"})

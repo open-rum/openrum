@@ -3,6 +3,7 @@ package security_test
 import (
 	"bytes"
 	"compress/gzip"
+	"context"
 	"errors"
 	"net/http/httptest"
 	"strings"
@@ -35,7 +36,7 @@ func TestIngestRejectsDecompressionBomb(t *testing.T) {
 	if err := writer.Close(); err != nil {
 		t.Fatal(err)
 	}
-	request := httptest.NewRequest("POST", "/ingest/v1/envelope", bytes.NewReader(compressed.Bytes()))
+	request := httptest.NewRequestWithContext(context.Background(), "POST", "/ingest/v1/envelope", bytes.NewReader(compressed.Bytes()))
 	request.Header.Set("Content-Type", "application/json")
 	request.Header.Set("Content-Encoding", "gzip")
 	if _, err := ingest.ReadEnvelopeBody(request); !errors.Is(err, ingest.ErrPayloadTooLarge) {

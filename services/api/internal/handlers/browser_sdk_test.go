@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -12,7 +13,7 @@ func TestBrowserSDKHandlerServesVersionedImmutableJavaScript(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	request := httptest.NewRequest(http.MethodGet, BrowserSDKPublicPath, nil)
+	request := httptest.NewRequestWithContext(context.Background(), http.MethodGet, BrowserSDKPublicPath, nil)
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, request)
 
@@ -34,9 +35,9 @@ func TestBrowserSDKHandlerHonorsETag(t *testing.T) {
 		t.Fatal(err)
 	}
 	first := httptest.NewRecorder()
-	handler.ServeHTTP(first, httptest.NewRequest(http.MethodGet, BrowserSDKPublicPath, nil))
+	handler.ServeHTTP(first, httptest.NewRequestWithContext(context.Background(), http.MethodGet, BrowserSDKPublicPath, nil))
 
-	request := httptest.NewRequest(http.MethodGet, BrowserSDKPublicPath, nil)
+	request := httptest.NewRequestWithContext(context.Background(), http.MethodGet, BrowserSDKPublicPath, nil)
 	request.Header.Set("If-None-Match", first.Header().Get("ETag"))
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, request)

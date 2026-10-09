@@ -24,8 +24,8 @@ func (occupant Occupant) String() string {
 // Listening reports whether anything accepts connections on a host port. This
 // is the weakest evidence the stack uses and the only kind available for a
 // service with no readiness endpoint, such as the dev server.
-func Listening(port int) bool {
-	connection, err := net.DialTimeout("tcp", fmt.Sprintf("127.0.0.1:%d", port), 300*time.Millisecond)
+func Listening(ctx context.Context, port int) bool {
+	connection, err := (&net.Dialer{Timeout: 300 * time.Millisecond}).DialContext(ctx, "tcp", fmt.Sprintf("127.0.0.1:%d", port))
 	if err != nil {
 		return false
 	}
@@ -58,8 +58,8 @@ func Ready(ctx context.Context, port int, path string) bool {
 // The answer is empty and the error nil when nothing holds the port. An error
 // means the question could not be asked, which callers treat as unknown rather
 // than as free.
-func Occupants(port int) ([]Occupant, error) {
-	command := exec.Command("lsof", "-nP", fmt.Sprintf("-iTCP:%d", port), "-sTCP:LISTEN", "-F", "pc")
+func Occupants(ctx context.Context, port int) ([]Occupant, error) {
+	command := exec.CommandContext(ctx, "lsof", "-nP", fmt.Sprintf("-iTCP:%d", port), "-sTCP:LISTEN", "-F", "pc")
 	output, err := command.Output()
 	if err != nil {
 		// lsof exits non-zero when nothing matches, which is an answer rather

@@ -136,10 +136,10 @@ func (storage *OSSStorage) Probe(ctx context.Context) (result StorageProbeResult
 		Bucket: oss.Ptr(storage.bucket), Key: oss.Ptr(key), Body: bytes.NewReader(body),
 		ContentLength: oss.Ptr(int64(len(body))), ContentType: &contentType, ForbidOverwrite: oss.Ptr("true"),
 	})
-	result.Steps = append(result.Steps, probeStep("write", writeErr, stepStarted))
+	result.Steps = append(result.Steps, probeStep(ctx, "write", writeErr, stepStarted))
 	if writeErr != nil {
 		result.ErrorCode = classifyStorageProbeError(ctx, writeErr)
-		result.Steps = append(result.Steps, storage.cleanupProbeObject(key))
+		result.Steps = append(result.Steps, storage.cleanupProbeObject(ctx, key))
 		return result
 	}
 
@@ -153,8 +153,8 @@ func (storage *OSSStorage) Probe(ctx context.Context) (result StorageProbeResult
 			readErr = ErrObjectMismatch
 		}
 	}
-	result.Steps = append(result.Steps, probeStep("read", readErr, stepStarted))
-	cleanup := storage.cleanupProbeObject(key)
+	result.Steps = append(result.Steps, probeStep(ctx, "read", readErr, stepStarted))
+	cleanup := storage.cleanupProbeObject(ctx, key)
 	result.Steps = append(result.Steps, cleanup)
 	if readErr != nil {
 		result.ErrorCode = classifyStorageProbeError(ctx, readErr)
@@ -164,19 +164,20 @@ func (storage *OSSStorage) Probe(ctx context.Context) (result StorageProbeResult
 	return result
 }
 
-func (storage *OSSStorage) cleanupProbeObject(key string) StorageProbeStep {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+func (storage *OSSStorage) cleanupProbeObject(parent context.Context, key string) StorageProbeStep {
+	// The delete must still run when the probe itself was cancelled or timed out.
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(parent), 5*time.Second)
 	defer cancel()
 	started := time.Now()
 	_, err := storage.probeClient.DeleteObject(ctx, &oss.DeleteObjectRequest{Bucket: oss.Ptr(storage.bucket), Key: oss.Ptr(key)})
-	return probeStep("delete", err, started)
+	return probeStep(ctx, "delete", err, started)
 }
 
-func probeStep(name string, err error, started time.Time) StorageProbeStep {
+func probeStep(ctx context.Context, name string, err error, started time.Time) StorageProbeStep {
 	step := StorageProbeStep{Name: name, Status: "passed", LatencyMS: time.Since(started).Milliseconds()}
 	if err != nil {
 		step.Status = "failed"
-		step.ErrorCode = classifyStorageProbeError(context.Background(), err)
+		step.ErrorCode = classifyStorageProbeError(ctx, err)
 	}
 	return step
 }

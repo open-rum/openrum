@@ -93,7 +93,7 @@ func (pattern ScrubPattern) validate() error {
 	}
 	compiled, err := regexp.Compile(pattern.Expression)
 	if err != nil {
-		return fmt.Errorf("%w: pattern %q does not compile: %s", ErrInvalidScrubRules, pattern.ID, err)
+		return fmt.Errorf("%w: pattern %q does not compile: %w", ErrInvalidScrubRules, pattern.ID, err)
 	}
 	// An expression that matches the empty string would replace between every
 	// character of every value, turning any string into a wall of markers. It
@@ -120,7 +120,7 @@ func (rules ScrubRules) Compile() (*CompiledScrubRules, error) {
 	for _, pattern := range rules.Patterns {
 		expression, err := regexp.Compile(pattern.Expression)
 		if err != nil {
-			return nil, fmt.Errorf("%w: pattern %q does not compile: %s",
+			return nil, fmt.Errorf("%w: pattern %q does not compile: %w",
 				ErrInvalidScrubRules, pattern.ID, err)
 		}
 		compiled.patterns = append(compiled.patterns, expression)

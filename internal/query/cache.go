@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strconv"
 	"time"
@@ -37,7 +38,7 @@ func (cache *OverviewCache) Get(ctx context.Context, filters OverviewFilters, ve
 		return Overview{}, false, err
 	}
 	payload, err := cache.client.Get(ctx, key).Bytes()
-	if err == redis.Nil {
+	if errors.Is(err, redis.Nil) {
 		return Overview{}, false, nil
 	}
 	if err != nil {

@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -21,7 +22,7 @@ func TestStoragePressureHandlerExposesGlobalCircuitBreakerState(t *testing.T) {
 		ObservedAt: time.Date(2026, 9, 15, 10, 0, 0, 0, time.UTC),
 	}})
 	response := httptest.NewRecorder()
-	handler.Get(response, httptest.NewRequest(http.MethodGet, "/api/v1/storage-pressure", nil))
+	handler.Get(response, httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/api/v1/storage-pressure", nil))
 
 	var payload storagePressureResponse
 	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {

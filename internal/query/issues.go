@@ -185,9 +185,10 @@ GROUP BY fingerprint`
 	}
 	candidateLimit := min(max(filters.Limit*4, filters.Limit+1), 1000)
 	order := "event_count DESC, last_seen_at DESC, fingerprint ASC"
-	if filters.Sort == "users" {
+	switch filters.Sort {
+	case "users":
 		order = "user_count DESC, last_seen_at DESC, fingerprint ASC"
-	} else if filters.Sort == "last_seen" {
+	case "last_seen":
 		order = "last_seen_at DESC, fingerprint ASC"
 	}
 	query += ` ORDER BY ` + order + ` LIMIT ?`

@@ -2,8 +2,6 @@ package handlers
 
 import (
 	"context"
-	"github.com/google/uuid"
-	"github.com/rs/zerolog"
 	"net/http"
 	"net/http/httptest"
 	"openrum/internal/auth"
@@ -11,6 +9,9 @@ import (
 	"openrum/internal/metadata"
 	"openrum/internal/query"
 	"testing"
+
+	"github.com/google/uuid"
+	"github.com/rs/zerolog"
 )
 
 type fakeLogQueries struct {
@@ -49,7 +50,7 @@ func TestLogsEnforceMembershipAndValidateBeforeQuery(t *testing.T) {
 			}
 			router.Handle("GET /api/v1/projects/{projectId}/logs", route)
 			projectID := uuid.New()
-			request := httptest.NewRequest("GET", "/api/v1/projects/"+projectID.String()+"/logs?"+tc.query, nil)
+			request := httptest.NewRequestWithContext(context.Background(), "GET", "/api/v1/projects/"+projectID.String()+"/logs?"+tc.query, nil)
 			request.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "valid"})
 			response := httptest.NewRecorder()
 			router.ServeHTTP(response, request)

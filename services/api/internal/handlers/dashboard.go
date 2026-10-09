@@ -6,10 +6,11 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/google/uuid"
-	"github.com/rs/zerolog"
 	"openrum/internal/httpx"
 	"openrum/internal/metadata"
+
+	"github.com/google/uuid"
+	"github.com/rs/zerolog"
 )
 
 type dashboardRepository interface {

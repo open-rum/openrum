@@ -302,11 +302,12 @@ func validateDashboardWidget(w dashboardWidget) error {
 	if !dashboardText(d.Release, 128) || !dashboardText(d.Route, 512) || !dashboardText(d.EventName, 80) {
 		return fmt.Errorf("data filters exceed their bounds")
 	}
-	if d.Source == "overview" {
+	switch d.Source {
+	case "overview":
 		if d.EventKind != "" || d.EventName != "" || d.Dimension != "" {
 			return fmt.Errorf("overview does not support event filters")
 		}
-	} else if d.Source == "events" {
+	case "events":
 		if d.Release != "" || d.Route != "" {
 			return fmt.Errorf("events do not support release or route filters")
 		}
@@ -316,7 +317,7 @@ func validateDashboardWidget(w dashboardWidget) error {
 		if !slices.Contains([]string{"country", "device", "browser", "source"}, d.Dimension) && !dashboardProperty.MatchString(d.Dimension) {
 			return fmt.Errorf("invalid event dimension")
 		}
-	} else {
+	default:
 		return fmt.Errorf("unsupported data source")
 	}
 	if w.Type == "top-issues" {
@@ -326,7 +327,9 @@ func validateDashboardWidget(w dashboardWidget) error {
 		return fmt.Errorf("invalid metric selection")
 	}
 	if len(d.Metrics) == 2 {
-		if d.Source != "overview" || !((d.Metrics[0] == "pageViews" && d.Metrics[1] == "uniqueUsers") || (d.Metrics[0] == "errorRate" && d.Metrics[1] == "apiFailureRate")) {
+		trafficPair := d.Metrics[0] == "pageViews" && d.Metrics[1] == "uniqueUsers"
+		stabilityPair := d.Metrics[0] == "errorRate" && d.Metrics[1] == "apiFailureRate"
+		if d.Source != "overview" || (!trafficPair && !stabilityPair) {
 			return fmt.Errorf("only traffic and stability metric pairs can share a chart")
 		}
 	}
