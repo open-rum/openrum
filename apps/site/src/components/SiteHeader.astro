@@ -7,9 +7,7 @@ const { lang = "en", path = "/" } = Astro.props;
 const zh = lang === "zh";
 const prefix = zh ? "/zh" : "";
 const equivalent = equivalentPath(path, zh ? "zh" : "en");
-const links = zh
-  ? [["文档", `${docsBase("zh")}/`]]
-  : [["Docs", `${docsBase("en")}/`]];
+const links = zh ? [["文档", `${docsBase("zh")}/`]] : [["Docs", `${docsBase("en")}/`]];
 ---
 
 <header class="site-header">
