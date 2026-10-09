@@ -347,7 +347,7 @@ for (const [width, theme, prefix] of [
     await block.getByRole("button").click();
     const copied = await page.evaluate(() => navigator.clipboard.readText());
     expect(copied).toBe(
-      "git clone https://github.com/openrum/openrum.git\ncd openrum\ncorepack enable\npnpm install --frozen-lockfile",
+      "git clone https://github.com/open-rum/openrum.git\ncd openrum\ncorepack enable\npnpm install --frozen-lockfile",
     );
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth - innerWidth),

@@ -56,7 +56,7 @@ jobs:
 
   publish:
     # A manual run only validates; publishing needs a pushed tag in the official repository.
-    if: github.event_name == 'push' && github.repository == 'openrum/openrum'
+    if: github.event_name == 'push' && github.repository == 'open-rum/openrum'
     needs: verify
     runs-on: ubuntu-latest
     timeout-minutes: 20

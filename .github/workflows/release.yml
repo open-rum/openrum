@@ -62,7 +62,7 @@ jobs:
       - name: Build docs from the tagged source
         env:
           PUBLIC_SITE_URL: https://openrum.dev
-          PUBLIC_REPOSITORY_URL: https://github.com/openrum/openrum
+          PUBLIC_REPOSITORY_URL: https://github.com/open-rum/openrum
           PUBLIC_OPENRUM_RELEASE: v${{ steps.version.outputs.version }}
           PUBLIC_COMMIT_SHA: ${{ github.sha }}
         run: |
@@ -78,7 +78,7 @@ jobs:
           retention-days: 30
 
   publish:
-    if: github.event_name == 'push' && github.repository == 'openrum/openrum'
+    if: github.event_name == 'push' && github.repository == 'open-rum/openrum'
     needs: prepare
     runs-on: ubuntu-latest
     timeout-minutes: 90
@@ -109,7 +109,7 @@ jobs:
           fi
       - name: Reject a previously published application image tag
         run: |
-          image="ghcr.io/openrum/openrum:${{ needs.prepare.outputs.version }}"
+          image="ghcr.io/open-rum/openrum:${{ needs.prepare.outputs.version }}"
           if docker manifest inspect "$image" >/dev/null 2>&1; then
             echo "$image already exists; publish a new version instead of overwriting it." >&2
             exit 1
@@ -122,7 +122,7 @@ jobs:
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           printf '%s' "$GHCR_TOKEN" | helm registry login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
-          if helm show chart oci://ghcr.io/openrum/charts/openrum --version "${{ needs.prepare.outputs.version }}" >/dev/null 2>&1; then
+          if helm show chart oci://ghcr.io/open-rum/charts/openrum --version "${{ needs.prepare.outputs.version }}" >/dev/null 2>&1; then
             echo "OCI Chart ${{ needs.prepare.outputs.version }} already exists; publish a new version instead of overwriting it." >&2
             exit 1
           fi
@@ -133,9 +133,9 @@ jobs:
           file: Dockerfile
           push: true
           platforms: linux/amd64,linux/arm64
-          tags: ghcr.io/openrum/openrum:${{ needs.prepare.outputs.version }}
-          cache-from: type=registry,ref=ghcr.io/openrum/openrum:buildcache
-          cache-to: type=registry,ref=ghcr.io/openrum/openrum:buildcache,mode=max,ignore-error=true
+          tags: ghcr.io/open-rum/openrum:${{ needs.prepare.outputs.version }}
+          cache-from: type=registry,ref=ghcr.io/open-rum/openrum:buildcache
+          cache-to: type=registry,ref=ghcr.io/open-rum/openrum:buildcache,mode=max,ignore-error=true
           build-args: |
             VERSION=${{ needs.prepare.outputs.version }}
             COMMIT=${{ github.sha }}
@@ -143,13 +143,13 @@ jobs:
           sbom: true
       - name: Verify the published application image
         run: |
-          docker pull "ghcr.io/openrum/openrum:${{ needs.prepare.outputs.version }}"
-          docker run --rm --entrypoint /bin/sh "ghcr.io/openrum/openrum:${{ needs.prepare.outputs.version }}" -ec \
+          docker pull "ghcr.io/open-rum/openrum:${{ needs.prepare.outputs.version }}"
+          docker run --rm --entrypoint /bin/sh "ghcr.io/open-rum/openrum:${{ needs.prepare.outputs.version }}" -ec \
             'test -x /app/api && test -x /app/ingest && test -x /app/consumer && test -x /app/worker && test -x /app/migrate && test -x /app/web'
       - name: Publish and verify OCI Helm chart
         run: |
-          helm push "release-artifacts/openrum-${{ needs.prepare.outputs.version }}.tgz" oci://ghcr.io/openrum/charts
-          helm show chart oci://ghcr.io/openrum/charts/openrum --version "${{ needs.prepare.outputs.version }}"
+          helm push "release-artifacts/openrum-${{ needs.prepare.outputs.version }}.tgz" oci://ghcr.io/open-rum/charts
+          helm show chart oci://ghcr.io/open-rum/charts/openrum --version "${{ needs.prepare.outputs.version }}"
       - name: Announce the verified release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

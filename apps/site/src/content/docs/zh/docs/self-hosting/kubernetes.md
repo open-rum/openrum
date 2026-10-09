@@ -14,7 +14,7 @@ appliesTo: Alpha
 
 **Kafka 主题必须自己建。** 生产者和消费者都设置了 `AllowAutoTopicCreation: false`，所以主题不存在是一个运行时故障，不会自动恢复。默认主题名是 `rum-events-v1`，并且 ingest 只在 `acks=all` 之后才报告持久化接收成功。
 
-**确保集群能够拉取镜像。** Helm 负责安装 Chart，容器镜像由 Kubernetes 按 Chart 中的地址拉取。Chart 默认使用 `ghcr.io/openrum/openrum`；只有首个正式版本发布且软件包公开后，这个默认地址才可使用。在此之前，请自行构建并发布镜像，在自己的 values 文件里覆盖 `image.repository`，不要修改 Chart 源文件。
+**确保集群能够拉取镜像。** Helm 负责安装 Chart，容器镜像由 Kubernetes 按 Chart 中的地址拉取。Chart 默认使用 `ghcr.io/open-rum/openrum`；只有首个正式版本发布且软件包公开后，这个默认地址才可使用。在此之前，请自行构建并发布镜像，在自己的 values 文件里覆盖 `image.repository`，不要修改 Chart 源文件。
 
 **先定好域名和 TLS 证书。** `config.appEnv: production` 会让所有服务在启动时拒绝非 HTTPS 的 `PUBLIC_BASE_URL`，而 `ingress.tls` 默认是空的——见[路由与 TLS](#路由与-tls)。
 
@@ -105,7 +105,7 @@ ingress:
 官方 `0.1.0` 版本发布后，可用 OCI Chart 和配套的默认镜像安装：
 
 ```sh
-helm upgrade --install openrum oci://ghcr.io/openrum/charts/openrum \
+helm upgrade --install openrum oci://ghcr.io/open-rum/charts/openrum \
   --version 0.1.0 \
   --namespace openrum --create-namespace \
   --values values.production.yaml \
