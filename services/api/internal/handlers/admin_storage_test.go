@@ -249,7 +249,7 @@ func adminStorageTestRouter(members adminOverviewRoles, prober sourcemap.Prober,
 }
 
 func performStorageRequest(router http.Handler, method, path string, csrf bool) *httptest.ResponseRecorder {
-	request := httptest.NewRequest(method, path, nil)
+	request := httptest.NewRequestWithContext(context.Background(), method, path, nil)
 	request.Host = "openrum.test"
 	request.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "session"})
 	if csrf {

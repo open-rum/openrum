@@ -140,7 +140,7 @@ func describeHost(ctx context.Context, service Service, supervisor Supervisor, p
 	pid, running := supervisor.Running(service)
 	if !running {
 		if hasPort {
-			if occupants, err := Occupants(port); err == nil && len(occupants) > 0 {
+			if occupants, err := Occupants(ctx, port); err == nil && len(occupants) > 0 {
 				return StateForeign, describeOccupants(occupants)
 			}
 		}
@@ -156,7 +156,7 @@ func describeHost(ctx context.Context, service Service, supervisor Supervisor, p
 		}
 		return StateStarting, detail
 	}
-	if hasPort && !Listening(port) {
+	if hasPort && !Listening(ctx, port) {
 		return StateStarting, detail
 	}
 	return StateRunning, detail
@@ -207,7 +207,7 @@ func Render(reports []Report, links bool) string {
 func writeRow(builder *strings.Builder, row []string, widths []int) {
 	for index, cell := range row {
 		if index < len(widths) {
-			builder.WriteString(fmt.Sprintf("%-*s  ", widths[index], cell))
+			fmt.Fprintf(builder, "%-*s  ", widths[index], cell)
 			continue
 		}
 		builder.WriteString(cell)

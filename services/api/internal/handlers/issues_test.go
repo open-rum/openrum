@@ -72,7 +72,7 @@ func TestIssueHandlerListsPermissionSafeAggregates(t *testing.T) {
 	queries := &fakeIssueQueries{page: query.IssuePage{Issues: []query.IssueSummary{{Fingerprint: "v1:abc", Status: metadata.IssueStatusUnresolved}}}}
 	handler := NewIssueHandler(fakeOverviewProjects{access: metadata.ProjectAccess{Role: metadata.RoleViewer}}, queries, fakeIssueEvents{}, fakeIssueStates{}, zerolog.Nop())
 	router := issueTestRouter(handler, userID)
-	request := httptest.NewRequest(http.MethodGet, issueURL(projectID, "/issues"), nil)
+	request := httptest.NewRequestWithContext(context.Background(), http.MethodGet, issueURL(projectID, "/issues"), nil)
 	request.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "valid"})
 	response := httptest.NewRecorder()
 	router.ServeHTTP(response, request)
@@ -86,7 +86,7 @@ func TestIssueHandlerParsesIssueSpecificFilters(t *testing.T) {
 	queries := &fakeIssueQueries{page: query.IssuePage{Issues: []query.IssueSummary{}}}
 	handler := NewIssueHandler(fakeOverviewProjects{access: metadata.ProjectAccess{Role: metadata.RoleViewer}}, queries, fakeIssueEvents{}, fakeIssueStates{}, zerolog.Nop())
 	router := issueTestRouter(handler, userID)
-	request := httptest.NewRequest(http.MethodGet, issueURL(projectID, "/issues")+"&title=checkout&errorType=TypeError&fingerprint=v1%3Acheckout&userId=customer-1", nil)
+	request := httptest.NewRequestWithContext(context.Background(), http.MethodGet, issueURL(projectID, "/issues")+"&title=checkout&errorType=TypeError&fingerprint=v1%3Acheckout&userId=customer-1", nil)
 	request.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "valid"})
 	response := httptest.NewRecorder()
 	router.ServeHTTP(response, request)
@@ -100,7 +100,7 @@ func TestIssueHandlerReturnsOverviewAggregates(t *testing.T) {
 	queries := &fakeIssueQueries{overview: query.IssueOverview{Trend: []query.IssueOverviewPoint{{Events: 12, AnonymousUsers: 8, IdentifiedUsers: 5}}}}
 	handler := NewIssueHandler(fakeOverviewProjects{access: metadata.ProjectAccess{Role: metadata.RoleViewer}}, queries, fakeIssueEvents{}, fakeIssueStates{}, zerolog.Nop())
 	router := issueTestRouter(handler, userID)
-	request := httptest.NewRequest(http.MethodGet, issueURL(projectID, "/issues/overview"), nil)
+	request := httptest.NewRequestWithContext(context.Background(), http.MethodGet, issueURL(projectID, "/issues/overview"), nil)
 	request.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "valid"})
 	response := httptest.NewRecorder()
 	router.ServeHTTP(response, request)
@@ -114,7 +114,7 @@ func TestIssueMutationRejectsViewerBeforeQuery(t *testing.T) {
 	queries := &fakeIssueQueries{}
 	handler := NewIssueHandler(fakeOverviewProjects{access: metadata.ProjectAccess{Role: metadata.RoleViewer}}, queries, fakeIssueEvents{}, fakeIssueStates{}, zerolog.Nop())
 	router := issueTestRouter(handler, userID)
-	request := httptest.NewRequest(http.MethodPatch, issueURL(projectID, "/issues/v1:abc"), strings.NewReader(`{"status":"resolved"}`))
+	request := httptest.NewRequestWithContext(context.Background(), http.MethodPatch, issueURL(projectID, "/issues/v1:abc"), strings.NewReader(`{"status":"resolved"}`))
 	request.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "valid"})
 	response := httptest.NewRecorder()
 	router.ServeHTTP(response, request)
@@ -126,7 +126,7 @@ func TestIssueMutationRejectsViewerBeforeQuery(t *testing.T) {
 func postBatch(t *testing.T, role metadata.OrganizationRole, userID, projectID uuid.UUID, body string, states fakeIssueStates) *httptest.ResponseRecorder {
 	t.Helper()
 	handler := NewIssueHandler(fakeOverviewProjects{access: metadata.ProjectAccess{Role: role}}, &fakeIssueQueries{}, fakeIssueEvents{}, states, zerolog.Nop())
-	request := httptest.NewRequest(http.MethodPost, "/api/v1/projects/"+projectID.String()+"/issues/batch", strings.NewReader(body))
+	request := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/api/v1/projects/"+projectID.String()+"/issues/batch", strings.NewReader(body))
 	request.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "valid"})
 	response := httptest.NewRecorder()
 	issueTestRouter(handler, userID).ServeHTTP(response, request)
@@ -196,7 +196,7 @@ func TestIssueListResolvesTheMeAssigneeAndNewFilters(t *testing.T) {
 		},
 		"&assignee=none": func() bool { return queries.last.Assignee == query.AssigneeNone && !queries.last.NewOnly },
 	} {
-		request := httptest.NewRequest(http.MethodGet, issueURL(projectID, "/issues")+suffix, nil)
+		request := httptest.NewRequestWithContext(context.Background(), http.MethodGet, issueURL(projectID, "/issues")+suffix, nil)
 		request.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "valid"})
 		response := httptest.NewRecorder()
 		router.ServeHTTP(response, request)
@@ -204,7 +204,7 @@ func TestIssueListResolvesTheMeAssigneeAndNewFilters(t *testing.T) {
 			t.Fatalf("%s: status=%d filters=%+v", suffix, response.Code, queries.last)
 		}
 	}
-	request := httptest.NewRequest(http.MethodGet, issueURL(projectID, "/issues")+"&assignee=somebody", nil)
+	request := httptest.NewRequestWithContext(context.Background(), http.MethodGet, issueURL(projectID, "/issues")+"&assignee=somebody", nil)
 	request.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "valid"})
 	response := httptest.NewRecorder()
 	router.ServeHTTP(response, request)
@@ -228,7 +228,7 @@ func TestEventHandlerHidesCrossProjectLookup(t *testing.T) {
 	router := httpx.NewRouter(zerolog.Nop())
 	authenticated := httpx.RequireSession(connectionFixtureAuthenticator{principal: auth.Principal{UserID: userID}})
 	router.Handle("GET /api/v1/events/{eventId}", authenticated(http.HandlerFunc(handler.Get)))
-	request := httptest.NewRequest(http.MethodGet, "/api/v1/events/"+eventID.String(), nil)
+	request := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/api/v1/events/"+eventID.String(), nil)
 	request.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "valid"})
 	response := httptest.NewRecorder()
 	router.ServeHTTP(response, request)

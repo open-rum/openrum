@@ -51,7 +51,7 @@ func TestSDKConfigAppliesTemporaryEmergencyCap(t *testing.T) {
 			EmergencySampleRate: &capRate, EmergencyExpiresAt: &emergencyExpiry,
 		}}, zerolog.Nop())
 	handler.now = func() time.Time { return now }
-	request := httptest.NewRequest(http.MethodGet, "/api/v1/sdk/config", nil)
+	request := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/api/v1/sdk/config", nil)
 	request.Header.Set("X-OpenRUM-Key", "orr_pk_valid")
 	response := httptest.NewRecorder()
 	handler.Get(response, request)
@@ -83,7 +83,7 @@ func TestSDKConfigAppliesStoragePressureCapWithoutReplacingStricterProjectCap(t 
 	)
 	handler.now = func() time.Time { return now }
 	response := httptest.NewRecorder()
-	request := httptest.NewRequest(http.MethodGet, "/api/v1/sdk/config", nil)
+	request := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/api/v1/sdk/config", nil)
 	request.Header.Set("X-OpenRUM-Key", "orr_pk_valid")
 	handler.Get(response, request)
 	var payload sdkConfigResponse
@@ -114,12 +114,12 @@ func TestSDKConfigAppliesStoragePressureCapWithoutReplacingStricterProjectCap(t 
 func TestSDKConfigRejectsInvalidKeyAndSupportsPreflight(t *testing.T) {
 	handler := NewSDKConfigHandler(fakeSDKConfigKeys{err: metadata.ErrInvalidProjectKey}, fakeSDKConfigReader{}, zerolog.Nop())
 	response := httptest.NewRecorder()
-	handler.Get(response, httptest.NewRequest(http.MethodGet, "/api/v1/sdk/config", nil))
+	handler.Get(response, httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/api/v1/sdk/config", nil))
 	if response.Code != http.StatusUnauthorized {
 		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
 	}
 	response = httptest.NewRecorder()
-	handler.Options(response, httptest.NewRequest(http.MethodOptions, "/api/v1/sdk/config", nil))
+	handler.Options(response, httptest.NewRequestWithContext(context.Background(), http.MethodOptions, "/api/v1/sdk/config", nil))
 	if response.Code != http.StatusNoContent || response.Header().Get("Access-Control-Allow-Headers") != "X-OpenRUM-Key" {
 		t.Fatalf("status=%d headers=%v", response.Code, response.Header())
 	}

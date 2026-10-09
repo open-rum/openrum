@@ -82,7 +82,7 @@ func TestAdminOverviewRequiresInstanceRoleAndDoesNotExposeSecrets(t *testing.T) 
 	}})(http.HandlerFunc(handler.Get)))
 
 	for token, expected := range map[string]int{"admin": http.StatusOK, "member": http.StatusForbidden, "missing": http.StatusUnauthorized} {
-		request := httptest.NewRequest(http.MethodGet, "/api/v1/admin/overview", nil)
+		request := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/api/v1/admin/overview", nil)
 		if token != "missing" {
 			request.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: token})
 		}

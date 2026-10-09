@@ -185,7 +185,7 @@ func adminMemberTestRouterWithElevation(
 }
 
 func performAdminRequest(handler http.Handler, token, method, path, body string, csrf bool) *httptest.ResponseRecorder {
-	request := httptest.NewRequest(method, path, strings.NewReader(body))
+	request := httptest.NewRequestWithContext(context.Background(), method, path, strings.NewReader(body))
 	request.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: token})
 	request.AddCookie(&http.Cookie{Name: auth.CSRFCookieName, Value: "test-csrf-token"})
 	if body != "" {

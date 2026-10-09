@@ -184,10 +184,11 @@ func devDataFixture(t *testing.T, ingestURL *string) (*DevDataHandler, http.Hand
 		target = *ingestURL
 	}
 	handler := NewDevDataHandler("development", projects, target, zerolog.Nop(), devDataKeyStub{keys: []metadata.ProjectKey{{PublicKey: "orr_pk_local", IsDefault: true}}})
-	handler.now = func() time.Time { return time.Date(2026, 9, 22, 6, 0, 0, 0, time.UTC) }
 	if handler == nil {
 		t.Fatal("development produced no handler")
+		return nil, nil, uuid.Nil
 	}
+	handler.now = func() time.Time { return time.Date(2026, 9, 22, 6, 0, 0, 0, time.UTC) }
 	router := httpx.NewRouter(zerolog.Nop())
 	baseURL, _ := url.Parse("http://openrum.test")
 	authenticated := httpx.RequireSession(testEventAuthenticator{principal: auth.Principal{UserID: userID}})

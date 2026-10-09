@@ -10,9 +10,10 @@ import (
 	"regexp"
 	"strings"
 
+	openrumcrypto "openrum/internal/crypto"
+
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgconn"
-	openrumcrypto "openrum/internal/crypto"
 )
 
 var (

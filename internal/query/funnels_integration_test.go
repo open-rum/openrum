@@ -21,7 +21,8 @@ func TestFunnelQueryReconcilesKnownSessions(t *testing.T) {
 		t.Fatal(err)
 	}
 	projectID := uuid.New()
-	from := time.Date(2026, 9, 3, 8, 0, 0, 0, time.UTC)
+	// Relative to now: raw events expire after 14 days, so a fixed date ages out of rum_events.
+	from := time.Now().UTC().Truncate(time.Hour).Add(-24 * time.Hour)
 	insert := func(sessionID uuid.UUID, country string, offset int, eventType, navigation, customName string) {
 		at := from.Add(time.Duration(offset) * time.Minute)
 		_, err := database.ExecContext(ctx, `INSERT INTO rum_events

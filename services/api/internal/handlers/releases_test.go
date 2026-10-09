@@ -172,7 +172,7 @@ func newReleaseFixture(t *testing.T, role metadata.OrganizationRole, storage sou
 
 // session sends a Console request with the cookies and headers CSRF requires.
 func (fixture *releaseFixture) session(method, target, body string) *httptest.ResponseRecorder {
-	request := httptest.NewRequest(method, target, strings.NewReader(body))
+	request := httptest.NewRequestWithContext(context.Background(), method, target, strings.NewReader(body))
 	request.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "valid"})
 	request.AddCookie(&http.Cookie{Name: auth.CSRFCookieName, Value: "csrf"})
 	request.Header.Set(httpx.CSRFHeader, "csrf")
@@ -183,7 +183,7 @@ func (fixture *releaseFixture) session(method, target, body string) *httptest.Re
 }
 
 func (fixture *releaseFixture) token(method, target, body, token string) *httptest.ResponseRecorder {
-	request := httptest.NewRequest(method, target, strings.NewReader(body))
+	request := httptest.NewRequestWithContext(context.Background(), method, target, strings.NewReader(body))
 	request.Header.Set("Authorization", "Bearer "+token)
 	response := httptest.NewRecorder()
 	fixture.router.ServeHTTP(response, request)
@@ -391,7 +391,7 @@ func TestUploadTokenIsScopedToItsProjectAndCannotDelete(t *testing.T) {
 
 func TestReleaseSessionWritesStillRequireCSRF(t *testing.T) {
 	fixture := newReleaseFixture(t, metadata.RoleMember, &fakeSourceMapStorage{})
-	request := httptest.NewRequest(http.MethodPost, "/api/v1/projects/"+fixture.projectID.String()+"/releases", strings.NewReader(`{"version":"web@1"}`))
+	request := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/api/v1/projects/"+fixture.projectID.String()+"/releases", strings.NewReader(`{"version":"web@1"}`))
 	request.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "valid"})
 	response := httptest.NewRecorder()
 	fixture.router.ServeHTTP(response, request)

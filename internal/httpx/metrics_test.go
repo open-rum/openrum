@@ -1,6 +1,7 @@
 package httpx
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -32,7 +33,7 @@ func TestRouterHTTPMetricsUseRoutePattern(t *testing.T) {
 	router.HandleFunc("GET /v1/projects/{projectID}", func(response http.ResponseWriter, _ *http.Request) {
 		response.WriteHeader(503)
 	})
-	router.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest("GET", "/v1/projects/secret-project", nil))
+	router.ServeHTTP(httptest.NewRecorder(), httptest.NewRequestWithContext(context.Background(), "GET", "/v1/projects/secret-project", nil))
 
 	want := `# HELP openrum_http_requests_total HTTP requests by method, matched route pattern and status class.
 # TYPE openrum_http_requests_total counter

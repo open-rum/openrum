@@ -2,6 +2,7 @@ package sourcemap
 
 import (
 	"context"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -47,7 +48,7 @@ func TestS3StorageProbeRoundTripUsesIsolatedPathAndDeletes(t *testing.T) {
 }
 
 func TestS3StorageRejectsInvalidConfiguration(t *testing.T) {
-	if _, err := NewS3Storage(context.Background(), "", "", "bucket", false); err != ErrInvalidStorage {
+	if _, err := NewS3Storage(context.Background(), "", "", "bucket", false); !errors.Is(err, ErrInvalidStorage) {
 		t.Fatalf("err=%v", err)
 	}
 }

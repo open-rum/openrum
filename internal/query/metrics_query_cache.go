@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strconv"
 	"time"
@@ -34,7 +35,7 @@ func (cache *MetricsCache) Get(ctx context.Context, query MetricsQuery, version 
 		return MetricsResult{}, false, err
 	}
 	payload, err := cache.client.Get(ctx, key).Bytes()
-	if err == redis.Nil {
+	if errors.Is(err, redis.Nil) {
 		return MetricsResult{}, false, nil
 	}
 	if err != nil {

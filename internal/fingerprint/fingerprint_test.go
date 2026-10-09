@@ -2,6 +2,7 @@ package fingerprint
 
 import (
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -47,7 +48,7 @@ func TestCustomFingerprintIsBoundedAndDeterministic(t *testing.T) {
 	if first != second {
 		t.Fatalf("first=%+v second=%+v", first, second)
 	}
-	if _, err := Compute(Input{Custom: []string{"line\nbreak"}}); err != ErrInvalidCustomFingerprint {
+	if _, err := Compute(Input{Custom: []string{"line\nbreak"}}); !errors.Is(err, ErrInvalidCustomFingerprint) {
 		t.Fatalf("err=%v", err)
 	}
 }

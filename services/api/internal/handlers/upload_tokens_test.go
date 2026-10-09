@@ -47,7 +47,7 @@ func uploadTokenRouter(role metadata.OrganizationRole, store *fakeUploadTokenSto
 }
 
 func performUploadTokenRequest(router http.Handler, method, target, body string) *httptest.ResponseRecorder {
-	request := httptest.NewRequest(method, target, strings.NewReader(body))
+	request := httptest.NewRequestWithContext(context.Background(), method, target, strings.NewReader(body))
 	request.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "valid"})
 	request.AddCookie(&http.Cookie{Name: auth.CSRFCookieName, Value: "csrf"})
 	request.Header.Set(httpx.CSRFHeader, "csrf")

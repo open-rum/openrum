@@ -37,7 +37,7 @@ func TestOAuthCallbackConsumesStateOnceAndStartIsRateLimited(t *testing.T) {
 	}
 	defer func() { _ = client.Del(context.Background(), key).Err() }()
 	for attempt := range 2 {
-		request := httptest.NewRequest(http.MethodGet, "/api/v1/auth/providers/company/callback?state="+state+"&code=one-use", nil)
+		request := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/api/v1/auth/providers/company/callback?state="+state+"&code=one-use", nil)
 		request.SetPathValue("providerId", "company")
 		response := httptest.NewRecorder()
 		handler.Callback(response, request)
@@ -65,7 +65,7 @@ func TestOAuthCallbackConsumesStateOnceAndStartIsRateLimited(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() { _ = client.Del(context.Background(), cancelKey).Err() }()
-	cancelRequest := httptest.NewRequest(http.MethodGet,
+	cancelRequest := httptest.NewRequestWithContext(context.Background(), http.MethodGet,
 		"/api/v1/auth/providers/company/callback?state="+cancelState+"&error=access_denied", nil)
 	cancelRequest.SetPathValue("providerId", "company")
 	cancelRequest.AddCookie(&http.Cookie{Name: flowCookieName(cancelState), Value: binding})
@@ -75,7 +75,7 @@ func TestOAuthCallbackConsumesStateOnceAndStartIsRateLimited(t *testing.T) {
 		t.Fatalf("cancelled login lost safe return address: %s", got)
 	}
 	ip := "198.51.100.42"
-	request := httptest.NewRequest(http.MethodPost, "/api/v1/auth/providers/company/start", nil)
+	request := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/api/v1/auth/providers/company/start", nil)
 	request.RemoteAddr = ip + ":4321"
 	for attempt := range oauthStartLimit + 1 {
 		allowed, err := handler.oauthStartAllowed(request)

@@ -44,7 +44,7 @@ func TestOverviewHandlerRejectsExpensiveQueryBeforeClickHouse(t *testing.T) {
 	handler := NewOverviewHandler(fakeOverviewProjects{}, repository, nil, nil, zerolog.Nop())
 	router := overviewTestRouter(handler, userID)
 	to := time.Date(2026, 9, 2, 12, 0, 0, 0, time.UTC)
-	request := httptest.NewRequest(http.MethodGet, "/api/v1/projects/"+projectID.String()+"/overview?from="+
+	request := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/api/v1/projects/"+projectID.String()+"/overview?from="+
 		to.Add(-30*24*time.Hour).Format(time.RFC3339)+"&to="+to.Format(time.RFC3339), nil)
 	request.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "valid"})
 	response := httptest.NewRecorder()
@@ -64,7 +64,7 @@ func TestOverviewHandlerReturnsUnavailableWithoutLeakingBackendError(t *testing.
 	handler := NewOverviewHandler(fakeOverviewProjects{}, repository, nil, nil, zerolog.Nop())
 	router := overviewTestRouter(handler, userID)
 	to := time.Date(2026, 9, 2, 12, 0, 0, 0, time.UTC)
-	request := httptest.NewRequest(http.MethodGet, "/api/v1/projects/"+projectID.String()+"/overview?from="+
+	request := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/api/v1/projects/"+projectID.String()+"/overview?from="+
 		to.Add(-time.Hour).Format(time.RFC3339)+"&to="+to.Format(time.RFC3339), nil)
 	request.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "valid"})
 	response := httptest.NewRecorder()

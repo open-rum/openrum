@@ -35,7 +35,7 @@ func TestUsageCSVIsEscapedAndRequiresProjectAccess(t *testing.T) {
 	router := httpx.NewRouter(zerolog.Nop())
 	authenticated := httpx.RequireSession(connectionFixtureAuthenticator{principal: auth.Principal{UserID: userID}})
 	router.Handle("GET /api/v1/projects/{projectId}/usage.csv", authenticated(http.HandlerFunc(handler.CSV)))
-	request := httptest.NewRequest(http.MethodGet, "/api/v1/projects/"+projectID.String()+"/usage.csv?from="+bucket.Add(-time.Hour).Format(time.RFC3339Nano)+"&to="+bucket.Add(time.Hour).Format(time.RFC3339Nano), nil)
+	request := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/api/v1/projects/"+projectID.String()+"/usage.csv?from="+bucket.Add(-time.Hour).Format(time.RFC3339Nano)+"&to="+bucket.Add(time.Hour).Format(time.RFC3339Nano), nil)
 	request.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "valid"})
 	response := httptest.NewRecorder()
 	router.ServeHTTP(response, request)

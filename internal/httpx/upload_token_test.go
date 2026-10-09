@@ -44,7 +44,7 @@ func TestRequireSessionOrUploadTokenAcceptsBearerWithoutCSRF(t *testing.T) {
 		writer.WriteHeader(http.StatusNoContent)
 	}))
 	perform := func(authorization string) *httptest.ResponseRecorder {
-		request := httptest.NewRequest(http.MethodPost, "/api/v1/projects/x/releases", nil)
+		request := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/api/v1/projects/x/releases", nil)
 		if authorization != "" {
 			request.Header.Set("Authorization", authorization)
 		}
@@ -72,14 +72,14 @@ func TestRequireSessionOrUploadTokenKeepsCSRFForSessions(t *testing.T) {
 	baseURL, _ := url.Parse("https://openrum.example")
 	guard := RequireSessionOrUploadToken(stubAuthenticator{principal: auth.Principal{UserID: uuid.New()}}, &stubUploadTokens{}, baseURL)
 	handler := guard(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) { writer.WriteHeader(http.StatusNoContent) }))
-	request := httptest.NewRequest(http.MethodPost, "/api/v1/projects/x/releases", nil)
+	request := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/api/v1/projects/x/releases", nil)
 	request.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "session"})
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, request)
 	if response.Code != http.StatusForbidden {
 		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
 	}
-	request = httptest.NewRequest(http.MethodPost, "/api/v1/projects/x/releases", nil)
+	request = httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/api/v1/projects/x/releases", nil)
 	request.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "session"})
 	request.AddCookie(&http.Cookie{Name: auth.CSRFCookieName, Value: "csrf"})
 	request.Header.Set(CSRFHeader, "csrf")

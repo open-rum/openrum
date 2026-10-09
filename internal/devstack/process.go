@@ -1,6 +1,7 @@
 package devstack
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -76,7 +77,7 @@ func (supervisor Supervisor) Start(service Service, environment Environment) err
 		// launches the built binary as a child of itself, so signalling it
 		// stops the wrapper and leaves the server holding the port.
 		binary := supervisor.binaryPath(service)
-		build := exec.Command("go", "build", "-o", binary, service.Build)
+		build := exec.CommandContext(context.Background(), "go", "build", "-o", binary, service.Build)
 		build.Dir = supervisor.Root
 		build.Stdout = os.Stderr
 		build.Stderr = os.Stderr
@@ -95,7 +96,7 @@ func (supervisor Supervisor) Start(service Service, environment Environment) err
 		return err
 	}
 	defer func() { _ = log.Close() }()
-	process := exec.Command(command, arguments...)
+	process := exec.CommandContext(context.Background(), command, arguments...)
 	process.Dir = supervisor.Root
 	process.Env = append(os.Environ(), values...)
 	process.Stdout = log

@@ -492,12 +492,13 @@ func (handler *ExternalAuthHandler) redirectFailureWithReturnTo(writer http.Resp
 		code = reason[0]
 	}
 	target := "/login?error=" + code
-	if purpose == "link" {
+	switch purpose {
+	case "link":
 		target = "/settings/account?link=failed"
 		if code != "external" {
 			target = "/settings/account?link=" + code
 		}
-	} else if purpose == "test" {
+	case "test":
 		target = "/settings/instance/authentication?test=failed"
 		if code != "external" {
 			target = "/settings/instance/authentication?test=" + code

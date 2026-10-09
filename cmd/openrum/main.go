@@ -149,7 +149,7 @@ func (stack stack) seed() error {
 }
 
 func (stack stack) buildBrowserSDK() error {
-	command := exec.Command("pnpm", "--filter", "@openrum/browser", "build")
+	command := exec.CommandContext(context.Background(), "pnpm", "--filter", "@openrum/browser", "build")
 	command.Dir = stack.root
 	command.Stdout = os.Stdout
 	command.Stderr = os.Stderr
@@ -188,7 +188,7 @@ func (stack stack) startHost(service devstack.Service) error {
 		return nil
 	}
 	if hasPort {
-		occupants, err := devstack.Occupants(port)
+		occupants, err := devstack.Occupants(context.Background(), port)
 		if err == nil && len(occupants) > 0 {
 			var names []string
 			for _, occupant := range occupants {
@@ -221,7 +221,7 @@ func (stack stack) awaitHost(service devstack.Service) error {
 			if devstack.Ready(context.Background(), port, service.ReadyPath) {
 				return nil
 			}
-		} else if devstack.Listening(port) {
+		} else if devstack.Listening(context.Background(), port) {
 			return nil
 		}
 		time.Sleep(250 * time.Millisecond)
@@ -278,7 +278,7 @@ func (stack stack) tail(service devstack.Service) error {
 	if _, err := os.Stat(path); err != nil {
 		return fmt.Errorf("no log for the host %s yet", service.Name)
 	}
-	command := exec.Command("tail", "-n", "100", "-f", path)
+	command := exec.CommandContext(context.Background(), "tail", "-n", "100", "-f", path)
 	command.Stdout = os.Stdout
 	command.Stderr = os.Stderr
 	return command.Run()
@@ -313,7 +313,7 @@ func (stack stack) restart(name string) error {
 }
 
 func (stack stack) status(mode devstack.Mode) error {
-	command := exec.Command("docker", devstack.ComposeStatus(stack.environment.Path)...)
+	command := exec.CommandContext(context.Background(), "docker", devstack.ComposeStatus(stack.environment.Path)...)
 	command.Dir = stack.root
 	output, err := command.Output()
 	if err != nil {
@@ -332,7 +332,7 @@ func (stack stack) status(mode devstack.Mode) error {
 }
 
 func (stack stack) compose(arguments []string) error {
-	command := exec.Command("docker", arguments...)
+	command := exec.CommandContext(context.Background(), "docker", arguments...)
 	command.Dir = stack.root
 	command.Stdout = os.Stdout
 	command.Stderr = os.Stderr
@@ -341,7 +341,7 @@ func (stack stack) compose(arguments []string) error {
 }
 
 func (stack stack) composeQuietly(arguments []string) error {
-	command := exec.Command("docker", arguments...)
+	command := exec.CommandContext(context.Background(), "docker", arguments...)
 	command.Dir = stack.root
 	command.Stderr = os.Stderr
 	return command.Run()
@@ -381,10 +381,10 @@ func preflight(mode devstack.Mode) error {
 	if _, err := exec.LookPath("docker"); err != nil {
 		return errors.New("docker is not on PATH; install Docker Engine or Docker Desktop")
 	}
-	if err := exec.Command("docker", "compose", "version").Run(); err != nil {
+	if err := exec.CommandContext(context.Background(), "docker", "compose", "version").Run(); err != nil {
 		return errors.New("docker compose v2 is unavailable; install the Compose plugin")
 	}
-	if err := exec.Command("docker", "info").Run(); err != nil {
+	if err := exec.CommandContext(context.Background(), "docker", "info").Run(); err != nil {
 		return errors.New("the docker daemon is not responding; start Docker and try again")
 	}
 	if mode != devstack.ModeDev {

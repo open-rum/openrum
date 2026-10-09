@@ -39,7 +39,7 @@ func TestAnalyticsHandlerRejectsExpensiveQueryBeforeClickHouse(t *testing.T) {
 	handler := NewAnalyticsHandler(fakeOverviewProjects{}, queries, zerolog.Nop())
 	router := analyticsTestRouter(handler, userID)
 	to := time.Date(2026, 9, 3, 12, 0, 0, 0, time.UTC)
-	request := httptest.NewRequest(http.MethodGet, "/api/v1/projects/"+projectID.String()+"/analytics/events?dimension=property:campaign&from="+
+	request := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/api/v1/projects/"+projectID.String()+"/analytics/events?dimension=property:campaign&from="+
 		to.Add(-30*24*time.Hour).Format(time.RFC3339)+"&to="+to.Format(time.RFC3339), nil)
 	request.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "valid"})
 	response := httptest.NewRecorder()
@@ -58,7 +58,7 @@ func TestAnalyticsHandlerReturnsBoundedContract(t *testing.T) {
 	queries := &fakeBehaviorQueries{result: query.BehaviorAnalytics{Dimension: "browser", Breakdown: []query.BehaviorBreakdown{}, Trend: []query.BehaviorTrendPoint{}, RowLimit: 100}}
 	router := analyticsTestRouter(NewAnalyticsHandler(fakeOverviewProjects{}, queries, zerolog.Nop()), userID)
 	to := time.Date(2026, 9, 3, 12, 0, 0, 0, time.UTC)
-	request := httptest.NewRequest(http.MethodGet, "/api/v1/projects/"+projectID.String()+"/analytics/events?dimension=browser&from="+
+	request := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/api/v1/projects/"+projectID.String()+"/analytics/events?dimension=browser&from="+
 		to.Add(-time.Hour).Format(time.RFC3339)+"&to="+to.Format(time.RFC3339), nil)
 	request.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "valid"})
 	response := httptest.NewRecorder()

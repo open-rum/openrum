@@ -24,7 +24,8 @@ func TestBehaviorAggregatesReconcileWithRawEvents(t *testing.T) {
 	}
 	projectID := uuid.New()
 	sessionA, sessionB := uuid.New(), uuid.New()
-	from := time.Date(2026, 9, 3, 8, 0, 0, 0, time.UTC)
+	// Relative to now: raw events expire after 14 days, so a fixed date ages out of rum_events.
+	from := time.Now().UTC().Truncate(time.Hour).Add(-24 * time.Hour)
 	_, err := database.ExecContext(ctx, `INSERT INTO rum_events
 		(project_id,event_id,event_type,timestamp,received_at,environment,session_id,anonymous_user_id,page_id,
 		referrer,navigation_type,sample_rate,browser,device_type,country,custom_name,attributes,ingest_flags)

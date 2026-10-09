@@ -47,7 +47,7 @@ func metricsRequest(projectID uuid.UUID, duration time.Duration, parameters url.
 	to := time.Date(2026, 9, 2, 12, 0, 0, 0, time.UTC)
 	parameters.Set("from", to.Add(-duration).Format(time.RFC3339))
 	parameters.Set("to", to.Format(time.RFC3339))
-	request := httptest.NewRequest(http.MethodGet, "/api/v1/projects/"+projectID.String()+"/metrics/query?"+parameters.Encode(), nil)
+	request := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/api/v1/projects/"+projectID.String()+"/metrics/query?"+parameters.Encode(), nil)
 	request.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "valid"})
 	return request
 }
@@ -206,7 +206,7 @@ func TestIdenticalConcurrentQueriesShareOneRun(t *testing.T) {
 func TestMetricsCatalogIsServedToProjectMembers(t *testing.T) {
 	userID, projectID := uuid.New(), uuid.New()
 	router := metricsTestRouter(NewMetricsHandler(fakeOverviewProjects{}, &fakeMetricsRepository{}, nil, nil, zerolog.Nop()), userID)
-	request := httptest.NewRequest(http.MethodGet, "/api/v1/projects/"+projectID.String()+"/metrics/catalog", nil)
+	request := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/api/v1/projects/"+projectID.String()+"/metrics/catalog", nil)
 	request.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "valid"})
 	response := httptest.NewRecorder()
 	router.ServeHTTP(response, request)
