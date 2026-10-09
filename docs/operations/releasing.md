@@ -63,7 +63,7 @@ git tag -a browser-v0.1.0 -m "@openrum/browser 0.1.0"
 git push origin browser-v0.1.0
 ```
 
-The workflow refuses an existing npm version, publishes with provenance, and reads the version back from the registry. A plain version publishes under `latest`; a prerelease such as `browser-v0.1.0-alpha.1` publishes under `next`, so `npm install @openrum/browser` never picks it up. npm does not allow republishing a version, so fix a bad release with a new patch version.
+The workflow refuses an existing npm version, publishes with provenance (only while the repository is public; npm cannot sign provenance for a private repository), and reads the version back from the registry. A plain version publishes under `latest`; a prerelease such as `browser-v0.1.0-alpha.1` publishes under `next`, so `npm install @openrum/browser` never picks it up. npm does not allow republishing a version, so fix a bad release with a new patch version.
 
 ## Deploy separately
 
