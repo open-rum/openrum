@@ -80,7 +80,7 @@ One-time setup:
 To release:
 
 1. Bump `version` in `packages/browser-sdk/package.json`, update the SDK docs, and merge to `main`.
-2. Use **Publish browser SDK → Run workflow** with a tag such as `browser-v0.1.1` for a dry run. It checks the tag against the package version, runs lint, type check, tests and the build, then packs the tarball and installs it into an empty project to import it and type-check against it. That last step is what catches a private workspace dependency leaking into the published package. A dry run never publishes.
+2. Use **Publish browser SDK → Run workflow** with a tag such as `browser-v0.1.1` for a dry run. It checks the tag against the package version and that `repository.url` names this repository (npm rejects a provenance-signed upload otherwise), runs lint, type check, tests and the build, then packs the tarball and installs it into an empty project to import it and type-check against it. That last step is what catches a private workspace dependency leaking into the published package. A dry run never publishes.
 3. Run the same pre-tag checks as for a product release (green `main`, clone on the latest `main`, no GitHub web Release), then push the tag:
 
 ```sh
