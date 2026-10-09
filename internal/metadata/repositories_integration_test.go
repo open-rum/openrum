@@ -173,18 +173,27 @@ func TestRepositoryIsolationAndLastOwnerInvariant(t *testing.T) {
 	close(start)
 	waitGroup.Wait()
 	close(errorsFound)
-	successes, lastOwnerFailures := 0, 0
+	// Whichever demotion lands first wins. If the first owner demotes themselves, they are an
+	// Admin when the second request runs, and an Admin may not change an Owner (forbidden);
+	// if the second owner is demoted first, the first owner is the last Owner. Both losses are
+	// correct, so the invariant is one winner, one refusal and an Owner left standing.
+	successes, refusals := 0, 0
 	for updateErr := range errorsFound {
 		switch {
 		case updateErr == nil:
 			successes++
-		case errors.Is(updateErr, ErrLastOwner):
-			lastOwnerFailures++
+		case errors.Is(updateErr, ErrLastOwner), errors.Is(updateErr, ErrForbidden):
+			refusals++
 		default:
 			t.Fatalf("unexpected concurrent update error=%v", updateErr)
 		}
 	}
-	if successes != 1 || lastOwnerFailures != 1 {
-		t.Fatalf("concurrent demotions: success=%d last-owner=%d", successes, lastOwnerFailures)
+	if successes != 1 || refusals != 1 {
+		t.Fatalf("concurrent demotions: success=%d refusals=%d", successes, refusals)
+	}
+	var owners int
+	if err := database.QueryRowContext(ctx,
+		"SELECT count(*) FROM organization_members WHERE organization_id=$1 AND role='owner'", organizationA).Scan(&owners); err != nil || owners != 1 {
+		t.Fatalf("owners left after concurrent demotions=%d err=%v", owners, err)
 	}
 }
