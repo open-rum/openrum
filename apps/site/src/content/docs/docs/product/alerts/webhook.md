@@ -1,9 +1,8 @@
 ---
 title: Receive alerts with a webhook
 description: Receive alerts as signed JSON on your own HTTPS service and verify that they came from OpenRUM.
+appliesTo: Alpha
 ---
-
-**Applies to:** Alpha. Status: Alpha implemented.
 
 A webhook channel posts each alert as JSON to your HTTPS service. Use it to open tickets, page an on-call tool, or forward alerts to a chat tool OpenRUM does not support natively yet.
 

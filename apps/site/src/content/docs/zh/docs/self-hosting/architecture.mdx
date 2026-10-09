@@ -1,57 +1,138 @@
 ---
-title: 架构
-description: 一个 Event 如何从浏览器走到 Console，以及每一步由谁负责。
+title: 总体架构
+description: 一个 OpenRUM Instance 的服务、依赖、通信协议和仓库结构，以及 Event 在其中走过的路径。
 appliesTo: Alpha
 ---
 
 import { Aside } from "@astrojs/starlight/components";
 import eventPath from "@/assets/diagrams/event-path.svg?raw";
 
-一个 OpenRUM Instance 由四个 Go 服务、五个依赖和一个浏览器 SDK 组成。搞清楚哪一步归谁负责，是
-让容量估算和故障排查有据可依、而不是靠猜的前提。
+一个 OpenRUM Instance 由一个 Console Web 服务和四个 Go 服务（API、Ingest、Consumer、Worker）组成，依赖 PostgreSQL、ClickHouse、Kafka 和 Redis，并在用户的页面里运行 Browser SDK。对象存储是可选的，只在需要 Source Map 时才用到。Event 同步接收，先缓冲在 Kafka 里，再异步存储和处理。
 
-## 一个 Event 走过的路径
+搞清楚哪一步归谁负责，是让容量估算和故障排查有据可依、而不是靠猜的前提。
+
+## 系统组成
+
+OpenRUM 采用"一个镜像、多个进程"的布局：五个应用服务构建在同一个容器镜像里，用不同的启动命令运行。Console、API、Ingest、Consumer 和 Worker 可以独立伸缩、独立失效，并共用下面这些依赖。
+
+### 应用服务
+
+| 服务 | 镜像里的命令 | 端口 | 职责 |
+| --- | --- | --- | --- |
+| Console Web 服务 | `/app/web`（nginx） | `8080` | 提供 Console 静态文件，并把 `/api/` 转发给 API、`/ingest/` 转发给 Ingest，所以一个公开域名就够用 |
+| API | `/app/api` | `8080` | Console 与控制面操作：登录、会话、角色、Project、Release、告警，以及全部分析查询 |
+| Ingest | `/app/ingest` | `8081` | Browser SDK 的公开写入端点：限流、key 与 Origin 认证、schema 校验，以及可靠写入 Kafka |
+| Consumer | `/app/consumer` | `8082` | 读取 Kafka，做规范化与清洗、过滤、指纹计算，并把 Event 写入 ClickHouse |
+| Worker | `/app/worker` | `8083` | 后台任务：堆栈映射、告警评估、数据生命周期、紧急清理、Project 删除 |
+
+每个 Go 服务还在自己的端口上提供 `GET /health/live`、`GET /health/ready` 和 `GET /metrics`，Console Web 服务也提供这两个健康检查路径。同一个镜像里还有两个运行完就退出、不对外服务的命令：`/app/migrate` 执行数据库迁移，`/app/demo` 在你执行 `openrum seed` 时写入演示数据。
+
+<Aside type="note" title="启动时从不执行表结构变更">
+  应用服务启动时只检查表结构版本是否兼容。迁移作为单独的任务，在部署服务之前执行一次。见[升级](/zh/docs/self-hosting/upgrades/)。
+</Aside>
+
+### 依赖
+
+| 依赖 | 默认端口 | 存放 | 失去它意味着 |
+| --- | --- | --- | --- |
+| PostgreSQL | `5432` | 控制面：账号、Organization、Project、Release、告警规则和设置 | Console 无法认证或配置，Ingest 也失去 Project key 的来源；已存储的 Event 不受影响 |
+| ClickHouse | `9000`（原生）、`8123`（HTTP） | Event 以及由它们生成的聚合 | 分析和排查中断；数据仍会继续进入 Kafka |
+| Kafka | `9092` | Ingest 与 Consumer 之间的可靠缓冲 | Ingest 开始拒绝请求；这是唯一一个失效会丢 Event 的依赖 |
+| Redis | `6379` | 限流计数器、缓存和短期状态 | 限流能力下降；没有需要恢复的数据 |
+| 对象存储 | S3 兼容 | Source Map Artifact，可选 | 无法上传新 Release；已有映射不受影响 |
+
+表里只有 Kafka 的失效是有损的，这也是[容量规划](/zh/docs/self-hosting/capacity/)为什么先从 Kafka 的保留余量算起、而不是先看 ClickHouse 磁盘。各存储具体存什么见[数据存储](/zh/docs/self-hosting/data-stores/)。
+
+### 部署形态
+
+| 形态 | 位置 | 说明 |
+| --- | --- | --- |
+| 本地开发 | `deploy/compose/docker-compose.yml` | 在一台机器上跑整套服务，由 `openrum` 命令使用，演示数据可选。不用于生产 |
+| 单机生产 | `deploy/compose/production.compose.yml` | 同样的服务，前面加一层 Caddy，终止 TLS 并路由 `/api/*`、`/ingest/*` 和其余请求 |
+| Kubernetes | `deploy/helm/openrum` | Helm chart，包含 Deployment、Service、Ingress、自动伸缩、中断预算、迁移 Job 和 Prometheus 规则 |
+
+见[本地开发](/zh/docs/getting-started/local-development/)、[Docker 生产部署](/zh/docs/self-hosting/docker-production/)和 [Kubernetes 与 Helm](/zh/docs/self-hosting/kubernetes/)。chart 可以内置一个 Redis 方便快速上手；PostgreSQL、ClickHouse 和 Kafka 需要你自己提供。
+
+## 技术栈
+
+| 层 | 技术 | 说明 |
+| --- | --- | --- |
+| 后端语言 | Go 1.26 | 一个模块，四个服务入口位于 `services/` |
+| HTTP | `net/http` 与标准 `ServeMux` | `internal/httpx` 里的小型共享路由层负责 request ID、日志和指标 |
+| PostgreSQL 访问 | `pgx` v5 | 控制面；迁移是纯 SQL 文件 |
+| ClickHouse 访问 | `clickhouse-go` v2 | 原生协议，批量写入，用 SQL 查询 |
+| 消息 | `segmentio/kafka-go` | Ingest 里是生产者，Consumer 里是消费组 |
+| 缓存与计数器 | `go-redis` v9 | |
+| 登录 | 本地密码、OpenID Connect、LDAP、Google、GitHub | `go-oidc`、`go-ldap`、`oauth2` |
+| Source Map | `go-sourcemap`、`aws-sdk-go-v2`（S3） | Worker 做堆栈映射，Artifact 放在对象存储 |
+| 日志与指标 | `zerolog`、Prometheus 客户端 | 结构化 JSON 日志；每个服务都有 `/metrics` |
+| Console | React 19、Vite、TanStack Router 与 Query、Tailwind CSS 4、Recharts | `apps/web` |
+| Browser SDK | TypeScript | `packages/browser-sdk`，共享的 Event schema 在 `packages/protocol` |
+| 构建插件 | TypeScript | `packages/vite-plugin` 负责上传 Source Map |
+| 文档站点 | Astro 与 Starlight | `apps/site` |
+
+## 组件之间的通信
+
+| 链路 | 协议 | 说明 |
+| --- | --- | --- |
+| Browser SDK → Ingest | HTTPS `POST /ingest/v1/envelope`，JSON，可选 gzip | 通过 `X-OpenRUM-Key` 请求头认证。页面被隐藏时，未发送的批次用 `sendBeacon` 刷出。见 [Ingest 响应码](/zh/docs/reference/ingest-responses/) |
+| 浏览器 → Console Web 服务 → API | HTTPS，`/api/` 下的 REST | 会话 Cookie，写操作还需要 CSRF 令牌 |
+| 入口层 → 各服务 | HTTP | `/api/*` 到 API，`/ingest/*` 到 Ingest，其余到 Console Web 服务。单机生产用 Caddy，Kubernetes 用 Ingress |
+| Ingest → Kafka | Kafka 协议 | Kafka 的确认才会变成 `202` |
+| Kafka → Consumer | Kafka 消费组 | 只有 ClickHouse 写入成功后才提交 offset，失败的条目进入死信主题 |
+| Consumer → ClickHouse | 原生协议，批量写入 | |
+| API → ClickHouse | 原生协议 | Console 的每一次查询 |
+| API、Worker、Consumer、Ingest → PostgreSQL | PostgreSQL 协议 | 每个服务读写自己需要的控制面数据 |
+| Ingest、Consumer、API → Redis | RESP | 限流、缓存、接入状态 |
+| API → Kafka | Kafka 协议 | Console 里的**发送测试 Event** 会绕过 Ingest，直接把一个合成 Event 发布到同一个主题 |
+| CI 或 Vite 插件 → API → 对象存储 | HTTPS | 插件用 Upload Token 向 API 申请预签名 URL，直接把文件传到存储桶，再向 API 确认 |
+| Worker → 飞书/Lark 或 Webhook | HTTPS | 告警通知 |
+| API → 身份提供者 | HTTPS 或 LDAP | 只在 Instance Owner 启用了对应登录方式时才会用到 |
+| Prometheus → 每个服务 | HTTP `GET /metrics` | 健康探针使用 `/health/live` 和 `/health/ready` |
+
+## 典型流程：一个 Event 到达 Console
 
 <figure class="docs-diagram">
   <Fragment set:html={eventPath} />
   <figcaption>
-    实线边传递 Event，虚线边是配额检查。由 `docs/diagrams/event-path.mmd` 生成。
+    实线边传递 Event，虚线边是配额检查。
   </figcaption>
 </figure>
 
-Ingest 是在 Envelope 可靠写入 Kafka 之后确认的，而不是在它可被查询之后。这是读这张图时最有用的
-一件事：`202` 只代表已接收，Kafka 下游的一切都是异步的。因此一个 Instance 可以在流量突增或
-ClickHouse 重启期间不丢 Event，同时也意味着 Event 可能已被接收、但还没出现在 Console 里。
+1. Browser SDK 采集 Event，完成清洗后放入本地队列，并把一个批次（一个最多 100 个 Event 的 Envelope）发给 Ingest。
+2. Ingest 执行各项检查，把 Envelope 写入 Kafka。Kafka 确认之后才返回 `202`。
+3. Consumer 读取 Envelope，做规范化与清洗，应用 Project 的过滤和规则，计算错误的 Fingerprint，并把 Event 写入 ClickHouse。物化视图在数据落库时更新按分钟的聚合。
+4. Worker 用该 Release 的 Source Map 映射堆栈帧，并基于聚合数据评估告警规则。
+5. API 从 ClickHouse 回答 Console 的查询，并用 Redis 做短期缓存。Console Web 服务在前面，把 `/api/` 转发给它。
 
-## 各组件的职责
-
-| 组件                  | 负责                                                                          |
-| --------------------- | ----------------------------------------------------------------------------- |
-| Browser SDK           | 采集 Page View、交互、错误、Web Vitals 和 API Request，并在离开页面前完成清洗 |
-| Vite 插件             | 构建时按 Release 上传 Source Map Artifact                                     |
-| Ingest                | 校验 write key、按 Envelope schema 校验、清洗、指纹计算，并写入 Kafka         |
-| Consumer              | 读取 Kafka，把 Event 与聚合结果写入 ClickHouse                                |
-| Worker                | 后台任务：映射堆栈帧、数据生命周期、通知、Project 删除                        |
-| API                   | 需要认证的 Console 与控制面操作                                               |
-| Console（`apps/web`） | 运维人员使用的界面                                                            |
+所以 `202` 的含义是*已接收*，而不是*可查询*。一个 Instance 可以在流量突增或 ClickHouse 重启期间不丢 Event，同时也意味着 Event 可能已被接收、但还没出现在 Console 里。第 2 步的检查和第 3 步的各个阶段，按顺序列在[事件链路](/zh/docs/self-hosting/event-pipeline/)里。
 
 <Aside title="映射后的堆栈帧会晚一点到">
-  符号化是 Worker 的批处理任务，在 Error 已经入库之后才运行，所以一个 Error 会先带着原始帧出现，
-  过一会儿才拿到映射后的帧。如果它的 Release 从未上传过，那它就只会保留原始帧。
+  映射是 Worker 的批处理任务，在错误入库之后才运行，所以一个错误会先带着原始帧出现，过一会儿才拿到映射后的帧。它的
+  Release 如果从未上传过，就只会保留原始帧。
 </Aside>
 
-## 各依赖的用途
+## 仓库结构
 
-| 依赖       | 存放                                  | 失去它意味着                                           |
-| ---------- | ------------------------------------- | ------------------------------------------------------ |
-| PostgreSQL | 控制面：Project、用户、Alert、Release | Console 无法认证或配置；已存储的 Event 不受影响        |
-| ClickHouse | Event 与聚合结果                      | Analysis 和排查中断；数据仍会继续进入 Kafka            |
-| Kafka      | 可靠的接入缓冲                        | Ingest 开始拒绝请求；这是唯一一个失效会丢 Event 的依赖 |
-| Redis      | 配额、状态和短期缓存                  | 配额约束能力下降                                       |
-| 对象存储   | Source Map Artifact，可选             | 无法上传新 Release；已有映射不受影响                   |
+| 目录 | 内容 |
+| --- | --- |
+| `services/api`、`services/ingest`、`services/consumer`、`services/worker` | 四个 Go 服务。`services/api` 里还有 `migrate` 和 `demo` 命令 |
+| `internal/` | 共享的 Go 包：`auth`、`metadata`（PostgreSQL）、`query`（ClickHouse）、`ingest`、`event`、`fingerprint`、`privacy`、`processing`、`filter`、`sourcemap`、`notify`、`storagepressure`、`observability`、`config` 等 |
+| `migrations/` | PostgreSQL 与 ClickHouse 的表结构迁移，会被嵌入 `migrate` 命令 |
+| `apps/web` | Console（React） |
+| `apps/site` | 本文档站点和落地页 |
+| `packages/browser-sdk`、`packages/vite-plugin`、`packages/protocol` | Browser SDK、Source Map 上传插件和共享的 Event schema |
+| `packages/ui`、`packages/design-tokens` | Console 和站点共用的组件与设计令牌 |
+| `cmd/openrum` | 用于启动和检查本地开发环境的 `openrum` 命令，见 [CLI](/zh/docs/getting-started/local-development/cli/) |
+| `deploy/` | Compose 文件、Helm chart、Prometheus 规则、Grafana 仪表盘，以及镜像里的 nginx 配置 |
+| `examples/` | 一个可运行的 React + Vite 示例 |
+| `tests/` | 端到端、集成、压测、性能和安全测试 |
+| `scripts/` | 构建、发布、文档和体积预算脚本 |
+| `docs/` | 支撑公开文档的设计说明、运维指南和决策记录 |
 
-表里只有 Kafka 的失效是有损的，这也是[容量规划](/zh/docs/self-hosting/capacity/)为什么先从 Kafka
-的保留余量算起、而不是先看 ClickHouse 磁盘。
+## 接下来读什么
 
-版本与配置见[外部依赖](/zh/docs/self-hosting/dependencies/)，这些名字所属的领域语言见仓库根目录的
-`CONTEXT.md`。
+- [组件与职责](/zh/docs/self-hosting/components/)逐个介绍每个服务，包括它停掉时哪些功能会受影响。
+- [事件链路](/zh/docs/self-hosting/event-pipeline/)按顺序列出一个 Event 经过的每一道检查。
+- [数据存储](/zh/docs/self-hosting/data-stores/)介绍 PostgreSQL、ClickHouse、Kafka、Redis 和对象存储里分别放什么。
+- [外部依赖](/zh/docs/self-hosting/dependencies/)介绍版本与配置，仓库根目录的 `CONTEXT.md` 定义了这里用到的领域术语。

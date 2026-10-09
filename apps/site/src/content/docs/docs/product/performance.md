@@ -1,9 +1,8 @@
 ---
 title: Performance
 description: Core Web Vitals, Route performance and experience regressions.
+appliesTo: Alpha
 ---
-
-**Applies to:** Alpha. Status: Alpha implemented.
 
 Performance views explain why a journey felt slow or unstable.
 

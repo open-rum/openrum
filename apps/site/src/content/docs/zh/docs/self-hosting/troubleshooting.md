@@ -22,20 +22,20 @@ docker compose -f deploy/compose/docker-compose.yml logs --tail=100 api ingest c
 
 - 使用与 `PUBLIC_BASE_URL` 一致的 `http://127.0.0.1:4173`。
 - 运行 `curl --fail http://127.0.0.1:4173/health/ready` 检查 API Readiness。
-- 本地演示账号为 `demo@openrum.local` / `OpenRUM-demo-2026!`，仅用于本地评估。
+- 本地演示账号为 `demo@openrum.local` / `OpenRUM-demo-2026!`，仅用于本地开发，且只有执行 `pnpm openrum seed` 之后才存在。
 
 ## 事件没有出现
 
 1. 检查 Browser SDK `dsn` 与项目允许的 Origin。
 2. 检查 Ingest 日志和项目 Key 的 Origin Allowlist。
-3. 确认 Kafka、Consumer 和 ClickHouse 健康；首次启动等待演示数据完成。
+3. 确认 Kafka、Consumer 和 ClickHouse 健康；如果使用演示数据，等待 `pnpm openrum seed` 执行完成。
 4. 在较宽时间范围查看“事件”，再用相同 `session_id` 查看“会话”。
 
 ## 调查路径不完整
 
 | 现象 | 可能原因 | 下一步 |
 | --- | --- | --- |
-| 行为图表为空 | Seed 未完成或 ClickHouse 异常 | 等待并检查 Consumer/ClickHouse |
+| 行为图表为空 | 未加载演示数据，或 ClickHouse 异常 | 执行 `pnpm openrum seed`，并检查 Consumer/ClickHouse |
 | 会话没有错误 | 该会话确实无错误事件 | 在演示项目筛选带错误的会话 |
 | Issue 无源码栈 | 未配置对象存储，或没有与栈帧匹配的 Artifact | 参见 [Source Map 上传失败](#source-map-上传失败) |
 | API 面板为空 | 未捕获 fetch/XHR 或采样关闭 | 从示例应用触发请求 |

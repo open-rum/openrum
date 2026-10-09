@@ -36,6 +36,48 @@ type Scenario struct {
 	Releases []Weight  `json:"releases"`
 	Clients  []Client  `json:"clients"`
 	Journeys []Journey `json:"journeys"`
+	// Users makes visitors return across sessions and lets a share sign in with a
+	// business user ID. Nil keeps one anonymous visitor per session.
+	Users *UserPool `json:"users,omitempty"`
+	// Referrers set the first page's referrer per session; an empty value is direct
+	// traffic. The pipeline derives the traffic source from the referrer's domain.
+	Referrers []Weight `json:"referrers,omitempty"`
+	// DailyRhythm weights session start times by local hour so trends have a day and
+	// night shape. Nil spreads sessions evenly.
+	DailyRhythm *DailyRhythm `json:"dailyRhythm,omitempty"`
+	// Incidents raise error and server-failure odds inside part of the window, the
+	// way a bad deploy or an upstream outage shows up in real traffic.
+	Incidents []Incident `json:"incidents,omitempty"`
+}
+
+// UserPool describes who the sessions belong to.
+type UserPool struct {
+	// Visitors is the number of distinct browsers; sessions reuse them, so a
+	// smaller pool means more returning visitors. Zero means one per session.
+	Visitors int `json:"visitors"`
+	// SignedIn is the share of visitors who are signed in, between 0 and 1.
+	SignedIn float64 `json:"signedIn"`
+	// IDs are the business user IDs given to signed-in visitors, reused in order
+	// when there are more signed-in visitors than IDs. Empty generates IDs from Prefix.
+	IDs []string `json:"ids,omitempty"`
+	// Prefix starts generated user IDs, for example "cust_" gives cust_10001.
+	Prefix string `json:"prefix,omitempty"`
+}
+
+// DailyRhythm is a 24-hour activity curve in one time zone.
+type DailyRhythm struct {
+	TimeZone string `json:"timeZone"`
+	// Hourly holds 24 relative weights, hour 0 first.
+	Hourly []float64 `json:"hourly"`
+}
+
+// Incident is a stretch of the window, given as fractions from 0 (From) to 1 (To),
+// where errors and failing API responses become more likely.
+type Incident struct {
+	Start             float64 `json:"start"`
+	End               float64 `json:"end"`
+	ErrorMultiplier   float64 `json:"errorMultiplier"`
+	FailureMultiplier float64 `json:"failureMultiplier"`
 }
 
 // Weight gives a value a relative share of the sessions. Weights need no
@@ -68,9 +110,16 @@ type Page struct {
 	// Route is the normalized template, for example /products/:id. Path is the
 	// concrete URL path. Keeping both lets a scenario exercise the difference
 	// between a raw URL and its route.
-	Route  string  `json:"route"`
-	Path   string  `json:"path"`
-	Title  string  `json:"title"`
+	Route string `json:"route"`
+	Path  string `json:"path"`
+	// Paths are alternative concrete paths for the same route, one drawn per visit,
+	// so a route aggregates several real URLs. Empty uses Path.
+	Paths []string `json:"paths,omitempty"`
+	Title string   `json:"title"`
+	// Exit is the probability the session ends after this page, which is how a
+	// funnel loses visitors step by step. Zero always continues.
+	Exit   float64 `json:"exit,omitempty"`
+	Clicks []Click `json:"clicks,omitempty"`
 	Vitals []Vital `json:"vitals"`
 	APIs   []API   `json:"apis"`
 	Errors []Error `json:"errors"`
@@ -131,12 +180,25 @@ type Event struct {
 	Odds         float64            `json:"odds"`
 	Attributes   map[string]string  `json:"attributes"`
 	Measurements map[string]float64 `json:"measurements"`
+	// MeasurementRanges draw a value per event, such as a varying order amount.
+	MeasurementRanges map[string]Range `json:"measurementRanges,omitempty"`
+}
+
+// Click is an automatic SDK click behavior event (ui.click) on a named element.
+type Click struct {
+	Name    string  `json:"name"`
+	Element string  `json:"element"`
+	Role    string  `json:"role,omitempty"`
+	Odds    float64 `json:"odds"`
 }
 
 // Range is an inclusive draw interval. Min equal to Max makes a constant.
 type Range struct {
 	Min float64 `json:"min"`
 	Max float64 `json:"max"`
+	// Skew bends the draw towards Min: 0 or 1 is uniform, 2 makes most values fast
+	// with a long slow tail, the shape real timings and Web Vitals have.
+	Skew float64 `json:"skew,omitempty"`
 }
 
 // MaxSessions caps a single request. The generator holds every envelope in
@@ -178,6 +240,7 @@ func (scenario *Scenario) Validate() error {
 	if len(scenario.Journeys) == 0 {
 		problems = append(problems, errors.New("at least one journey is required"))
 	}
+	problems = append(problems, scenario.validateTraffic()...)
 	for index, journey := range scenario.Journeys {
 		problems = append(problems, journey.validate(index)...)
 	}
@@ -196,6 +259,21 @@ func (journey *Journey) validate(index int) []error {
 		label := fmt.Sprintf("journeys[%d].pages[%d]", index, pageIndex)
 		if !strings.HasPrefix(page.Path, "/") {
 			problems = append(problems, fmt.Errorf("%s.path must start with /", label))
+		}
+		for _, path := range page.Paths {
+			if !strings.HasPrefix(path, "/") {
+				problems = append(problems, fmt.Errorf("%s.paths must start with /", label))
+				break
+			}
+		}
+		if math.IsNaN(page.Exit) || page.Exit < 0 || page.Exit > 1 {
+			problems = append(problems, fmt.Errorf("%s.exit must be between 0 and 1", label))
+		}
+		for _, click := range page.Clicks {
+			if strings.TrimSpace(click.Name) == "" || !allowedClickElements[strings.ToLower(click.Element)] {
+				problems = append(problems, fmt.Errorf("%s.clicks need a name and an element of a, button, input, select, textarea, summary or custom", label))
+				break
+			}
 		}
 		for apiIndex, api := range page.APIs {
 			if !strings.HasPrefix(api.Path, "/") {
@@ -227,6 +305,54 @@ func (journey *Journey) validate(index int) []error {
 	return problems
 }
 
+func (scenario *Scenario) validateTraffic() []error {
+	problems := make([]error, 0)
+	if users := scenario.Users; users != nil {
+		if users.Visitors < 0 || math.IsNaN(users.SignedIn) || users.SignedIn < 0 || users.SignedIn > 1 {
+			problems = append(problems, errors.New("users.visitors must not be negative and users.signedIn must be between 0 and 1"))
+		}
+		if len(users.IDs) > MaxSessions || utf8.RuneCountInString(users.Prefix) > 32 {
+			problems = append(problems, fmt.Errorf("users allows at most %d IDs and a prefix of 32 characters", MaxSessions))
+		}
+		for _, id := range users.IDs {
+			if strings.TrimSpace(id) == "" || utf8.RuneCountInString(id) > 128 {
+				problems = append(problems, errors.New("users.ids must be non-empty and at most 128 characters"))
+				break
+			}
+		}
+	}
+	for index, referrer := range scenario.Referrers {
+		if referrer.Value == "" {
+			continue
+		}
+		if parsed, err := url.Parse(referrer.Value); err != nil || parsed.Host == "" || (parsed.Scheme != "http" && parsed.Scheme != "https") {
+			problems = append(problems, fmt.Errorf("referrers[%d] must be an absolute http(s) URL or empty for direct traffic", index))
+		}
+	}
+	if rhythm := scenario.DailyRhythm; rhythm != nil {
+		if _, err := time.LoadLocation(rhythm.TimeZone); err != nil || len(rhythm.Hourly) != 24 {
+			problems = append(problems, errors.New("dailyRhythm needs a valid timeZone and 24 hourly weights"))
+		}
+		positive := false
+		for _, weight := range rhythm.Hourly {
+			if math.IsNaN(weight) || weight < 0 {
+				problems = append(problems, errors.New("dailyRhythm.hourly weights must not be negative"))
+				break
+			}
+			positive = positive || weight > 0
+		}
+		if !positive {
+			problems = append(problems, errors.New("dailyRhythm.hourly needs at least one positive weight"))
+		}
+	}
+	for index, incident := range scenario.Incidents {
+		if incident.Start < 0 || incident.End > 1 || incident.End <= incident.Start || incident.ErrorMultiplier < 0 || incident.FailureMultiplier < 0 {
+			problems = append(problems, fmt.Errorf("incidents[%d] needs 0 <= start < end <= 1 and non-negative multipliers", index))
+		}
+	}
+	return problems
+}
+
 func validateBaseURL(candidate string) error {
 	if strings.TrimSpace(candidate) == "" {
 		return errors.New("baseUrl is required")
@@ -246,3 +372,7 @@ var supportedMethods = map[string]bool{
 }
 
 var supportedVitals = map[string]bool{"LCP": true, "INP": true, "CLS": true, "FCP": true, "TTFB": true}
+
+var allowedClickElements = map[string]bool{
+	"a": true, "button": true, "input": true, "select": true, "textarea": true, "summary": true, "custom": true,
+}

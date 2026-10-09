@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -156,6 +157,19 @@ func TestConsumerDoesNotCommitWhenRetentionCannotBeResolved(t *testing.T) {
 		t.Fatal("expected retention resolver error")
 	}
 	if source.commits != 0 || len(events.events) != 0 || len(deadLetters.letters) != 0 {
+		t.Fatalf("commits=%d events=%d deadLetters=%d", source.commits, len(events.events), len(deadLetters.letters))
+	}
+}
+
+// A Project deleted or stopped while its events sit in Kafka must not stall the
+// shared partition: those events are dropped and the offset moves on.
+func TestConsumerDropsEventsOfInactiveProjectsAndCommits(t *testing.T) {
+	source, events, deadLetters, consumer := testConsumer(t, validQueuePayload(t))
+	consumer.retention = fixedRetentionPolicies{err: fmt.Errorf("lookup: %w", metadata.ErrNotFound)}
+	if err := consumer.ConsumeOne(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if source.commits != 1 || len(events.events) != 0 || len(deadLetters.letters) != 0 {
 		t.Fatalf("commits=%d events=%d deadLetters=%d", source.commits, len(events.events), len(deadLetters.letters))
 	}
 }

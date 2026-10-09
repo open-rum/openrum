@@ -61,6 +61,8 @@ export type DevDataRequest = {
   minutes?: number;
   seed?: number;
   scenario?: DevDataScenario;
+  /** Business user IDs for signed-in visitors and the signed-in share (0–1). */
+  users?: { ids?: string[]; signedIn?: number };
 };
 
 export function getDevDataPresets(

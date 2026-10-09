@@ -78,6 +78,10 @@ _Avoid_: Issue ID, hash, signature
 The project-specific workflow state attached to an issue, independently of its immutable error events.
 _Avoid_: Error status, event status
 
+**Regression**:
+A resolved Issue that fails again after it was marked resolved. It is derived when the Issue list is read (the Issue State stays resolved, with the time it was resolved), so it needs no separate write and goes away when someone resolves the Issue again.
+_Avoid_: Reopened, recurrence
+
 **Web Vital**:
 A user-experience measurement captured from a real page view, such as LCP, INP, or CLS.
 _Avoid_: Performance event, timing

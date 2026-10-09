@@ -109,15 +109,110 @@ describe("issues page states", () => {
       ),
     );
     const view = renderPage();
-    await waitFor(() => expect(view.getByLabelText("错误概览图表")).toBeTruthy());
-    expect(view.getByLabelText("问题次数趋势")).toBeTruthy();
-    expect(view.getByLabelText("发生错误的独立会话。趋势")).toBeTruthy();
+    await waitFor(() => expect(view.getByLabelText("错误概览")).toBeTruthy());
+    expect(view.getByLabelText("事件趋势")).toBeTruthy();
+    expect(view.getByLabelText("按错误类型的错误占比").textContent).toContain("TypeError");
 
-    fireEvent.click(within(view.getByLabelText("切换影响范围")).getByText("用户"));
-    expect(view.getByText("匿名用户与已设置 user.id 的业务用户。")).toBeTruthy();
+    fireEvent.click(within(view.getByLabelText("切换趋势指标")).getByText("用户"));
+    expect(view.getByLabelText("用户趋势")).toBeTruthy();
 
     fireEvent.click(within(view.getByLabelText("切换错误分布维度")).getByText("国家"));
-    expect(view.getByText("按异常国家查看错误占比。")).toBeTruthy();
+    expect(view.getByLabelText("按国家的错误占比")).toBeTruthy();
+  });
+
+  it("applies one change to the selected rows in a single request", async () => {
+    useControlPlaneHandlers();
+    let batch: { issues: { fingerprint: string }[]; status?: string } | undefined;
+    server.use(
+      http.get(`/api/v1/projects/${projectId}/issues`, () =>
+        HttpResponse.json({ issues: [issue("a"), issue("b")], facets: emptyFacets() }),
+      ),
+      http.get(`/api/v1/organizations/${organizationId}/members`, () =>
+        HttpResponse.json({ members: [] }),
+      ),
+      http.post(`/api/v1/projects/${projectId}/issues/batch`, async ({ request }) => {
+        batch = (await request.json()) as typeof batch;
+        return HttpResponse.json({ updated: 2 });
+      }),
+    );
+    const view = renderPage();
+    await waitFor(() => expect(view.getByText("TypeError: a")).toBeTruthy());
+    expect(view.queryByRole("toolbar", { name: "批量操作" })).toBeNull();
+
+    fireEvent.click(view.getByRole("checkbox", { name: "选择问题：TypeError: a" }));
+    expect(view.getByText("已选 1 个问题")).toBeTruthy();
+    fireEvent.click(view.getByRole("checkbox", { name: "选择本页全部问题" }));
+    expect(view.getByText("已选 2 个问题")).toBeTruthy();
+
+    fireEvent.click(view.getByRole("button", { name: "标记解决" }));
+    await waitFor(() => expect(batch).toBeTruthy());
+    expect(batch?.status).toBe("resolved");
+    expect(batch?.issues.map((item) => item.fingerprint)).toEqual(["v1:a", "v1:b"]);
+    // A finished change clears the selection and puts the heading back.
+    await waitFor(() => expect(view.queryByRole("toolbar", { name: "批量操作" })).toBeNull());
+    expect(view.getByText("问题列表")).toBeTruthy();
+  });
+
+  it("offers no selection to viewers", async () => {
+    useControlPlaneHandlers();
+    server.use(
+      http.get(`/api/v1/projects/${projectId}/issues`, () =>
+        HttpResponse.json({ issues: [issue("a")], facets: emptyFacets() }),
+      ),
+    );
+    server.use(
+      http.get(`/api/v1/organizations/${organizationId}/projects`, () =>
+        HttpResponse.json({
+          projects: [
+            {
+              id: projectId,
+              organizationId,
+              name: "Web H5",
+              slug: "web-h5",
+              allowedOrigins: [],
+              environment: "production",
+              retentionDays: 14,
+              eventSampleRate: 1,
+              apiSampleRate: 0.2,
+              errorSampleRate: 1,
+              status: "active",
+              role: "viewer",
+              createdAt: "2026-09-03T00:00:00Z",
+              updatedAt: "2026-09-03T00:00:00Z",
+            },
+          ],
+        }),
+      ),
+    );
+    const view = renderPage();
+    await waitFor(() => expect(view.getByText("TypeError: a")).toBeTruthy());
+    expect(view.queryAllByRole("checkbox")).toHaveLength(0);
+  });
+
+  it("filters by the quick chips and writes them to the URL", async () => {
+    useControlPlaneHandlers();
+    const requests: URLSearchParams[] = [];
+    server.use(
+      http.get(`/api/v1/projects/${projectId}/issues`, ({ request }) => {
+        requests.push(new URL(request.url).searchParams);
+        return HttpResponse.json({ issues: [issue("a")], facets: emptyFacets() });
+      }),
+    );
+    const view = renderPage();
+    await waitFor(() => expect(view.getByText("TypeError: a")).toBeTruthy());
+    const chips = within(view.getByRole("group", { name: "快捷筛选" }));
+    fireEvent.click(chips.getByRole("button", { name: "未分配" }));
+    await waitFor(() => expect(requests.at(-1)?.get("assignee")).toBe("none"));
+    fireEvent.click(chips.getByRole("button", { name: "分配给我" }));
+    await waitFor(() => expect(requests.at(-1)?.get("assignee")).toBe("me"));
+    fireEvent.click(chips.getByRole("button", { name: "新问题" }));
+    await waitFor(() => expect(requests.at(-1)?.get("new")).toBe("1"));
+    const search = new URLSearchParams(window.location.search);
+    expect(search.get("assignee")).toBe("me");
+    expect(search.get("new")).toBe("1");
+    fireEvent.click(view.getByText("清除筛选"));
+    await waitFor(() => expect(requests.at(-1)?.has("assignee")).toBe(false));
+    expect(requests.at(-1)?.has("new")).toBe(false);
   });
 
   it("renders a bounded error state", async () => {
@@ -213,7 +308,8 @@ describe("issues page states", () => {
     fireEvent.focus(view.getByLabelText("搜索错误或添加筛选条件"));
     expect(view.getByText("添加筛选条件")).toBeTruthy();
     expect(view.getByText("错误标题")).toBeTruthy();
-    expect(view.getByText("错误类型")).toBeTruthy();
+    // The overview's distribution switch also says 错误类型.
+    expect(view.getAllByText("错误类型").length).toBeGreaterThan(1);
     expect(view.getByText("Fingerprint")).toBeTruthy();
     expect(view.getByText("用户 ID")).toBeTruthy();
     expect(view.getByText("国家 / 地区")).toBeTruthy();

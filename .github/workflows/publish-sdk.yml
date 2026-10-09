@@ -1,0 +1,98 @@
+name: Publish browser SDK
+
+# The SDK has its own version lifecycle, separate from the product's vX.Y.Z tags.
+# Tag the commit browser-vX.Y.Z (or browser-vX.Y.Z-alpha.N for a prerelease).
+on:
+  push:
+    tags: ["browser-v*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "SDK tag to validate without publishing, for example browser-v0.1.0"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-sdk-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      npm_tag: ${{ steps.version.outputs.npm_tag }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Confirm a release tag is on main
+        if: github.event_name == 'push'
+        run: |
+          git fetch origin main:refs/remotes/origin/main
+          git merge-base --is-ancestor HEAD origin/main
+      - name: Validate the tag against the package version
+        id: version
+        env:
+          RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.version || github.ref_name }}
+        run: node scripts/release/check-sdk-version.mjs
+      - uses: pnpm/setup@v2
+        with:
+          runtime: node@24
+          cache: true
+          require-lockfile: true
+      - name: Lint, type-check, test and build the SDK
+        run: |
+          pnpm --filter @openrum/browser lint
+          pnpm --filter @openrum/browser typecheck
+          pnpm --filter @openrum/browser test
+          pnpm --filter @openrum/browser build
+      - name: Prove the tarball installs and type-checks from a clean project
+        run: node scripts/release/verify-sdk-package.mjs
+
+  publish:
+    # A manual run only validates; publishing needs a pushed tag in the official repository.
+    if: github.event_name == 'push' && github.repository == 'openrum/openrum'
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: public-release
+    permissions:
+      contents: read
+      # Lets npm sign a provenance statement linking the package to this workflow run.
+      id-token: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/setup@v2
+        with:
+          runtime: node@24
+          cache: true
+          require-lockfile: true
+      - name: Reject a previously published npm version
+        run: |
+          if npm view "@openrum/browser@${{ needs.verify.outputs.version }}" version >/dev/null 2>&1; then
+            echo "@openrum/browser@${{ needs.verify.outputs.version }} already exists on npm; publish a new version instead of overwriting it." >&2
+            exit 1
+          fi
+      - name: Publish to npm
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_TAG: ${{ needs.verify.outputs.npm_tag }}
+        run: |
+          test -n "$NODE_AUTH_TOKEN" || { echo "The NPM_TOKEN secret is missing from the public-release environment." >&2; exit 1; }
+          printf '//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}\n' > "$RUNNER_TEMP/npmrc"
+          export NPM_CONFIG_USERCONFIG="$RUNNER_TEMP/npmrc"
+          pnpm --filter @openrum/browser build
+          pnpm --filter @openrum/browser publish --access public --provenance --tag "$NPM_TAG" --no-git-checks
+      - name: Verify the published package
+        run: |
+          for attempt in 1 2 3 4 5 6; do
+            if npm view "@openrum/browser@${{ needs.verify.outputs.version }}" version; then exit 0; fi
+            sleep 10
+          done
+          echo "@openrum/browser@${{ needs.verify.outputs.version }} did not appear on npm." >&2
+          exit 1

@@ -195,3 +195,17 @@ func TestComposeLogsPassesASelectionThrough(t *testing.T) {
 		t.Errorf("logs do not follow: %s", joined)
 	}
 }
+
+func TestSeedRunsTheGeneratorOnceAndLeavesTheRunningStackAlone(t *testing.T) {
+	joined := strings.Join(ComposeSeed("deploy/compose/.env"), " ")
+	for _, want := range []string{"--profile seed", "--env-file deploy/compose/.env", " run --rm --no-deps ", "demo-seed"} {
+		if !strings.Contains(joined, want) {
+			t.Errorf("seed command is missing %q: %s", want, joined)
+		}
+	}
+	// A plain `up` has to stay free of the generator, or every start would
+	// load the demo dataset again.
+	if strings.Contains(strings.Join(ComposeUp("env", ModeUp), " "), "demo-seed") {
+		t.Error("up names the demo generator")
+	}
+}

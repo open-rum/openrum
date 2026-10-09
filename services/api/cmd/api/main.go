@@ -310,6 +310,7 @@ func registerRoutes(ctx context.Context, router *httpx.Router, configuration con
 	router.Handle("GET /api/v1/projects/{projectId}/issues", requireSession(http.HandlerFunc(issueHandler.List)))
 	router.Handle("GET /api/v1/projects/{projectId}/issues/overview", requireSession(http.HandlerFunc(issueHandler.Overview)))
 	router.Handle("GET /api/v1/projects/{projectId}/issues/{fingerprint}", requireSession(http.HandlerFunc(issueHandler.Get)))
+	router.Handle("POST /api/v1/projects/{projectId}/issues/batch", requireSession(requireCSRF(http.HandlerFunc(issueHandler.Batch))))
 	router.Handle("PATCH /api/v1/projects/{projectId}/issues/{fingerprint}", requireSession(requireCSRF(http.HandlerFunc(issueHandler.Patch))))
 	router.Handle("GET /api/v1/projects/{projectId}/issues/{fingerprint}/events", requireSession(http.HandlerFunc(issueHandler.Events)))
 	router.Handle("GET /api/v1/events/{eventId}", requireSession(http.HandlerFunc(eventHandler.Get)))

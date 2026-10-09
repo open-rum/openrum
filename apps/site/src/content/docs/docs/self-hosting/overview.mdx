@@ -1,6 +1,6 @@
 ---
 title: Self-hosting
-description: Choose recommended Kubernetes/Helm or single-host Docker for production, with a separate local evaluation stack.
+description: Choose recommended Kubernetes/Helm or single-host Docker for production.
 appliesTo: Alpha
 ---
 
@@ -31,13 +31,13 @@ OpenRUM runs on infrastructure you control. Choose a deployment path first; the 
 </div>
 
 <Aside type="caution" title="Current support boundary">
-  The [local evaluation Compose stack](/docs/self-hosting/compose/) still includes Demo data and
+  The Compose stack used for local development includes Demo data and
   example credentials; do not expose it to real traffic. The separate production Docker stack
   removes those defaults but remains a single failure domain. The Helm path also needs external data
   services, TLS and an image registry; it is not a one-command cluster installation.
 </Aside>
 
-If you want to change OpenRUM's source code rather than evaluate a containerized Instance, follow [Local development](/docs/getting-started/local-development/) instead.
+If you want to change OpenRUM's source code or try it from a checkout, follow [Local development](/docs/getting-started/local-development/) instead.
 
 ## What you operate
 

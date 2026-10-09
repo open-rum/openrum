@@ -9,7 +9,7 @@ Contributions can be bug reports, documentation, tests or code. The best startin
 
 1. Search existing GitHub Issues and open pull requests to avoid duplicate work. For a behavior change, open or join an Issue before writing code. A small typo or broken-link fix can go straight to a pull request.
 2. Discuss new features, public API or SDK contracts, event schemas, storage behavior and deployment changes in an Issue first. Describe the user problem, proposed behavior, alternatives and compatibility or rollout concerns. A pull request is not the place to discover that a feature is out of scope.
-3. Read the [domain model](/docs/getting-started/domain-model/), root `CONTEXT.md` and relevant `docs/adr/` decisions before changing shared terminology or architecture. If a proposal conflicts with an existing decision, explain that conflict in the Issue.
+3. Read the [glossary](/docs/reference/glossary/), root `CONTEXT.md` and relevant `docs/adr/` decisions before changing shared terminology or architecture. If a proposal conflicts with an existing decision, explain that conflict in the Issue.
 4. Report suspected vulnerabilities privately using the [vulnerability reporting guide](/docs/self-hosting/security/vulnerability-reporting/). Do not open a public Issue or pull request containing an exploitable detail, credential or customer data.
 
 For a bug report, include the affected version or commit, environment, minimal reproduction, expected and actual behavior, and sanitized logs or screenshots. Include a Request ID when available. For a feature request, describe the use case and acceptance criteria rather than only the proposed UI or implementation.

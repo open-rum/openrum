@@ -183,7 +183,7 @@ func (repository *BehaviorRepository) Get(ctx context.Context, requested Behavio
 	if err := CheckBehaviorBudget(filters); err != nil {
 		return BehaviorAnalytics{}, err
 	}
-	interval := performanceInterval(filters.To.Sub(filters.From))
+	interval := legacySeriesInterval(filters.To.Sub(filters.From))
 	if filters.MaxPoints > 0 {
 		interval = fmt.Sprintf("%d MINUTE", int(adaptiveSeriesInterval(filters.To.Sub(filters.From), filters.MaxPoints)/time.Minute))
 	}

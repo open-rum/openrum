@@ -41,9 +41,7 @@ export function ModuleDetailContent({
     widget.data.source === "overview" ? effectiveOverviewFilters(widget, filters) : undefined;
   const freshness = data.result.freshness;
   const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-  const chartWidget: Widget = scalar
-    ? { ...widget, view: widget.statAppearance === "bar-right" ? "bar" : "line" }
-    : widget;
+  const chartWidget: Widget = scalar ? { ...widget, view: "area" } : widget;
 
   return (
     <div className="dashboard-detail-layout">

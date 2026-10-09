@@ -10,7 +10,11 @@
     "ignoreDeprecations": "6.0",
     "skipLibCheck": true,
     "lib": ["ES2022", "DOM"],
-    "types": ["node"]
+    "types": ["node"],
+    "paths": {
+      "@openrum/protocol": ["../protocol/src/index.ts"],
+      "@openrum/protocol/dsn": ["../protocol/src/dsn.ts"]
+    }
   },
   "include": ["src", "test"]
 }

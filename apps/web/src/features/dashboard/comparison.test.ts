@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { describeComparison } from "./comparison";
 import { formatDetailedMetric, type ScalarData } from "./adapters";
-import { createWidget, type Widget } from "./model";
+import { createCatalogWidget, createWidget, type Widget } from "./model";
 
 const scalar: ScalarData = {
   kind: "scalar",
@@ -57,6 +57,18 @@ describe("dashboard comparison", () => {
         widget("pageViews"),
       ),
     ).toMatchObject({ tone: "neutral", direction: "flat", label: "0.0%" });
+  });
+  it("lets a card say which way a neutral catalog metric is good", () => {
+    const revenue = (direction?: "up" | "down") =>
+      createCatalogWidget("stat", {
+        metrics: ["measurement.sum"],
+        measurement: "amount",
+        direction,
+      });
+    const neutral: ScalarData = { ...scalar, direction: "neutral" };
+    expect(describeComparison(neutral, revenue())).toMatchObject({ tone: "neutral" });
+    expect(describeComparison(neutral, revenue("up"))).toMatchObject({ tone: "positive" });
+    expect(describeComparison(neutral, revenue("down"))).toMatchObject({ tone: "negative" });
   });
   it("does not fabricate changes for missing data or insufficient samples", () => {
     expect(describeComparison({ ...scalar, value: null }, widget("pageViews"))?.tone).toBe(

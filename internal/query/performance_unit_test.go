@@ -46,8 +46,14 @@ func TestNormalizePerformanceFilters(t *testing.T) {
 }
 
 func TestPerformanceIntervalsAndLowSampleLabel(t *testing.T) {
-	if performanceInterval(6*time.Hour) != "1 MINUTE" || performanceInterval(7*time.Hour) != "15 MINUTE" || performanceInterval(3*24*time.Hour) != "1 HOUR" || performanceInterval(20*24*time.Hour) != "6 HOUR" {
+	// The shared ~30-bucket policy: 1 h → 2 min, 6 h → 15 min, 24 h → 1 h, 7 d → 6 h, 30 d → 1 d.
+	if performanceInterval(time.Hour) != 2*time.Minute || performanceInterval(6*time.Hour) != 15*time.Minute ||
+		performanceInterval(24*time.Hour) != time.Hour || performanceInterval(7*24*time.Hour) != 6*time.Hour ||
+		performanceInterval(30*24*time.Hour) != 24*time.Hour || performanceIntervalSQL(time.Hour) != "60 MINUTE" {
 		t.Fatal("unexpected performance interval")
+	}
+	if legacySeriesInterval(6*time.Hour) != "1 MINUTE" || legacySeriesInterval(7*time.Hour) != "15 MINUTE" || legacySeriesInterval(3*24*time.Hour) != "1 HOUR" || legacySeriesInterval(20*24*time.Hour) != "6 HOUR" {
+		t.Fatal("legacy analytics/API density changed")
 	}
 	value := finalizeMetric(1250, 74)
 	if value.P75 == nil || value.Sufficient {

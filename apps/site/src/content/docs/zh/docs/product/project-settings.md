@@ -1,9 +1,8 @@
 ---
 title: 项目设置
 description: 配置环境、DSN、Source Map 上传令牌、Origin、采样、保留时间、入站治理和速率限制。
+appliesTo: Alpha
 ---
-
-**适用版本：** Alpha。状态：Alpha 已实现。
 
 Project 设置决定一个被监控的 Web 产品如何上报和保留遥测数据。
 
@@ -22,7 +21,7 @@ Release 及其 Source Map Artifact 不属于项目设置，请在项目主导航
 Console 的设置地址会明确写出作用域：
 
 - **常规**（`/settings/project/<id>/general`）：名称、开发平台、Origin、保留天数、停用/启用和删除项目。
-- **接入指引**（`/projects/<id>/onboarding`）：复制项目默认 DSN 和平台接入代码，并管理 **Source Map 上传令牌**。Owner 和 Admin 可以创建和吊销令牌，明文只显示一次。参见 [Release 与 Source Map](/zh/docs/sdk/source-maps/)。
+- **接入指引**（`/projects/<id>/onboarding`）：复制项目默认 DSN 和平台接入代码，并管理 **Source Map 上传令牌**。Owner 和 Admin 可以创建和吊销令牌，明文只显示一次。参见 [Source Map](/zh/docs/sdk/source-maps/)。
 - **数据管理**：集中采样、速率限制、入站过滤、URL 归一化和隐私脱敏。通过页内标签切换，各项独立保存，作用于当前项目的全部环境。
 - **用量统计**（`/settings/project/<id>/usage`）：查看已接收量、估算原始量、处理结果并导出 CSV；采样配置与报表分开。
 

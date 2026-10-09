@@ -91,7 +91,8 @@ export function PlotRenderer({
   detailed = false,
   showTable = detailed,
   showNotes = detailed,
-  showInterval = true,
+  // Cards stay uncluttered; the aggregation interval is listed in 详细.
+  showInterval = false,
 }: ModuleRenderProps) {
   const gradientId = `module-${useId().replace(/:/g, "")}`;
   const animate = useChartMotion();
@@ -151,7 +152,7 @@ export function PlotRenderer({
         <>
           <ChartContainer
             config={config}
-            className={detailed ? "h-80 w-full sm:h-96" : "h-64 w-full"}
+            className={detailed ? "h-80 w-full sm:h-96" : "h-64 w-full min-[1680px]:h-72"}
             initialDimension={{ width: 600, height: 256 }}
             aria-label={widget.title}
           >

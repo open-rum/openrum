@@ -331,3 +331,27 @@ func performDevDataRequest(router http.Handler, projectID uuid.UUID, body string
 	router.ServeHTTP(response, request)
 	return response
 }
+
+func TestDevDataBusinessUserIDsReachTheEnvelopes(t *testing.T) {
+	users := map[string]bool{}
+	ingest := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var batch struct {
+			Context struct {
+				UserID string `json:"user_id"`
+			} `json:"context"`
+			Events []json.RawMessage `json:"events"`
+		}
+		_ = json.NewDecoder(r.Body).Decode(&batch)
+		users[batch.Context.UserID] = true
+		writeJSON(w, http.StatusAccepted, map[string]any{"accepted": len(batch.Events), "rejected": []any{}})
+	}))
+	defer ingest.Close()
+	_, router, _ := devDataFixture(t, &ingest.URL)
+	response := performDevDataRequest(router, devDataProjectID, `{"sessions":40,"minutes":60,"users":{"ids":["vip-001"," vip-002 "],"signedIn":1}}`)
+	if response.Code != 202 {
+		t.Fatalf("response: %s", response.Body.String())
+	}
+	if len(users) != 2 || !users["vip-001"] || !users["vip-002"] {
+		t.Fatalf("user ids=%v", users)
+	}
+}

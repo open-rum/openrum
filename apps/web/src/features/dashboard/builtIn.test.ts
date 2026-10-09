@@ -52,7 +52,7 @@ describe("built-in default dashboard", () => {
     ])
       expect(kinds, kind).toContain(kind);
     const appearances = new Set(widgets.map((widget) => widget.statAppearance).filter(Boolean));
-    expect([...appearances].sort()).toEqual(["bar-right", "line-right", "plain"]);
+    expect([...appearances].sort()).toEqual(["area-right", "plain"]);
     expect(widgets.some((widget) => widget.data.source === "catalog" && widget.data.compare)).toBe(
       true,
     );

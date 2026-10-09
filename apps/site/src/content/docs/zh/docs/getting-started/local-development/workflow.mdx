@@ -18,7 +18,7 @@ import { Aside } from "@astrojs/starlight/components";
 | Browser SDK                          | `pnpm --filter @openrum/browser build`，再刷新或重启引用它的示例 |
 | 文档站                               | 另开终端运行 `pnpm site:dev`，与监控服务独立                     |
 
-容器的 `restart` 只重启现有镜像，不会重新编译代码。需要全镜像运行时使用 `pnpm openrum up`；它和 `dev` 共用端口及数据，由命令自动切换模式。
+容器的 `restart` 只重启现有镜像，不会重新编译代码。需要全镜像运行时使用 `pnpm openrum up`；它和 `dev` 共用端口及数据，由命令自动切换模式。全部命令，以及每个命令会保留或删除什么，见 [openrum 命令](/zh/docs/getting-started/local-development/cli/)。
 
 ```sh
 pnpm openrum logs api
@@ -34,7 +34,6 @@ pnpm openrum dev
 
 本地控制台右下角试管按钮可以打开“造数据”。选择项目、环境和时间范围后生成，按面板的查询验证结果查看数据。建议先生成少量数据验证，再增加数量。
 
-场景说明见[演示数据](/zh/docs/getting-started/demo-data/)。
 
 <Aside type="danger" title="重置会删除数据">
   需要彻底重新开始时使用 `pnpm openrum reset`，它会要求确认并删除全部本地数据库；日常停止用 `stop`。

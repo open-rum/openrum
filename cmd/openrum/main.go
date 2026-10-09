@@ -65,7 +65,9 @@ func run(command string, arguments []string) error {
 		if !confirmed && !confirm("Delete every local OpenRUM database volume?") {
 			return errors.New("reset cancelled")
 		}
-		return stack.remove(devstack.ComposeReset(environment.Path), "removed the containers and their volumes; the next start reseeds the demo dataset")
+		return stack.remove(devstack.ComposeReset(environment.Path), "removed the containers and their volumes; the next start is empty, run `openrum seed` to load the demo dataset")
+	case "seed":
+		return stack.seed()
 	case "logs":
 		return stack.logs(arguments)
 	case "restart":
@@ -130,6 +132,20 @@ func (stack stack) start(mode devstack.Mode) error {
 		}
 	}
 	return stack.status(mode)
+}
+
+// seed loads the demo account and dataset into a stack that is already up. It
+// is a command of its own rather than part of a start: the Console's data
+// generator covers day-to-day work, and loading 14 days of traffic on every
+// start made a throwaway stack slow to reach.
+func (stack stack) seed() error {
+	if err := preflight(devstack.ModeUp); err != nil {
+		return err
+	}
+	if err := stack.compose(devstack.ComposeSeed(stack.environment.Path)); err != nil {
+		return fmt.Errorf("seed the demo dataset (is the stack up? try `openrum up` or `openrum dev` first): %w", err)
+	}
+	return nil
 }
 
 func (stack stack) buildBrowserSDK() error {
@@ -433,6 +449,7 @@ func usage() {
   openrum status           what is running, and what is not ready yet
   openrum logs [service]   follow logs; a host service tails its own file
   openrum restart <name>   restart one service
+  openrum seed             load the demo account and dataset into a running stack
   openrum stop             stop everything, keeping the containers and their data
   openrum down             remove the containers, keeping the volumes
   openrum reset [--yes]    remove the containers and delete every local database

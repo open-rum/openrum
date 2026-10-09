@@ -24,11 +24,11 @@ type issueQueries interface {
 }
 
 func (handler *IssueHandler) Overview(writer http.ResponseWriter, request *http.Request) {
-	_, projectID, _, ok := handler.authorizeProject(writer, request, auth.ActionReadProject)
+	principal, projectID, _, ok := handler.authorizeProject(writer, request, auth.ActionReadProject)
 	if !ok {
 		return
 	}
-	filters, err := parseIssueFilters(request, projectID)
+	filters, err := parseIssueFilters(request, projectID, principal.UserID)
 	if err != nil {
 		writeIssueValidationError(writer, request)
 		return
@@ -43,11 +43,12 @@ func (handler *IssueHandler) Overview(writer http.ResponseWriter, request *http.
 }
 
 type issueEvents interface {
-	ListIssueEvents(context.Context, uuid.UUID, string, time.Time, time.Time, int, string) (query.EventPage, error)
+	ListIssueEvents(context.Context, query.IssueFilters, string) (query.EventPage, error)
 }
 
 type issueStates interface {
 	MutateIssueState(context.Context, uuid.UUID, metadata.IssueState) (metadata.IssueState, error)
+	BatchMutateIssueStates(context.Context, uuid.UUID, uuid.UUID, []metadata.IssueRef, metadata.IssueStatePatch) (int, error)
 }
 
 type IssueHandler struct {
@@ -63,15 +64,16 @@ func NewIssueHandler(projects overviewProjects, queries issueQueries, events iss
 }
 
 func (handler *IssueHandler) List(writer http.ResponseWriter, request *http.Request) {
-	_, projectID, _, ok := handler.authorizeProject(writer, request, auth.ActionReadProject)
+	principal, projectID, _, ok := handler.authorizeProject(writer, request, auth.ActionReadProject)
 	if !ok {
 		return
 	}
-	filters, err := parseIssueFilters(request, projectID)
+	filters, err := parseIssueFilters(request, projectID, principal.UserID)
 	if err != nil {
 		writeIssueValidationError(writer, request)
 		return
 	}
+	filters.RowDetails = true
 	result, err := handler.queries.List(request.Context(), filters)
 	if err != nil {
 		handler.writeQueryError(writer, request, err)
@@ -81,7 +83,7 @@ func (handler *IssueHandler) List(writer http.ResponseWriter, request *http.Requ
 }
 
 func (handler *IssueHandler) Get(writer http.ResponseWriter, request *http.Request) {
-	_, projectID, _, ok := handler.authorizeProject(writer, request, auth.ActionReadProject)
+	principal, projectID, _, ok := handler.authorizeProject(writer, request, auth.ActionReadProject)
 	if !ok {
 		return
 	}
@@ -89,12 +91,13 @@ func (handler *IssueHandler) Get(writer http.ResponseWriter, request *http.Reque
 	if !ok {
 		return
 	}
-	filters, err := parseIssueFilters(request, projectID)
+	filters, err := parseIssueFilters(request, projectID, principal.UserID)
 	if err != nil {
 		writeIssueValidationError(writer, request)
 		return
 	}
 	filters.Fingerprint, filters.Limit, filters.Cursor, filters.Status = fingerprint, 1, "", ""
+	filters.Assignee, filters.NewOnly = "", false
 	page, err := handler.queries.List(request.Context(), filters)
 	if err != nil {
 		handler.writeQueryError(writer, request, err)
@@ -139,12 +142,13 @@ func (handler *IssueHandler) Patch(writer http.ResponseWriter, request *http.Req
 		writeIssueValidationError(writer, request)
 		return
 	}
-	filters, err := parseIssueFilters(request, projectID)
+	filters, err := parseIssueFilters(request, projectID, principal.UserID)
 	if err != nil {
 		writeIssueValidationError(writer, request)
 		return
 	}
 	filters.Fingerprint, filters.Limit, filters.Cursor, filters.Status = fingerprint, 1, "", ""
+	filters.Assignee, filters.NewOnly = "", false
 	page, err := handler.queries.List(request.Context(), filters)
 	if err != nil {
 		handler.writeQueryError(writer, request, err)
@@ -158,6 +162,11 @@ func (handler *IssueHandler) Patch(writer http.ResponseWriter, request *http.Req
 	state := metadata.IssueState{
 		ProjectID: projectID, Fingerprint: fingerprint, FingerprintVersion: int16(current.FingerprintVersion),
 		Status: current.Status, AssigneeUserID: current.AssigneeUserID, ResolvedInRelease: current.ResolvedInRelease,
+		ResolvedAt: current.ResolvedAt,
+	}
+	// A regression is a resolved Issue that failed again; the stored status is still resolved.
+	if state.Status == metadata.IssueStatusRegressed {
+		state.Status = metadata.IssueStatusResolved
 	}
 	if payload.Status != nil {
 		if !validIssueStatus(*payload.Status) {
@@ -165,6 +174,8 @@ func (handler *IssueHandler) Patch(writer http.ResponseWriter, request *http.Req
 			return
 		}
 		state.Status = *payload.Status
+		// Resolving again, even an Issue that regressed, restarts the regression clock.
+		state.ResolvedAt = nil
 	}
 	if payload.AssigneeUserID != nil {
 		state.AssigneeUserID, ok = optionalUUID(*payload.AssigneeUserID)
@@ -188,8 +199,73 @@ func (handler *IssueHandler) Patch(writer http.ResponseWriter, request *http.Req
 	writeJSON(writer, http.StatusOK, updated)
 }
 
+// maxIssueBatch bounds one batch to a page of the list (the page limit is 100).
+const maxIssueBatch = 100
+
+type batchIssueRequest struct {
+	Issues []struct {
+		Fingerprint        string `json:"fingerprint"`
+		FingerprintVersion int    `json:"fingerprintVersion"`
+	} `json:"issues"`
+	Status         *metadata.IssueStatus `json:"status"`
+	AssigneeUserID *string               `json:"assigneeUserId"`
+}
+
+// Batch applies one status and/or assignee change to the Issues the person selected in the
+// list. It reuses the single-Issue permission and writes in one transaction.
+func (handler *IssueHandler) Batch(writer http.ResponseWriter, request *http.Request) {
+	principal, projectID, _, ok := handler.authorizeProject(writer, request, auth.ActionResolveIssue)
+	if !ok {
+		return
+	}
+	var payload batchIssueRequest
+	if !decodeJSONBody(writer, request, &payload) {
+		return
+	}
+	if len(payload.Issues) == 0 || len(payload.Issues) > maxIssueBatch || (payload.Status == nil && payload.AssigneeUserID == nil) {
+		writeIssueValidationError(writer, request)
+		return
+	}
+	refs := make([]metadata.IssueRef, 0, len(payload.Issues))
+	seen := make(map[string]bool, len(payload.Issues))
+	for _, item := range payload.Issues {
+		fingerprint := strings.TrimSpace(item.Fingerprint)
+		if fingerprint == "" || len(fingerprint) > 128 || strings.ContainsAny(fingerprint, "\x00\r\n") ||
+			item.FingerprintVersion < 1 || item.FingerprintVersion > 32767 {
+			writeIssueValidationError(writer, request)
+			return
+		}
+		if seen[fingerprint] {
+			continue
+		}
+		seen[fingerprint] = true
+		refs = append(refs, metadata.IssueRef{Fingerprint: fingerprint, FingerprintVersion: int16(item.FingerprintVersion)})
+	}
+	var patch metadata.IssueStatePatch
+	if payload.Status != nil {
+		if !validIssueStatus(*payload.Status) {
+			writeIssueValidationError(writer, request)
+			return
+		}
+		patch.Status = payload.Status
+	}
+	if payload.AssigneeUserID != nil {
+		patch.SetAssignee = true
+		if patch.AssigneeUserID, ok = optionalUUID(*payload.AssigneeUserID); !ok {
+			writeIssueValidationError(writer, request)
+			return
+		}
+	}
+	updated, err := handler.states.BatchMutateIssueStates(request.Context(), principal.UserID, projectID, refs, patch)
+	if err != nil {
+		writeControlPlaneError(writer, request, handler.logger, err)
+		return
+	}
+	writeJSON(writer, http.StatusOK, map[string]int{"updated": updated})
+}
+
 func (handler *IssueHandler) Events(writer http.ResponseWriter, request *http.Request) {
-	_, projectID, _, ok := handler.authorizeProject(writer, request, auth.ActionReadProject)
+	principal, projectID, _, ok := handler.authorizeProject(writer, request, auth.ActionReadProject)
 	if !ok {
 		return
 	}
@@ -197,12 +273,12 @@ func (handler *IssueHandler) Events(writer http.ResponseWriter, request *http.Re
 	if !ok {
 		return
 	}
-	filters, err := parseIssueFilters(request, projectID)
+	filters, err := parseIssueFilters(request, projectID, principal.UserID)
 	if err != nil {
 		writeIssueValidationError(writer, request)
 		return
 	}
-	result, err := handler.events.ListIssueEvents(request.Context(), projectID, fingerprint, filters.From, filters.To, filters.Limit, filters.Cursor)
+	result, err := handler.events.ListIssueEvents(request.Context(), filters, fingerprint)
 	if err != nil {
 		handler.writeQueryError(writer, request, err)
 		return
@@ -241,7 +317,9 @@ func (handler *IssueHandler) writeQueryError(writer http.ResponseWriter, request
 	httpx.WriteError(writer, request, http.StatusServiceUnavailable, "QUERY_UNAVAILABLE", "Issue data is temporarily unavailable.")
 }
 
-func parseIssueFilters(request *http.Request, projectID uuid.UUID) (query.IssueFilters, error) {
+// parseIssueFilters reads the shared Issue filters. The caller's own user ID stands in for the
+// assignee value "me", so a bookmarked link means whoever opens it.
+func parseIssueFilters(request *http.Request, projectID, userID uuid.UUID) (query.IssueFilters, error) {
 	values := request.URL.Query()
 	from, err := time.Parse(time.RFC3339Nano, values.Get("from"))
 	if err != nil {
@@ -263,7 +341,10 @@ func parseIssueFilters(request *http.Request, projectID uuid.UUID) (query.IssueF
 		Route: values.Get("route"), Browser: values.Get("browser"), DeviceType: values.Get("deviceType"), Country: values.Get("country"),
 		Title: values.Get("title"), ErrorType: values.Get("errorType"), Fingerprint: values.Get("fingerprint"), UserID: values.Get("userId"),
 		Status: metadata.IssueStatus(values.Get("status")), Limit: limit, Cursor: values.Get("cursor"),
-		Sort: values.Get("sort"),
+		Sort: values.Get("sort"), Assignee: values.Get("assignee"), NewOnly: values.Get("new") == "1",
+	}
+	if filters.Assignee == "me" {
+		filters.Assignee = userID.String()
 	}
 	_, err = query.NormalizeIssueFilters(filters)
 	return filters, err

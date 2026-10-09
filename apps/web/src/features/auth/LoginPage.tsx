@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSearch } from "@tanstack/react-router";
-import { Building2Icon, ShieldCheckIcon } from "lucide-react";
+import { Building2Icon, CircleAlertIcon, ClockAlertIcon, ShieldCheckIcon } from "lucide-react";
 import { SiGithub } from "@icons-pack/react-simple-icons";
 import { GoogleIcon } from "@/components/icons/GoogleIcon";
 import { Button } from "@/components/ui/button";
@@ -72,7 +72,10 @@ export function LoginPage({ returnTo, expired, externalError }: LoginPageProps) 
       </div>
 
       {expired ? (
-        <Alert className="mb-5" role="status">
+        // An expired session is the reason the person is here, so it gets the warning tone
+        // rather than the near-invisible default card.
+        <Alert variant="warning" className="mb-5" role="status">
+          <ClockAlertIcon aria-hidden="true" />
           <AlertDescription>登录已过期，请重新登录。完成后会返回刚才的页面。</AlertDescription>
         </Alert>
       ) : null}
@@ -82,6 +85,7 @@ export function LoginPage({ returnTo, expired, externalError }: LoginPageProps) 
           className="mb-5"
           role="alert"
         >
+          {externalError === "cancelled" ? null : <CircleAlertIcon aria-hidden="true" />}
           <AlertDescription>
             {externalError === "cancelled"
               ? "已取消外部授权，您可以选择其他登录方式。"

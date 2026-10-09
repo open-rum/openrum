@@ -3,6 +3,7 @@ package metadata
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 	"testing"
 )
 
@@ -46,6 +47,7 @@ func TestDashboardStatAppearanceValidation(t *testing.T) {
 	}{
 		{"legacy", "stat", "number", "", true},
 		{"plain", "stat", "number", `,"statAppearance":"plain"`, true},
+		{"area", "stat", "number", `,"statAppearance":"area-right"`, true},
 		{"right", "stat", "number", `,"statAppearance":"line-right"`, true},
 		{"right-bar", "stat", "number", `,"statAppearance":"bar-right"`, true},
 		{"bottom", "stat", "number", `,"statAppearance":"line-bottom"`, true},
@@ -72,5 +74,37 @@ func TestCatalogBreakdownRejectsTheRetiredMapView(t *testing.T) {
 		if err := ValidateDashboardConfig(raw, nil); (err == nil) != valid {
 			t.Fatalf("%s: valid=%v error=%v", view, valid, err)
 		}
+	}
+}
+
+func TestDashboardTabbedCardValidation(t *testing.T) {
+	trend := func(id, size, group string) string {
+		field := ""
+		if group != "" {
+			field = fmt.Sprintf(`,"groupId":%q`, group)
+		}
+		return fmt.Sprintf(`{"id":%q,"type":"timeseries","version":2,"title":"趋势","size":%q,"view":"line","data":{"source":"catalog","metrics":["traffic.pageViews"],"filters":{}}%s}`, id, size, field)
+	}
+	stat := `{"id":"s","type":"stat","version":2,"title":"PV","size":"compact","view":"number","groupId":"g","data":{"source":"catalog","metrics":["traffic.pageViews"],"filters":{}}}`
+	for _, tc := range []struct {
+		name    string
+		widgets []string
+		valid   bool
+	}{
+		{"two tabs", []string{trend("a", "half", "g"), trend("b", "half", "g")}, true},
+		{"three tabs", []string{trend("a", "third", "g"), trend("b", "third", "g"), trend("c", "third", "g")}, true},
+		{"four tabs", []string{trend("a", "half", "g"), trend("b", "half", "g"), trend("c", "half", "g"), trend("d", "half", "g")}, false},
+		{"lonely tab", []string{trend("a", "half", "g"), trend("b", "half", "")}, false},
+		{"split group", []string{trend("a", "half", "g"), trend("b", "half", "g"), trend("c", "half", ""), trend("d", "half", "g")}, false},
+		{"mixed sizes", []string{trend("a", "half", "g"), trend("b", "full", "g")}, false},
+		{"stat tab", []string{trend("a", "half", "g"), stat}, false},
+		{"invalid id", []string{trend("a", "half", "bad id"), trend("b", "half", "bad id")}, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			raw := json.RawMessage(`{"schemaVersion":1,"widgets":[` + strings.Join(tc.widgets, ",") + `]}`)
+			if err := ValidateDashboardConfig(raw, nil); (err == nil) != tc.valid {
+				t.Fatalf("valid=%v error=%v", tc.valid, err)
+			}
+		})
 	}
 }

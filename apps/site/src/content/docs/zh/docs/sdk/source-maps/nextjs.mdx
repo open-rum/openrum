@@ -1,0 +1,114 @@
+---
+title: Next.js
+description: 在 Next.js 应用中让 Next 生成浏览器 Source Map，并在 next build 之后用 openrum-sourcemaps 上传，再让 SDK 上报同一个 Release。
+appliesTo: Alpha
+---
+
+import { Aside, Steps } from "@astrojs/starlight/components";
+
+Next.js 使用自己的构建流程，没有 Vite 插件的位置。做法是让 Next 生成浏览器 Source Map，再在
+`next build` 之后运行 `openrum-sourcemaps`。开始之前，先按[概览](/zh/docs/sdk/source-maps/#创建上传令牌)
+创建上传令牌，并把它保存为 CI Secret `OPENRUM_UPLOAD_TOKEN`。
+
+<Steps>
+
+1. ## 安装命令行工具
+
+   `openrum-sourcemaps` 在 `@openrum/vite-plugin` 包里。Alpha 阶段它尚未发布到 npm，在 OpenRUM 仓库中
+   构建，再把该目录安装到你的应用：
+
+   ```sh
+   pnpm --filter @openrum/vite-plugin build
+   pnpm add -D /path/to/openrum/packages/vite-plugin
+   ```
+
+   安装后可以用 `pnpm exec openrum-sourcemaps --help` 确认命令可用。这个包会带上 Vite 依赖，但
+   Next.js 项目只使用其中的命令行。
+
+1. ## 让 Next 生成 Source Map，并在构建后上传
+
+   ```ts title="next.config.ts"
+   import type { NextConfig } from "next";
+
+   const config: NextConfig = {
+     productionBrowserSourceMaps: true,
+   };
+
+   export default config;
+   ```
+
+   ```json title="package.json"
+   {
+     "scripts": {
+       "build": "next build && openrum-sourcemaps --out-dir .next/static --url-prefix _next/static/"
+     }
+   }
+   ```
+
+   CLI 通过环境变量读取 `OPENRUM_BASE_URL`、`OPENRUM_PROJECT_ID`、`OPENRUM_RELEASE` 和
+   `OPENRUM_UPLOAD_TOKEN`，完整列表见[插件与 CLI 选项](/zh/docs/sdk/source-maps/#插件与-cli-选项)。
+
+   - `--out-dir .next/static`：Next 把浏览器端的 chunk 和对应的 `.map` 文件放在这里。服务端代码
+     在 `.next/server`，不会上传。
+   - `--url-prefix _next/static/`：浏览器请求的脚本地址是 `/_next/static/chunks/…`，而 `.next/static`
+     下的相对路径不含 `_next/static/`，所以需要补上，否则 Artifact 名称和栈帧 URL 对不上。
+
+   配置了 `basePath: "/app"` 时，脚本地址是 `/app/_next/static/…`，前缀要写成
+   `app/_next/static/`。配置了 `assetPrefix` 为 CDN 地址时，取该地址的路径部分再加
+   `_next/static/`。
+
+   <Aside type="caution" title="不运行 CLI，Source Map 会公开">
+     `productionBrowserSourceMaps: true` 会让 Next 把 `.map` 文件放进 `.next/static`，并在 chunk 末尾写入
+     `sourceMappingURL`，它们会和站点一起对外提供，任何人都能下载你的源码。CLI 会在上传前把 `.map`
+     从构建目录删除，并去掉这些注释，所以它必须在打包镜像或部署之前运行。使用 `output: "standalone"`
+     时，要在复制 `.next/static` 之前运行。
+   </Aside>
+
+1. ## 让 SDK 上报同一个 Release
+
+   用同一个 CI 变量同时设置 CLI 的 `release` 和 SDK 的 `release`：
+
+   ```tsx title="app/monitoring.tsx"
+   "use client";
+
+   import { init } from "@openrum/browser";
+   import { useEffect } from "react";
+
+   export function Monitoring() {
+     useEffect(() => {
+       init({
+         dsn: process.env.NEXT_PUBLIC_OPENRUM_DSN!,
+         release: process.env.NEXT_PUBLIC_APP_RELEASE, // 与 OPENRUM_RELEASE 相同
+       });
+     }, []);
+
+     return null;
+   }
+   ```
+
+   `NEXT_PUBLIC_` 变量在 `next build` 时被写入浏览器 bundle，所以它必须在构建步骤里设置。
+   `init()` 必须在浏览器中执行，完整写法见 [Next.js SDK](/zh/docs/sdk/browser/nextjs/)。
+
+   ```yaml title=".github/workflows/deploy.yml"
+   - name: Build and upload Source Maps
+     run: pnpm build
+     env:
+       OPENRUM_BASE_URL: https://rum.example.com
+       OPENRUM_PROJECT_ID: <your-project-id>
+       OPENRUM_RELEASE: ${{ github.sha }}
+       NEXT_PUBLIC_APP_RELEASE: ${{ github.sha }}
+       OPENRUM_UPLOAD_TOKEN: ${{ secrets.OPENRUM_UPLOAD_TOKEN }}
+   ```
+
+   <Aside type="caution" title="值不一致不会报错">
+     没有 `release` 的事件无法还原。`dist` 不同，或只在一侧设置了 `dist`，都会查到另一个 Release，
+     结果是找不到 Artifact。
+   </Aside>
+
+1. ## 验证还原
+
+   部署后按[概览](/zh/docs/sdk/source-maps/#验证还原)验证：在 **发布** 页确认 Artifact 可用，用匹配测试器
+   检查一个真实的帧，再触发一个已知错误。栈帧没有还原时，先对比栈帧 URL 路径和 Artifact 名称，见
+   [栈帧没有还原的原因](/zh/docs/sdk/source-maps/#栈帧没有还原的原因)。
+
+</Steps>

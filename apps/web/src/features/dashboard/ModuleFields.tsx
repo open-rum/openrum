@@ -91,9 +91,18 @@ export function ModuleFields({
         ...widget,
         type,
         version: 2,
-        size: type === "stat" ? "compact" : widget.size === "compact" ? "half" : widget.size,
+        size:
+          type === "stat"
+            ? widget.size === "half"
+              ? "half"
+              : "compact"
+            : widget.size === "compact"
+              ? "half"
+              : widget.size,
         view: type === "stat" ? "number" : table ? "table" : type === "breakdown" ? "bar" : "line",
         statAppearance: type === "stat" ? widget.statAppearance : undefined,
+        // A stat card cannot stay inside a tabbed card.
+        groupId: type === "stat" ? undefined : widget.groupId,
         data: {
           ...widget.data,
           metrics: single ? widget.data.metrics.slice(0, 1) : widget.data.metrics,
@@ -311,7 +320,36 @@ export function ModuleFields({
             趋势使用当前时间范围的真实数据；数值仍为整个周期的汇总。
           </FieldDescription>
         </Field>
-      ) : (
+      ) : null}
+      {widget.type === "stat" && widget.data.source === "catalog" ? (
+        <Field>
+          <FieldLabel>变化含义</FieldLabel>
+          <ToggleGroup
+            type="single"
+            variant="outline"
+            value={widget.data.direction ?? "auto"}
+            onValueChange={(value) => {
+              if (!value || widget.data.source !== "catalog") return;
+              onChange({
+                ...widget,
+                data: {
+                  ...widget.data,
+                  direction: value === "auto" ? undefined : (value as "up" | "down"),
+                },
+              });
+            }}
+            aria-label="变化含义"
+          >
+            <ToggleGroupItem value="auto">跟随指标</ToggleGroupItem>
+            <ToggleGroupItem value="up">越高越好</ToggleGroupItem>
+            <ToggleGroupItem value="down">越低越好</ToggleGroupItem>
+          </ToggleGroup>
+          <FieldDescription>
+            决定环比徽标的颜色：上涨是好消息显示绿色，坏消息显示红色。收入、订单等通用数值默认不判断好坏。
+          </FieldDescription>
+        </Field>
+      ) : null}
+      {widget.type === "stat" ? null : (
         <Field>
           <FieldLabel>展示方式</FieldLabel>
           <ToggleGroup

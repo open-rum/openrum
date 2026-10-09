@@ -1,9 +1,8 @@
 ---
 title: Troubleshooting
 description: Diagnose local startup, missing Events, login and Source Map problems.
+appliesTo: Alpha
 ---
-
-**Applies to:** Alpha.
 
 ## Local Compose will not become healthy
 
@@ -26,20 +25,20 @@ docker compose -f deploy/compose/docker-compose.yml down -v
 
 - Use exactly `http://127.0.0.1:4173`, matching `PUBLIC_BASE_URL`.
 - Confirm API readiness: `curl --fail http://127.0.0.1:4173/health/ready`.
-- Demo credentials are `demo@openrum.local` / `OpenRUM-demo-2026!` for local evaluation only.
+- Demo credentials are `demo@openrum.local` / `OpenRUM-demo-2026!` for local development only, and exist only after `pnpm openrum seed`.
 
 ## Events do not appear
 
 1. Confirm the Browser SDK `dsn` and the Project's allowed Origin.
 2. Check ingest logs and Origin allowlist for the Project key.
-3. Confirm Kafka, Consumer and ClickHouse are healthy; wait for Demo seed completion on first boot.
+3. Confirm Kafka, Consumer and ClickHouse are healthy; if you use the demo dataset, wait for `pnpm openrum seed` to finish.
 4. Open **Events** with a wide time range, then inspect **Sessions** for the same `session_id`.
 
 ## Investigation path incomplete
 
 | Symptom                         | Likely cause                                                    | Next step                                               |
 | ------------------------------- | --------------------------------------------------------------- | ------------------------------------------------------- |
-| Behavior charts empty           | Seed unfinished or ClickHouse unhealthy                         | Wait, then check Consumer/ClickHouse                    |
+| Behavior charts empty           | Demo not seeded, or ClickHouse unhealthy                        | Run `pnpm openrum seed`, then check Consumer/ClickHouse |
 | Session without errors          | Selected Session has no error Events                            | Filter Sessions with errors on `/checkout` in Demo      |
 | Issue missing Source Map frames | Object storage not configured, or no Artifact matches the frame | See [Source Map upload fails](#source-map-upload-fails) |
 | API panel empty                 | No fetch/XHR captured or sampling disabled                      | Trigger traffic from the React example                  |

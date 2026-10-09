@@ -88,4 +88,4 @@ built-in one. It falls when you filter, so the fix is usually one of:
 - [Funnels, paths and retention](/docs/product/analytics/explorations/) — the three exploration queries and their limits
 - [Compared with GA4](/docs/product/analytics/ga4/) — feature-by-feature, including the gaps
 
-Related: [Investigation](/docs/product/investigation/), [Domain model](/docs/getting-started/domain-model/), [Browser SDK](/docs/sdk/browser/).
+Related: [Investigation](/docs/product/investigation/), [Glossary and core concepts](/docs/reference/glossary/), [Browser SDK](/docs/sdk/browser/).

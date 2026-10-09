@@ -1,0 +1,35 @@
+---
+title: Vue
+description: Initialize the OpenRUM browser SDK once in a Vite-built Vue app.
+appliesTo: "@openrum/browser 0.1.0"
+---
+
+Before you start, install the SDK and copy the Project's DSN as described in the
+[Browser SDK overview](/docs/sdk/browser/#initialize). Add your app's origin to the Project's
+allowed origins.
+
+## Initialize
+
+```ts title="src/monitoring.ts"
+import { init } from "@openrum/browser";
+
+init({
+  dsn: import.meta.env.VITE_OPENRUM_DSN,
+  environment: import.meta.env.MODE,
+  release: import.meta.env.VITE_APP_RELEASE,
+});
+```
+
+```ts title="src/main.ts"
+import "./monitoring.ts";
+import { createApp } from "vue";
+```
+
+Vue Router's HTML5 history mode navigates through `history.pushState`, so Page Views are
+captured without a router hook. Hash mode is not captured; see
+[Support matrix](/docs/sdk/browser/#support-matrix).
+
+## Next steps
+
+- [Verify](/docs/sdk/browser/#verify) that capture, ingest and aggregation agree.
+- For Vite builds, the [React (Vite) Source Map page](/docs/sdk/source-maps/react/) shows the plugin setup, which is the same for Vue.

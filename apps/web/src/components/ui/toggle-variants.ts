@@ -9,6 +9,10 @@ export const toggleVariants = cva(
         outline: "border border-input bg-transparent hover:bg-muted",
         selection:
           "border border-input bg-transparent hover:bg-muted data-[state=on]:border-[var(--ds-selection-border)] data-[state=on]:bg-[var(--ds-selection)] data-[state=on]:text-[var(--ds-selection-foreground)] aria-pressed:border-[var(--ds-selection-border)] aria-pressed:bg-[var(--ds-selection)] aria-pressed:text-[var(--ds-selection-foreground)]",
+        // Single-select segmented control: the selection is a SlidingIndicator behind the
+        // options, so the options themselves stay transparent.
+        segmented:
+          "relative z-[1] bg-transparent text-muted-foreground hover:bg-transparent hover:text-foreground aria-pressed:bg-transparent data-[state=on]:bg-transparent data-[state=on]:text-foreground",
         legend:
           "bg-transparent font-normal text-muted-foreground aria-pressed:bg-transparent data-[state=on]:bg-transparent data-[state=off]:line-through data-[state=off]:opacity-50",
       },

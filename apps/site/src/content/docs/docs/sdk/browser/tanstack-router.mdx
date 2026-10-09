@@ -1,0 +1,36 @@
+---
+title: TanStack Router
+description: Initialize the OpenRUM browser SDK once in an app that uses TanStack Router.
+appliesTo: "@openrum/browser 0.1.0"
+---
+
+Before you start, install the SDK and copy the Project's DSN as described in the
+[Browser SDK overview](/docs/sdk/browser/#initialize). Add your app's origin to the Project's
+allowed origins.
+
+## Initialize
+
+```ts title="src/monitoring.ts"
+import { init } from "@openrum/browser";
+
+init({
+  dsn: import.meta.env.VITE_OPENRUM_DSN,
+  environment: import.meta.env.MODE,
+  release: import.meta.env.VITE_APP_RELEASE,
+});
+```
+
+```ts title="src/main.tsx"
+import "./monitoring.ts";
+import { createRouter } from "@tanstack/react-router";
+```
+
+TanStack Router commits navigations through `history.pushState`, so each one produces a
+Page View. The recorded Route is the resolved pathname, not the route pattern:
+`/orders/8fc1` rather than `/orders/$orderId`. See
+[Route patterns](/docs/sdk/browser/#route-patterns-are-not-recorded-yet).
+
+## Next steps
+
+- [Verify](/docs/sdk/browser/#verify) that capture, ingest and aggregation agree.
+- For Vite builds, the [React (Vite) Source Map page](/docs/sdk/source-maps/react/) shows the plugin setup.

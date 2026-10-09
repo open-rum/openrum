@@ -94,7 +94,8 @@ describe("development generator", () => {
         environment: "test",
         from: new Date(result.from).toISOString(),
         to: new Date(result.to).toISOString(),
-        sessions: 100,
+        sessions: 300,
+        users: { ids: [], signedIn: 0.45 },
       }),
     );
     expect(vi.mocked(generateDevData).mock.calls[0][1]).not.toHaveProperty("dsn");

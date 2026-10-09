@@ -1,0 +1,86 @@
+---
+title: 组件与职责
+description: 每个 OpenRUM 服务负责什么、连接哪些依赖，以及它停掉时会影响什么。
+appliesTo: Alpha
+---
+
+import { Aside } from "@astrojs/starlight/components";
+
+一个 Instance 运行五个应用服务，另外在你的应用里接入 Browser SDK。其中四个是 Go 服务，第五个是 Console Web 服务，它只是一个静态文件服务器，同时作为另外两个公开服务的统一入口。它们共用四个依赖，主要通过依赖来协作：Console 找 API，SDK 找 Ingest，事件通过 Kafka 从 Ingest 流向 Consumer，再通过 ClickHouse 从 Consumer 流向 API。整体图见[架构](/zh/docs/self-hosting/architecture/)，本页是逐个组件的参考。
+
+## 一览
+
+| 组件 | 角色 | 读写 |
+| --- | --- | --- |
+| Browser SDK | 在页面里采集事件，并把批次发送给 Ingest | 通过 HTTPS 访问 Ingest |
+| Console Web 服务 | 提供 Console；把 `/api/` 转发给 API、`/ingest/` 转发给 Ingest，一个公开域名就够用 | API、Ingest |
+| API | Console 与控制面操作、登录、角色校验和分析查询 | PostgreSQL、ClickHouse、Redis、Kafka（仅测试 Event）、可选对象存储 |
+| Ingest | 接收浏览器发来的事件批次，写入 Kafka | PostgreSQL（Project key 与设置）、Redis、Kafka |
+| Consumer | 把队列里的批次变成已存储的 Event | Kafka、ClickHouse、PostgreSQL（Project 规则）、Redis |
+| Worker | 后台任务：堆栈映射、告警评估、清理与删除 | PostgreSQL、ClickHouse、可选对象存储 |
+
+## API
+
+API 是 Console 唯一访问的服务。每个请求都带会话 Cookie 和 CSRF 令牌，API 在服务端解析调用者的[组织角色和实例角色](/zh/docs/product/roles-permissions/)，所以 URL 里的 Project ID 本身从来不构成授权。
+
+它负责：
+
+- 登录、账号与成员管理，包括外部认证提供者
+- Project、Release、告警和通知渠道的配置
+- 面向实例管理员的实例设置与维护流程
+- 全部分析查询，都在 ClickHouse 上执行
+- **发送测试 Event** 操作：直接把一个合成 Event 发布到 Kafka
+
+API 停掉后没人能使用 Console，但遥测数据仍在进来：Ingest 和 Consumer 不依赖它。
+
+## Ingest
+
+Ingest 是 Browser SDK 发送数据的公开写入端点。它检查请求是否被允许、格式是否正确，然后交给 Kafka 并应答。它不写 ClickHouse，也不改写事件。
+
+它负责[事件链路](/zh/docs/self-hosting/event-pipeline/)里同步的那一半：按 IP 和 Project 的限流、key 与 Origin 认证、请求体与 schema 校验，以及可靠写入 Kafka。返回 `202` 表示 Kafka 已确认这个批次。全部状态码和错误码见 [Ingest 响应码](/zh/docs/reference/ingest-responses/)。
+
+Ingest 停掉后，SDK 会把批次留在队列里重试。只有队列被丢弃，或者浏览器在发送前就关闭，事件才会丢失。
+
+## Consumer
+
+Consumer 以消费组方式读取 Kafka 主题，负责那些依赖已保存设置和事件内容的处理：规范化与隐私清洗、Project 入站过滤、处理规则、保留策略、错误指纹计算，以及写入 ClickHouse。无法处理的事件会进入死信主题，不会卡住分区。
+
+只有 ClickHouse 已经写入成功，它才提交 Kafka offset。ClickHouse 写入失败时会退避重试且不提交 offset，所以 Consumer 会落后，而不是丢数据。这段时间里 Kafka 的保留期就是缓冲，见[容量规划](/zh/docs/self-hosting/capacity/)。
+
+## Worker
+
+Worker 运行那些不该阻塞请求的任务：
+
+| 任务 | 做什么 |
+| --- | --- |
+| 堆栈映射 | 用已上传的 [Source Map](/zh/docs/sdk/source-maps/) 把压缩后的堆栈帧映射回源码，Release 之后才上传时也会重新映射 |
+| 告警 | 调度并评估告警规则，再向通知渠道发送通知 |
+| 保留清理 | 执行[数据生命周期](/zh/docs/self-hosting/data-lifecycle/)策略和经过预览的维护任务 |
+| 紧急清理 | 执行[存储压力](/zh/docs/self-hosting/storage-pressure/)里描述的引导式恢复 |
+| Project 删除与数据清除 | Console 停用 Project 之后，清除它的事件和 Artifact |
+
+Worker 停掉后，已存储的事件和查询不受影响。映射后的堆栈帧、告警评估和清理会暂停，直到它恢复。
+
+<Aside title="映射后的堆栈帧会晚一点到">
+  映射在错误入库之后才运行，所以一个错误会先带着原始帧出现，过一会儿才拿到映射后的帧。它的
+  Release 如果从未上传过，就只会保留原始帧。
+</Aside>
+
+## Console Web 服务
+
+Console 是一个静态应用。它前面的 Web 服务负责提供文件，并转发两个前缀：`/api/` 转给 API，`/ingest/` 转给 Ingest。它还提供 `/health/live` 和 `/health/ready`。在 Kubernetes 里，同样的分流由 Ingress 完成，见 [Kubernetes 与 Helm](/zh/docs/self-hosting/kubernetes/)。
+
+## 客户端部分
+
+[Browser SDK](/zh/docs/sdk/browser/) 采集 Page View、交互、错误、Web Vitals、日志和 API Request，在数据离开页面之前去掉敏感值，并负责排队与重试。[Vite 插件](/zh/docs/sdk/source-maps/)在构建时为某个 Release 上传 Source Map Artifact，使用的是 Project 上传令牌，而不是 Console 会话。
+
+## 扩展与故障速查
+
+Ingest 随流量扩展；Consumer 随 Kafka 分区数和 ClickHouse 写入能力扩展；API 随 Console 与查询负载扩展。共享状态放在 Redis 和 PostgreSQL 里，而不在服务自己的内存中，Helm chart 也为每个服务设置了副本数。副本和容量的指导见 [Kubernetes 与 Helm](/zh/docs/self-hosting/kubernetes/)和[容量规划](/zh/docs/self-hosting/capacity/)。
+
+| 如果它停了 | 遥测接收 | Console |
+| --- | --- | --- |
+| API | 不受影响 | 不可用 |
+| Ingest | 停止；SDK 排队并重试 | 已有数据仍可查询 |
+| Consumer | 仍可接收，但 Event 在 Kafka 里等待 | 最新数据滞后 |
+| Worker | 不受影响 | 没有映射帧、告警和清理 |

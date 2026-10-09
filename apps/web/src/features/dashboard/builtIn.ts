@@ -28,8 +28,8 @@ const entry = (id: string, library: string) => fixed(id, libraryEntry(library).c
 
 /**
  * Health at a glance, then the trends behind it, then what to act on. The default also
- * shows every kind of module once, so a new Project sees what dashboards can draw: all
- * three stat card styles; line (with the previous period), area, bar, stacked-bar and
+ * shows every kind of module once, so a new Project sees what dashboards can draw: both
+ * stat card styles (plain and right-side area); line (with the previous period), area, bar, stacked-bar and
  * stacked-area trends; ranked bars, a table and a donut; a ranked table, a metric table
  * and the Top Issues list. Half-width modules are ordered in pairs so rows stay full.
  */
@@ -37,11 +37,11 @@ export function defaultDashboard(): { schemaVersion: 1; widgets: Widget[] } {
   return {
     schemaVersion: 1,
     widgets: [
-      stat("sessions", "traffic.sessions", "会话数", "line-right"),
-      stat("page-views", "traffic.pageViews", "PV", "line-right"),
-      stat("users", "traffic.uniqueUsers", "UV", "line-right"),
-      stat("error-rate", "traffic.errorRate", "错误率", "bar-right"),
-      stat("api-failure-rate", "traffic.apiFailureRate", "API 失败率", "bar-right"),
+      stat("sessions", "traffic.sessions", "会话数", "area-right"),
+      stat("page-views", "traffic.pageViews", "PV", "area-right"),
+      stat("users", "traffic.uniqueUsers", "UV", "area-right"),
+      stat("error-rate", "traffic.errorRate", "错误率", "area-right"),
+      stat("api-failure-rate", "traffic.apiFailureRate", "API 失败率", "area-right"),
       stat("lcp", "vitals.lcpP75", "LCP P75", "plain"),
       stat("inp", "vitals.inpP75", "INP P75", "plain"),
       stat("cls", "vitals.clsP75", "CLS P75", "plain"),

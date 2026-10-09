@@ -5,6 +5,7 @@ import { type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 import { ToggleGroup as ToggleGroupPrimitive } from "radix-ui";
 
+import { SlidingIndicator } from "@/components/ui/sliding-indicator";
 import { toggleVariants } from "@/components/ui/toggle-variants";
 
 const ToggleGroupContext = React.createContext<
@@ -32,21 +33,41 @@ function ToggleGroup({
     spacing?: number;
     orientation?: "horizontal" | "vertical";
   }) {
+  const rootRef = React.useRef<HTMLDivElement>(null);
+  // Every horizontal single-select outline group is a segmented control: one pill track
+  // whose selection slides between options.
+  const segmented =
+    props.type === "single" &&
+    orientation === "horizontal" &&
+    (variant === "outline" || variant === "segmented");
+  const itemVariant = segmented ? "segmented" : variant;
   return (
     <ToggleGroupPrimitive.Root
+      ref={rootRef}
       data-slot="toggle-group"
-      data-variant={variant}
+      data-variant={itemVariant}
       data-size={size}
-      data-spacing={spacing}
+      data-spacing={segmented ? "segmented" : spacing}
       data-orientation={orientation}
-      style={{ "--gap": spacing } as React.CSSProperties}
+      style={{ "--gap": segmented ? 0.5 : spacing } as React.CSSProperties}
       className={cn(
         "group/toggle-group flex w-fit flex-row items-center gap-[--spacing(var(--gap))] rounded-full data-vertical:rounded-2xl data-vertical:flex-col data-vertical:items-stretch",
+        segmented && "relative border border-input bg-muted/50 p-[3px]",
         className,
       )}
       {...props}
     >
-      <ToggleGroupContext.Provider value={{ variant, size, spacing, orientation }}>
+      {segmented ? (
+        <SlidingIndicator containerRef={rootRef} activeSelector='[data-state="on"]' />
+      ) : null}
+      <ToggleGroupContext.Provider
+        value={{
+          variant: itemVariant,
+          size,
+          spacing: segmented ? undefined : spacing,
+          orientation,
+        }}
+      >
         {children}
       </ToggleGroupContext.Provider>
     </ToggleGroupPrimitive.Root>

@@ -196,9 +196,38 @@ html[data-landing-palette] body {
   position: relative;
   margin-top: clamp(56px, 8vw, 96px);
 }
+/* A soft glow in the palette's accent sits behind the screenshot and around its edge, so
+   the product shot reads as lit from within rather than pasted onto the page. */
+.lp-hero-shot::before {
+  content: "";
+  position: absolute;
+  inset: -16% 12% 55%;
+  z-index: 0;
+  background: radial-gradient(
+    50% 60% at 50% 70%,
+    color-mix(in srgb, var(--lp-accent) 38%, transparent),
+    transparent 72%
+  );
+  filter: blur(52px);
+  pointer-events: none;
+}
+.lp-hero-screenshot {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid color-mix(in srgb, var(--lp-accent) 28%, var(--lp-line));
+  border-radius: 16px;
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--lp-accent) 10%, transparent),
+    0 -28px 90px -30px color-mix(in srgb, var(--lp-accent) 50%, transparent),
+    0 48px 140px -56px color-mix(in srgb, var(--lp-fg) 18%, transparent);
+}
 .lp-hero-shot::after {
   content: "";
   position: absolute;
+  z-index: 2;
   inset: auto 0 0;
   height: 40%;
   background: linear-gradient(to bottom, transparent, var(--lp-bg));
@@ -230,6 +259,7 @@ html[data-landing-palette] body {
 
 /* Tour */
 .lp-tabs {
+  position: relative;
   display: flex;
   justify-content: center;
   gap: 4px;
@@ -242,7 +272,29 @@ html[data-landing-palette] body {
   border-radius: 999px;
   scrollbar-width: none;
 }
+.lp-tabs-indicator {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  left: 0;
+  width: 0;
+  border-radius: 999px;
+  background: var(--lp-fg);
+  pointer-events: none;
+}
+.lp-tabs-indicator.is-ready {
+  transition:
+    transform 220ms ease,
+    width 220ms ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  .lp-tabs-indicator.is-ready {
+    transition: none;
+  }
+}
 .lp-tabs button {
+  position: relative;
+  z-index: 1;
   flex: none;
   height: 40px;
   padding: 0 20px;
@@ -257,7 +309,6 @@ html[data-landing-palette] body {
     color 150ms ease;
 }
 .lp-tabs button[aria-selected="true"] {
-  background: var(--lp-fg);
   color: var(--lp-bg);
 }
 .lp-caption {

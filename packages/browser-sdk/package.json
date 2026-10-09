@@ -23,11 +23,11 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@openrum/protocol": "workspace:*",
     "web-vitals": "^6.2.1"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@openrum/protocol": "workspace:*",
     "@types/node": "^24.10.0",
     "eslint": "^10.9.1",
     "tsup": "^8.5.0",
