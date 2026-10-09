@@ -2,12 +2,19 @@
 
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import type { Project } from "@/lib/api/projects";
 import { AnalysisContextControls, useAnalysisContextState } from "./AnalysisContextBar";
 
 const projectId = "11111111-1111-4111-8111-111111111111";
 const project = { id: projectId } as Project;
+
+// The range calendar is a separate module that loads when the custom range opens. Loading it
+// once up front keeps the first test that opens it from racing a cold dynamic import, which is
+// slow on a loaded CI machine.
+beforeAll(async () => {
+  await import("./RangeCalendar");
+}, 30_000);
 
 afterEach(() => {
   cleanup();
@@ -47,7 +54,9 @@ describe("analysis time filter", () => {
 
     expect(screen.getByText("自定义时间范围")).toBeTruthy();
     // The calendar is a separate module that loads when the custom range opens.
-    await waitFor(() => expect(document.querySelector('[data-slot="calendar"]')).toBeTruthy());
+    await waitFor(() => expect(document.querySelector('[data-slot="calendar"]')).toBeTruthy(), {
+      timeout: 5000,
+    });
     expect(document.querySelectorAll('input[type="time"]')).toHaveLength(2);
 
     await user.click(screen.getByRole("button", { name: "返回快捷时间范围" }));
