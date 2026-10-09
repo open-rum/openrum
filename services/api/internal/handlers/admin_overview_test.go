@@ -70,7 +70,7 @@ func TestAdminOverviewRequiresInstanceRoleAndDoesNotExposeSecrets(t *testing.T) 
 		adminID: metadata.InstanceRoleAdmin,
 	}}
 	source := fixedAdminOverviewSource{response: adminOverviewResponse{
-		Version: "v0.1.0", Environment: "test", DeploymentMode: "kubernetes",
+		Version: "v0.1.1", Environment: "test", DeploymentMode: "kubernetes",
 		StartedAt:    time.Now().UTC().Format(timeFormat),
 		Dependencies: []adminDependencyResponse{{ID: "postgres", Label: "PostgreSQL", Status: "healthy", Detail: "available"}},
 		Pipeline:     adminPipelineResponse{Capacity: adminCapacityResponse{Status: "unknown", Detail: "unknown"}},

@@ -21,7 +21,7 @@ The Browser SDK posts bounded envelopes to ingest. An HTTP success means Kafka d
 
 The Instance serves a versioned IIFE build for pages that cannot install an npm package. The
 script is public, CORS-enabled and immutable for one year; changing its contents requires a new
-versioned URL. The current path is `/sdk/browser/0.1.0/openrum.min.js`, which exposes the
+versioned URL. The current path is `/sdk/browser/0.1.1/openrum.min.js`, which exposes the
 documented singleton API on `window.OpenRUM`.
 
 ## Console API

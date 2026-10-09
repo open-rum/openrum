@@ -20,21 +20,21 @@ Make one release-preparation PR that updates `deploy/helm/openrum/Chart.yaml` (`
 
 Keep the docs for unreleased features in review until the corresponding artifact is published. The current public docs site shows one current version; the versioned static archive preserves the exact docs built from each tag, but the site does not yet serve archived versions at separate URLs.
 
-Run normal CI on the PR, then use **Publish release → Run workflow** with a version such as `v0.1.0` to run the full release validation without publishing. The dry run checks the version contract, renders and packages the Chart, builds the documentation from the candidate commit, and retains both artifacts for inspection. It does not push images, Chart packages, tags, GitHub Releases, or production deployments.
+Run normal CI on the PR, then use **Publish release → Run workflow** with a version such as `v0.1.1` to run the full release validation without publishing. The dry run checks the version contract, renders and packages the Chart, builds the documentation from the candidate commit, and retains both artifacts for inspection. It does not push images, Chart packages, tags, GitHub Releases, or production deployments.
 
 ## Publish
 
 After the release-preparation PR is merged and the commit is approved, create and push an immutable tag:
 
 ```sh
-git tag -a v0.1.0 -m "OpenRUM v0.1.0"
-git push origin v0.1.0
+git tag -a v0.1.1 -m "OpenRUM v0.1.1"
+git push origin v0.1.1
 ```
 
 `Publish release` then reuses the main CI checks, validates that the tag points to a commit on `main`, checks all Chart/image versions, and runs Helm lint/template plus documentation build/link checks. Only after those checks pass does the `public-release` job:
 
-1. Build and publish `ghcr.io/open-rum/openrum:0.1.0` for amd64 and arm64, then inspect the published image.
-2. Push `openrum-0.1.0.tgz` to `oci://ghcr.io/open-rum/charts`, then pull its metadata back.
+1. Build and publish `ghcr.io/open-rum/openrum:0.1.1` for amd64 and arm64, then inspect the published image.
+2. Push `openrum-0.1.1.tgz` to `oci://ghcr.io/open-rum/charts`, then pull its metadata back.
 3. Attach the static docs archive built from the same commit to the GitHub Release. The current Netlify site deploys from its connected branch, not from this archive.
 4. Create the GitHub pre-release with generated notes only after the artifacts have been published.
 
@@ -55,15 +55,15 @@ One-time setup:
 To release:
 
 1. Bump `version` in `packages/browser-sdk/package.json`, update the SDK docs, and merge to `main`.
-2. Use **Publish browser SDK → Run workflow** with a tag such as `browser-v0.1.0` for a dry run. It checks the tag against the package version, runs lint, type check, tests and the build, then packs the tarball and installs it into an empty project to import it and type-check against it. That last step is what catches a private workspace dependency leaking into the published package. A dry run never publishes.
+2. Use **Publish browser SDK → Run workflow** with a tag such as `browser-v0.1.1` for a dry run. It checks the tag against the package version, runs lint, type check, tests and the build, then packs the tarball and installs it into an empty project to import it and type-check against it. That last step is what catches a private workspace dependency leaking into the published package. A dry run never publishes.
 3. Push the tag:
 
 ```sh
-git tag -a browser-v0.1.0 -m "@openrum/browser 0.1.0"
-git push origin browser-v0.1.0
+git tag -a browser-v0.1.1 -m "@openrum/browser 0.1.1"
+git push origin browser-v0.1.1
 ```
 
-The workflow refuses an existing npm version, publishes with provenance (only while the repository is public; npm cannot sign provenance for a private repository), and reads the version back from the registry. A plain version publishes under `latest`; a prerelease such as `browser-v0.1.0-alpha.1` publishes under `next`, so `npm install @openrum/browser` never picks it up. npm does not allow republishing a version, so fix a bad release with a new patch version.
+The workflow refuses an existing npm version, publishes with provenance (only while the repository is public; npm cannot sign provenance for a private repository), and reads the version back from the registry. A plain version publishes under `latest`; a prerelease such as `browser-v0.1.1-alpha.1` publishes under `next`, so `npm install @openrum/browser` never picks it up. npm does not allow republishing a version, so fix a bad release with a new patch version.
 
 ## Deploy separately
 
@@ -71,7 +71,7 @@ An operator can install or upgrade the versioned Chart with environment-specific
 
 ```sh
 helm upgrade --install openrum oci://ghcr.io/open-rum/charts/openrum \
-  --version 0.1.0 \
+  --version 0.1.1 \
   --namespace openrum --create-namespace \
   --values values.production.yaml \
   --wait --timeout 15m

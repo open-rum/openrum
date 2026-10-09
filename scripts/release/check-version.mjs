@@ -9,7 +9,7 @@ const match =
 
 if (!match) {
   throw new Error(
-    `RELEASE_TAG must be a semantic version tag such as v0.1.0 or v0.1.0-alpha.1; received ${JSON.stringify(tag)}`,
+    `RELEASE_TAG must be a semantic version tag such as v0.1.1 or v0.1.1-alpha.1; received ${JSON.stringify(tag)}`,
   );
 }
 

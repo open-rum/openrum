@@ -89,7 +89,7 @@ This stack uses example credentials and single-node dependencies for local evalu
 Create a Project in the Console, add your application's origin to its allowed origins, and copy the client DSN. For a local test page, the running Instance serves the Browser SDK directly:
 
 ```html
-<script src="http://127.0.0.1:4173/api/v1/sdk/browser/0.1.0/openrum.min.js"></script>
+<script src="http://127.0.0.1:4173/api/v1/sdk/browser/0.1.1/openrum.min.js"></script>
 <script>
   OpenRUM.init({
     dsn: "PASTE_YOUR_PROJECT_DSN",

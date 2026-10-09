@@ -72,7 +72,7 @@ ingress:
       secretName: openrum-tls
 ```
 
-To use an internal mirror, add `image.repository: registry.example.com/openrum` and `image.tag: "0.1.0"` to this file, using the exact image version paired with the Chart. For a private registry, create an image-pull Secret in the same namespace and add `imagePullSecrets: [{ name: your-registry-secret }]`. The chart passes it to the application Deployments, the pre-install migration Job, and the Helm test Pod. If the cluster cannot pull the default `busybox:1.37` test image, also override `smokeTest.image`.
+To use an internal mirror, add `image.repository: registry.example.com/openrum` and `image.tag: "0.1.1"` to this file, using the exact image version paired with the Chart. For a private registry, create an image-pull Secret in the same namespace and add `imagePullSecrets: [{ name: your-registry-secret }]`. The chart passes it to the application Deployments, the pre-install migration Job, and the Helm test Pod. If the cluster cannot pull the default `busybox:1.37` test image, also override `smokeTest.image`.
 
 `publicBaseURL` must be an absolute `http(s)` URL, and under `appEnv: production` it must be HTTPS. It is the origin the Console and the SDK are told to use, so it has to be the address users actually reach — not an internal Service name.
 
@@ -102,11 +102,11 @@ A bundled Redis restart takes API and Ingest out of service for a few seconds. F
 
 ## 3. Install
 
-Once the official `0.1.0` release is available, install its OCI chart and matching default image:
+Once the official `0.1.1` release is available, install its OCI chart and matching default image:
 
 ```sh
 helm upgrade --install openrum oci://ghcr.io/open-rum/charts/openrum \
-  --version 0.1.0 \
+  --version 0.1.1 \
   --namespace openrum --create-namespace \
   --values values.production.yaml \
   --wait --timeout 15m
