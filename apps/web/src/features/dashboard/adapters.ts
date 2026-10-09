@@ -4,8 +4,17 @@ import type { OverviewFilters } from "@/lib/filters/schema";
 import { metricLabel, type Widget } from "./model";
 import { effectiveOverviewFilters, type DashboardData } from "./queries";
 import { continuousRows, intervalSeconds } from "./chartDensity";
+import { categoryColor } from "@/lib/charts/palette";
+import {
+  adaptCatalogPlot,
+  adaptCatalogStat,
+  adaptMetricTable,
+  adaptRankedTable,
+  type MatrixData,
+  type RankedData,
+} from "./adaptCatalog";
 
-type Unit = "count" | "percent" | "ms" | "score";
+export type Unit = "count" | "percent" | "ms" | "score" | "number";
 export type ScalarData = {
   kind: "scalar";
   value: number | null;
@@ -14,6 +23,8 @@ export type ScalarData = {
   comparison?: { change: number | null; unit: "percent" | "points"; previous: number | null };
   insufficient?: boolean;
   trend?: PlotData;
+  /** Which way is better, from the catalog. Classic metrics fall back to a fixed list. */
+  direction?: "up" | "down" | "neutral";
 };
 export type SeriesDefinition = {
   key: string;
@@ -21,6 +32,7 @@ export type SeriesDefinition = {
   unit: Unit;
   color: string;
   ink: string;
+  role?: "current" | "previous" | "other";
 };
 export type PlotData = {
   kind: "series" | "categories";
@@ -31,18 +43,23 @@ export type PlotData = {
   thresholds?: { good: number; poor: number };
   intervalSeconds?: number;
   rangeMs?: number;
+  stacked?: boolean;
+  comparison?: { from: string; to: string };
   distribution?: {
     dimension: string;
     limitReached: boolean;
     rowLimit: number;
     nonAdditive: boolean;
+    /** False for rates, percentiles and distinct counts: their groups are not parts of a whole. */
+    shareable?: boolean;
   };
 };
 export type AdaptedData =
   | ScalarData
   | PlotData
   | { kind: "issues"; issues: OverviewResponse["topIssues"]; filters: OverviewFilters }
-  | { kind: "apis"; apis: OverviewResponse["slowApis"]; filters: OverviewFilters };
+  | RankedData
+  | MatrixData;
 
 const counts = new Intl.NumberFormat("zh-CN", { notation: "compact", maximumFractionDigits: 2 });
 export function formatMetric(value: number | null, unit: Unit): string {
@@ -54,9 +71,12 @@ export function formatMetric(value: number | null, unit: Unit): string {
   return counts.format(value);
 }
 
+const numbers = new Intl.NumberFormat("zh-CN", { maximumFractionDigits: 2 });
+
 /** Detail tables retain full counts and milliseconds, without compact-unit rounding. */
 export function formatDetailedMetric(value: number | null, unit: Unit): string {
   if (value === null || !Number.isFinite(value)) return "—";
+  if (unit === "number") return numbers.format(value);
   if (unit === "count" || unit === "ms") {
     const number = value.toLocaleString("zh-CN", { maximumFractionDigits: 2 });
     return unit === "ms" ? `${number} ms` : number;
@@ -76,8 +96,8 @@ function definition(widget: Widget, key: string, index: number): SeriesDefinitio
     key,
     label: metricLabel(widget.data, key),
     unit,
-    color: semantic ?? `var(--ds-chart-${(index % 4) + 1})`,
-    ink: semantic ?? `var(--ds-chart-${(index % 4) + 1})`,
+    color: semantic ?? categoryColor(index),
+    ink: semantic ?? categoryColor(index),
   };
 }
 function unitFor(metric: string): Unit {
@@ -109,6 +129,7 @@ function overviewValue(kpis: OverviewResponse["kpis"], metric: string): number |
 }
 
 export function adaptStat(widget: Widget, data: DashboardData): ScalarData {
+  if (data.source === "catalog") return adaptCatalogStat(widget, data.result);
   const metric = widget.data.metrics[0];
   const trend =
     widget.statAppearance && widget.statAppearance !== "plain"
@@ -170,6 +191,7 @@ function eventValue(metric: BehaviorAnalyticsResponse["totals"], key: string): n
 }
 
 export function adaptPlot(widget: Widget, data: DashboardData): PlotData {
+  if (data.source === "catalog") return adaptCatalogPlot(widget, data.result);
   const series = widget.data.metrics.map((key, index) => definition(widget, key, index));
   if (data.source === "events") {
     const metric = widget.data.metrics[0];
@@ -185,7 +207,7 @@ export function adaptPlot(widget: Widget, data: DashboardData): PlotData {
         kind: "categories",
         rows,
         series,
-        note: `${widget.view === "map" ? `全部 ${rows.length} 个国家/地区分组 · 查询上限 ${data.result.rowLimit} 组` : widget.view === "donut" || widget.view === "bar" ? `已返回 ${rows.length} 个分组 · 查询上限 ${data.result.rowLimit} 组` : "Top 10"} · ${data.result.sampleCount.toLocaleString()} 个采集样本${data.result.totals.approximate ? " · 近似统计" : ""} · 用户与会话可能跨分组重复`,
+        note: `${widget.view === "donut" || widget.view === "bar" ? `已返回 ${rows.length} 个分组 · 查询上限 ${data.result.rowLimit} 组` : "Top 10"} · ${data.result.sampleCount.toLocaleString()} 个采集样本${data.result.totals.approximate ? " · 近似统计" : ""} · 用户与会话可能跨分组重复`,
         empty: rows.length === 0,
         distribution: {
           dimension: data.result.dimension,
@@ -261,6 +283,17 @@ export function adaptPlot(widget: Widget, data: DashboardData): PlotData {
   };
 }
 
+export function adaptTable(
+  widget: Widget,
+  data: DashboardData,
+  filters: OverviewFilters,
+): AdaptedData {
+  if (data.source !== "catalog") throw new Error("表格需要指标目录数据");
+  return widget.type === "metric-table"
+    ? adaptMetricTable(data.result)
+    : adaptRankedTable(data.result, filters);
+}
+
 export function adaptList(
   widget: Widget,
   data: DashboardData,
@@ -268,7 +301,5 @@ export function adaptList(
 ): AdaptedData {
   if (data.source !== "overview") throw new Error("列表需要概览数据");
   const effective = effectiveOverviewFilters(widget, filters);
-  return widget.type === "top-issues"
-    ? { kind: "issues", issues: data.result.topIssues, filters: effective }
-    : { kind: "apis", apis: data.result.slowApis, filters: effective };
+  return { kind: "issues", issues: data.result.topIssues, filters: effective };
 }

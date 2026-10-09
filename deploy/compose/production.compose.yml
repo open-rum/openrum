@@ -223,7 +223,13 @@ services:
   worker:
     <<: *app-service
     command: [/app/worker]
-    environment: *application-env
+    environment:
+      <<: *application-env
+      # Console-managed object storage is sealed with the master key; the worker needs
+      # it to symbolicate source maps and to delete artifacts with the project.
+      OPENRUM_ALLOW_MANAGED_SECRETS: ${OPENRUM_ALLOW_MANAGED_SECRETS:-false}
+      OPENRUM_MASTER_KEY: ${OPENRUM_MASTER_KEY:-}
+      OPENRUM_MASTER_KEY_ID: ${OPENRUM_MASTER_KEY_ID:-v1}
     depends_on:
       migrate: { condition: service_completed_successfully }
     healthcheck:

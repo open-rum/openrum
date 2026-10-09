@@ -81,4 +81,4 @@ appliesTo: Alpha
 - [漏斗、路径与留存](/zh/docs/product/analytics/explorations/) —— 三种探索查询和各自的限制
 - [和 GA4 的对比](/zh/docs/product/analytics/ga4/) —— 逐条对比，包括缺口
 
-相关：[调查路径](/zh/docs/product/investigation/)、[领域模型](/zh/docs/getting-started/domain-model/)、[Browser SDK](/zh/docs/sdk/browser/)。
+相关：[调查路径](/zh/docs/product/investigation/)、[术语与核心概念](/zh/docs/reference/glossary/)、[Browser SDK](/zh/docs/sdk/browser/)。

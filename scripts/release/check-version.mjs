@@ -9,7 +9,7 @@ const match =
 
 if (!match) {
   throw new Error(
-    `RELEASE_TAG must be a semantic version tag such as v0.1.0 or v0.1.0-alpha.1; received ${JSON.stringify(tag)}`,
+    `RELEASE_TAG must be a semantic version tag such as v0.1.1 or v0.1.1-alpha.1; received ${JSON.stringify(tag)}`,
   );
 }
 
@@ -37,9 +37,9 @@ for (const [field, actual] of Object.entries(expected)) {
   if (actual !== version)
     throw new Error(`${field} is ${actual ?? "missing"}; expected ${version} from ${tag}`);
 }
-if (imageRepository !== "ghcr.io/openrum/openrum") {
+if (imageRepository !== "ghcr.io/open-rum/openrum") {
   throw new Error(
-    `image.repository must be ghcr.io/openrum/openrum for the public chart; received ${imageRepository ?? "missing"}`,
+    `image.repository must be ghcr.io/open-rum/openrum for the public chart; received ${imageRepository ?? "missing"}`,
   );
 }
 

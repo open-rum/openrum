@@ -8,6 +8,11 @@ deploy/compose/.env
 # `go build ./cmd/openrum` drops the binary here; the command is meant to be
 # run through `pnpm openrum`, which builds it into a temporary location.
 /openrum
+# Binaries from `go build` run inside a service's cmd directory.
+/services/*/cmd/*/*
+!/services/*/cmd/*/*.go
+*.tsbuildinfo
+.claude/launch.json
 node_modules/
 .astro/
 dist/

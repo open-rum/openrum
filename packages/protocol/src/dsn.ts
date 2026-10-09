@@ -1,5 +1,5 @@
 export const OPENRUM_INGEST_PATH = "/ingest/v1/envelope";
-export const OPENRUM_BROWSER_SDK_VERSION = "0.1.0";
+export const OPENRUM_BROWSER_SDK_VERSION = "0.1.1";
 export const OPENRUM_BROWSER_SDK_PATH = `/sdk/browser/${OPENRUM_BROWSER_SDK_VERSION}/openrum.min.js`;
 
 export type ParsedOpenRUMDSN = {

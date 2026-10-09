@@ -82,9 +82,14 @@ import { Steps, Aside, LinkCard } from "@astrojs/starlight/components";
      kafkaBrokers: kafka-0:9092,kafka-1:9092,kafka-2:9092
      kafkaEventTopic: rum-events-v1
      kafkaRetentionDuration: 168h
-     redisAddress: redis.example:6379
      # 替换为你实际管理的 Ingress 代理地址段。
      ingestTrustedProxies: "10.42.0.0/16"
+
+   # Chart 默认自带 Redis。要使用你自己的 Redis：
+   # redis:
+   #   mode: external
+   #   external:
+   #     address: redis.example:6379
 
    ingress:
      enabled: true
@@ -97,7 +102,7 @@ import { Steps, Aside, LinkCard } from "@astrojs/starlight/components";
 
    - `repository/tag`：镜像构建步骤的镜像。
    - `publicBaseURL/host`：浏览器真正访问的域名；生产要求 HTTPS。
-   - Kafka 与 Redis 地址：Pod 实际可访问的端点，不是开发机的 `localhost`。
+   - Kafka 地址，以及使用自己的 Redis 时的 Redis 地址：Pod 实际可访问的端点，不是开发机的 `localhost`。自带 Redis 是单实例，见 [Redis：自带或外部](/zh/docs/self-hosting/kubernetes/#redis自带或外部)。
    - `ingestTrustedProxies`：只填自己管理的代理地址段，让限流能识别真实客户端 IP。
    - `className`：与你安装的 Ingress Controller 一致。
 

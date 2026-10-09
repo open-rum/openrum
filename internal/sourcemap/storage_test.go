@@ -21,7 +21,7 @@ func TestVerifyObjectChecksSizeAndDigest(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, object := range []ObjectInfo{{SizeBytes: 41, SHA256: valid.SHA256}, {SizeBytes: 42, SHA256: "bad"}} {
-		if err := VerifyObject(object, 42, digest); err != ErrObjectMismatch {
+		if err := VerifyObject(object, 42, digest); !errors.Is(err, ErrObjectMismatch) {
 			t.Fatalf("object=%+v err=%v", object, err)
 		}
 	}
@@ -69,10 +69,19 @@ func TestStorageProbeWritesReadsAndAlwaysDeletesDiagnosticObject(t *testing.T) {
 }
 
 func TestStorageProbeReportsReadIntegrityAndCleanupFailures(t *testing.T) {
-	client := &fakeOSSObjectClient{deleteErr: errors.New("delete denied")}
+	// Storage that writes and reads but cannot delete still works; the probe
+	// passes with a warning instead of blocking the configuration.
+	client := &fakeOSSObjectClient{deleteErr: errors.New("delete timed out")}
 	storage := &OSSStorage{probeClient: client, bucket: "openrum-test"}
 	result := storage.Probe(t.Context())
-	if result.Success || result.ErrorCode != "cleanup_failed" || !client.deleted {
+	if !result.Success || result.ErrorCode != "" || len(result.Warnings) != 1 || result.Warnings[0] != "cleanup_failed" || !client.deleted {
+		t.Fatalf("result=%+v", result)
+	}
+
+	client = &fakeOSSObjectClient{deleteErr: statusError{status: 403}}
+	storage = &OSSStorage{probeClient: client, bucket: "openrum-test"}
+	result = storage.Probe(t.Context())
+	if !result.Success || len(result.Warnings) != 1 || result.Warnings[0] != "delete_forbidden" {
 		t.Fatalf("result=%+v", result)
 	}
 
@@ -143,11 +152,11 @@ func TestClassifyStorageProbeErrorUsesSafeFiniteCodes(t *testing.T) {
 }
 
 func TestOSSStorageRejectsInvalidConfigAndLongTTL(t *testing.T) {
-	if _, err := NewOSSStorage("", "", "bucket"); err != ErrInvalidStorage {
+	if _, err := NewOSSStorage("", "", "bucket"); !errors.Is(err, ErrInvalidStorage) {
 		t.Fatalf("err=%v", err)
 	}
 	storage := &OSSStorage{}
-	if _, err := storage.PresignUpload(t.Context(), "key", 1, make([]byte, 32), MaxPresignTTL+time.Second); err != ErrObjectMismatch {
+	if _, err := storage.PresignUpload(t.Context(), "key", 1, make([]byte, 32), MaxPresignTTL+time.Second); !errors.Is(err, ErrObjectMismatch) {
 		t.Fatalf("err=%v", err)
 	}
 }

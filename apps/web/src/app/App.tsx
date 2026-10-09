@@ -65,7 +65,7 @@ function formatEnvironmentLabel(value?: string) {
 
 const primaryNavigation = [
   {
-    label: "数据大盘",
+    label: "仪表盘",
     icon: SquaresFour,
     to: "/projects/$projectId/overview",
     preserveAnalysisContext: true,
@@ -277,6 +277,7 @@ export function App() {
                           ? {
                               from: analysisContext.from.toISOString(),
                               to: analysisContext.to.toISOString(),
+                              timePreset: analysisContext.timePreset,
                               environment: analysisContext.environment,
                             }
                           : undefined;
@@ -303,39 +304,6 @@ export function App() {
                         </SidebarTooltip>
                       );
                     })}
-                    <SidebarTooltip
-                      label={project ? "项目设置" : "设置"}
-                      enabled={sidebarCollapsed}
-                    >
-                      {project ? (
-                        <Link
-                          className="nav-item"
-                          to="/settings/project/$projectId/general"
-                          params={{ projectId: project.id }}
-                          aria-label="项目设置"
-                        >
-                          <Sliders size={17} />
-                          <span>项目设置</span>
-                          <CaretRight
-                            className="nav-item__next"
-                            size={14}
-                            weight="bold"
-                            aria-hidden="true"
-                          />
-                        </Link>
-                      ) : (
-                        <Link className="nav-item" to="/settings/account" aria-label="设置">
-                          <Sliders size={17} />
-                          <span>设置</span>
-                          <CaretRight
-                            className="nav-item__next"
-                            size={14}
-                            weight="bold"
-                            aria-hidden="true"
-                          />
-                        </Link>
-                      )}
-                    </SidebarTooltip>
                   </nav>
                 </div>
 
@@ -348,13 +316,14 @@ export function App() {
                     organizationName={organization?.name}
                     project={project}
                     showInstance={Boolean(user.instanceRole)}
+                    instanceOwner={user.instanceRole === "instance_owner"}
                   />
                 </div>
               </div>
             </div>
 
             <div className="sidebar__footer">
-              <nav className="sidebar__utility-nav" aria-label="组织快捷入口">
+              <nav className="sidebar__utility-nav" aria-label="设置与快捷入口">
                 <SidebarTooltip label="用量统计" enabled={sidebarCollapsed}>
                   <Link
                     className="nav-item nav-item--utility"
@@ -366,6 +335,40 @@ export function App() {
                     <span>用量统计</span>
                   </Link>
                 </SidebarTooltip>
+                <SidebarTooltip label="设置" enabled={sidebarCollapsed}>
+                  {project ? (
+                    <Link
+                      className="nav-item nav-item--utility"
+                      to="/settings/project/$projectId/general"
+                      params={{ projectId: project.id }}
+                      aria-label="设置"
+                    >
+                      <Sliders size={17} />
+                      <span>设置</span>
+                      <CaretRight
+                        className="nav-item__next"
+                        size={14}
+                        weight="bold"
+                        aria-hidden="true"
+                      />
+                    </Link>
+                  ) : (
+                    <Link
+                      className="nav-item nav-item--utility"
+                      to="/settings/account"
+                      aria-label="设置"
+                    >
+                      <Sliders size={17} />
+                      <span>设置</span>
+                      <CaretRight
+                        className="nav-item__next"
+                        size={14}
+                        weight="bold"
+                        aria-hidden="true"
+                      />
+                    </Link>
+                  )}
+                </SidebarTooltip>
               </nav>
               <div className="account-panel">
                 <AccountMenu
@@ -373,6 +376,7 @@ export function App() {
                   email={user.email}
                   signingOut={signOut.isPending}
                   onSignOut={() => signOut.mutate()}
+                  showInstanceSettings={Boolean(user.instanceRole)}
                 />
               </div>
               {signOut.error ? <p className="sidebar__error">退出失败，请重试。</p> : null}

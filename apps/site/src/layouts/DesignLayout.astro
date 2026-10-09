@@ -3,6 +3,7 @@ import "../styles/global.css";
 import "../styles/design/workbench.css";
 import BrandMark from "../components/BrandMark.astro";
 import PaletteBootstrap from "../components/PaletteBootstrap.astro";
+import SitePaletteBootstrap from "../components/SitePaletteBootstrap.astro";
 import AppearanceControls from "../components/design/AppearanceControls.astro";
 const { title = "Design system", gallery = false } = Astro.props;
 const canonical = new URL(Astro.url.pathname, Astro.site);
@@ -10,10 +11,12 @@ const release = import.meta.env.PUBLIC_OPENRUM_RELEASE || "Alpha";
 const commit = import.meta.env.PUBLIC_COMMIT_SHA || "local";
 const sections = [
   ["brand", "品牌标识"],
-  ["citrus", "Citrus 配色"],
+  ["palettes", "配色"],
+  ["card", "四色色卡"],
   ["colors", "语义颜色"],
   ["typography", "字体与排版"],
   ["foundations", "空间与质感"],
+  ["density", "布局密度"],
   ["charts", "数据可视化"],
   ["previews", "落地页方案"],
 ];
@@ -26,11 +29,11 @@ const sections = [
     <title>{title} — OpenRUM</title>
     <meta
       name="description"
-      content="OpenRUM 可视化设计规范、品牌资产、Citrus 主题、图表和落地页方案。"
+      content="OpenRUM 可视化设计规范、品牌资产、配色与色卡、布局密度、图表和落地页方案。"
     />
     <meta name="robots" content="noindex,follow" />
     <link rel="canonical" href={canonical} />
-    <link rel="icon" href="/favicon.svg" /><PaletteBootstrap manageTheme />
+    <link rel="icon" href="/favicon.svg" /><PaletteBootstrap manageTheme /><SitePaletteBootstrap />
   </head>
   <body class:list={["ds-body", { "ds-gallery-body": gallery }]}>
     <a class="ds-skip-link" href="#design-main">跳到设计规范</a>

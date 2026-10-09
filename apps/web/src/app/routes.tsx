@@ -10,6 +10,7 @@ import {
 } from "@tanstack/react-router";
 import { HTTPError, getSetupStatus, safeReturnTo, sessionQueryOptions } from "@/lib/auth/session";
 import { LoginRoutePage } from "@/features/auth/LoginPage";
+import { AwaitingAccessPage } from "@/features/auth/AwaitingAccessPage";
 import { SetupPage } from "@/features/auth/SetupPage";
 import { App } from "./App";
 import { PlannedPage } from "./PlannedPage";
@@ -132,6 +133,10 @@ const DataRetentionPage = lazyRouteComponent(
   "DataRetentionPage",
 );
 const AuditPage = lazyRouteComponent(() => import("@/features/admin/AuditPage"), "AuditPage");
+const AuthenticationPage = lazyRouteComponent(
+  () => import("@/features/admin/AuthenticationPage"),
+  "AuthenticationPage",
+);
 
 type RouterContext = {
   queryClient: QueryClient;
@@ -142,7 +147,7 @@ const rootRoute = createRootRouteWithContext<RouterContext>()({
   notFoundComponent: () => (
     <PlannedPage
       title="页面不存在"
-      description="当前地址没有对应页面，请返回数据大盘继续浏览。"
+      description="当前地址没有对应页面，请返回仪表盘继续浏览。"
       icon={WarningCircle}
     />
   ),
@@ -155,7 +160,8 @@ const setupRoute = createRoute({
     const status = await getSetupStatus();
     if (!status.initialized) return;
     try {
-      await context.queryClient.fetchQuery(sessionQueryOptions());
+      const user = await context.queryClient.fetchQuery(sessionQueryOptions());
+      if (user.accessStatus === "pending") throw redirect({ to: "/awaiting-access" });
       throw redirect({ to: "/" });
     } catch (error) {
       if (error instanceof HTTPError && error.status === 401) {
@@ -170,15 +176,23 @@ const setupRoute = createRoute({
 const loginRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/login",
-  validateSearch: (search: Record<string, unknown>) => ({
+  validateSearch: (
+    search: Record<string, unknown>,
+  ): { returnTo?: string; expired?: boolean; error?: string } => ({
     returnTo: typeof search.returnTo === "string" ? search.returnTo : undefined,
     expired: search.expired === true || search.expired === "1" ? true : undefined,
+    error:
+      search.error === "external" || search.error === "cancelled" || search.error === "expired"
+        ? search.error
+        : undefined,
   }),
   beforeLoad: async ({ context, search }) => {
     const status = await getSetupStatus();
     if (!status.initialized) throw redirect({ to: "/setup" });
     try {
-      await context.queryClient.fetchQuery(sessionQueryOptions());
+      const user = await context.queryClient.fetchQuery(sessionQueryOptions());
+      if (user.accessStatus === "pending")
+        throw redirect({ to: "/awaiting-access", search: { returnTo: search.returnTo } });
       throw redirect({ href: safeReturnTo(search.returnTo) });
     } catch (error) {
       if (error instanceof HTTPError && error.status === 401) return;
@@ -188,12 +202,32 @@ const loginRoute = createRoute({
   component: LoginRoutePage,
 });
 
+const awaitingAccessRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/awaiting-access",
+  validateSearch: (search: Record<string, unknown>): { returnTo?: string } => ({
+    returnTo: typeof search.returnTo === "string" ? search.returnTo : undefined,
+  }),
+  beforeLoad: async ({ context, search }) => {
+    try {
+      const user = await context.queryClient.fetchQuery(sessionQueryOptions());
+      if (user.accessStatus !== "pending") throw redirect({ href: safeReturnTo(search.returnTo) });
+    } catch (error) {
+      if (error instanceof HTTPError && error.status === 401) throw redirect({ to: "/login" });
+      throw error;
+    }
+  },
+  component: AwaitingAccessPage,
+});
+
 const protectedRoute = createRoute({
   getParentRoute: () => rootRoute,
   id: "protected",
   beforeLoad: async ({ context, location }) => {
     try {
-      await context.queryClient.ensureQueryData(sessionQueryOptions());
+      const user = await context.queryClient.ensureQueryData(sessionQueryOptions());
+      if (user.accessStatus === "pending")
+        throw redirect({ to: "/awaiting-access", search: { returnTo: location.href } });
     } catch (error) {
       if (error instanceof HTTPError && error.status === 401) {
         throw redirect({
@@ -339,6 +373,14 @@ const projectOverviewRoute = createRoute({
   component: OverviewPage,
 });
 
+// A named dashboard. The bare overview address above keeps working and opens the one this
+// device last used, so the sidebar link and existing bookmarks never break.
+const projectDashboardRoute = createRoute({
+  getParentRoute: () => protectedRoute,
+  path: "/projects/$projectId/overview/$dashboardId",
+  component: OverviewPage,
+});
+
 const issuesRoute = createRoute({
   getParentRoute: () => protectedRoute,
   path: "/issues",
@@ -428,6 +470,11 @@ const requireInstanceRole = async ({ context }: { context: { queryClient: QueryC
   if (!user.instanceRole) throw redirect({ to: "/projects" });
 };
 
+const requireInstanceOwner = async ({ context }: { context: { queryClient: QueryClient } }) => {
+  const user = await context.queryClient.ensureQueryData(sessionQueryOptions());
+  if (user.instanceRole !== "instance_owner") throw redirect({ to: "/projects" });
+};
+
 const settingsAccountRoute = createRoute({
   getParentRoute: () => protectedRoute,
   path: "/settings/account",
@@ -513,6 +560,13 @@ const settingsInstanceObjectStorageRoute = createRoute({
   path: "/settings/instance/object-storage",
   beforeLoad: requireInstanceRole,
   component: ObjectStoragePage,
+});
+
+const settingsInstanceAuthenticationRoute = createRoute({
+  getParentRoute: () => protectedRoute,
+  path: "/settings/instance/authentication",
+  beforeLoad: requireInstanceOwner,
+  component: AuthenticationPage,
 });
 
 const settingsInstanceAuditRoute = createRoute({
@@ -691,6 +745,7 @@ const protectedChildren = plannedRoutes.map(({ path, title, description, icon })
 const routeTree = rootRoute.addChildren([
   setupRoute,
   loginRoute,
+  awaitingAccessRoute,
   protectedRoute.addChildren([
     indexRoute,
     projectsRoute,
@@ -713,6 +768,7 @@ const routeTree = rootRoute.addChildren([
     onboardingRoute,
     projectOnboardingRoute,
     projectOverviewRoute,
+    projectDashboardRoute,
     issuesRoute,
     projectIssuesRoute,
     issueDetailRoute,
@@ -740,6 +796,7 @@ const routeTree = rootRoute.addChildren([
     settingsInstanceRoute,
     settingsInstanceRetentionRoute,
     settingsInstanceObjectStorageRoute,
+    settingsInstanceAuthenticationRoute,
     settingsInstanceAuditRoute,
     legacySettingsRoute,
     legacyChannelsRoute,

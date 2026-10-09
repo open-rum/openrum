@@ -9,7 +9,6 @@ test("project creation reaches the queryable overview magic moment in under five
 
   await page.goto("/onboarding");
   await page.getByLabel("项目名称").fill("Magic Moment H5");
-  await page.getByLabel("项目 Slug").fill("magic-moment-h5");
   await page.getByLabel("允许的 Origin").fill("http://127.0.0.1:4174");
   await page.getByRole("button", { name: "创建项目" }).click();
 
@@ -48,7 +47,7 @@ test("onboarding offers a bundler-free Instance CDN snippet", async ({ page }) =
   await page.getByRole("tab", { name: "CDN 脚本" }).click();
   const cdnPanel = page.getByRole("tabpanel", { name: "CDN 脚本" });
   await expect(cdnPanel).toContainText("OpenRUM.init");
-  await expect(cdnPanel).toContainText("/sdk/browser/0.1.0/openrum.min.js");
+  await expect(cdnPanel).toContainText("/sdk/browser/0.1.1/openrum.min.js");
   await expect(cdnPanel).toContainText("script.onload");
   await page.getByRole("tab", { name: "同步加载" }).click();
   await expect(cdnPanel).not.toContainText("script.onload");

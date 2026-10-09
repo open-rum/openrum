@@ -1,0 +1,85 @@
+---
+title: 使用 LDAP 登录
+description: 从 LDAP 基础概念开始，了解需要向 IT 索取的信息，并配置、测试 OpenRUM 目录登录。
+appliesTo: Alpha
+---
+
+import { Aside, Steps, LinkCard } from "@astrojs/starlight/components";
+
+如果公司其他系统已经使用 LDAP，OpenRUM 通常可以连接同一套员工账号目录。你不需要自己创建一套新的 LDAP 服务，但需要请管理该目录的 IT 同事提供连接信息和一个只读搜索账号。
+
+## LDAP 是什么？
+
+LDAP（Lightweight Directory Access Protocol，轻量级目录访问协议）是一种查询公司目录的标准方式。目录里通常有员工账号、邮箱、姓名等信息。可以把它理解为由公司集中维护、允许受控查询的账号簿；**LDAP 是访问这个账号簿的协议，不是 OpenRUM 自己的一套用户密码**。Active Directory 等目录也可能提供 LDAP 接口。字段名称和登录名格式由公司的目录决定。
+
+LDAP 条目有一个 **DN（Distinguished Name）**，即它在目录树中的完整位置。例如 `uid=alice,ou=People,dc=example,dc=com` 是一个用户的 DN；`dc=example,dc=com` 可以作为搜索起点，称为 **Base DN**。用户在登录页输入的通常是简短的目录用户名，例如 `alice`，而不是完整 DN。
+
+### 登录时会发生什么？
+
+<Steps>
+
+1. 用户在 OpenRUM 登录页选择 LDAP，输入目录用户名和密码。
+2. OpenRUM API 通过加密连接访问公司目录，先用只读搜索账号和用户搜索过滤器找到**恰好一条**用户记录。
+3. OpenRUM 再以找到的用户 DN 和刚提交的密码向目录进行绑定验证。成功后创建 OpenRUM 会话；用户的 LDAP 密码不会存入 OpenRUM。
+
+</Steps>
+
+这与点击 Google、GitHub 或 OIDC 按钮后跳转到外部授权页不同：LDAP 用户名和密码是在 OpenRUM 登录页提交的，**不需要 OAuth 回调地址**。生产环境还应通过 HTTPS 访问 OpenRUM 登录页。
+
+<Aside type="note" title="目录账号不等于控制台权限">
+  LDAP 只验证用户是否属于目录中的那个账号。OpenRUM 不会根据 LDAP
+  组自动分配组织角色。首次登录会得到待授权账号；组织管理员还须按现有成员流程授予角色。
+</Aside>
+
+## 先向 IT 同事索取什么？
+
+可以把下面这份清单发给负责现有 LDAP 接入的同事。示例值仅用于理解，实际值必须来自公司的目录配置；搜索账号密码请通过公司认可的安全渠道交付。
+
+- **LDAP URL：** API 连接目录的地址和端口，例如 `ldaps://ldap.example.com:636`；也可使用支持 StartTLS 的 `ldap://ldap.example.com:389`。确认 API 所在机器能访问该地址。
+- **Base DN：** 用户搜索的起点，例如 `dc=example,dc=com`，或更窄的员工组织单元。
+- **搜索账号 DN 和密码：** 让 OpenRUM 查询用户，不是员工的登录密码。DN 可能类似 `cn=openrum-reader,ou=Service Accounts,dc=example,dc=com`。该账号需要读取用户 DN、稳定 ID、邮箱和可选姓名属性。
+- **用户搜索过滤器：** 根据登录页输入的用户名查找用户。OpenLDAP 常见 `(uid={username})`；Active Directory 可能用 `(sAMAccountName={username})`。确认员工应输入短用户名还是邮箱。
+- **稳定 ID 属性：** 长期识别同一用户，即使姓名或登录名改变。OpenLDAP 常见 `entryUUID`；Active Directory 常见 `objectGUID`。值必须唯一且稳定。
+- **邮箱和显示名称属性：** 用于建立 OpenRUM 账号及显示姓名。邮箱常用 `mail`，姓名可用 `displayName`；确认员工条目有邮箱值。
+- **CA 证书（如需）：** 如果 API 主机尚不信任公司 CA，索取 PEM 格式 CA 证书来验证目录服务器证书，不要索取服务器私钥。
+- **测试用户：** 请 IT 提供普通测试账号，或安排一名员工自行输入密码，以验证真实用户搜索和密码绑定。
+
+## 在 OpenRUM 中配置
+
+<Steps>
+
+1. ## 准备安全连接
+
+   以 Instance Owner 登录，并按[控制台认证部署指南](/zh/docs/self-hosting/authentication/)启用加密托管。API 服务必须能够访问 LDAP 端口。`ldaps://` 从连接开始使用 TLS；`ldap://` 会在发送任何账号密码前升级到 StartTLS。目录证书须由 API 主机信任，或在提供者表单中粘贴 PEM CA 证书。OpenRUM 不提供关闭证书校验的选项。
+
+1. ## 填写 LDAP 卡片
+
+   打开**系统设置 → 认证与访问**，选择 **LDAP** 卡片。填写提供者 ID（默认 `ldap`）、显示名称，以及上面清单中的 LDAP URL、Base DN、搜索账号 DN、用户过滤器、各属性、可选 CA 证书和**搜索账号密码**。先不要勾选**启用并在登录页展示**。检查过滤器中确实包含字面量 `{username}`，然后点击**保存配置**，按提示用 Owner 的 OpenRUM 密码重新验证。
+
+1. ## 测试连接，再启用
+
+   点击**测试连接**。这个测试只检查 TLS、搜索账号能否绑定，以及 Base DN 是否存在；**通过不代表员工用户名、过滤器和密码都正确**。测试成功后，勾选**启用并在登录页展示**并再次保存。登录页现在才会出现 LDAP 按钮。
+
+1. ## 用真实用户完成验收
+
+   在独立浏览器会话打开登录页，选择 LDAP 按钮，输入测试用户的目录用户名和密码。这样才能验证用户过滤器、唯一搜索结果、所需属性和用户密码绑定。如果是新外部账号，登录后只会看到待授权状态，组织管理员授予角色后才能进入控制台。如果此人已有 OpenRUM 账号，应先用原方式登录，在 **Account → 已连接的登录方式** 主动连接 LDAP，避免同邮箱冲突。
+
+</Steps>
+
+## 常见问题怎么查？
+
+- **LDAP 卡片能看，但无法保存：** 确认已用 Instance Owner 登录，并且 API 启用了 `OPENRUM_ALLOW_MANAGED_SECRETS` 和有效的 `OPENRUM_MASTER_KEY`。
+- **“测试连接”失败：** 检查 API 到目录的网络和端口、LDAPS/StartTLS、证书名称与 CA、搜索账号 DN 和密码、Base DN。
+- **测试通过，但员工登录失败：** 核对员工输入的用户名格式、过滤器是否返回恰好一人、搜索账号能否读取稳定 ID 与邮箱属性，以及员工密码。连接测试不会覆盖这些步骤。
+- **登录成功却不能进入控制台：** 查看是否处于待授权状态，请组织管理员授予组织角色；LDAP 组不会自动成为 OpenRUM 角色。
+- **登录页没有 LDAP 按钮：** 在认证设置页确认提供者已保存、已启用，并且加密主密钥仍可用。
+- **证书校验失败：** 请 IT 核对服务器证书的主机名、有效期和 CA 链，并修复信任配置；不要绕过校验。
+
+<Aside type="caution" title="更换目录时">
+  同一个提供者 ID 应始终对应同一目录。变更 LDAP URL、Base DN 或稳定 ID 属性时，创建新提供者
+  ID，并让用户连接新身份。停用旧配置不会删除历史身份关联。
+</Aside>
+
+想进一步了解协议，可阅读 [OpenLDAP 的入门介绍](https://www.openldap.org/doc/admin26/intro.html)和 [RFC 4513](https://www.rfc-editor.org/rfc/rfc4513.html) 的加密与认证要求。
+
+<LinkCard title="其他登录方式" href="/zh/docs/getting-started/sign-in/" />

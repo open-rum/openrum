@@ -1,0 +1,86 @@
+---
+title: Components and responsibilities
+description: What each OpenRUM service does, which dependencies it talks to and what stops when it is down.
+appliesTo: Alpha
+---
+
+import { Aside } from "@astrojs/starlight/components";
+
+An Instance runs five application services next to your application's Browser SDK. Four of them are Go services. The fifth, the Console web server, is a static file server that fronts the other two public services. They share four dependencies and coordinate mostly through them: the Console talks to the API, the SDK talks to Ingest, and events move from Ingest to Consumer through Kafka and from Consumer to the API through ClickHouse. [Architecture](/docs/self-hosting/architecture/) shows the whole picture; this page is the per-component reference.
+
+## At a glance
+
+| Component | Role | Reads or writes |
+| --- | --- | --- |
+| Browser SDK | Captures events in the page and sends batches to Ingest | Ingest over HTTPS |
+| Console web server | Serves the Console; routes `/api/` to the API and `/ingest/` to Ingest, so one public origin covers both | API, Ingest |
+| API | Console and control-plane operations, sign-in, role checks and analysis queries | PostgreSQL, ClickHouse, Redis, Kafka (test Events only), optional object storage |
+| Ingest | Accepts event batches from browsers and puts them on Kafka | PostgreSQL (project keys and settings), Redis, Kafka |
+| Consumer | Turns queued batches into stored Events | Kafka, ClickHouse, PostgreSQL (project rules), Redis |
+| Worker | Background jobs: stack mapping, alert evaluation, cleanup and deletion | PostgreSQL, ClickHouse, optional object storage |
+
+## API
+
+The API is the only service the Console talks to. Every request carries a session cookie and a CSRF token; the API resolves the caller's [organization and instance roles](/docs/product/roles-permissions/) on the server, so a Project ID in a URL is never authorization on its own.
+
+It owns:
+
+- Sign-in, account and member management, including external providers
+- Project, release, alert and notification-channel configuration
+- Instance settings and maintenance workflows for Instance administrators
+- Every analysis query, which it runs against ClickHouse
+- The **Send test Event** action, which publishes a synthetic Event straight to Kafka
+
+If the API is down, nobody can use the Console, but telemetry keeps arriving: Ingest and Consumer do not depend on it.
+
+## Ingest
+
+Ingest is the public write endpoint that the Browser SDK posts to. It checks that a request is allowed and well formed, hands it to Kafka and answers. It does not write ClickHouse and does not rewrite events.
+
+It owns the synchronous half of the [event pipeline](/docs/self-hosting/event-pipeline/): the per-IP and Project rate limits, key and Origin authentication, body and schema validation, and the durable Kafka write. A `202` means Kafka acknowledged the batch. The full list of status and error codes is in [Ingest responses](/docs/reference/ingest-responses/).
+
+If Ingest is down, the SDK keeps batches in its queue and retries. Events are lost only when a queue is discarded or the browser is closed before it can send.
+
+## Consumer
+
+The Consumer reads the Kafka topic as a consumer group and does the work that depends on stored settings and on the event's content: normalization and privacy scrubbing, Project inbound filters, processing rules, retention, error fingerprinting and the ClickHouse write. Events that cannot be processed go to a dead-letter topic instead of blocking the partition.
+
+It commits a Kafka offset only after ClickHouse has the events. A ClickHouse failure is retried with backoff and the offset is not committed, so the Consumer falls behind rather than dropping data. Kafka retention is the buffer during that time; see [Capacity planning](/docs/self-hosting/capacity/).
+
+## Worker
+
+The Worker runs the jobs that should not block a request:
+
+| Job | What it does |
+| --- | --- |
+| Stack mapping | Maps minified stack frames to source with uploaded [Source Maps](/docs/sdk/source-maps/), including re-mapping when a Release is uploaded later |
+| Alerts | Schedules and evaluates alert rules, then delivers notifications to channels |
+| Retention cleanup | Applies [data lifecycle](/docs/self-hosting/data-lifecycle/) policy and previewed maintenance jobs |
+| Emergency cleanup | Runs the guided recovery described in [Storage pressure](/docs/self-hosting/storage-pressure/) |
+| Project deletion and data purge | Removes a Project's events and artifacts after the Console disables it |
+
+If the Worker is down, stored events and queries are unaffected. Mapped stack frames, alert evaluation and cleanup pause until it returns.
+
+<Aside title="Mapped stack frames arrive late">
+  Mapping runs after an error is stored, so an error appears with raw frames first and gains mapped
+  frames a moment later. An error whose Release was never uploaded keeps its raw frames.
+</Aside>
+
+## Console web server
+
+The Console is a static application. The web server in front of it serves the files and proxies two prefixes: `/api/` to the API and `/ingest/` to Ingest. It also answers `/health/live` and `/health/ready`. In Kubernetes the same split is done by the Ingress; see [Kubernetes and Helm](/docs/self-hosting/kubernetes/).
+
+## Client-side pieces
+
+The [Browser SDK](/docs/sdk/browser/) captures page views, interactions, errors, Web Vitals, logs and API requests, removes sensitive values before data leaves the page, and queues and retries sends. The [Vite plugin](/docs/sdk/source-maps/) uploads Source Map Artifacts for a Release during your build, using a Project upload token instead of a Console session.
+
+## Scaling and failure at a glance
+
+Ingest scales with traffic; Consumer scales with Kafka partitions and ClickHouse insert capacity; the API scales with Console and query load. Shared state lives in Redis and PostgreSQL rather than in a service's memory, and the Helm chart sets a replica count per service. Replica guidance and sizing live in [Kubernetes and Helm](/docs/self-hosting/kubernetes/) and [Capacity planning](/docs/self-hosting/capacity/).
+
+| If this stops | Telemetry intake | Console |
+| --- | --- | --- |
+| API | Unaffected | Unavailable |
+| Ingest | Stops; the SDK queues and retries | Existing data still queryable |
+| Consumer | Accepted, but Events wait in Kafka | Newest data lags |
+| Worker | Unaffected | No mapped frames, alerts or cleanup |

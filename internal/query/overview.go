@@ -81,15 +81,6 @@ type OverviewIssue struct {
 	LastSeenAt  *time.Time `json:"lastSeenAt"`
 }
 
-type OverviewAPI struct {
-	Method      string   `json:"method"`
-	URL         string   `json:"url"`
-	Requests    uint64   `json:"requests"`
-	Failures    uint64   `json:"failures"`
-	FailureRate *float64 `json:"failureRate"`
-	DurationP95 *float64 `json:"durationP95"`
-}
-
 type OverviewFreshness struct {
 	LatestReceivedAt *time.Time `json:"latestReceivedAt"`
 	AgeSeconds       *float64   `json:"ageSeconds"`
@@ -104,7 +95,6 @@ type Overview struct {
 	Comparison      OverviewComparison `json:"comparison"`
 	Series          []OverviewPoint    `json:"series"`
 	TopIssues       []OverviewIssue    `json:"topIssues"`
-	SlowAPIs        []OverviewAPI      `json:"slowApis"`
 	Freshness       OverviewFreshness  `json:"freshness"`
 }
 
@@ -143,10 +133,6 @@ func (repository *OverviewRepository) Get(ctx context.Context, requested Overvie
 	if err != nil {
 		return Overview{}, err
 	}
-	slowAPIs, err := repository.readSlowAPIs(ctx, filters)
-	if err != nil {
-		return Overview{}, err
-	}
 	freshness, err := repository.readFreshness(ctx, filters)
 	if err != nil {
 		return Overview{}, err
@@ -160,7 +146,6 @@ func (repository *OverviewRepository) Get(ctx context.Context, requested Overvie
 		},
 		Series:    series,
 		TopIssues: topIssues,
-		SlowAPIs:  slowAPIs,
 		Freshness: freshness,
 	}, nil
 }
@@ -255,39 +240,6 @@ GROUP BY point ORDER BY point`, minutes, where)
 		return nil, fmt.Errorf("iterate overview series: %w", err)
 	}
 	return points, nil
-}
-
-func (repository *OverviewRepository) readSlowAPIs(ctx context.Context, filters OverviewFilters) ([]OverviewAPI, error) {
-	where, arguments := filters.where(true)
-	rows, err := repository.database.QueryContext(ctx, `
-SELECT api_method, api_url_normalized,
-  uniqCombined64Merge(requests) AS request_count,
-  coalesce(uniqCombined64Merge(failures), 0) AS failure_count,
-  quantileTDigestMerge(0.95)(duration_p95) AS p95
-FROM api_metrics_1m WHERE `+where+`
-GROUP BY api_method, api_url_normalized
-HAVING request_count > 0
-ORDER BY p95 DESC, request_count DESC, api_method, api_url_normalized
-LIMIT 5`, arguments...)
-	if err != nil {
-		return nil, fmt.Errorf("query slow APIs: %w", err)
-	}
-	defer func() { _ = rows.Close() }()
-	results := make([]OverviewAPI, 0)
-	for rows.Next() {
-		var current OverviewAPI
-		var p95 float64
-		if err := rows.Scan(&current.Method, &current.URL, &current.Requests, &current.Failures, &p95); err != nil {
-			return nil, fmt.Errorf("scan slow API: %w", err)
-		}
-		current.FailureRate = ratio(float64(current.Failures), float64(current.Requests))
-		current.DurationP95 = finiteValue(p95, current.Requests)
-		results = append(results, current)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterate slow APIs: %w", err)
-	}
-	return results, nil
 }
 
 func (repository *OverviewRepository) readFreshness(ctx context.Context, filters OverviewFilters) (OverviewFreshness, error) {

@@ -1,6 +1,6 @@
 ---
 title: Self-hosting
-description: Choose recommended Kubernetes/Helm or single-host Docker for production, with a separate local evaluation stack.
+description: Choose recommended Kubernetes/Helm or single-host Docker for production.
 appliesTo: Alpha
 ---
 
@@ -16,8 +16,8 @@ OpenRUM runs on infrastructure you control. Choose a deployment path first; the 
       <Badge text="Recommended" class="docs-deployment-badge" />
       <LinkCard
         title="Kubernetes / Helm"
-        href="/docs/self-hosting/kubernetes/"
-        description="Deploy application services to a cluster. Prepare external PostgreSQL, ClickHouse, Kafka, Redis, HTTPS, secrets and backups."
+        href="/docs/getting-started/production-deployment/"
+        description="Deploy application services to a cluster. Prepare external PostgreSQL, ClickHouse, Kafka, HTTPS, secrets and backups; Redis can be bundled."
       />
     </div>
     <div class="docs-deployment-choice">
@@ -31,13 +31,13 @@ OpenRUM runs on infrastructure you control. Choose a deployment path first; the 
 </div>
 
 <Aside type="caution" title="Current support boundary">
-  The [local evaluation Compose stack](/docs/self-hosting/compose/) still includes Demo data and
+  The Compose stack used for local development includes Demo data and
   example credentials; do not expose it to real traffic. The separate production Docker stack
   removes those defaults but remains a single failure domain. The Helm path also needs external data
   services, TLS and an image registry; it is not a one-command cluster installation.
 </Aside>
 
-If you want to change OpenRUM's source code rather than evaluate a containerized Instance, follow [Local development](/docs/getting-started/local-development/) instead.
+If you want to change OpenRUM's source code or try it from a checkout, follow [Local development](/docs/getting-started/local-development/) instead.
 
 ## What you operate
 
@@ -45,6 +45,7 @@ Self-hosting means your team owns the domain and HTTPS, credentials, capacity, s
 
 - [Capacity and retention](/docs/self-hosting/capacity/) before accepting real traffic.
 - [Backups and a tested restore](/docs/self-hosting/backup-restore/) before the first upgrade.
+- [Console authentication](/docs/self-hosting/authentication/) when enabling Google, GitHub, OIDC or LDAP sign-in.
 - [Upgrades](/docs/self-hosting/upgrades/), [storage pressure](/docs/self-hosting/storage-pressure/) and [troubleshooting](/docs/self-hosting/troubleshooting/) during operation.
 - The [threat model](/docs/self-hosting/security/threat-model/) before exposing Ingest to the internet.
 

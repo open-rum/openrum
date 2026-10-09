@@ -36,9 +36,16 @@ type IssueFilters struct {
 	Country     string
 	Fingerprint string
 	Status      metadata.IssueStatus
-	Sort        string
-	Limit       int
-	Cursor      string
+	// Assignee narrows to Issues nobody owns (AssigneeNone) or one member's (a user UUID).
+	Assignee string
+	// NewOnly keeps Issues first seen inside the range (see fillFirstSeen for the horizon).
+	NewOnly bool
+	Sort    string
+	Limit   int
+	Cursor  string
+	// RowDetails adds each listed Issue's trend and culprit, which the list view draws but
+	// a single Issue's detail page does not need.
+	RowDetails bool
 }
 
 type IssueSummary struct {
@@ -54,6 +61,18 @@ type IssueSummary struct {
 	Status             metadata.IssueStatus `json:"status"`
 	AssigneeUserID     *uuid.UUID           `json:"assigneeUserId"`
 	ResolvedInRelease  *uuid.UUID           `json:"resolvedInReleaseId"`
+	ResolvedAt         *time.Time           `json:"resolvedAt,omitempty"`
+	// Trend is the Issue's event count per bucket over the range, oldest first, on the shared
+	// grid IssuePage.TrendIntervalSeconds describes. Only list responses carry it.
+	Trend []uint64 `json:"trend,omitempty"`
+	// Culprit is where the latest event in the range failed, read from its raw stack.
+	Culprit *IssueCulprit `json:"culprit,omitempty"`
+}
+
+// IssueCulprit names the innermost application frame of a stack.
+type IssueCulprit struct {
+	Function string `json:"function,omitempty"`
+	File     string `json:"file"`
 }
 
 type IssueFacet struct {
@@ -74,6 +93,8 @@ type IssuePage struct {
 	Issues     []IssueSummary `json:"issues"`
 	NextCursor string         `json:"nextCursor,omitempty"`
 	Facets     IssueFacets    `json:"facets"`
+	// TrendIntervalSeconds is the bucket width of every Issue's Trend; zero without one.
+	TrendIntervalSeconds int `json:"trendIntervalSeconds,omitempty"`
 }
 
 type IssueTrendPoint struct {
@@ -164,9 +185,10 @@ GROUP BY fingerprint`
 	}
 	candidateLimit := min(max(filters.Limit*4, filters.Limit+1), 1000)
 	order := "event_count DESC, last_seen_at DESC, fingerprint ASC"
-	if filters.Sort == "users" {
+	switch filters.Sort {
+	case "users":
 		order = "user_count DESC, last_seen_at DESC, fingerprint ASC"
-	} else if filters.Sort == "last_seen" {
+	case "last_seen":
 		order = "last_seen_at DESC, fingerprint ASC"
 	}
 	query += ` ORDER BY ` + order + ` LIMIT ?`
@@ -190,6 +212,12 @@ GROUP BY fingerprint`
 			return IssuePage{}, fmt.Errorf("query issue states: %w", err)
 		}
 	}
+	// Filtering on "new" needs every candidate's true first sighting before the page is cut.
+	if filters.NewOnly {
+		if err := repository.fillFirstSeen(ctx, filters, candidates); err != nil {
+			return IssuePage{}, err
+		}
+	}
 	issues := make([]IssueSummary, 0, filters.Limit)
 	consumed := 0
 	for _, issue := range candidates {
@@ -199,14 +227,38 @@ GROUP BY fingerprint`
 			issue.Status = state.Status
 			issue.AssigneeUserID = state.AssigneeUserID
 			issue.ResolvedInRelease = state.ResolvedInRelease
+			issue.ResolvedAt = state.ResolvedAt
+		}
+		// A resolved Issue that failed again after it was resolved has regressed.
+		if issue.Status == metadata.IssueStatusResolved && issue.ResolvedAt != nil && issue.LastSeenAt.After(*issue.ResolvedAt) {
+			issue.Status = metadata.IssueStatusRegressed
 		}
 		if filters.Status != "" && issue.Status != filters.Status {
+			continue
+		}
+		if !matchesAssignee(filters.Assignee, issue.AssigneeUserID) {
+			continue
+		}
+		if filters.NewOnly && issue.FirstSeenAt.Before(filters.From) {
 			continue
 		}
 		issues = append(issues, issue)
 		if len(issues) == filters.Limit {
 			break
 		}
+	}
+	if !filters.NewOnly {
+		if err := repository.fillFirstSeen(ctx, filters, issues); err != nil {
+			return IssuePage{}, err
+		}
+	}
+	trendInterval := 0
+	if filters.RowDetails {
+		interval, err := repository.fillRowDetails(ctx, filters, issues)
+		if err != nil {
+			return IssuePage{}, err
+		}
+		trendInterval = int(interval / time.Second)
 	}
 	next := ""
 	if consumed > 0 && (consumed < len(candidates) || len(candidates) == candidateLimit) {
@@ -216,7 +268,128 @@ GROUP BY fingerprint`
 	if err != nil {
 		return IssuePage{}, err
 	}
-	return IssuePage{Issues: issues, NextCursor: next, Facets: facets}, nil
+	return IssuePage{Issues: issues, NextCursor: next, Facets: facets, TrendIntervalSeconds: trendInterval}, nil
+}
+
+// fillFirstSeen replaces each Issue's first sighting inside the range with its earliest one
+// up to newIssueLookback before the range, the horizon the new-issues metric uses, so the
+// Console can tell an Issue that started in the range from one that keeps recurring. Only the
+// shared Environment narrows it; dimension filters describe the range, not the Issue's age.
+func (repository *IssuesRepository) fillFirstSeen(ctx context.Context, filters IssueFilters, issues []IssueSummary) error {
+	if len(issues) == 0 {
+		return nil
+	}
+	placeholders := make([]string, len(issues))
+	arguments := []any{filters.ProjectID, filters.From.Add(-newIssueLookback), filters.To}
+	if filters.Environment != "" {
+		arguments = append(arguments, filters.Environment)
+	}
+	for index, issue := range issues {
+		placeholders[index] = "?"
+		arguments = append(arguments, issue.Fingerprint)
+	}
+	environment := ""
+	if filters.Environment != "" {
+		environment = " AND environment = ?"
+	}
+	rows, err := repository.database.QueryContext(ctx, `SELECT fingerprint, minMerge(first_seen)
+FROM issue_metrics_5m WHERE project_id = ? AND bucket >= ? AND bucket < ?`+environment+`
+  AND fingerprint IN (`+strings.Join(placeholders, ", ")+`)
+GROUP BY fingerprint`, arguments...)
+	if err != nil {
+		return fmt.Errorf("query issue first seen: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+	earliest := make(map[string]time.Time, len(issues))
+	for rows.Next() {
+		var fingerprint string
+		var firstSeen time.Time
+		if err := rows.Scan(&fingerprint, &firstSeen); err != nil {
+			return fmt.Errorf("scan issue first seen: %w", err)
+		}
+		earliest[fingerprint] = firstSeen.UTC()
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	for index := range issues {
+		if firstSeen, ok := earliest[issues[index].Fingerprint]; ok && firstSeen.Before(issues[index].FirstSeenAt) {
+			issues[index].FirstSeenAt = firstSeen
+		}
+	}
+	return nil
+}
+
+// fillRowDetails gives each listed Issue a dense trend on one shared grid and the place its
+// latest event failed. Both use the list's own filters, so a row's line and location agree with
+// its counts; the user filter is the exception, because rollups do not keep user IDs.
+func (repository *IssuesRepository) fillRowDetails(ctx context.Context, filters IssueFilters, issues []IssueSummary) (time.Duration, error) {
+	interval := ConsoleSeriesInterval(filters.To.Sub(filters.From), 5*time.Minute)
+	if len(issues) == 0 {
+		return interval, nil
+	}
+	placeholders := make([]string, len(issues))
+	fingerprints := make([]any, len(issues))
+	index := make(map[string]int, len(issues))
+	for position, issue := range issues {
+		placeholders[position], fingerprints[position], index[issue.Fingerprint] = "?", issue.Fingerprint, position
+	}
+	in := strings.Join(placeholders, ", ")
+
+	where, arguments := issueWhere(filters)
+	minutes := max(1, int(interval/time.Minute))
+	rows, err := repository.database.QueryContext(ctx, fmt.Sprintf(`SELECT fingerprint,
+  toStartOfInterval(bucket, INTERVAL %d MINUTE) AS point, uniqCombined64Merge(events)
+FROM issue_metrics_5m WHERE %s AND fingerprint IN (%s)
+GROUP BY fingerprint, point`, minutes, where, in), append(arguments, fingerprints...)...)
+	if err != nil {
+		return 0, fmt.Errorf("query issue row trends: %w", err)
+	}
+	grid := seriesBuckets(filters.From, filters.To, interval)
+	position := make(map[int64]int, len(grid))
+	for slot, bucket := range grid {
+		position[bucket.Unix()] = slot
+	}
+	for position := range issues {
+		issues[position].Trend = make([]uint64, len(grid))
+	}
+	for rows.Next() {
+		var fingerprint string
+		var point time.Time
+		var events uint64
+		if err := rows.Scan(&fingerprint, &point, &events); err != nil {
+			_ = rows.Close()
+			return 0, fmt.Errorf("scan issue row trend: %w", err)
+		}
+		if row, ok := index[fingerprint]; ok {
+			if slot, found := position[point.UTC().Unix()]; found {
+				issues[row].Trend[slot] = events
+			}
+		}
+	}
+	if err := rows.Err(); err != nil {
+		_ = rows.Close()
+		return 0, err
+	}
+	_ = rows.Close()
+
+	eventWhere, eventArguments := issueEventWhere(filters)
+	stacks, err := repository.database.QueryContext(ctx, fmt.Sprintf(`SELECT fingerprint, argMax(error_stack, timestamp)
+FROM rum_events WHERE %s AND fingerprint IN (%s) GROUP BY fingerprint`, eventWhere, in), append(eventArguments, fingerprints...)...)
+	if err != nil {
+		return 0, fmt.Errorf("query issue culprits: %w", err)
+	}
+	defer func() { _ = stacks.Close() }()
+	for stacks.Next() {
+		var fingerprint, stack string
+		if err := stacks.Scan(&fingerprint, &stack); err != nil {
+			return 0, fmt.Errorf("scan issue culprit: %w", err)
+		}
+		if row, ok := index[fingerprint]; ok {
+			issues[row].Culprit = culpritFromStack(stack)
+		}
+	}
+	return interval, stacks.Err()
 }
 
 func (repository *IssuesRepository) Trend(ctx context.Context, requested IssueFilters, fingerprint string) ([]IssueTrendPoint, error) {
@@ -396,7 +569,7 @@ func normalizeIssueFilters(filters IssueFilters) (IssueFilters, *issueCursor, er
 	if filters.Sort == "" {
 		filters.Sort = "events"
 	}
-	if filters.Limit < 1 || filters.Limit > 100 || !validIssueStatus(filters.Status) ||
+	if filters.Limit < 1 || filters.Limit > 100 || !validIssueStatus(filters.Status) || !validAssigneeFilter(filters.Assignee) ||
 		(filters.Sort != "events" && filters.Sort != "users" && filters.Sort != "last_seen") ||
 		!boundedQueryDimension(filters.Environment, 64) || !boundedQueryDimension(filters.Release, 128) ||
 		!boundedQueryDimension(filters.Route, 512) || !boundedQueryDimension(filters.Browser, 128) ||
@@ -424,7 +597,30 @@ func NormalizeIssueFilters(filters IssueFilters) (IssueFilters, error) {
 }
 
 func validIssueStatus(status metadata.IssueStatus) bool {
-	return status == "" || status == metadata.IssueStatusUnresolved || status == metadata.IssueStatusResolved || status == metadata.IssueStatusIgnored
+	return status == "" || status == metadata.IssueStatusUnresolved || status == metadata.IssueStatusResolved ||
+		status == metadata.IssueStatusIgnored || status == metadata.IssueStatusRegressed
+}
+
+// AssigneeNone is the Assignee filter value for Issues nobody owns.
+const AssigneeNone = "none"
+
+func validAssigneeFilter(value string) bool {
+	if value == "" || value == AssigneeNone {
+		return true
+	}
+	_, err := uuid.Parse(value)
+	return err == nil
+}
+
+func matchesAssignee(filter string, assignee *uuid.UUID) bool {
+	switch filter {
+	case "":
+		return true
+	case AssigneeNone:
+		return assignee == nil
+	default:
+		return assignee != nil && assignee.String() == filter
+	}
 }
 
 func issueWhere(filters IssueFilters) (string, []any) {

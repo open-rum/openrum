@@ -1,0 +1,111 @@
+---
+title: Next.js
+description: 在 Next.js 应用里接入 OpenRUM browser SDK，并避免它在服务端执行。
+appliesTo: "@openrum/browser 0.1.1"
+---
+
+import { Aside, Steps } from "@astrojs/starlight/components";
+
+Next.js 会在服务端渲染，而 `@openrum/browser` 是浏览器 SDK，所以真正需要决定的只有一件事：
+`init()` 必须在浏览器里执行，且只在浏览器里执行。
+
+<Aside type="danger" title="在服务端初始化会静默失败">
+  Node 下没有 `window`，于是 `init()` 会构造一个没有传输层的 client，正常返回，并把之后每一个 Event
+  都计为丢弃。既不抛错也不打日志，因此一个放错位置的 `init()` 看起来就跟"接入正常、只是
+  恰好没有流量"完全一样。
+</Aside>
+
+`"use client"` 本身不是屏障。Client Component 在渲染期间仍会在服务端被求值一次，因此写在其中的
+模块级 `init()` 会在 Node 下执行；又因为 `activeClient` 是模块级单例，那个已经失效的 client 会被
+服务端后续处理的每一个请求复用。请改为在 effect 里初始化，它只会在浏览器中执行。
+
+## App Router
+
+<Steps>
+
+1. 写一个只负责初始化的 Client Component。
+
+   ```tsx
+   // app/monitoring.tsx
+   "use client";
+
+   import { init } from "@openrum/browser";
+   import { useEffect } from "react";
+
+   export function Monitoring() {
+     useEffect(() => {
+       init({
+         dsn: process.env.NEXT_PUBLIC_OPENRUM_DSN!,
+         environment: process.env.NODE_ENV,
+         release: process.env.NEXT_PUBLIC_APP_RELEASE,
+       });
+     }, []);
+
+     return null;
+   }
+   ```
+
+   已有 client 在运行时 `init()` 会直接返回它，因此开发环境下 Strict Mode 触发两次 effect，也
+   不会产生两个 client 或两个 Session。
+
+2. 在根 layout 里渲染一次。
+
+   ```tsx
+   // app/layout.tsx
+   import { Monitoring } from "./monitoring";
+
+   export default function RootLayout({ children }: { children: React.ReactNode }) {
+     return (
+       <html lang="zh-CN">
+         <body>
+           <Monitoring />
+           {children}
+         </body>
+       </html>
+     );
+   }
+   ```
+
+3. 用 `NEXT_PUBLIC_` 前缀暴露 DSN。它包含浏览器公开的只写凭证，需要进入浏览器 bundle，而这正是
+   前缀的作用。
+
+</Steps>
+
+## Pages Router
+
+同样的调用，放在 `_app` 里：
+
+```tsx
+// pages/_app.tsx
+import { init } from "@openrum/browser";
+import type { AppProps } from "next/app";
+import { useEffect } from "react";
+
+export default function App({ Component, pageProps }: AppProps) {
+  useEffect(() => {
+    init({
+      dsn: process.env.NEXT_PUBLIC_OPENRUM_DSN!,
+      environment: process.env.NODE_ENV,
+      release: process.env.NEXT_PUBLIC_APP_RELEASE,
+    });
+  }, []);
+
+  return <Component {...pageProps} />;
+}
+```
+
+## 导航
+
+两种 Router 都通过 `history.pushState` 改变 URL，因此客户端导航无需路由钩子就会产生 Page View。
+记录下来的 Route 是解析后的 pathname，也就是说 `app/orders/[id]` 这样的动态段会被存成
+`/orders/8fc1`，而不是 `/orders/[id]`。这对 Analysis 的影响见
+[路由模式](/zh/docs/sdk/browser/#路由模式暂未被记录)。
+
+## 不在覆盖范围内
+
+| 关注点                         | 状态                                                                 |
+| ------------------------------ | -------------------------------------------------------------------- |
+| 服务端渲染期间抛出的错误       | 不采集。SDK 只观测浏览器，这些错误留在 Next.js 的服务端日志里。      |
+| Route Handler 与 Server Action | 不直接采集。它们的失败会以浏览器侧失败的 fetch 或 XHR Request 呈现。 |
+| Middleware 与 Edge runtime     | 不支持。那里既没有 `window` 也没有`localStorage`。                   |
+| Source Map                     | 构建后按 Release 上传，见 [Source Map](/zh/docs/sdk/source-maps/)。  |

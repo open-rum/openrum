@@ -51,7 +51,7 @@ export function ModuleContent({
   if (!query?.data)
     return (
       <Skeleton
-        className={widget.type === "stat" ? "h-24 w-full" : "h-64 w-full"}
+        className={widget.type === "stat" ? "h-24 w-full" : "h-64 w-full min-[1680px]:h-72"}
         aria-label="正在加载模块"
       />
     );

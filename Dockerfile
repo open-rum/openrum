@@ -17,7 +17,7 @@ COPY apps/web apps/web
 COPY packages packages
 RUN pnpm --filter @openrum/browser build && pnpm --filter @openrum/web build
 
-FROM --platform=$BUILDPLATFORM golang:1.26.6-alpine AS go-build
+FROM --platform=$BUILDPLATFORM golang:1.26.9-alpine AS go-build
 WORKDIR /src
 ARG TARGETOS
 ARG TARGETARCH
@@ -29,7 +29,7 @@ ARG VERSION=dev
 ARG COMMIT=unknown
 RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
     export CGO_ENABLED=0 GOOS="$TARGETOS" GOARCH="$TARGETARCH" && \
-    go build -trimpath -ldflags="-s -w -X main.version=${VERSION} -X main.commit=${COMMIT}" -o /out/api ./services/api/cmd/api && \
+    go build -trimpath -ldflags="-s -w -X main.version=${VERSION}" -o /out/api ./services/api/cmd/api && \
     go build -trimpath -ldflags="-s -w" -o /out/ingest ./services/ingest/cmd/ingest && \
     go build -trimpath -ldflags="-s -w" -o /out/consumer ./services/consumer/cmd/consumer && \
     go build -trimpath -ldflags="-s -w" -o /out/worker ./services/worker/cmd/worker && \

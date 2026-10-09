@@ -26,7 +26,7 @@ import { Steps, Aside, LinkCard } from "@astrojs/starlight/components";
    如果已经有源码，直接进入仓库根目录；否则执行：
 
    ```sh
-   git clone https://github.com/openrum/openrum.git
+   git clone https://github.com/open-rum/openrum.git
    cd openrum
    corepack enable
    pnpm install --frozen-lockfile
@@ -60,7 +60,7 @@ import { Steps, Aside, LinkCard } from "@astrojs/starlight/components";
    pnpm openrum dev
    ```
 
-   该命令构建所需镜像与 Browser SDK，启动基础设施和数据管道，执行数据库迁移与演示数据初始化，再从源码启动 API 和控制台。
+   该命令构建所需镜像与 Browser SDK，启动基础设施和数据管道，执行数据库迁移，再从源码启动 API 和控制台。
 
    | 运行位置             | 服务                                                           |
    | -------------------- | -------------------------------------------------------------- |
@@ -75,7 +75,13 @@ import { Steps, Aside, LinkCard } from "@astrojs/starlight/components";
 
    **成功标志：** 依赖及 API 就绪，控制台开发服务器运行并显示访问地址。失败时执行 `pnpm openrum logs api` 或查看对应服务日志。
 
-1. ## 登录控制台
+1. ## 加载演示数据并登录
+
+   ```sh
+   pnpm openrum seed
+   ```
+
+   该命令加载演示账号、项目，以及 14 天内约 30,000 个会话。这一步可选，重复执行是安全的。不执行时，首次访问会进入初始化页面，由你自己创建所有者账号。
 
    打开 `http://127.0.0.1:4173`，使用本地演示账号：
 

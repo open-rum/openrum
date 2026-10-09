@@ -1,0 +1,43 @@
+---
+title: Sign in with GitHub
+description: Create a GitHub OAuth App and use a verified primary email for Console sign-in.
+appliesTo: Alpha
+---
+
+import { Aside, Steps, LinkCard } from "@astrojs/starlight/components";
+
+GitHub sign-in uses an OAuth App. OpenRUM identifies the account by GitHub's stable numeric user ID and requires a verified **primary** email. Changing a GitHub username does not change the linked identity.
+
+Before starting, deploy OpenRUM at its canonical HTTPS `PUBLIC_BASE_URL`, sign in as Instance Owner, and [enable encrypted secret storage](/docs/self-hosting/authentication/).
+
+<Steps>
+
+1. ## Create a GitHub OAuth App
+
+   In [GitHub's OAuth App settings](https://github.com/settings/developers), register a new OAuth App. Set its Homepage URL to your OpenRUM origin and its Authorization callback URL to the following exact address for the default provider ID `github`:
+
+   ```text
+   https://rum.example.com/api/v1/auth/providers/github/callback
+   ```
+
+   Replace the domain with your `PUBLIC_BASE_URL` host, and replace `github` if you use a different provider ID. Copy the Client ID and create a Client Secret. OpenRUM requests `read:user` and `user:email`; the test account must have a verified primary email on GitHub.
+
+1. ## Configure and test OpenRUM
+
+   Open **System Settings → Authentication**, select the **GitHub** card, and enter the provider ID, display name, Client ID, and Client Secret. Save with **Enable and show on login** unchecked. Confirm with the Owner's OpenRUM password, then select **Test connection** and authorize the GitHub app. The test returns to settings without creating a user account.
+
+1. ## Enable and sign in
+
+   Check **Enable and show on login** and save. In a separate browser session, choose **Sign in with GitHub** on the login page. A new external account stays pending until an Organization administrator grants access. Existing users should [link GitHub in Account](/docs/getting-started/sign-in/) before using the login button.
+
+</Steps>
+
+<Aside type="tip" title="If sign-in fails">
+  Confirm the OAuth App's callback URL and Client ID, its authorization, and the account's verified
+  primary email. A verified secondary email alone is not enough. Retry **Test connection** before
+  enabling the method.
+</Aside>
+
+GitHub's [OAuth App creation guide](https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/creating-an-oauth-app) describes registration and callback settings.
+
+<LinkCard title="Other sign-in methods" href="/docs/getting-started/sign-in/" />

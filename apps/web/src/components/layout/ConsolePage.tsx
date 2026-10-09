@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import type { ComponentProps } from "react";
 import { PanelLeftOpen, SlidersHorizontal } from "lucide-react";
 
@@ -36,7 +36,10 @@ export function ConsolePage({
 }) {
   return (
     <section
-      className={cn("w-full px-4 py-6 sm:px-6 lg:px-8 lg:py-8", className)}
+      className={cn(
+        "w-full px-4 py-6 sm:px-6 lg:px-[var(--page-padding-x)] lg:py-[var(--page-padding-y)]",
+        className,
+      )}
       data-console-page=""
       data-width={width}
       {...props}
@@ -74,7 +77,7 @@ export function ConsolePage({
         ) : null}
         <div
           className={cn(
-            "flex w-full min-w-0 flex-col gap-6",
+            "flex w-full min-w-0 flex-col gap-[var(--page-gap)]",
             widthClasses[width],
             !rail && "mx-auto",
           )}
@@ -102,6 +105,7 @@ export function ConsolePageHeader({
   actions,
   back,
   titleId,
+  documentTitle,
   className,
 }: {
   title: ReactNode;
@@ -109,8 +113,12 @@ export function ConsolePageHeader({
   actions?: ReactNode;
   back?: ReactNode;
   titleId?: string;
+  /** Browser tab title; defaults to `title` when it is plain text. */
+  documentTitle?: string;
   className?: string;
 }) {
+  const tabTitle = documentTitle ?? (typeof title === "string" ? title : undefined);
+  useDocumentTitle(tabTitle);
   return (
     <header className={cn("flex min-w-0 flex-col gap-2", className)} data-console-page-header="">
       {back ? <div className="mb-1">{back}</div> : null}
@@ -168,7 +176,7 @@ export function ConsoleFilterBar({
   return (
     <div
       className={cn(
-        "flex min-w-0 flex-wrap items-center gap-3 rounded-lg border border-border bg-card p-3 shadow-(--shadow-control)",
+        "flex min-w-0 flex-wrap items-center gap-3 rounded-2xl border border-border bg-card p-3 shadow-(--shadow-control)",
         sticky && "sticky top-[74px] z-20",
         className,
       )}
@@ -217,4 +225,15 @@ export function ConsolePageContent({
       {children}
     </div>
   );
+}
+
+/** Sets the tab title to "<page> · OpenRUM" and restores the plain name on leave. */
+function useDocumentTitle(page?: string) {
+  useEffect(() => {
+    if (!page) return undefined;
+    document.title = `${page} · OpenRUM`;
+    return () => {
+      document.title = "OpenRUM";
+    };
+  }, [page]);
 }

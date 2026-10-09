@@ -92,6 +92,17 @@ export function listProjects(organizationId: string) {
   );
 }
 
+export type ReportedEnvironment = { name: string; lastSeenAt: string };
+
+/** Environments that have actually reported data for the project, most recent first. */
+export function getReportedEnvironments(projectId: string, signal?: AbortSignal) {
+  return apiFetch<{ environments: ReportedEnvironment[] }>(
+    `/api/v1/projects/${encodeURIComponent(projectId)}/environments`,
+    { signal },
+    protectedRequest,
+  );
+}
+
 export function getProject(projectId: string, signal?: AbortSignal) {
   return apiFetch<Project>(
     `/api/v1/projects/${encodeURIComponent(projectId)}`,
@@ -104,11 +115,8 @@ export function createProject(
   organizationId: string,
   input: {
     name: string;
-    slug: string;
     sdkPlatform: SDKPlatform;
     allowedOrigins: string[];
-    environment: string;
-    environments: string[];
     retentionDays: number;
     eventSampleRate: number;
     apiSampleRate: number;
@@ -130,7 +138,6 @@ export function createProject(
 // the server keeps the rest untouched via COALESCE.
 export type ProjectUpdate = {
   name?: string;
-  slug?: string;
   sdkPlatform?: SDKPlatform;
   allowedOrigins?: string[];
   environment?: string;
@@ -156,6 +163,15 @@ export function updateProject(projectId: string, input: ProjectUpdate) {
       headers: { "Content-Type": "application/json", ...csrfHeaders() },
       body: JSON.stringify(input),
     },
+    protectedRequest,
+  );
+}
+
+/** Permanently deletes the project's data; the project row is kept, marked deleting. */
+export function deleteProject(projectId: string) {
+  return apiFetch<{ status: "deleting"; deadlineHours: number }>(
+    `/api/v1/projects/${encodeURIComponent(projectId)}`,
+    { method: "DELETE", headers: csrfHeaders() },
     protectedRequest,
   );
 }

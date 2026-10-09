@@ -300,7 +300,8 @@ func TestHandlerRejectsAuthOriginRateAndSchemaFailures(t *testing.T) {
 		{name: "ip rate", configure: func(_ *fakeAuthenticator, limiter *fakeLimiter, _ *http.Request) { limiter.allowIP = false }, wantStatus: 429, wantCode: "RATE_LIMITED", wantScope: "ip", wantLimit: "1000"},
 		{name: "project rate", configure: func(_ *fakeAuthenticator, limiter *fakeLimiter, _ *http.Request) { limiter.allowProject = false }, wantStatus: 429, wantCode: "RATE_LIMITED", wantScope: "project", wantLimit: "5000"},
 		{name: "schema", body: []byte(`{"schema_version":"invalid"}`), wantStatus: 400, wantCode: "INVALID_ENVELOPE"},
-		{name: "environment", body: bytes.ReplaceAll(validEnvelope(t), []byte(`"environment": "production"`), []byte(`"environment": "staging"`)), wantStatus: 400, wantCode: "ENVIRONMENT_MISMATCH"},
+		// Only the four fixed environments are accepted; anything else is rejected.
+		{name: "environment", body: bytes.ReplaceAll(validEnvelope(t), []byte(`"environment": "production"`), []byte(`"environment": "canary"`)), wantStatus: 400, wantCode: "ENVIRONMENT_MISMATCH"},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {

@@ -39,6 +39,7 @@ import { getSessionTimelinePage } from "@/lib/api/sessions";
 import { listOrganizations, listProjects, type Project } from "@/lib/api/projects";
 import { HTTPError } from "@/lib/auth/session";
 import { projectIdFromPathname } from "@/lib/projects/currentProject";
+import { projectEnvironments } from "@/lib/projects/environments";
 
 const labels: Record<string, string> = {
   storefront: "综合电商旅程",
@@ -56,7 +57,8 @@ const labels: Record<string, string> = {
 };
 
 const descriptions: Record<string, string> = {
-  storefront: "浏览商品、加购和结账的完整旅程，包含页面、API、性能、错误与自定义事件。",
+  storefront:
+    "一次生成全部数据：浏览、搜索、购买、账户与客服旅程，含页面、五项性能指标、API、错误、日志、点击与业务事件；访客会回访、部分登录，带访问来源、昼夜节奏、漏斗流失和一次支付故障。",
   "api-surface": "覆盖多种接口、状态码和耗时，包含浏览器与版本差异，适合验证 API 分析。",
   "failing-release": "模拟新版本支付故障，验证错误聚合、版本对比与告警。",
   "web-vitals": "生成良好、待优化和较差的性能样本，验证性能图表与评分。",
@@ -229,7 +231,9 @@ export function DevDataForm({
   const [environment, setEnvironment] = useState(current?.environment || project.environment);
   const [windowValue, setWindowValue] = useState(current ? "current" : "60");
   const [preset, setPreset] = useState("storefront");
-  const [sessions, setSessions] = useState(100);
+  const [sessions, setSessions] = useState(300);
+  const [userIds, setUserIds] = useState("");
+  const [signedIn, setSignedIn] = useState("0.45");
   const [advanced, setAdvanced] = useState(false);
   const [draft, setDraft] = useState("");
   const presets = useQuery({
@@ -245,6 +249,15 @@ export function DevDataForm({
         sessions: advanced ? undefined : sessions,
         scenario,
         environment,
+        users: advanced
+          ? undefined
+          : {
+              ids: userIds
+                .split(/[\s,，]+/)
+                .map((id) => id.trim())
+                .filter(Boolean),
+              signedIn: Number(signedIn),
+            },
         ...(windowValue === "current" && current
           ? { from: current.from.toISOString(), to: current.to.toISOString() }
           : { minutes: Number(windowValue) }),
@@ -299,7 +312,7 @@ export function DevDataForm({
     queryClient.getQueryState(["dev-data-probe", result?.probeEventId])?.dataUpdateCount ?? 0;
   const probePending =
     Boolean(result?.probeEventId) && !probe.data && !probe.error && attempts < 15;
-  const environments = project.environments?.length ? project.environments : [project.environment];
+  const environments = projectEnvironments.map((item) => item.id);
   const blocked = project.status !== "active" || project.role === "viewer";
 
   return (
@@ -371,8 +384,40 @@ export function DevDataForm({
                 onChange={(event) => setSessions(Number(event.target.value))}
               />
               <FieldDescription>
-                建议 100 条快速验证，300 条看趋势，上限 5,000。数量越大耗时越长。
+                建议 300 条看趋势，1,000 条以上更接近真实，上限 5,000。数量越大耗时越长。
               </FieldDescription>
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="dev-user-ids">业务用户 ID（可选）</FieldLabel>
+              <Textarea
+                id="dev-user-ids"
+                rows={2}
+                placeholder="每行或用逗号分隔，例如 alice、vip-001；留空自动生成 cust_10001 起的 ID"
+                value={userIds}
+                disabled={advanced}
+                onChange={(event) => setUserIds(event.target.value)}
+              />
+              <FieldDescription>
+                登录访客会固定使用其中一个 ID，可在会话、错误和日志中按 user.id 查找。SDK
+                目前只上报用户 ID，不支持用户名。
+              </FieldDescription>
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="dev-signed-in">登录访客占比</FieldLabel>
+              <Choice
+                id="dev-signed-in"
+                value={signedIn}
+                onChange={setSignedIn}
+                disabled={advanced}
+                items={[
+                  { value: "0", label: "全部匿名" },
+                  { value: "0.2", label: "20%" },
+                  { value: "0.45", label: "45%（推荐）" },
+                  { value: "0.7", label: "70%" },
+                  { value: "1", label: "全部登录" },
+                ]}
+              />
+              <FieldDescription>访客会跨会话回访，所以 UV 少于会话数。</FieldDescription>
             </Field>
           </div>
           <Alert>
@@ -499,7 +544,7 @@ function DevDataOutcome({
           {!queryable && !pending && result.accepted > 0
             ? " 尚未确认样本可查询：请检查 Consumer、项目入站过滤和数据保留期限，不要反复追加数据。"
             : null}
-          {queryable ? " 样本检查不代表每条事件均已入库或每项大盘指标都有数据。" : null}
+          {queryable ? " 样本检查不代表每条事件均已入库或每项仪表盘指标都有数据。" : null}
         </AlertDescription>
       </Alert>
       <div className="flex flex-wrap gap-2">
@@ -521,7 +566,7 @@ function DevDataOutcome({
       </p>
       <div className="flex flex-wrap gap-2">
         <Button asChild variant="outline">
-          <a href={`/projects/${projectId}/overview?${search}`}>按生成范围查看大盘</a>
+          <a href={`/projects/${projectId}/overview?${search}`}>按生成范围查看仪表盘</a>
         </Button>
         <Button variant="ghost" disabled={!result.probeEventId} onClick={onRefresh}>
           检查入库并刷新

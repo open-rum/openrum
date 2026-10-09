@@ -1,0 +1,65 @@
+---
+title: 组织、项目与角色
+description: Instance、Organization、Project 和 Environment 如何组合在一起，以及各类角色分别作用于哪里。
+appliesTo: Alpha
+---
+
+import organizationModel from "@/assets/diagrams/organization-model.zh.svg?raw";
+
+OpenRUM 有两个相互独立的权限范围。你日常做的大部分事情发生在某个 **Organization** 之内，少数运维操作发生在 **Instance** 层面。知道一项设置属于哪个范围，就知道谁能改它。
+
+<figure class="docs-diagram">
+  <Fragment set:html={organizationModel} />
+  <figcaption>
+    一个 Instance 包含多个 Organization，一个 Organization 包含多个 Project，一个 Project 上报一个或多个
+    Environment。图中的 Environment 名称只是示例。
+  </figcaption>
+</figure>
+
+## 四个层级
+
+| 层级 | 是什么 | 归谁管 |
+| --- | --- | --- |
+| Instance | 一套自托管的 OpenRUM，以及它的全局策略：登录方式、数据生命周期、存储与维护 | Instance Owner 和 Instance Admin |
+| Organization | 一个团队边界，拥有 Project、成员和通知渠道 | 它的成员，每人有一个 Organization 角色 |
+| Project | 一个 Web 产品，也是它的 Event、Issue、Release 和告警规则的上报边界 | 继承自所属 Organization |
+| Environment | Project 内的部署范围，例如 `production` 或 `staging` | 继承自所属 Project |
+
+## 角色来自 Organization
+
+一个人的角色挂在 **Organization** 上，而不是 Project 上。只要你能看到某个 Organization，同样的角色就适用于其中的每个 Project。当前版本没有 Project 级角色，所以想让某个人对某一个产品拥有不同的权限，就把这个产品放进单独的 Organization。
+
+Organization 有四个角色：**Owner**、**Admin**、**Member** 和 **Viewer**。每个角色能做什么见[角色与权限](/zh/docs/product/roles-permissions/)。
+
+由此得到几条规则：
+
+- 一个人可以属于多个 Organization，并在每个里面拥有不同角色。角色不会在 Organization 之间继承。
+- 创建 Organization 的人成为它的第一个 Owner。
+- Organization 始终至少保留一名 Owner，最后一名 Owner 不能被降级或移除。
+- 成员只能看到自己所属 Organization 的 Project。
+
+## Instance 角色是独立的
+
+**Instance Owner** 和 **Instance Admin** 管理的是这套安装本身，而不是某个团队的数据。完成首次初始化的人会成为第一个 Instance Owner，同时也是第一个 Organization 的 Owner。此后两个范围互相独立：Organization 角色不会带来 Instance 角色，Instance 角色也不会带来对某个 Organization 里 Project 的访问权。
+
+这是有意的分离。运维服务器的人不会自动看到每个团队的错误，团队 Owner 也无法改变整个 Instance 的登录策略。各 Instance 角色能做什么见[角色与权限](/zh/docs/product/roles-permissions/#instance-角色)。
+
+## 设置在哪里
+
+Console 按范围对设置分组，这个分组同时也告诉你谁能看到它们。
+
+| 范围 | Console 位置 | 示例 |
+| --- | --- | --- |
+| 账户 | **个人资料** | 你的名称、密码和已关联的登录方式 |
+| 组织 | **成员与权限**、**通知渠道** | 成员、角色、告警发往哪里 |
+| 项目 | **项目**分组下的各页 | Key、允许的 Origin、采样、限流、过滤、用量 |
+| 系统 | **系统设置** | 登录提供者、数据生命周期、对象存储、审计 |
+
+能看到某个 Project 的人就能看到它所属 Organization 与 Project 的设置，但能不能修改取决于角色。没有 Instance 角色的人看不到系统设置，它不是显示出来再拒绝，而是整个入口都不存在。
+
+## 相关页面
+
+- [角色与权限](/zh/docs/product/roles-permissions/)列出每个角色具体能执行哪些操作。
+- [成员与账号](/zh/docs/product/members-and-accounts/)介绍如何添加人员，以及什么是待审批账号。
+- [项目设置](/zh/docs/product/project-settings/)介绍 Project 范围内的各项控制。
+- [术语与核心概念](/zh/docs/reference/glossary/)给出这些术语的定义。

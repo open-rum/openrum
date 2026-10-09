@@ -34,7 +34,7 @@ func TestPerformanceHandlerValidatesAndReturnsBoundedResult(t *testing.T) {
 	router.Handle("GET /api/v1/projects/{projectId}/performance", authenticated(http.HandlerFunc(handler.Get)))
 	from := time.Date(2026, 9, 3, 0, 0, 0, 0, time.UTC)
 	url := "/api/v1/projects/" + projectID.String() + "/performance?from=" + from.Format(time.RFC3339Nano) + "&to=" + from.Add(time.Hour).Format(time.RFC3339Nano) + "&metric=inp&route=%2Fcheckout&percentile=p99&country=cn&deviceType=mobile&browser=Safari"
-	request := httptest.NewRequest(http.MethodGet, url, nil)
+	request := httptest.NewRequestWithContext(context.Background(), http.MethodGet, url, nil)
 	request.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "valid"})
 	response := httptest.NewRecorder()
 	router.ServeHTTP(response, request)
@@ -45,7 +45,7 @@ func TestPerformanceHandlerValidatesAndReturnsBoundedResult(t *testing.T) {
 		t.Fatalf("dimensions not forwarded: %+v", queries.filters)
 	}
 
-	request = httptest.NewRequest(http.MethodGet, "/api/v1/projects/"+projectID.String()+"/performance?from=bad&to=bad", nil)
+	request = httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/api/v1/projects/"+projectID.String()+"/performance?from=bad&to=bad", nil)
 	request.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "valid"})
 	response = httptest.NewRecorder()
 	router.ServeHTTP(response, request)

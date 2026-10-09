@@ -112,10 +112,8 @@ func TestOverviewRepositoryReturnsFilteredKPIsComparisonSeriesAndFreshness(t *te
 		t.Fatalf("series=%+v", result.Series)
 	}
 	if len(result.TopIssues) != 1 || result.TopIssues[0].Events != 1 || result.TopIssues[0].Users != 1 ||
-		result.TopIssues[0].LastSeenAt == nil || !result.TopIssues[0].LastSeenAt.Equal(currentAt) || len(result.SlowAPIs) != 2 ||
-		result.SlowAPIs[0].URL != "https://shop.example.com/api/slow" || result.SlowAPIs[0].DurationP95 == nil ||
-		!near(*result.SlowAPIs[0].DurationP95, 400) {
-		t.Fatalf("issues=%+v APIs=%+v", result.TopIssues, result.SlowAPIs)
+		result.TopIssues[0].LastSeenAt == nil || !result.TopIssues[0].LastSeenAt.Equal(currentAt) {
+		t.Fatalf("issues=%+v", result.TopIssues)
 	}
 	if result.Freshness.LatestReceivedAt == nil || !result.Freshness.LatestReceivedAt.Equal(currentTo.Add(-10*time.Second)) ||
 		result.Freshness.AgeSeconds == nil || !near(*result.Freshness.AgeSeconds, 10) || result.Freshness.Stale {
@@ -137,7 +135,7 @@ func TestOverviewRepositoryReturnsExplicitEmptyState(t *testing.T) {
 	}
 	if result.KPIs.PageViews.Value != 0 || result.KPIs.PageViews.Samples != 0 || result.KPIs.ErrorRate.Value != nil ||
 		result.KPIs.APIFailureRate.Value != nil || result.KPIs.LCP.P75 != nil || result.KPIs.LCP.Sufficient ||
-		result.Series == nil || len(result.Series) != 0 || result.SlowAPIs == nil || len(result.SlowAPIs) != 0 ||
+		result.Series == nil || len(result.Series) != 0 ||
 		result.Freshness.LatestReceivedAt != nil || result.Freshness.AgeSeconds != nil {
 		t.Fatalf("empty result=%+v", result)
 	}

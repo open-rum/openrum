@@ -1,9 +1,8 @@
 ---
 title: Investigation
 description: Move from a behavior change to Session, Issue and root cause.
+appliesTo: Alpha
 ---
-
-**Applies to:** Alpha.
 
 OpenRUM keeps behavior analytics and error monitoring in one investigation path so operators do not copy IDs between tools.
 
@@ -13,6 +12,10 @@ OpenRUM keeps behavior analytics and error monitoring in one investigation path 
 2. **Open Sessions** for the affected Route or cohort and inspect the ordered timeline of Page Views, interactions, API Requests and errors.
 3. **Follow an error Event to its Issue** and review Fingerprint, impact, Release and whether the problem is new.
 4. **Confirm the root cause** with Session context and the failed API Request. When object storage is configured, resolve a mapped original source frame from the Source Map Artifact.
+
+## Triage the Issue list
+
+The Issue list is built for triage. The **New issues**, **Unassigned** and **Assigned to me** chips narrow it in one click, and the status filter includes **Regressed**: Issues you resolved that have failed again since. Select rows with the checkboxes to resolve, ignore, reopen or assign many Issues at once; members with the Viewer role can read the list but not change it.
 
 ## Evidence you should expect
 
@@ -26,4 +29,4 @@ OpenRUM keeps behavior analytics and error monitoring in one investigation path 
 
 ## Demo walkthrough
 
-After the local Quickstart, use the seeded ecommerce path: product behavior → checkout Session → `v1:demo-checkout` Issue → failed `POST /api/orders`. See [Deterministic Demo data](/docs/getting-started/demo-data/).
+After starting local development and running `pnpm openrum seed`, use the seeded ecommerce path: product behavior → checkout Session → `v1:demo-checkout` Issue → failed `POST /api/orders`.

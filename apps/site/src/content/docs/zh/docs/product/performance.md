@@ -1,9 +1,8 @@
 ---
 title: 性能
 description: 通过 Core Web Vitals、Route 性能和体验回归理解真实用户体验。
+appliesTo: Alpha
 ---
-
-**适用版本：** Alpha。状态：Alpha 已实现。
 
 性能页面用于解释一次真实用户旅程为什么缓慢或不稳定。
 

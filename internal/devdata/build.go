@@ -3,6 +3,7 @@ package devdata
 import (
 	"encoding/hex"
 	"fmt"
+	"math"
 	"math/rand"
 	"strings"
 	"time"
@@ -50,21 +51,29 @@ func Build(scenario Scenario) ([]Batch, Summary, error) {
 	journeys := newPicker(scenario.Journeys, func(journey Journey) int { return journey.Weight })
 	releases := newPicker(scenario.Releases, func(release Weight) int { return release.Weight })
 
+	referrers := newPicker(scenario.Referrers, func(referrer Weight) int { return referrer.Weight })
+	visitors := newVisitorPool(scenario, clients, random)
+
 	batches := make([]Batch, 0, scenario.Sessions)
 	summary := Summary{Sessions: scenario.Sessions, ByType: map[string]int{}}
-	span := scenario.To.Sub(scenario.From)
 	for index := 0; index < scenario.Sessions; index++ {
+		visitor := visitors.next(index, random)
 		session := sessionSeed{
-			client:  clients.pick(random),
+			client:  visitor.client,
 			journey: journeys.pick(random),
 			// Sessions are spread across the window instead of clustered at one
-			// instant, so per-minute rollups and trend charts have a shape.
-			startedAt: scenario.From.Add(time.Duration(random.Float64() * float64(span))),
+			// instant, so per-minute rollups and trend charts have a shape; a daily
+			// rhythm makes that shape follow when people actually shop.
+			startedAt: sessionStart(scenario, random),
 			sessionID: uuid.NewString(),
-			anonymous: uuid.NewString(),
+			anonymous: visitor.anonymous,
+			userID:    visitor.userID,
 		}
 		if releases.total > 0 {
 			session.release = releases.pick(random).Value
+		}
+		if referrers.total > 0 || len(scenario.Referrers) > 0 {
+			session.referrer = referrers.pick(random).Value
 		}
 		built := buildSession(scenario, session, random)
 		fitSessionWindow(built, scenario.From, scenario.To)
@@ -119,17 +128,127 @@ type sessionSeed struct {
 	client    Client
 	journey   Journey
 	release   string
+	referrer  string
 	startedAt time.Time
 	sessionID string
 	anonymous string
+	userID    string
+}
+
+type visitor struct {
+	client    Client
+	anonymous string
+	userID    string
+}
+
+// visitorPool hands out returning visitors: each keeps its device and, when signed
+// in, its business user ID across sessions, so UV is lower than sessions and a user
+// can be followed through several visits.
+type visitorPool struct {
+	visitors []visitor
+	clients  picker[Client]
+}
+
+func newVisitorPool(scenario Scenario, clients picker[Client], random *rand.Rand) visitorPool {
+	pool := visitorPool{clients: clients}
+	users := scenario.Users
+	if users == nil || users.Visitors <= 0 {
+		return pool
+	}
+	prefix := users.Prefix
+	if prefix == "" {
+		prefix = "user_"
+	}
+	signedIn := 0
+	pool.visitors = make([]visitor, users.Visitors)
+	for index := range pool.visitors {
+		current := visitor{client: clients.pick(random), anonymous: uuid.NewString()}
+		if occurs(users.SignedIn, random) {
+			if len(users.IDs) > 0 {
+				current.userID = strings.TrimSpace(users.IDs[signedIn%len(users.IDs)])
+			} else {
+				current.userID = fmt.Sprintf("%s%d", prefix, 10_001+signedIn)
+			}
+			signedIn++
+		}
+		pool.visitors[index] = current
+	}
+	return pool
+}
+
+// next picks the visitor for a session. Activity is skewed so a few loyal visitors
+// return often while most come once or twice, as in real storefront traffic.
+func (pool visitorPool) next(index int, random *rand.Rand) visitor {
+	if len(pool.visitors) == 0 {
+		return visitor{client: pool.clients.pick(random), anonymous: uuid.NewString()}
+	}
+	if index < len(pool.visitors) {
+		return pool.visitors[index]
+	}
+	skewed := math.Pow(random.Float64(), 1.8)
+	return pool.visitors[int(skewed*float64(len(pool.visitors)))%len(pool.visitors)]
+}
+
+// sessionStart draws a start time, following the daily rhythm when one is set.
+func sessionStart(scenario Scenario, random *rand.Rand) time.Time {
+	span := float64(scenario.To.Sub(scenario.From))
+	uniform := func() time.Time { return scenario.From.Add(time.Duration(random.Float64() * span)) }
+	rhythm := scenario.DailyRhythm
+	if rhythm == nil || len(rhythm.Hourly) != 24 {
+		return uniform()
+	}
+	location, err := time.LoadLocation(rhythm.TimeZone)
+	if err != nil {
+		return uniform()
+	}
+	peak := 0.0
+	for _, weight := range rhythm.Hourly {
+		peak = math.Max(peak, weight)
+	}
+	// Rejection sampling keeps every draw inside the window while bending the
+	// density towards busy hours; the bound keeps a flat-zero curve from looping.
+	for attempt := 0; attempt < 64; attempt++ {
+		candidate := uniform()
+		hour := candidate.In(location).Hour()
+		next := rhythm.Hourly[(hour+1)%24]
+		minute := float64(candidate.In(location).Minute()) / 60
+		weight := rhythm.Hourly[hour]*(1-minute) + next*minute
+		if random.Float64()*peak <= weight {
+			return candidate
+		}
+	}
+	return uniform()
+}
+
+// incidentAt returns the error and failure multipliers in effect at a moment.
+func incidentAt(scenario Scenario, at time.Time) (float64, float64) {
+	errors, failures := 1.0, 1.0
+	span := float64(scenario.To.Sub(scenario.From))
+	if span <= 0 {
+		return errors, failures
+	}
+	position := float64(at.Sub(scenario.From)) / span
+	for _, incident := range scenario.Incidents {
+		if position >= incident.Start && position < incident.End {
+			errors = math.Max(errors, incident.ErrorMultiplier)
+			failures = math.Max(failures, incident.FailureMultiplier)
+		}
+	}
+	return errors, failures
 }
 
 func buildSession(scenario Scenario, session sessionSeed, random *rand.Rand) []Batch {
 	batches := make([]Batch, 0, len(session.journey.Pages))
 	at := session.startedAt
 	referrer := ""
+	referrer = session.referrer
 	for pageIndex, page := range session.journey.Pages {
-		pageURL := strings.TrimSuffix(scenario.BaseURL, "/") + page.Path
+		path := page.Path
+		if len(page.Paths) > 0 {
+			path = page.Paths[random.Intn(len(page.Paths))]
+		}
+		errorBoost, failureBoost := incidentAt(scenario, at)
+		pageURL := strings.TrimSuffix(scenario.BaseURL, "/") + path
 		events := make([]event.EventV1, 0, 8)
 		navigation := "navigate"
 		if pageIndex > 0 {
@@ -140,9 +259,10 @@ func buildSession(scenario Scenario, session sessionSeed, random *rand.Rand) []B
 			Timestamp: timestamp(at), NavigationType: navigation,
 		})
 		events = append(events, pageVitals(page, at, navigation, random)...)
-		events = append(events, pageAPIs(page, session, at, scenario.BaseURL, random)...)
-		events = append(events, pageErrors(page, at, random)...)
+		events = append(events, pageAPIs(page, session, at, scenario.BaseURL, failureBoost, random)...)
+		events = append(events, pageErrors(page, path, at, errorBoost, random)...)
 		events = append(events, pageCustom(page, at, random)...)
+		events = append(events, pageClicks(page, at, random)...)
 		for _, log := range page.Logs {
 			if !occurs(log.Odds, random) {
 				continue
@@ -153,7 +273,8 @@ func buildSession(scenario Scenario, session sessionSeed, random *rand.Rand) []B
 		context := event.EventContext{
 			Environment: scenario.Environment, Release: session.release,
 			SessionID: session.sessionID, PageID: uuid.NewString(), AnonymousUserID: session.anonymous,
-			Page: event.PageContext{URL: pageURL, Route: page.Route, Title: page.Title, Referrer: referrer},
+			UserID: session.userID,
+			Page:   event.PageContext{URL: pageURL, Route: page.Route, Title: page.Title, Referrer: referrer},
 			// A trace per page view is what a browser SDK propagating context
 			// would produce, and it gives the API samples something to link to.
 			Trace: &event.TraceContext{TraceID: traceID(random), SpanID: spanID(random)},
@@ -170,6 +291,9 @@ func buildSession(scenario Scenario, session sessionSeed, random *rand.Rand) []B
 			})
 		}
 		referrer = pageURL
+		if occurs(page.Exit, random) {
+			break
+		}
 		// Advance far enough that consecutive pages land in different seconds
 		// without the session outgrowing a plausible visit.
 		at = at.Add(time.Duration(4_000+random.Intn(26_000)) * time.Millisecond)
@@ -195,7 +319,7 @@ func pageVitals(page Page, at time.Time, navigation string, random *rand.Rand) [
 	return events
 }
 
-func pageAPIs(page Page, session sessionSeed, at time.Time, baseURL string, random *rand.Rand) []event.EventV1 {
+func pageAPIs(page Page, session sessionSeed, at time.Time, baseURL string, failureBoost float64, random *rand.Rand) []event.EventV1 {
 	events := make([]event.EventV1, 0, len(page.APIs))
 	for _, api := range page.APIs {
 		if !occurs(api.Odds, random) {
@@ -206,7 +330,7 @@ func pageAPIs(page Page, session sessionSeed, at time.Time, baseURL string, rand
 			repeat = int(api.Repeat.draw(random))
 		}
 		for call := 0; call < repeat; call++ {
-			request := apiRequest(api, session, baseURL, random)
+			request := apiRequest(api, session, baseURL, failureBoost, random)
 			events = append(events, event.EventV1{
 				EventID: uuid.NewString(), Type: event.EventTypeAPI,
 				Timestamp: timestamp(at.Add(time.Duration(random.Intn(6_000)) * time.Millisecond)), Request: &request,
@@ -216,10 +340,13 @@ func pageAPIs(page Page, session sessionSeed, at time.Time, baseURL string, rand
 	return events
 }
 
-func apiRequest(api API, session sessionSeed, baseURL string, random *rand.Rand) event.APIRequest {
+func apiRequest(api API, session sessionSeed, baseURL string, failureBoost float64, random *rand.Rand) event.APIRequest {
 	outcomes := api.Outcomes
 	if replacement, found := api.FailingReleases[session.release]; found && len(replacement) > 0 {
 		outcomes = replacement
+	}
+	if failureBoost > 1 {
+		outcomes = boostFailures(outcomes, failureBoost)
 	}
 	outcome := parseOutcome(pickWeighted(outcomes, random))
 	latency := api.LatencyMS.draw(random)
@@ -251,10 +378,23 @@ func apiRequest(api API, session sessionSeed, baseURL string, random *rand.Rand)
 	return request
 }
 
-func pageErrors(page Page, at time.Time, random *rand.Rand) []event.EventV1 {
+// boostFailures scales the weight of every failing outcome, leaving successes as
+// they are, so an incident raises the failure rate without inventing new statuses.
+func boostFailures(outcomes []Weight, factor float64) []Weight {
+	boosted := make([]Weight, len(outcomes))
+	for index, item := range outcomes {
+		boosted[index] = item
+		if parsed := parseOutcome(item.Value); parsed.failure != "" {
+			boosted[index].Weight = int(math.Round(float64(item.Weight) * factor))
+		}
+	}
+	return boosted
+}
+
+func pageErrors(page Page, path string, at time.Time, boost float64, random *rand.Rand) []event.EventV1 {
 	events := make([]event.EventV1, 0, len(page.Errors))
 	for _, failure := range page.Errors {
-		if !occurs(failure.Odds, random) {
+		if !occurs(math.Min(1, failure.Odds*boost), random) {
 			continue
 		}
 		details := event.ErrorDetails{
@@ -265,7 +405,7 @@ func pageErrors(page Page, at time.Time, random *rand.Rand) []event.EventV1 {
 			EventID: uuid.NewString(), Type: event.EventTypeError,
 			Timestamp: timestamp(at.Add(time.Duration(random.Intn(9_000)) * time.Millisecond)), Error: &details,
 			Breadcrumbs: []event.Breadcrumb{{
-				Timestamp: timestamp(at), Category: "navigation", Message: "opened " + page.Path, Level: "info",
+				Timestamp: timestamp(at), Category: "navigation", Message: "opened " + path, Level: "info",
 			}},
 		})
 	}
@@ -278,10 +418,41 @@ func pageCustom(page Page, at time.Time, random *rand.Rand) []event.EventV1 {
 		if !occurs(custom.Odds, random) {
 			continue
 		}
+		measurements := custom.Measurements
+		if len(custom.MeasurementRanges) > 0 {
+			measurements = make(map[string]float64, len(custom.Measurements)+len(custom.MeasurementRanges))
+			for key, value := range custom.Measurements {
+				measurements[key] = value
+			}
+			for key, span := range custom.MeasurementRanges {
+				measurements[key] = round(span.draw(random), 2)
+			}
+		}
 		events = append(events, event.EventV1{
 			EventID: uuid.NewString(), Type: event.EventTypeCustom,
 			Timestamp: timestamp(at.Add(time.Duration(random.Intn(11_000)) * time.Millisecond)),
-			Name:      custom.Name, Attributes: custom.Attributes, Measurements: custom.Measurements,
+			Name:      custom.Name, Attributes: custom.Attributes, Measurements: measurements,
+		})
+	}
+	return events
+}
+
+// pageClicks emits the automatic SDK click behavior event, so paths, heatmap-style
+// click rankings and session timelines have interactions between page views.
+func pageClicks(page Page, at time.Time, random *rand.Rand) []event.EventV1 {
+	events := make([]event.EventV1, 0, len(page.Clicks))
+	for _, click := range page.Clicks {
+		if !occurs(click.Odds, random) {
+			continue
+		}
+		attributes := map[string]string{"element": strings.ToLower(click.Element), "name": click.Name}
+		if click.Role != "" {
+			attributes["role"] = click.Role
+		}
+		events = append(events, event.EventV1{
+			EventID: uuid.NewString(), Type: event.EventTypeCustom,
+			Timestamp: timestamp(at.Add(time.Duration(1_000+random.Intn(9_000)) * time.Millisecond)),
+			Name:      event.BehaviorEventClick, Attributes: attributes,
 		})
 	}
 	return events
@@ -356,7 +527,11 @@ func (span Range) draw(random *rand.Rand) float64 {
 	if span.Max <= span.Min {
 		return span.Min
 	}
-	return span.Min + random.Float64()*(span.Max-span.Min)
+	draw := random.Float64()
+	if span.Skew > 1 {
+		draw = math.Pow(draw, span.Skew)
+	}
+	return span.Min + draw*(span.Max-span.Min)
 }
 
 func occurs(odds float64, random *rand.Rand) bool {

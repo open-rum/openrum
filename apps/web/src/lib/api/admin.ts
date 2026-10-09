@@ -85,6 +85,11 @@ export const objectStorageStatusSchema = z.object({
   testAvailable: z.boolean(),
   managedSecretsAvailable: z.boolean(),
   configurationSource: z.string(),
+  // False once storage refused a delete: uploads still work, deletions leave objects.
+  deleteAllowed: z.boolean().default(true),
+  // Ready Source Map objects in the active Bucket; absent when usage is unavailable.
+  artifactCount: z.number().int().nonnegative().optional(),
+  artifactBytes: z.number().int().nonnegative().optional(),
 });
 
 export const objectStorageProbeSchema = z.object({
@@ -96,9 +101,12 @@ export const objectStorageProbeSchema = z.object({
     z.object({
       name: z.enum(["write", "read", "delete"]),
       status: z.enum(["passed", "failed"]),
+      errorCode: z.string().optional(),
       latencyMs: z.number().int().nonnegative(),
     }),
   ),
+  // Limits that do not block saving, e.g. "delete_forbidden".
+  warnings: z.array(z.string()).default([]),
 });
 
 export type ObjectStorageStatus = z.infer<typeof objectStorageStatusSchema>;

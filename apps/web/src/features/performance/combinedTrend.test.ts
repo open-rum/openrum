@@ -47,4 +47,19 @@ describe("combined vital trend", () => {
     expect(combinedTrend([point], "p75")[0].ttfb).toBeNull();
     expect(combinedTrend([], "p75")).toEqual([]);
   });
+  it("keeps absent buckets as gaps on the server's interval grid", () => {
+    const point = (bucket: string) => ({
+      bucket,
+      lcp: metric(2500),
+      inp: metric(200),
+      cls: metric(0.1),
+    });
+    const rows = combinedTrend(
+      [point("2026-09-12T10:00:00.000Z"), point("2026-09-12T13:00:00.000Z")],
+      "p75",
+      { from: "2026-09-12T10:00:00Z", to: "2026-09-12T14:00:00Z", intervalSeconds: 3600 },
+    );
+    expect(rows.map((row) => row.lcp)).toEqual([2500, null, null, 2500]);
+    expect(rows[1].bucket).toBe("2026-09-12T11:00:00.000Z");
+  });
 });

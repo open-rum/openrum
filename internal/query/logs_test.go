@@ -1,11 +1,12 @@
 package query
 
 import (
-	"github.com/google/uuid"
 	"reflect"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 func TestLogSearchIsBoundedAndParameterized(t *testing.T) {

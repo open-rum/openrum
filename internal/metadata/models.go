@@ -18,8 +18,11 @@ const (
 	UserStatusActive   UserStatus = "active"
 	UserStatusDisabled UserStatus = "disabled"
 
-	AuthSourceLocal AuthSource = "local"
-	AuthSourceOIDC  AuthSource = "oidc"
+	AuthSourceLocal  AuthSource = "local"
+	AuthSourceOIDC   AuthSource = "oidc"
+	AuthSourceGoogle AuthSource = "google"
+	AuthSourceGitHub AuthSource = "github"
+	AuthSourceLDAP   AuthSource = "ldap"
 
 	RoleOwner  OrganizationRole = "owner"
 	RoleAdmin  OrganizationRole = "admin"
@@ -124,16 +127,24 @@ type Project struct {
 	UpdatedAt         time.Time
 }
 
-func (project Project) AcceptsEnvironment(environment string) bool {
-	if len(project.Environments) == 0 {
-		return environment == project.Environment
-	}
-	for _, candidate := range project.Environments {
+// FixedEnvironments is the whole set a project can report under: 开发, 测试, 灰度 and
+// 生产. Every project accepts all four; the SDK's environment option picks one.
+var FixedEnvironments = []string{"development", "test", "staging", "production"}
+
+func IsFixedEnvironment(environment string) bool {
+	for _, candidate := range FixedEnvironments {
 		if candidate == environment {
 			return true
 		}
 	}
 	return false
+}
+
+// AcceptsEnvironment reports whether Ingest takes an envelope for this environment. It
+// no longer depends on a per-project list, so reports never bounce because an
+// environment was not enabled first.
+func (project Project) AcceptsEnvironment(environment string) bool {
+	return IsFixedEnvironment(environment)
 }
 
 type ProjectKey struct {

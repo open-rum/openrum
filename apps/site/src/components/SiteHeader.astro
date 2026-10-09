@@ -7,27 +7,13 @@ const { lang = "en", path = "/" } = Astro.props;
 const zh = lang === "zh";
 const prefix = zh ? "/zh" : "";
 const equivalent = equivalentPath(path, zh ? "zh" : "en");
-const links = zh
-  ? [
-      ["产品", "/zh/product"],
-      ["自部署", "/zh/self-host"],
-      ["基准", "/zh/benchmarks"],
-      ["社区", "/zh/community"],
-      ["文档", `${docsBase("zh")}/`],
-    ]
-  : [
-      ["Product", "/product"],
-      ["Self-host", "/self-host"],
-      ["Benchmarks", "/benchmarks"],
-      ["Community", "/community"],
-      ["Docs", `${docsBase("en")}/`],
-    ];
+const links = zh ? [["文档", `${docsBase("zh")}/`]] : [["Docs", `${docsBase("en")}/`]];
 ---
 
 <header class="site-header">
   <nav class="site-container site-nav" aria-label={zh ? "公共导航" : "Public navigation"}>
     <a class="site-brand" href={`${prefix}/`} aria-label="OpenRUM"
-      ><span class="brand-mark" aria-hidden="true"><BrandMark size={28} /></span><BrandWordmark />
+      ><span class="brand-mark" aria-hidden="true"><BrandMark /></span><BrandWordmark />
     </a><div class="site-links">
       {
         links.map(([label, href]) => (

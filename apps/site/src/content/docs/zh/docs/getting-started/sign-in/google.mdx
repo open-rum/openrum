@@ -1,0 +1,42 @@
+---
+title: 使用 Google 登录
+description: 注册 Google OAuth Web 客户端，在 OpenRUM 中配置并验证登录。
+appliesTo: Alpha
+---
+
+import { Aside, Steps, LinkCard } from "@astrojs/starlight/components";
+
+Google 登录使用 OpenID Connect 授权码流程。OpenRUM 会校验 ID Token，并要求邮箱已验证。符合应用受众设置的 Google 和 Google Workspace 账号可以使用。
+
+开始前，请使用规范 HTTPS `PUBLIC_BASE_URL` 部署 OpenRUM，以 Instance Owner 身份登录，并[启用密钥加密托管](/zh/docs/self-hosting/authentication/)。缺少主密钥时，可以查看 Google 卡片，但不能保存或启用。
+
+<Steps>
+
+1. ## 创建 Google OAuth 客户端
+
+   在 [Google Cloud Console](https://console.cloud.google.com/apis/credentials) 配置应用品牌和受众，再创建类型为 **Web application** 的 OAuth 客户端。默认提供者 ID 为 `google`，将以下精确地址加入 **Authorized redirect URIs**：
+
+   ```text
+   https://rum.example.com/api/v1/auth/providers/google/callback
+   ```
+
+   把 `rum.example.com` 换成 `PUBLIC_BASE_URL` 的域名。如果使用其他提供者 ID，也要替换路径中的 `google`。复制 Client ID 和 Client Secret。OpenRUM 只请求 `openid`、`profile`、`email` 范围；确认测试账号符合 Google 应用的受众设置。
+
+1. ## 配置并测试 OpenRUM
+
+   打开**系统设置 → 认证与访问**，选择 **Google** 卡片，填写提供者 ID、显示名称、Client ID 和 Client Secret。先不要勾选**启用并在登录页展示**，点击**保存配置**，按提示输入 Owner 的 OpenRUM 密码。接着点击**测试连接**，完成 Google 授权。成功后会返回设置页，且不会创建用户账号。
+
+1. ## 启用并登录
+
+   勾选**启用并在登录页展示**，再次保存。在独立浏览器会话打开登录页，点击**使用 Google 登录**。新外部账号需要组织管理员授予访问权限；已有 OpenRUM 账号的用户应先到 [Account 连接 Google](/zh/docs/getting-started/sign-in/)，再使用该登录按钮。
+
+</Steps>
+
+<Aside type="tip" title="登录失败时">
+  检查 Google
+  中登记的回调地址与卡片显示的地址是否完全一致，包括协议和路径；再检查应用受众、测试账号，并重试**测试连接**。待授权账号还需要组织角色才能使用控制台。
+</Aside>
+
+Google 的 [OpenID Connect 配置指南](https://developers.google.com/identity/openid-connect/openid-connect)说明了 OAuth 客户端、回调地址、授权界面与权限范围。
+
+<LinkCard title="其他登录方式" href="/zh/docs/getting-started/sign-in/" />

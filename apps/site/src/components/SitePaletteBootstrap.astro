@@ -1,0 +1,19 @@
+---
+// Applies the visitor's palette before first paint on every public page: home, docs and
+// the design workbench. Older keys from the home page's first switcher are still read.
+// Unreadable or blocked storage falls back to the default palette.
+---
+
+<script is:inline>
+  (() => {
+    let palette = "amber";
+    try {
+      const saved =
+        localStorage.getItem("openrum-palette") ||
+        localStorage.getItem("openrum-site-palette") ||
+        localStorage.getItem("openrum-landing-palette");
+      if (saved === "amber" || saved === "lime" || saved === "magenta") palette = saved;
+    } catch {}
+    document.documentElement.dataset.palette = palette;
+  })();
+</script>

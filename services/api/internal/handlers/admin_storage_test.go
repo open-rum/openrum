@@ -41,10 +41,18 @@ func (storage *managedStorageMemory) Read(context.Context, string, int64) ([]byt
 }
 
 type fakeManagedStorageSecrets struct {
-	called bool
-	value  metadata.ManagedObjectStorage
-	secret metadata.InstanceSecret
-	err    error
+	called  bool
+	value   metadata.ManagedObjectStorage
+	secret  metadata.InstanceSecret
+	err     error
+	current *metadata.ManagedObjectStorage
+}
+
+func (store *fakeManagedStorageSecrets) GetObjectStorage(context.Context) (metadata.ManagedObjectStorage, metadata.InstanceSecret, error) {
+	if store.current == nil {
+		return metadata.ManagedObjectStorage{}, metadata.InstanceSecret{}, metadata.ErrNotFound
+	}
+	return *store.current, store.secret, nil
 }
 
 func (store *fakeManagedStorageSecrets) PutObjectStorage(
@@ -241,7 +249,7 @@ func adminStorageTestRouter(members adminOverviewRoles, prober sourcemap.Prober,
 }
 
 func performStorageRequest(router http.Handler, method, path string, csrf bool) *httptest.ResponseRecorder {
-	request := httptest.NewRequest(method, path, nil)
+	request := httptest.NewRequestWithContext(context.Background(), method, path, nil)
 	request.Host = "openrum.test"
 	request.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "session"})
 	if csrf {
@@ -252,4 +260,85 @@ func performStorageRequest(router http.Handler, method, path string, csrf bool) 
 	response := httptest.NewRecorder()
 	router.ServeHTTP(response, request)
 	return response
+}
+
+func TestManagedStorageRejectsEndpointOutsideAllowlistBeforeProbing(t *testing.T) {
+	ownerID := uuid.New()
+	members := &fakeInstanceMembers{roles: map[uuid.UUID]metadata.InstanceRole{ownerID: metadata.InstanceRoleOwner}}
+	secrets := &fakeManagedStorageSecrets{}
+	handler := NewAdminStorageHandler(members, retentionReauthFixture{}, nil,
+		config.Config{AllowManagedSecrets: true, AppEnv: "production", ObjectStorageAllowlist: []string{"minio.example.com"}}, zerolog.Nop())
+	handler.EnableManagedSecrets(secrets, sourcemap.NewSwitchableStorage(nil, nil))
+	built := false
+	handler.newStorage = func(context.Context, metadata.ManagedObjectStorage) (sourcemap.Storage, sourcemap.Prober, error) {
+		built = true
+		return &managedStorageMemory{}, &fixedStorageProber{result: sourcemap.StorageProbeResult{Success: true}}, nil
+	}
+	router := adminStorageManagedTestRouter(handler, ownerID)
+	payload := `{"provider":"s3","region":"us-east-1","bucket":"openrum","endpoint":"https://169.254.169.254","accessKeyId":"AKIA1234567890","secretAccessKey":"top-secret"}`
+	response := performAdminRequest(router, "session", http.MethodPut, "/api/v1/admin/object-storage/managed", payload, true)
+	if response.Code != http.StatusBadRequest || built || secrets.called || !strings.Contains(response.Body.String(), "VALIDATION_ERROR") {
+		t.Fatalf("status=%d built=%v persisted=%v body=%s", response.Code, built, secrets.called, response.Body.String())
+	}
+	allowed := strings.Replace(payload, "https://169.254.169.254", "https://minio.example.com", 1)
+	response = performAdminRequest(router, "session", http.MethodPut, "/api/v1/admin/object-storage/managed", allowed, true)
+	if response.Code != http.StatusOK || !built {
+		t.Fatalf("allowlisted status=%d built=%v body=%s", response.Code, built, response.Body.String())
+	}
+}
+
+func TestManagedStorageSavesWhenOnlyDeleteIsForbidden(t *testing.T) {
+	ownerID := uuid.New()
+	members := &fakeInstanceMembers{roles: map[uuid.UUID]metadata.InstanceRole{ownerID: metadata.InstanceRoleOwner}}
+	switcher := sourcemap.NewSwitchableStorage(&managedStorageMemory{value: "old"}, nil)
+	secrets := &fakeManagedStorageSecrets{secret: metadata.InstanceSecret{Version: 2, KeyID: "key-2026"}}
+	handler := NewAdminStorageHandler(members, retentionReauthFixture{}, switcher, config.Config{AllowManagedSecrets: true}, zerolog.Nop())
+	handler.EnableManagedSecrets(secrets, switcher)
+	handler.newStorage = func(context.Context, metadata.ManagedObjectStorage) (sourcemap.Storage, sourcemap.Prober, error) {
+		return &managedStorageMemory{value: "candidate"}, &fixedStorageProber{result: sourcemap.StorageProbeResult{
+			Success: true, StartedAt: time.Now().UTC(), Warnings: []string{"delete_forbidden"},
+			Steps: []sourcemap.StorageProbeStep{{Name: "write", Status: "passed"}, {Name: "read", Status: "passed"}, {Name: "delete", Status: "failed", ErrorCode: "forbidden"}},
+		}}, nil
+	}
+	response := performAdminRequest(adminStorageManagedTestRouter(handler, ownerID), "session", http.MethodPut,
+		"/api/v1/admin/object-storage/managed", managedStoragePayload(), true)
+	if response.Code != http.StatusOK || !secrets.called || !secrets.value.DeleteForbidden ||
+		switcher.DeleteAllowed() || handler.status().DeleteAllowed || !strings.Contains(response.Body.String(), "delete_forbidden") {
+		t.Fatalf("status=%d saved=%+v deleteAllowed=%v body=%s", response.Code, secrets.value, switcher.DeleteAllowed(), response.Body.String())
+	}
+}
+
+func TestManagedStorageKeepsStoredCredentialsWhenFieldsAreBlank(t *testing.T) {
+	for _, step := range []struct {
+		name        string
+		payload     string
+		wantStatus  int
+		wantAccess  string
+		wantPersist bool
+	}{
+		{"same provider reuses the stored key", `{"provider":"oss","region":"ap-southeast-1","bucket":"openrum","endpoint":"https://oss-ap-southeast-1-internal.aliyuncs.com","accessKeyId":"","secretAccessKey":""}`, http.StatusOK, "LTAIstored", true},
+		{"another provider must supply its own key", `{"provider":"s3","region":"us-east-1","bucket":"openrum","accessKeyId":"","secretAccessKey":""}`, http.StatusBadRequest, "", false},
+	} {
+		t.Run(step.name, func(t *testing.T) {
+			ownerID := uuid.New()
+			members := &fakeInstanceMembers{roles: map[uuid.UUID]metadata.InstanceRole{ownerID: metadata.InstanceRoleOwner}}
+			switcher := sourcemap.NewSwitchableStorage(&managedStorageMemory{value: "old"}, nil)
+			secrets := &fakeManagedStorageSecrets{
+				secret:  metadata.InstanceSecret{Version: 3, KeyID: "key-2026"},
+				current: &metadata.ManagedObjectStorage{Provider: "oss", Bucket: "openrum", Region: "ap-southeast-1", AccessKeyID: "LTAIstored", SecretAccessKey: "stored-secret"},
+			}
+			handler := NewAdminStorageHandler(members, retentionReauthFixture{}, switcher, config.Config{AllowManagedSecrets: true}, zerolog.Nop())
+			handler.EnableManagedSecrets(secrets, switcher)
+			handler.newStorage = func(context.Context, metadata.ManagedObjectStorage) (sourcemap.Storage, sourcemap.Prober, error) {
+				return &managedStorageMemory{value: "candidate"}, &fixedStorageProber{result: sourcemap.StorageProbeResult{Success: true, StartedAt: time.Now().UTC()}}, nil
+			}
+			response := performAdminRequest(adminStorageManagedTestRouter(handler, ownerID), "session", http.MethodPut,
+				"/api/v1/admin/object-storage/managed", step.payload, true)
+			if response.Code != step.wantStatus || secrets.called != step.wantPersist ||
+				(step.wantPersist && (secrets.value.AccessKeyID != step.wantAccess || secrets.value.SecretAccessKey != "stored-secret")) ||
+				strings.Contains(response.Body.String(), "stored-secret") {
+				t.Fatalf("status=%d persisted=%v value=%+v body=%s", response.Code, secrets.called, secrets.value, response.Body.String())
+			}
+		})
+	}
 }

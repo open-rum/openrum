@@ -64,14 +64,14 @@ describe("onboarding states", () => {
     await user.click(current.getByRole("tab", { name: "CDN 脚本" }));
     const cdnPanel = current.getByRole("tabpanel", { name: "CDN 脚本" });
     expect(cdnPanel.textContent).toContain(
-      'script.src = "https://rum.example.com/sdk/browser/0.1.0/openrum.min.js"',
+      'script.src = "https://rum.example.com/sdk/browser/0.1.1/openrum.min.js"',
     );
     expect(cdnPanel.textContent).toContain("OpenRUM.init");
     expect(cdnPanel.textContent).toContain("script.onload");
 
     await user.click(current.getByRole("tab", { name: "同步加载" }));
     expect(cdnPanel.textContent).toContain(
-      'src="https://rum.example.com/sdk/browser/0.1.0/openrum.min.js"',
+      'src="https://rum.example.com/sdk/browser/0.1.1/openrum.min.js"',
     );
     expect(cdnPanel.textContent).not.toContain("script.onload");
   });

@@ -1,371 +1,492 @@
 ---
-import {
-  ArrowRight,
-  Check,
-  Database,
-  Github,
-  PlayCircle,
-  Server,
-  ShieldCheck,
-  TriangleAlert,
-} from "lucide-astro";
-import StrokeText from "./StrokeText.jsx";
+import { ArrowRight, Github, Plus } from "lucide-astro";
 import BrandMark from "../BrandMark.astro";
-import TechStack from "./TechStack.astro";
-import Reliability from "./Reliability.astro";
-import FeatureBento from "./FeatureBento.astro";
+import BrandWordmark from "../BrandWordmark.astro";
 import PublicLayout from "../../layouts/PublicLayout.astro";
+import ProductMock from "./ProductMock.astro";
+import PaletteMenu from "../PaletteMenu.astro";
+import { docsBase, equivalentPath } from "../../lib/site";
 import "../../styles/landing.css";
+
 const { lang = "en" } = Astro.props;
 const zh = lang === "zh";
-const prefix = zh ? "/zh" : "";
-const repository = import.meta.env.PUBLIC_REPOSITORY_URL || "https://github.com/openrum/openrum";
-const docs = zh ? "/zh/docs" : "/docs";
+const repository = import.meta.env.PUBLIC_REPOSITORY_URL || "https://github.com/open-rum/openrum";
+const release = import.meta.env.PUBLIC_OPENRUM_RELEASE || "Alpha";
+const commit = import.meta.env.PUBLIC_COMMIT_SHA || "local";
+const docs = docsBase(zh ? "zh" : "en");
+const home = zh ? "/zh/" : "/";
+const quickstart = `${docs}/self-hosting/overview/`;
+const contributing = `${docs}/contributing/`;
+const benchmark = `${repository}/blob/main/docs/benchmarks/local-capacity-2026-09-18.md`;
+const otherLanguage = equivalentPath(Astro.url.pathname, zh ? "zh" : "en");
+
 const copy = zh
   ? {
-      sloganLead: "了解你的用户",
-      sloganAccent: "快速修复问题",
-      description: "追踪应用错误、分析用户行为、监控应用性能，数据完全掌握在自己手里。",
-      quick: "立即开始",
-      exampleTag: "示例",
-      appRange: "最近 7 天",
-      topPagesTitle: "热门页面",
-      topPagesRows: [
-        ["/product", "32.4%"],
-        ["/checkout", "18.7%"],
-        ["/dashboard", "12.3%"],
-        ["/profile", "8.9%"],
-        ["/", "6.1%"],
+      title: "OpenRUM · 开源、可自托管的前端监控平台",
+      description: "开源、可自托管的前端监控平台：错误、性能、会话与用户行为。",
+      nav: { docs: "文档", start: "开始部署", language: "English" },
+      pill: "Alpha",
+      shiny: "AI 即将支持",
+      heroTitle: "看清每一次真实访问",
+      heroLead: "开源、可自托管的前端监控平台。",
+      heroDocs: "阅读文档",
+      heroShotAlt:
+        "OpenRUM 控制台的默认仪表盘：会话、PV、UV、错误率、API 失败率与 Web Vitals 指标卡，以及会话趋势和访问量图表。",
+      tourTitle: "一个控制台，看全整个前端",
+      tabs: [
+        ["errors", "错误", "哪里坏了，影响了谁。"],
+        ["performance", "性能", "页面有多快，慢在哪里。"],
+        ["sessions", "会话", "用户经历了什么。"],
+        ["logs", "日志", "每一行日志，都连着它的会话。"],
+        ["alerts", "告警", "出了问题，先于用户知道。"],
+        ["events", "仪表盘", "你关心的数字，排成你要的样子。"],
       ],
-      errorTitle: "快速定位并修复问题",
-      errorLead:
-        "获取完整的错误上下文，包括堆栈信息、面包屑、用户信息和更多内容，减少调试时间，提升稳定性。",
-      errorCalloutLead: "从错误到修复",
-      errorCallout: "只需几分钟，而不是几小时。",
-      errorStatus: "Open",
-      errorType: "TypeError",
-      errorMessage: "Cannot read properties of undefined (reading 'map')",
-      errorTabs: ["详情", "追踪信息", "标签", "用户", "设备", "原始数据"],
-      errorMeta: [
-        ["事件 ID", "7f3a2e6c-8b4d-4a4f-9e2c-1d65e8a77f2b"],
-        ["发生时间", "2025-08-03 14:32:18（2 小时前）"],
-        ["URL", "https://app.example.com/product"],
-        ["用户", "user_123456"],
-        ["浏览器", "Chrome 126.0.0.0"],
-        ["设备", "Mac OS 14.5 - MacBook Pro"],
+      whyTitle: "架构与性能",
+      whyLead: "为高并发写入而设计，查询依然秒回。",
+      flow: [
+        ["Browser SDK", "采集"],
+        ["Ingest", "接收"],
+        ["Kafka", "缓冲"],
+        ["Consumer", "批量写入"],
+        ["ClickHouse", "列式存储"],
+        ["API", "查询"],
+        ["控制台", "可视化"],
       ],
-      stackLabel: "堆栈信息",
-      analyticsEyebrow: "行为分析",
-      analyticsTitle: "了解用户在做什么",
-      analyticsLead:
-        "PV/UV、会话、来源和自定义事件与错误落在同一份数据里，所以「这个错误值不值得今天修」是能回答的。",
-      analyticsQuote: "错误告诉你哪里坏了，行为分析告诉你它为什么重要。",
-      analyticsLink: "查看行为分析能力",
-      analyticsStats: [
-        ["页面浏览", "128.4K"],
-        ["独立用户", "32.8K"],
-        ["会话", "46.2K"],
-        ["跳出率", "38%"],
+      lanes: ["写入路径", "查询路径"],
+      support: [
+        ["Redis", "限流计数"],
+        ["PostgreSQL", "项目与配置"],
       ],
-      proofEyebrow: "自部署",
-      proofTitle: "你的数据，你的服务器",
-      proofLead: "部署在你自己的基础设施上，监控数据从头到尾不经过第三方。",
-      proof: [
-        ["可选对象存储", "没有 Bucket 时核心监控仍可运行；Source Map 可接 OSS 或 S3-compatible。"],
-        ["数据生命周期", "原始与聚合数据按项目策略物理过期，历史清理可预览、审计和限速。"],
-        ["透明证据", "公开 Demo seed、压测方法与失败结果，不把本地演练包装成生产容量声明。"],
+      supportLabel: "辅助服务",
+      flowLabel:
+        "数据流：浏览器 SDK 上报到 Ingest，经 Kafka 缓冲，由 Consumer 写入 ClickHouse，控制台通过 API 查询。Ingest 用 Redis 做限流计数，API 从 PostgreSQL 读取项目与配置。",
+      numbers: [
+        ["2,000", "事件/秒"],
+        ["50 ms", "接收 P95"],
+        ["685 ms", "查询 P95"],
       ],
-      deployList: ["Docker Compose", "Kubernetes", "无厂商锁定", "数据完全自持"],
-      terminalTitle: "本地启动一套完整实例",
-      terminalComment: "# 拉起全部服务",
-      terminalNote: "容器就绪后访问 http://127.0.0.1:4173 完成初始化，无需注册任何账号。",
+      points: [
+        ["写入不丢", "Kafka 缓冲，高峰不丢数据"],
+        ["查询够快", "物化视图预聚合"],
+        ["尖峰保护", "按项目速率限制，突增流量挡在入口，整个服务不会被冲垮"],
+        ["存储保护", "磁盘接近写满时自动降采样，数据库不会被撑爆"],
+      ],
+      footnote: "单机合成负载实测，非生产认证。",
+      method: "查看测试方法",
+      faqTitle: "常见问题",
+      faq: [
+        [
+          "需要什么样的服务器？",
+          "一台装了 Docker 的机器就能起步。生产环境可以用 Docker 或 Kubernetes 部署。",
+        ],
+        ["支持哪些平台？", "目前支持 Web 浏览器，并提供 Vite 插件上传 Source Map。"],
+        ["数据会发给第三方吗？", "不会。所有数据都写入你自己部署的数据库。"],
+        ["会拖慢我的页面吗？", "SDK 在后台上报，并且可以按比例采样。"],
+        ["现在能用在生产环境吗？", "目前是 Alpha 阶段，适合试点和内部项目。"],
+      ],
+      makeTitle: "Make it better, together.",
+      makeLead: "OpenRUM 由社区共建。提 Issue、改文档、写代码，都欢迎。",
+      makeGithub: "在 GitHub 上参与",
+      makeGuide: "贡献指南",
+      license: "MIT 许可",
     }
   : {
-      sloganLead: "Understand your users",
-      sloganAccent: "Fix issues faster",
+      title: "OpenRUM · Open-source, self-hostable frontend monitoring",
       description:
-        "Track errors, analyze user behavior, and monitor application performance — all on your own infrastructure.",
-      quick: "Get started",
-      exampleTag: "Example",
-      appRange: "Last 7 days",
-      topPagesTitle: "Top Pages",
-      topPagesRows: [
-        ["/product", "32.4%"],
-        ["/checkout", "18.7%"],
-        ["/dashboard", "12.3%"],
-        ["/profile", "8.9%"],
-        ["/", "6.1%"],
+        "Open-source, self-hostable frontend monitoring: errors, performance, sessions and user behavior.",
+      nav: { docs: "Docs", start: "Get started", language: "简体中文" },
+      pill: "Alpha",
+      shiny: "AI-powered, coming soon",
+      heroTitle: "See every real visit.",
+      heroLead: "Open-source, self-hostable frontend monitoring.",
+      heroDocs: "Read the docs",
+      heroShotAlt:
+        "The OpenRUM Console default dashboard: stat cards for sessions, page views, users, error rate, API failure rate and Web Vitals, above session and traffic trends.",
+      tourTitle: "Your whole frontend, in one console.",
+      tabs: [
+        ["errors", "Errors", "What broke, and who it hit."],
+        ["performance", "Performance", "How fast pages are, and where they slow down."],
+        ["sessions", "Sessions", "What users actually went through."],
+        ["logs", "Logs", "Every log line, tied to its session."],
+        ["alerts", "Alerts", "Hear about it before your users do."],
+        ["events", "Dashboards", "Your numbers, arranged your way."],
       ],
-      errorTitle: "Find and fix issues, faster",
-      errorLead:
-        "Get full error context with stack traces, breadcrumbs, user information and more. Reduce debugging time and improve stability.",
-      errorCalloutLead: "From error to fix",
-      errorCallout: "in minutes, not hours.",
-      errorStatus: "Open",
-      errorType: "TypeError",
-      errorMessage: "Cannot read properties of undefined (reading 'map')",
-      errorTabs: ["Details", "Breadcrumbs", "Tags", "User", "Device", "Raw"],
-      errorMeta: [
-        ["Event ID", "7f3a2e6c-8b4d-4a4f-9e2c-1d65e8a77f2b"],
-        ["Occurred", "2025-08-03 14:32:18 (2 hours ago)"],
-        ["URL", "https://app.example.com/product"],
-        ["User", "user_123456"],
-        ["Browser", "Chrome 126.0.0.0"],
-        ["Device", "Mac OS 14.5 - MacBook Pro"],
+      whyTitle: "Architecture and performance",
+      whyLead: "Built for heavy writes. Queries still come back fast.",
+      flow: [
+        ["Browser SDK", "Capture"],
+        ["Ingest", "Receive"],
+        ["Kafka", "Buffer"],
+        ["Consumer", "Batch write"],
+        ["ClickHouse", "Columnar storage"],
+        ["API", "Query"],
+        ["Console", "Explore"],
       ],
-      stackLabel: "Stack Trace",
-      analyticsEyebrow: "Behavior analytics",
-      analyticsTitle: "Understand what your users do",
-      analyticsLead:
-        "Page views, sessions, acquisition and Custom Events sit in the same dataset as your errors, so “is this error worth fixing today” is a question you can answer.",
-      analyticsQuote: "Errors tell you what broke. Analytics tells you why it matters.",
-      analyticsLink: "See behavior analytics",
-      analyticsStats: [
-        ["Page views", "128.4K"],
-        ["Unique users", "32.8K"],
-        ["Sessions", "46.2K"],
-        ["Bounce rate", "38%"],
+      lanes: ["Write path", "Query path"],
+      support: [
+        ["Redis", "Rate-limit counters"],
+        ["PostgreSQL", "Projects and settings"],
       ],
-      proofEyebrow: "Self-hosted",
-      proofTitle: "Your data. Your server.",
-      proofLead:
-        "Deploy on your own infrastructure. Monitoring data never passes through anyone else.",
-      proof: [
+      supportLabel: "Supporting services",
+      flowLabel:
+        "Data flow: the Browser SDK sends to Ingest, Kafka buffers it, the Consumer writes to ClickHouse, and the Console queries it through the API. Ingest keeps rate-limit counters in Redis, and the API reads projects and settings from PostgreSQL.",
+      numbers: [
+        ["2,000", "events/s"],
+        ["50 ms", "Ingest P95"],
+        ["685 ms", "Query P95"],
+      ],
+      points: [
+        ["Nothing dropped", "Kafka absorbs the peaks"],
+        ["Fast queries", "Pre-aggregated with materialized views"],
         [
-          "Optional object storage",
-          "Core monitoring runs without a Bucket; Source Maps can use OSS or an S3-compatible provider.",
+          "Spike protection",
+          "Per-project rate limits stop surges at the door, so the whole service stays up",
         ],
         [
-          "Data lifecycle",
-          "Raw and aggregate data expire by Project policy; historical cleanup is previewed, audited and rate-limited.",
-        ],
-        [
-          "Transparent evidence",
-          "Demo seeds, benchmark methods and failed overload results are public—not promoted as production capacity.",
+          "Storage protection",
+          "Sampling tightens as the disk fills, so ingestion never runs the database out of space",
         ],
       ],
-      deployList: ["Docker Compose", "Kubernetes", "No vendor lock-in", "Full data ownership"],
-      terminalTitle: "Bring up a full instance locally",
-      terminalComment: "# start every service",
-      terminalNote:
-        "Once the containers report ready, open http://127.0.0.1:4173 to finish setup. No account signup required.",
+      footnote: "Synthetic load on one machine, not a production certification.",
+      method: "See the method",
+      faqTitle: "FAQ",
+      faq: [
+        [
+          "What servers do I need?",
+          "Any machine with Docker is enough to start. For production, deploy with Docker or Kubernetes.",
+        ],
+        [
+          "Which platforms are supported?",
+          "Web browsers today, plus a Vite plugin that uploads Source Maps.",
+        ],
+        [
+          "Does my data go to a third party?",
+          "No. Everything is written to the databases you deploy.",
+        ],
+        [
+          "Will it slow my pages down?",
+          "The SDK reports in the background, and you can sample a share of traffic.",
+        ],
+        ["Is it ready for production?", "It's in Alpha, which suits pilots and internal projects."],
+      ],
+      makeTitle: "Make it better, together.",
+      makeLead: "OpenRUM is built in the open. Issues, docs and code are all welcome.",
+      makeGithub: "Contribute on GitHub",
+      makeGuide: "Contributing guide",
+      license: "MIT License",
     };
-const proofIcons = [Server, Database, ShieldCheck];
-const trendAxis = ["Jul 26", "Jul 27", "Jul 28", "Jul 29", "Jul 30", "Jul 31", "Aug 1"];
-const stackFrames = [
-  ["TypeError: Cannot read properties of undefined (reading 'map')", ""],
-  ["  at ProductList", "(.../src/pages/product/index.tsx:45:22)"],
-  ["  at renderWithHooks", "(react-dom.development.js:16067:18)"],
-  ["  at mountIndeterminateComponent", "(react-dom.development.js:20074:17)"],
-];
-const pageTitle = zh
-  ? "OpenRUM — 了解你的用户，快速修复问题"
-  : "OpenRUM — Understand your users. Fix issues faster.";
 ---
 
-<PublicLayout title={pageTitle} description={copy.description} lang={lang}>
-  <div class="lp-page">
-    <section class="lp-hero" aria-labelledby="lp-hero-title">
-      <div class="site-container lp-hero-content">
-        <p class="lp-hero-badge">
-          <span class="lp-hero-badge-dot" aria-hidden="true"></span>
-          Open Source <span aria-hidden="true">·</span> Alpha
-        </p>
-        <h1 id="lp-hero-title">
-          <span class="lp-title-line">
-            <StrokeText client:load text={copy.sloganLead} fillColor="var(--ds-action-contrast)" />
-          </span>
-          <span class="lp-title-line lp-accent">
-            <StrokeText
-              client:load
-              text={copy.sloganAccent}
-              strokeColor="var(--ds-primary)"
-              fillColor="var(--ds-action-contrast)"
-            />
-          </span>
-        </h1>
-        <p class="lp-hero-copy">{copy.description}</p>
-        <div class="lp-cta">
-          <a
-            class="ui-button ui-button-contrast lp-cta-button"
-            href={`${docs}/getting-started/quickstart/`}
+<PublicLayout title={copy.title} description={copy.description} lang={lang} landing>
+  <script is:inline>
+    (() => {
+      const root = document.documentElement;
+      root.classList.add("lp-js");
+    })();
+  </script>
+  <div class="lp">
+    <header class="lp-header">
+      <nav class="lp-wrap lp-nav" aria-label={zh ? "主导航" : "Main navigation"}>
+        <a class="lp-brand" href={home} aria-label="OpenRUM"><BrandMark /><BrandWordmark /></a>
+        <div class="lp-nav-links">
+          <a href={`${docs}/`}>{copy.nav.docs}</a>
+          <a class="lp-nav-github" href={repository}
+            ><Github size={16} aria-hidden="true" /><span>GitHub</span></a
           >
-            {copy.quick}<ArrowRight data-icon="inline-end" size={17} />
-          </a>
-          <a class="ui-button ui-button-neutral lp-cta-button" href={repository}>
-            <Github data-icon="inline-start" size={17} />GitHub
-          </a>
+          <a href={otherLanguage} lang={zh ? "en" : "zh-CN"}>{copy.nav.language}</a>
+          <PaletteMenu lang={lang} />
+          <a class="lp-button lp-button-primary lp-button-small" href={quickstart}
+            >{copy.nav.start}</a
+          >
         </div>
-        <TechStack lang={lang} />
-      </div>
-    </section>
+      </nav>
+    </header>
 
-    <FeatureBento lang={lang} />
-
-    <Reliability lang={lang} />
-
-    <section class="lp-section lp-rule">
-      <div class="site-container lp-split lp-reveal">
-        <div class="lp-app">
-          <div class="lp-app-bar lp-app-bar-issue">
-            <span class="lp-issue-mark"><TriangleAlert size={13} /></span>
-            <strong class="lp-issue-title"
-              ><span class="lp-issue-type">{copy.errorType}:</span>
-              {copy.errorMessage}</strong
+    <main id="main-content">
+      <section class="lp-hero" aria-labelledby="lp-hero-title">
+        <div class="lp-wrap lp-hero-inner">
+          <p class="lp-announce">
+            <span class="lp-pill">{copy.pill}</span><span class="lp-shiny">{copy.shiny}</span>
+          </p>
+          <h1 id="lp-hero-title">{copy.heroTitle}</h1>
+          <p class="lp-lead">{copy.heroLead}</p>
+          <div class="lp-actions">
+            <a class="lp-button lp-button-primary" href={quickstart}>{copy.nav.start}</a>
+            <a class="lp-button lp-button-ghost" href={`${docs}/`}
+              >{copy.heroDocs}<ArrowRight size={16} aria-hidden="true" /></a
             >
-            <span class="lp-issue-status">{copy.errorStatus}</span>
-          </div>
-          <div class="lp-app-body">
-            <ul class="lp-tabs">
-              {
-                copy.errorTabs.map((tab, index) => (
-                  <li class={index === 0 ? "is-active" : ""}>{tab}</li>
-                ))
-              }
-            </ul>
-            <dl class="lp-meta">
-              {
-                copy.errorMeta.map(([label, value]) => (
-                  <div>
-                    <dt>{label}</dt>
-                    <dd>{value}</dd>
-                  </div>
-                ))
-              }
-            </dl>
-            <p class="lp-app-label" id="lp-stack-label">{copy.stackLabel}</p>
-            <pre
-              class="lp-stack"
-              tabindex="0"
-              role="group"
-              aria-labelledby="lp-stack-label"><code>{stackFrames.map(([symbol, location]) => (
-              <span class="lp-stack-frame"><span class="lp-stack-symbol">{symbol}</span>{location ? " " : ""}<span class="lp-stack-location">{location}</span></span>
-            ))}</code></pre>
           </div>
         </div>
-        <div class="lp-split-copy">
-          <h2 class="lp-split-title">{copy.errorTitle}</h2>
-          <p>{copy.errorLead}</p>
-          <div class="lp-callout">
-            <span class="lp-callout-icon"><PlayCircle size={19} /></span>
-            <p>
-              <strong>{copy.errorCalloutLead}</strong>
-              <span>{copy.errorCallout}</span>
-            </p>
-          </div>
+        <div class="lp-wrap lp-hero-shot lp-reveal">
+          <img
+            class="lp-hero-screenshot"
+            src="/screenshots/dashboard-dark-1440.webp"
+            srcset="/screenshots/dashboard-dark-1440.webp 1440w, /screenshots/dashboard-dark-2880.webp 2880w"
+            sizes="(min-width: 1212px) 1180px, calc(100vw - 32px)"
+            width="1440"
+            height="810"
+            alt={copy.heroShotAlt}
+            fetchpriority="high"
+            decoding="async"
+          />
         </div>
-      </div>
-    </section>
+      </section>
 
-    <section class="lp-section lp-rule">
-      <div class="site-container lp-split lp-split-reverse lp-reveal">
-        <div class="lp-split-copy">
-          <p class="lp-eyebrow">{copy.analyticsEyebrow}</p>
-          <h2>{copy.analyticsTitle}</h2>
-          <p>{copy.analyticsLead}</p>
-          <blockquote class="lp-quote">{copy.analyticsQuote}</blockquote>
-          <a class="lp-tile-link" href={`${prefix}/product`}>{copy.analyticsLink} →</a>
-        </div>
-        <div class="lp-app">
-          <div class="lp-app-bar">
-            <span class="lp-app-brand"
-              ><span class="lp-app-mark"><BrandMark size={16} /></span><span class="lp-app-word"
-                >Analytics</span
-              ></span
-            >
-            <span class="lp-app-tag">{copy.exampleTag}</span>
-            <span class="lp-app-chip">{copy.appRange}</span>
+      <section class="lp-section" aria-labelledby="lp-tour-title">
+        <div class="lp-wrap">
+          <h2 id="lp-tour-title" class="lp-title">{copy.tourTitle}</h2>
+          <div class="lp-tabs" role="tablist" aria-label={copy.tourTitle}>
+            <span class="lp-tabs-indicator" aria-hidden="true"></span>
+            {
+              copy.tabs.map(([id, label], index) => (
+                <button
+                  type="button"
+                  role="tab"
+                  id={`lp-tab-${id}`}
+                  aria-controls={`lp-panel-${id}`}
+                  aria-selected={index === 0 ? "true" : "false"}
+                  tabindex={index === 0 ? 0 : -1}
+                >
+                  {label}
+                </button>
+              ))
+            }
           </div>
-          <div class="lp-app-body">
-            <dl class="lp-stats">
-              {
-                copy.analyticsStats.map(([label, value]) => (
-                  <div>
-                    <dt>{label}</dt>
-                    <dd>{value}</dd>
-                  </div>
-                ))
-              }
-            </dl>
-            <figure class="lp-chart">
-              <figcaption>{copy.analyticsStats[0][0]}</figcaption>
-              <div class="lp-bars">
-                {[46, 62, 51, 78, 66, 91, 84].map((height) => <span style={`height:${height}%`} />)}
+          {
+            copy.tabs.map(([id, , caption], index) => (
+              <div
+                class="lp-panel lp-reveal"
+                role="tabpanel"
+                id={`lp-panel-${id}`}
+                aria-labelledby={`lp-tab-${id}`}
+                hidden={index !== 0}
+              >
+                <ProductMock
+                  kind={id as "errors" | "performance" | "sessions" | "logs" | "alerts" | "events"}
+                  lang={lang}
+                />
+                <p class="lp-caption">{caption}</p>
               </div>
-              <ol class="lp-chart-axis" aria-hidden="true">
-                {trendAxis.map((tick) => <li>{tick}</li>)}
-              </ol>
-            </figure>
-            <p class="lp-app-label">{copy.topPagesTitle}</p>
-            <ul class="lp-top-pages">
+            ))
+          }
+        </div>
+      </section>
+
+      <section class="lp-section" id="architecture" aria-labelledby="lp-why-title">
+        <div class="lp-wrap">
+          <h2 id="lp-why-title" class="lp-title">{copy.whyTitle}</h2>
+          <p class="lp-sub">{copy.whyLead}</p>
+          <figure class="lp-arch lp-reveal">
+            <svg class="lp-arch-wide" viewBox="0 0 1000 310" aria-hidden="true">
+              <defs>
+                <pattern id="lp-arch-grid" width="20" height="20" patternUnits="userSpaceOnUse">
+                  <circle class="lp-arch-dot" cx="1" cy="1" r="1"></circle>
+                </pattern>
+              </defs>
+              <rect class="lp-arch-grid" width="1000" height="310" fill="url(#lp-arch-grid)"></rect>
+              <text class="lp-arch-lane" x="10" y="36">{copy.lanes[0]}</text>
+              <text class="lp-arch-lane lp-arch-lane-query" x="640" y="176">{copy.lanes[1]}</text>
+              <path class="lp-track" d="M150 90 H220 M360 90 H430 M570 90 H640 M780 90 H850"></path>
+              <path class="lp-track" d="M920 124 V196 M850 230 H780"></path>
+              <path class="lp-track" d="M290 124 V196 M920 264 V292 H500 V264"></path>
+              <path class="lp-stream" d="M150 90 H220 M360 90 H430 M570 90 H640 M780 90 H850"
+              ></path>
+              <path class="lp-stream lp-stream-query" d="M920 124 V196 M850 230 H780"></path>
+              <path class="lp-stream lp-stream-support" d="M290 124 V196 M920 264 V292 H500 V264"
+              ></path>
               {
-                copy.topPagesRows.map(([path, share]) => (
-                  <li>
-                    <span class="lp-top-path">{path}</span>
-                    <span class="lp-top-bar" style={`--lp-share:${share}`} />
-                    <span class="lp-top-share">{share}</span>
-                  </li>
+                copy.support.map(([name, role], index) => (
+                  <g
+                    class="lp-node lp-node-support"
+                    transform={`translate(${220 + index * 210} 196)`}
+                  >
+                    <rect width="140" height="68" rx="14" />
+                    <circle cx="16" cy="16" r="3" />
+                    <text class="lp-node-name" x="70" y="30">
+                      {name}
+                    </text>
+                    <text class="lp-node-role" x="70" y="50">
+                      {role}
+                    </text>
+                  </g>
                 ))
               }
-            </ul>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <section class="lp-section lp-rule">
-      <div class="site-container">
-        <div class="lp-head lp-reveal">
-          <p class="lp-eyebrow">{copy.proofEyebrow}</p>
-          <h2>{copy.proofTitle}</h2>
-          <p>{copy.proofLead}</p>
-        </div>
-        <div class="lp-proof-grid">
-          <div class="lp-reveal">
-            <ul class="lp-proof-list">
               {
-                copy.proof.map(([title, body], index) => {
-                  const Icon = proofIcons[index];
+                copy.flow.map(([name, role], index) => {
+                  const [x, y] =
+                    index < 5 ? [10 + index * 210, 56] : [index === 5 ? 850 : 640, 196];
                   return (
-                    <li class="lp-proof-item">
-                      <span class="lp-tile-icon" style="margin-bottom:0">
-                        <Icon size={19} />
-                      </span>
-                      <div>
-                        <strong>{title}</strong>
-                        <p>{body}</p>
-                      </div>
-                    </li>
+                    <g
+                      class={index < 5 ? "lp-node" : "lp-node lp-node-query"}
+                      transform={`translate(${x} ${y})`}
+                    >
+                      <rect width="140" height="68" rx="14" />
+                      <circle cx="16" cy="16" r="3" />
+                      <text class="lp-node-name" x="70" y="30">
+                        {name}
+                      </text>
+                      <text class="lp-node-role" x="70" y="50">
+                        {role}
+                      </text>
+                    </g>
                   );
                 })
               }
-            </ul>
-            <ul class="lp-deploy-list">
+            </svg>
+            <ol class="lp-arch-narrow" aria-label={copy.flowLabel}>
               {
-                copy.deployList.map((item) => (
-                  <li>
-                    <Check size={14} />
-                    {item}
+                copy.flow.map(([name, role], index) => (
+                  <li class={index >= 5 ? "lp-query" : undefined}>
+                    <b>{name}</b>
+                    <span>{role}</span>
                   </li>
                 ))
               }
-            </ul>
-          </div>
-          <div class="lp-reveal">
-            <div class="lp-terminal">
-              <div class="lp-terminal-bar">
-                <span></span><span></span><span></span><strong>{copy.terminalTitle}</strong>
-              </div>
-              <pre><code><span class="lp-terminal-comment">{copy.terminalComment}</span>
-docker compose <span class="lp-terminal-flag">--env-file</span> deploy/compose/.env.example \
-  <span class="lp-terminal-flag">-f</span> deploy/compose/docker-compose.yml up <span class="lp-terminal-flag">-d --build</span>
-
-curl --fail http://127.0.0.1:4173/health/ready</code></pre>
+            </ol>
+            <div class="lp-arch-support" aria-hidden="true">
+              <small>{copy.supportLabel}</small>
+              {
+                copy.support.map(([name, role]) => (
+                  <div>
+                    <b>{name}</b>
+                    <span>{role}</span>
+                  </div>
+                ))
+              }
             </div>
-            <p class="lp-terminal-note">{copy.terminalNote}</p>
+            <figcaption class="sr-only">{copy.flowLabel}</figcaption>
+          </figure>
+          <dl class="lp-numbers">
+            {
+              copy.numbers.map(([value, label]) => (
+                <div>
+                  <dt>{label}</dt>
+                  <dd>{value}</dd>
+                </div>
+              ))
+            }
+          </dl>
+          <ul class="lp-points">
+            {
+              copy.points.map(([heading, body]) => (
+                <li>
+                  <b>{heading}</b>
+                  <span>{body}</span>
+                </li>
+              ))
+            }
+          </ul>
+          <p class="lp-footnote">
+            {copy.footnote}
+            <a href={benchmark}>{copy.method}<ArrowRight size={14} aria-hidden="true" /></a>
+          </p>
+        </div>
+      </section>
+
+      <section class="lp-section" aria-labelledby="lp-faq-title">
+        <div class="lp-wrap lp-narrow">
+          <h2 id="lp-faq-title" class="lp-title">{copy.faqTitle}</h2>
+          <div class="lp-faq">
+            {
+              copy.faq.map(([question, answer]) => (
+                <details name="lp-faq">
+                  <summary>
+                    <span>{question}</span>
+                    <Plus size={18} aria-hidden="true" />
+                  </summary>
+                  <p>{answer}</p>
+                </details>
+              ))
+            }
           </div>
         </div>
+      </section>
+
+      <section class="lp-section lp-make" aria-labelledby="lp-make-title">
+        <div class="lp-wrap">
+          <h2 id="lp-make-title" lang="en">{copy.makeTitle}</h2>
+          <p class="lp-sub">{copy.makeLead}</p>
+          <div class="lp-actions">
+            <a class="lp-button lp-button-primary" href={repository}
+              ><Github size={18} aria-hidden="true" />{copy.makeGithub}</a
+            >
+            <a class="lp-button lp-button-ghost" href={contributing}
+              >{copy.makeGuide}<ArrowRight size={16} aria-hidden="true" /></a
+            >
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="lp-footer">
+      <div class="lp-wrap lp-footer-inner">
+        <a class="lp-brand" href={home} aria-label="OpenRUM"><BrandMark /><BrandWordmark /></a>
+        <nav aria-label={zh ? "页脚导航" : "Footer navigation"}>
+          <a href={`${docs}/`}>{copy.nav.docs}</a>
+          <a href={repository}>GitHub</a>
+          <a href={`${repository}/blob/main/LICENSE`}>{copy.license}</a>
+          <a href={otherLanguage} lang={zh ? "en" : "zh-CN"}>{copy.nav.language}</a>
+        </nav>
+        <p data-openrum-build>Release {release} · commit {commit.slice(0, 8)}</p>
       </div>
-    </section>
+    </footer>
   </div>
+
+  <script>
+    const tabs = [...document.querySelectorAll<HTMLButtonElement>(".lp-tabs [role=tab]")];
+    const indicator = document.querySelector<HTMLElement>(".lp-tabs-indicator");
+    // The selection is one pill that slides to the chosen tab rather than a recoloured tab.
+    const place = (tab: HTMLButtonElement) => {
+      if (!indicator) return;
+      indicator.style.width = `${tab.offsetWidth}px`;
+      indicator.style.transform = `translateX(${tab.offsetLeft}px)`;
+    };
+    const select = (next: HTMLButtonElement) => {
+      place(next);
+      for (const tab of tabs) {
+        const active = tab === next;
+        tab.setAttribute("aria-selected", String(active));
+        tab.tabIndex = active ? 0 : -1;
+        const panel = document.getElementById(tab.getAttribute("aria-controls") || "");
+        if (panel) panel.hidden = !active;
+      }
+      // On narrow screens the tab bar scrolls; keep the chosen tab centred in it.
+      const list = next.parentElement;
+      if (list && list.scrollWidth > list.clientWidth)
+        list.scrollTo({ left: next.offsetLeft - (list.clientWidth - next.offsetWidth) / 2 });
+    };
+    const current = () => tabs.find((tab) => tab.getAttribute("aria-selected") === "true");
+    const initial = current();
+    if (initial && indicator) {
+      place(initial);
+      requestAnimationFrame(() => indicator.classList.add("is-ready"));
+    }
+    window.addEventListener("resize", () => {
+      const tab = current();
+      if (tab) place(tab);
+    });
+    tabs.forEach((tab, index) => {
+      tab.addEventListener("click", () => select(tab));
+      tab.addEventListener("keydown", (event) => {
+        const offset = event.key === "ArrowRight" ? 1 : event.key === "ArrowLeft" ? -1 : 0;
+        if (!offset) return;
+        event.preventDefault();
+        const next = tabs[(index + offset + tabs.length) % tabs.length];
+        select(next);
+        next.focus();
+      });
+    });
+
+    const reveal = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries)
+          if (entry.isIntersecting) {
+            entry.target.classList.add("is-visible");
+            reveal.unobserve(entry.target);
+          }
+      },
+      { rootMargin: "0px 0px -10% 0px" },
+    );
+    document.querySelectorAll(".lp-reveal").forEach((element) => reveal.observe(element));
+  </script>
 </PublicLayout>

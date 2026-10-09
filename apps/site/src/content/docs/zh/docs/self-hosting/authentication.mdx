@@ -1,0 +1,56 @@
+---
+title: 控制台认证
+description: 为自托管实例配置 Google、GitHub、OIDC 和 LDAP 登录。
+appliesTo: Alpha
+---
+
+import { Aside, Steps } from "@astrojs/starlight/components";
+
+邮箱与 OpenRUM 密码登录始终可用。Instance Owner 可以添加 Google、GitHub、多个 OpenID Connect（OIDC）提供者，以及直连 LDAP。登录页只展示已启用且完整配置的方式。
+
+各提供者的配置和用户登录步骤见[登录指南](/zh/docs/getting-started/sign-in/)。
+
+<Steps>
+
+1. ## 保留本地 Owner 账号
+
+   在 `/setup` 使用 OpenRUM 密码创建 Owner，并将本地凭据保存在日常恢复保险库。启用外部方式前先验证本地登录。身份提供者故障时，使用该账号登录，在**系统设置 → 认证与访问**中停用或修复提供者。丢失加密主密钥时，外部登录方式也会隐藏，直到密钥恢复。
+
+1. ## 启用密钥加密托管
+
+   设置 `OPENRUM_ALLOW_MANAGED_SECRETS=true`，并将 `OPENRUM_MASTER_KEY` 设为恰好 32 字节随机值的 Base64。可使用 `openssl rand -base64 32` 生成新密钥。将其存放在部署 Secret 或私有生产 `.env` 文件中，不要提交到源码仓库。备份密钥及其 `OPENRUM_MASTER_KEY_ID`；没有先重新加密已有 Secret 就更换其中任一值，会使原凭据无法解密。修改环境变量后重启 API。未配置有效主密钥时，认证设置页不能启用提供者。
+
+1. ## 注册回调地址
+
+   使用 `PUBLIC_BASE_URL` 的规范 HTTPS 域名。在每个 OAuth/OIDC 提供者中注册以下精确回调地址，将 ID 替换为认证设置页填写的值：
+
+   ```text
+   https://rum.example.com/api/v1/auth/providers/<provider-id>/callback
+   ```
+
+   Google 需要 Web 类型 OAuth 应用，授权范围为 `openid`、`profile` 和 `email`。GitHub 需要 OAuth App、`read:user` 与 `user:email` 权限，以及已验证的主邮箱。通用 OIDC 须填写发现文档中的精确 HTTPS Issuer URL；OpenRUM 会验证签名后的 ID Token、受众、签发者、有效期、nonce 和 `email_verified` 声明。可以用不同 ID 配置多个 OIDC 提供者。每个提供者均需单独的 Client ID 和 Client Secret。
+
+1. ## 保存、测试并启用
+
+   以 Instance Owner 登录并打开**系统设置 → 认证与访问**。填写提供者 ID、显示名称、Client ID、Client Secret 及相应配置。保存、测试和停用前，Owner 须在最近五分钟内用 OpenRUM 密码重新验证。密钥在 PostgreSQL 中加密保存，设置接口不会返回明文。对于 Google、GitHub 和 OIDC，**测试连接**会完成真实授权及回调，但不会创建账号；对于 LDAP，则检查 TLS、搜索账号绑定和 Base DN。启用后，还应使用独立浏览器会话测试普通登录及账号授权。
+
+</Steps>
+
+## LDAP 目录配置
+
+第一次接触 LDAP？先读[使用 LDAP 登录](/zh/docs/getting-started/sign-in/ldap/)，了解 DN、搜索账号、所需目录信息和逐步验收。
+
+LDAP 使用 `ldaps://host:636`，或通过 `ldap://host:389` 在绑定前升级到 StartTLS。证书链须由主机信任存储认可，或在提供者设置中粘贴 PEM 格式 CA 证书。不能关闭证书校验。API 服务须能访问所配置的目录端口。
+
+使用只读搜索账号 DN 和其密码。设置 Base DN、包含 `{username}` 的过滤器（例如 `(uid={username})`）、稳定且唯一的 ID 属性（`entryUUID` 或 Active Directory 的 `objectGUID`）、邮箱属性（通常为 `mail`），以及可选的显示名称属性。搜索结果必须恰好有一个用户；随后 OpenRUM 用该用户 DN 和提交的密码进行绑定。OpenRUM 不保存用户的 LDAP 密码。连接测试检查 TLS、搜索账号绑定和 Base DN；还须用真实用户登录来验证过滤器和属性。
+
+## 账号授权与绑定
+
+外部身份首次登录会创建**待授权**账号。待授权用户只能查看状态和退出登录。组织管理员按现有成员流程添加该邮箱并授予组织角色后，下次状态检查即可进入控制台。授予 Instance 管理员角色前，用户还须在获批后进入 **Account** 设置独立的 OpenRUM 密码。敏感操作的五分钟重新验证也使用该密码。
+
+**相同邮箱不会自动合并账号。** 现有用户须先用当前方式登录，再到 **Account** 主动连接外部身份。稳定的提供者用户标识会绑定到当前账号。停用提供者后，历史身份关联仍保留，不能通过重配同一 ID 将原用户悄然指向别的目录。更换 Issuer、Client ID、LDAP URL、Base DN 或稳定 ID 属性时，请创建新的提供者 ID。只要还有另一种有效登录方式，用户就能解绑原身份。
+
+<Aside type="caution" title="部署验收">
+  本地模拟提供者测试能验证协议和账号规则。生产启用前，仍须使用真实测试账号验收 Google、GitHub
+  和自己的 OIDC/LDAP 目录，包括拒绝授权、回调过期、证书失败以及本地 Owner 恢复。
+</Aside>

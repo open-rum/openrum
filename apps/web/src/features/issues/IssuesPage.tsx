@@ -26,13 +26,15 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Toggle } from "@/components/ui/toggle";
 import { getIssueOverview, getIssues, type IssueFilters } from "@/lib/api/issues";
 import { TIME_SERIES_MAX_POINTS } from "@/lib/charts/timeSeries";
 import { listOrganizations, listProjects, type Project } from "@/lib/api/projects";
 import { projectIdFromPathname } from "@/lib/projects/currentProject";
 import { IssueFilterComposer } from "./IssueFilterComposer";
+import { IssueBulkBar } from "./IssueBulkBar";
 import { IssueTable } from "./IssueTable";
-import { IssueOverviewCharts } from "./IssueOverviewCharts";
+import { IssueOverview } from "./IssueOverview";
 import { useIssueFilters } from "./useIssueFilters";
 import "./issues.css";
 
@@ -105,6 +107,8 @@ function ProjectIssues({ project }: { project: Project }) {
       filters.country,
       filters.route,
       filters.status,
+      filters.assignee,
+      filters.newOnly,
       filters.sort,
       filters.cursor,
     ],
@@ -131,8 +135,19 @@ function ProjectIssues({ project }: { project: Project }) {
     queryFn: ({ signal }) => getIssueOverview(filters, signal),
   });
   const issues = query.data?.issues ?? [];
+  const canChange = project.role !== "viewer";
+  // A selection belongs to the page it was made on; any filter, sort or page change drops it.
+  const selectionKey = `${scope}|${filters.cursor ?? ""}`;
+  const [selection, setSelection] = useState<{ key: string; ids: ReadonlySet<string> }>({
+    key: selectionKey,
+    ids: new Set(),
+  });
+  const selectedIds = selection.key === selectionKey ? selection.ids : new Set<string>();
+  const selectedIssues = issues.filter((issue) => selectedIds.has(issue.fingerprint));
   const hasFilters = Boolean(
     filters.status ||
+    filters.assignee ||
+    filters.newOnly ||
     filters.title ||
     filters.errorType ||
     filters.fingerprint ||
@@ -147,6 +162,8 @@ function ProjectIssues({ project }: { project: Project }) {
   const clearFilters = () =>
     update({
       status: undefined,
+      assignee: undefined,
+      newOnly: undefined,
       title: undefined,
       errorType: undefined,
       fingerprint: undefined,
@@ -196,11 +213,43 @@ function ProjectIssues({ project }: { project: Project }) {
                 <SelectGroup>
                   <SelectItem value="all">全部状态</SelectItem>
                   <SelectItem value="unresolved">待处理</SelectItem>
+                  <SelectItem value="regressed">已回归</SelectItem>
                   <SelectItem value="resolved">已解决</SelectItem>
                   <SelectItem value="ignored">已忽略</SelectItem>
                 </SelectGroup>
               </SelectContent>
             </Select>
+            <div className="issue-quick-filters" role="group" aria-label="快捷筛选">
+              <Toggle
+                variant="outline"
+                size="sm"
+                pressed={Boolean(filters.newOnly)}
+                onPressedChange={(on) => update({ newOnly: on || undefined, cursor: undefined })}
+                title="首次发生在所选时间范围内的问题"
+              >
+                新问题
+              </Toggle>
+              <Toggle
+                variant="outline"
+                size="sm"
+                pressed={filters.assignee === "none"}
+                onPressedChange={(on) =>
+                  update({ assignee: on ? "none" : undefined, cursor: undefined })
+                }
+              >
+                未分配
+              </Toggle>
+              <Toggle
+                variant="outline"
+                size="sm"
+                pressed={filters.assignee === "me"}
+                onPressedChange={(on) =>
+                  update({ assignee: on ? "me" : undefined, cursor: undefined })
+                }
+              >
+                分配给我
+              </Toggle>
+            </div>
             <IssueFilterComposer
               filters={filters}
               facets={query.data?.facets}
@@ -225,7 +274,7 @@ function ProjectIssues({ project }: { project: Project }) {
             onRetry={() => void overviewQuery.refetch()}
           />
         ) : null}
-        {overviewQuery.data ? <IssueOverviewCharts overview={overviewQuery.data} /> : null}
+        {overviewQuery.data ? <IssueOverview overview={overviewQuery.data} /> : null}
         {query.isLoading ? <IssueTableSkeleton /> : null}
         {query.error ? (
           <AsyncError
@@ -237,12 +286,39 @@ function ProjectIssues({ project }: { project: Project }) {
         ) : null}
         {query.data && (issues.length > 0 || filters.cursor || query.data.nextCursor) ? (
           <section className="issues-page__table" aria-label="错误问题列表">
-            <div className="issue-list-heading">
-              <h2>问题列表</h2>
-              <span>标题搜索覆盖当前查询范围 · 用户与会话在每个问题内去重</span>
+            <div
+              className="issue-list-heading"
+              data-selecting={selectedIssues.length > 0 || undefined}
+            >
+              {selectedIssues.length ? (
+                <IssueBulkBar
+                  project={project}
+                  selected={selectedIssues}
+                  onClear={() => setSelection({ key: selectionKey, ids: new Set() })}
+                />
+              ) : (
+                <>
+                  <h2>问题列表</h2>
+                  <span>
+                    「新」表示首次发生在所选范围内（最多回溯 30 天）· 用户在每个问题内去重
+                  </span>
+                </>
+              )}
             </div>
             {issues.length ? (
-              <IssueTable issues={issues} filters={filters} />
+              <IssueTable
+                issues={issues}
+                filters={filters}
+                onSortChange={(sort) => update({ sort, cursor: undefined })}
+                selection={
+                  canChange
+                    ? {
+                        selected: selectedIds,
+                        onChange: (ids) => setSelection({ key: selectionKey, ids }),
+                      }
+                    : undefined
+                }
+              />
             ) : (
               <Empty>
                 <EmptyHeader>
@@ -331,13 +407,7 @@ function IssueTableSkeleton() {
   );
 }
 function IssueOverviewSkeleton() {
-  return (
-    <div className="grid gap-4 xl:grid-cols-3" aria-label="正在加载错误概览">
-      {Array.from({ length: 3 }, (_, index) => (
-        <Skeleton className="h-80" key={index} />
-      ))}
-    </div>
-  );
+  return <Skeleton className="h-40" aria-label="正在加载错误概览" />;
 }
 function NoProjectIssues() {
   return (

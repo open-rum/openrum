@@ -7,9 +7,10 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/rs/zerolog"
 	"openrum/internal/httpx"
 	"openrum/internal/query"
+
+	"github.com/rs/zerolog"
 )
 
 type logQueries interface {

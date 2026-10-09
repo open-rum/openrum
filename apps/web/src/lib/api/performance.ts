@@ -50,6 +50,8 @@ const detail = z.object({
 export const performanceResponseSchema = z.object({
   from: isoTime,
   to: isoTime,
+  // Optional for rolling upgrades; older servers used their own legacy density.
+  intervalSeconds: z.number().int().positive().optional(),
   routes: z.array(route),
   trend: z.array(
     z.object({

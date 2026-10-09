@@ -23,13 +23,8 @@ const htmlByPage = new Map(
 );
 const failures = [];
 
-function isRedirect(html) {
-  return /http-equiv=["']refresh["']/i.test(html);
-}
-
 for (const page of pages) {
   const html = htmlByPage.get(page);
-  if (isRedirect(html)) continue;
   const canonicals = [
     ...html.matchAll(/<link\b(?=[^>]*\brel=["']canonical["'])[^>]*\bhref=["']([^"']+)["'][^>]*>/gi),
   ].map((match) => match[1]);
@@ -76,7 +71,6 @@ for (const [canonical, owners] of canonicalOwners) {
 for (const page of pages) {
   const route = routeFor(page);
   if (route === "/" || /\/404(?:\.html)?\/?$/.test(route)) continue;
-  if (isRedirect(htmlByPage.get(page))) continue;
   if (inbound.get(page).size === 0)
     failures.push(`${display(page)}: orphan page has no inbound link`);
 }

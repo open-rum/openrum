@@ -13,6 +13,7 @@ import {
   type SDKPlatform,
 } from "@/lib/api/projects";
 import { recordProductEvent } from "@/lib/telemetry/productEvents";
+import { SliderField } from "@/components/ui/slider-field";
 import { ProjectPlatformSelector } from "./ProjectPlatformSelector";
 
 export function ProjectCreatePage() {
@@ -80,20 +81,17 @@ export function ProjectCreatePage() {
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
         <form
-          className="border border-border bg-card p-6"
+          className="rounded-2xl border border-border bg-card p-6"
           onSubmit={(event) => {
             event.preventDefault();
             const form = new FormData(event.currentTarget);
             projectMutation.mutate({
               name: String(form.get("name") ?? ""),
-              slug: String(form.get("slug") ?? ""),
               sdkPlatform,
               allowedOrigins: String(form.get("allowedOrigins") ?? "")
                 .split("\n")
                 .map((value) => value.trim())
                 .filter(Boolean),
-              environment: String(form.get("environment") ?? "production"),
-              environments: parseEnvironments(String(form.get("environments") ?? "production")),
               retentionDays: Number(form.get("retentionDays") ?? 14),
               eventSampleRate: Number(form.get("eventSampleRate") ?? 1),
               apiSampleRate: Number(form.get("apiSampleRate") ?? 0.2),
@@ -101,21 +99,10 @@ export function ProjectCreatePage() {
             });
           }}
         >
-          <div className="grid gap-5 sm:grid-cols-2">
+          <div className="grid items-start gap-5 sm:grid-cols-2">
             <FormField label="项目名称">
               <input name="name" required maxLength={120} placeholder="例如：商城 H5" />
             </FormField>
-            <FormField label="项目 Slug" hint="小写字母、数字和连字符">
-              <input
-                name="slug"
-                required
-                maxLength={63}
-                pattern="[a-z0-9]+(?:-[a-z0-9]+)*"
-                placeholder="mall-h5"
-              />
-            </FormField>
-          </div>
-          <div className="mt-6">
             <ProjectPlatformSelector value={sdkPlatform} onValueChange={setSDKPlatform} />
           </div>
           <div className="mt-5">
@@ -129,70 +116,49 @@ export function ProjectCreatePage() {
             </FormField>
           </div>
           <div className="mt-5 grid gap-5 sm:grid-cols-2">
-            <FormField label="默认环境" hint="进入项目时默认选择">
-              <input
-                name="environment"
-                required
-                defaultValue="production"
-                pattern="[a-z][a-z0-9_-]{0,63}"
-              />
-            </FormField>
-            <FormField label="可用环境" hint="每行一个，最多 16 个">
-              <textarea
-                name="environments"
-                required
-                rows={4}
-                defaultValue={"production\ntest\ndevelopment"}
-                placeholder={"production\ncanary\ntest\ndevelopment"}
-              />
-            </FormField>
-            <FormField label="原始数据保留天数" hint="1–90 天">
-              <input
-                name="retentionDays"
-                type="number"
-                min={1}
-                max={90}
-                required
-                defaultValue={14}
-              />
-            </FormField>
-            <FormField label="事件采样率" hint="0–1">
-              <input
-                name="eventSampleRate"
-                type="number"
-                min={0}
-                max={1}
-                step={0.01}
-                required
-                defaultValue={1}
-              />
-            </FormField>
-            <FormField label="API 采样率" hint="0–1">
-              <input
-                name="apiSampleRate"
-                type="number"
-                min={0}
-                max={1}
-                step={0.01}
-                required
-                defaultValue={0.2}
-              />
-            </FormField>
-            <FormField label="错误采样率" hint="0–1，建议保持 1">
-              <input
-                name="errorSampleRate"
-                type="number"
-                min={0}
-                max={1}
-                step={0.01}
-                required
-                defaultValue={1}
-              />
-            </FormField>
+            <SliderField
+              name="retentionDays"
+              label="原始数据保留天数"
+              min={1}
+              max={90}
+              defaultValue={14}
+              format={(value) => `${value} 天`}
+            />
+            <SliderField
+              name="eventSampleRate"
+              label="事件采样率"
+              min={0}
+              max={1}
+              scale={100}
+              step={10}
+              defaultValue={1}
+              format={(value) => `${Math.round(value * 100)}%`}
+            />
+            <SliderField
+              name="apiSampleRate"
+              label="API 采样率"
+              min={0}
+              max={1}
+              scale={100}
+              step={10}
+              defaultValue={0.2}
+              format={(value) => `${Math.round(value * 100)}%`}
+            />
+            <SliderField
+              name="errorSampleRate"
+              label="错误采样率"
+              hint="建议保持 100%"
+              min={0}
+              max={1}
+              scale={100}
+              step={10}
+              defaultValue={1}
+              format={(value) => `${Math.round(value * 100)}%`}
+            />
           </div>
 
           {!canCreate && organization ? (
-            <p className="mt-5 border border-(--ds-warning)/30 bg-(--ds-warning-soft) px-3 py-2.5 text-sm text-(--ds-warning) dark:text-(--ds-warning)">
+            <p className="mt-5 rounded-xl border border-(--ds-warning)/30 bg-(--ds-warning-soft) px-3 py-2.5 text-sm text-(--ds-warning) dark:text-(--ds-warning)">
               当前角色为 {organization.role}，只有 Owner 或 Admin 可以创建项目。
             </p>
           ) : null}
@@ -215,7 +181,7 @@ export function ProjectCreatePage() {
         </form>
 
         <aside className="space-y-4">
-          <div className="border border-border bg-card p-5">
+          <div className="rounded-2xl border border-border bg-card p-5">
             <div className="flex items-center justify-between gap-3">
               <h2 className="text-base font-semibold">所属组织</h2>
               <Button
@@ -235,7 +201,7 @@ export function ProjectCreatePage() {
               </p>
             ) : (
               <select
-                className="mt-4 h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                className="mt-4 h-10 w-full rounded-full border border-input bg-background px-3 text-sm"
                 aria-label="所属组织"
                 value={activeOrganizationId}
                 onChange={(event) => setOrganizationId(event.target.value)}
@@ -251,7 +217,7 @@ export function ProjectCreatePage() {
 
           {showOrganizationForm || organizations.length === 0 ? (
             <form
-              className="border border-border bg-card p-5"
+              className="rounded-2xl border border-border bg-card p-5"
               onSubmit={(event) => {
                 event.preventDefault();
                 const form = new FormData(event.currentTarget);
@@ -295,17 +261,6 @@ export function ProjectCreatePage() {
   );
 }
 
-function parseEnvironments(value: string) {
-  return [
-    ...new Set(
-      value
-        .split("\n")
-        .map((line) => line.trim())
-        .filter(Boolean),
-    ),
-  ];
-}
-
 function FormField({
   label,
   hint,
@@ -316,7 +271,7 @@ function FormField({
   children: React.ReactNode;
 }) {
   return (
-    <label className="block text-sm font-medium text-foreground [&_input]:mt-2 [&_input]:h-10 [&_input]:w-full [&_input]:rounded-md [&_input]:border [&_input]:border-input [&_input]:bg-background [&_input]:px-3 [&_input]:text-sm [&_input]:outline-none [&_input]:focus:border-ring [&_input]:focus:ring-2 [&_input]:focus:ring-ring/15 [&_textarea]:mt-2 [&_textarea]:w-full [&_textarea]:rounded-md [&_textarea]:border [&_textarea]:border-input [&_textarea]:bg-background [&_textarea]:p-3 [&_textarea]:font-mono [&_textarea]:text-sm [&_textarea]:outline-none [&_textarea]:focus:border-ring [&_textarea]:focus:ring-2 [&_textarea]:focus:ring-ring/15">
+    <label className="block text-sm font-medium text-foreground [&_input]:mt-2 [&_input]:h-[var(--control-height)] [&_input]:w-full [&_input]:rounded-full [&_input]:border [&_input]:border-input [&_input]:bg-background [&_input]:px-4 [&_input]:text-sm [&_input]:outline-none [&_input]:focus:border-ring [&_input]:focus:ring-2 [&_input]:focus:ring-ring/15 [&_textarea]:mt-2 [&_textarea]:w-full [&_textarea]:rounded-xl [&_textarea]:border [&_textarea]:border-input [&_textarea]:bg-background [&_textarea]:p-3 [&_textarea]:font-mono [&_textarea]:text-sm [&_textarea]:outline-none [&_textarea]:focus:border-ring [&_textarea]:focus:ring-2 [&_textarea]:focus:ring-ring/15">
       <span className="flex items-baseline justify-between gap-3">
         {label}
         {hint ? <small className="text-xs font-normal text-muted-foreground">{hint}</small> : null}
@@ -341,7 +296,7 @@ function OneTimeProjectKey({
   const snippet = `import { init } from "@openrum/browser";\n\ninit({\n  dsn: "${dsn}"\n});`;
   return (
     <section
-      className="mt-6 border border-(--ds-warning)/30 bg-(--ds-warning-soft) p-5 text-(--ds-warning) dark:text-(--ds-warning)"
+      className="mt-6 rounded-2xl border border-(--ds-warning)/30 bg-(--ds-warning-soft) p-5 text-(--ds-warning) dark:text-(--ds-warning)"
       aria-labelledby="dsn-created"
     >
       <div className="flex items-start gap-3">

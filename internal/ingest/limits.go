@@ -271,9 +271,9 @@ func (limiter *localRateLimiter) admitProject(
 	defer limiter.mutex.Unlock()
 	second := time.Now().Unix()
 	window := limiter.windows[key]
-	switch {
-	case window.second == second:
-	case window.second == second-1:
+	switch window.second {
+	case second:
+	case second - 1:
 		window = localWindow{second: second, previous: window.count}
 	default:
 		window = localWindow{second: second}

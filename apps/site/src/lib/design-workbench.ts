@@ -52,11 +52,9 @@ const sync = () => {
 const save = () => {
   const current = state();
   try {
-    localStorage.removeItem("openrum-palette");
     localStorage.setItem("openrum-theme", current.theme);
   } catch {}
   const url = new URL(location.href);
-  url.searchParams.delete("palette");
   url.searchParams.set("theme", current.theme);
   history.replaceState(null, "", url);
   sync();
@@ -70,6 +68,8 @@ document.querySelectorAll<HTMLSelectElement>("[data-design-mode]").forEach((sele
     save();
   });
 });
+// The palette menu announces changes so token readouts show the new palette's values.
+document.addEventListener("openrum:palettechange", () => sync());
 document.querySelectorAll<HTMLButtonElement>("[data-copy-token]").forEach((button) => {
   button.addEventListener("click", async () => {
     const value = `var(${button.dataset.copyToken})`;
@@ -89,18 +89,21 @@ document.querySelectorAll<HTMLButtonElement>("[data-download-logo]").forEach((bu
     svg.setAttribute("xmlns", "http://www.w3.org/2000/svg");
     svg.setAttribute("width", "512");
     svg.setAttribute("height", "512");
-    svg.setAttribute("fill", getComputedStyle(original).color);
+    svg.setAttribute("color", getComputedStyle(original).color);
+    // The body colour is baked in through `color`; the eyes are mask cut-outs, so the
+    // file needs no other resolved variable.
     svg.removeAttribute("style");
     svg.removeAttribute("aria-hidden");
+    svg.removeAttribute("focusable");
     const url = URL.createObjectURL(
       new Blob([new XMLSerializer().serializeToString(svg)], { type: "image/svg+xml" }),
     );
     const link = document.createElement("a");
     link.href = url;
-    link.download = `openrum-mark-citrus-${state().theme}.svg`;
+    link.download = `openrum-signal-scout-${root.dataset.palette || "amber"}-${state().theme}.svg`;
     link.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
-    announce("已下载柠檬绿 SVG 标记");
+    announce("已下载信号小怪 SVG");
   });
 });
 const resizeFrame = (host: HTMLElement) => {

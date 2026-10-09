@@ -27,6 +27,19 @@ func NewCache(maximumBytes int64) *Cache {
 	return &Cache{maximum: maximumBytes, entries: make(map[string]*list.Element), order: list.New()}
 }
 
+// Get returns an already parsed map. Callers check it before reading object
+// storage so a cached artifact costs neither a download nor a checksum pass.
+func (cache *Cache) Get(key string) (*ParsedMap, bool) {
+	cache.mutex.Lock()
+	defer cache.mutex.Unlock()
+	element := cache.entries[key]
+	if element == nil {
+		return nil, false
+	}
+	cache.order.MoveToFront(element)
+	return element.Value.(*cacheEntry).value, true
+}
+
 func (cache *Cache) GetOrParse(key, mapURL string, contents []byte) (*ParsedMap, error) {
 	cache.mutex.Lock()
 	defer cache.mutex.Unlock()

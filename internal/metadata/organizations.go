@@ -11,11 +11,12 @@ import (
 )
 
 var (
-	ErrNotFound          = errors.New("resource not found")
-	ErrLastOwner         = errors.New("organization must retain an owner")
-	ErrLastInstanceOwner = errors.New("instance must retain an owner")
-	ErrForbidden         = errors.New("operation is forbidden")
-	ErrConflict          = errors.New("resource already exists")
+	ErrNotFound                 = errors.New("resource not found")
+	ErrLastOwner                = errors.New("organization must retain an owner")
+	ErrLastInstanceOwner        = errors.New("instance must retain an owner")
+	ErrInstancePasswordRequired = errors.New("instance administrator must have an OpenRUM password")
+	ErrForbidden                = errors.New("operation is forbidden")
+	ErrConflict                 = errors.New("resource already exists")
 )
 
 type OrganizationAccess struct {
@@ -188,6 +189,9 @@ func (repository *OrganizationRepository) AddMember(ctx context.Context, actorID
 		organizationID, userID, role); err != nil {
 		return translateConstraintError(err)
 	}
+	if _, err := transaction.ExecContext(ctx, "UPDATE users SET access_status='approved', updated_at=now() WHERE id=$1 AND access_status='pending'", userID); err != nil {
+		return err
+	}
 	if err := insertAudit(ctx, transaction, organizationID, actorID, "member.added", "user", userID); err != nil {
 		return err
 	}
@@ -315,9 +319,15 @@ func canManageMembers(role OrganizationRole) bool {
 }
 
 func insertAudit(ctx context.Context, transaction *sql.Tx, organizationID, actorID uuid.UUID, action, resourceType string, resourceID uuid.UUID) error {
+	// A nil actor is recorded as NULL: upload tokens outlive the user who created
+	// them, and their actions are still audited.
+	var actor any = actorID
+	if actorID == uuid.Nil {
+		actor = nil
+	}
 	if _, err := transaction.ExecContext(ctx,
 		"INSERT INTO audit_logs (organization_id, actor_user_id, action, resource_type, resource_id) VALUES ($1, $2, $3, $4, $5)",
-		organizationID, actorID, action, resourceType, resourceID); err != nil {
+		organizationID, actor, action, resourceType, resourceID); err != nil {
 		return fmt.Errorf("insert audit log: %w", err)
 	}
 	return nil

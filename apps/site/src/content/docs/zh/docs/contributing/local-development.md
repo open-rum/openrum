@@ -3,7 +3,7 @@ title: 本地开发
 description: 从源码开发 OpenRUM 服务、SDK、Console 和文档站。
 ---
 
-本文是面向 OpenRUM 贡献者的开发参考。首次运行请先阅读分步骤的[本地开发教程](/zh/docs/getting-started/local-development/)；只想通过容器体验产品、不运行宿主机开发进程时，请使用 [Compose 部署](/zh/docs/self-hosting/compose/)。
+本文是面向 OpenRUM 贡献者的开发参考。首次运行请先阅读分步骤的[本地开发教程](/zh/docs/getting-started/local-development/)。
 
 ## 工具链
 
@@ -22,7 +22,7 @@ pnpm install --frozen-lockfile
 pnpm openrum dev
 ```
 
-`dev` 把基础设施和数据管道服务放在容器中，从源码运行 API 和 Console，因此既有前端热更新，也无需本地安装 PostgreSQL、ClickHouse、Kafka、Redis。命令会构建镜像、迁移、导入 Demo 数据并等待所有健康检查完成。
+`dev` 把基础设施和数据管道服务放在容器中，从源码运行 API 和 Console，因此既有前端热更新，也无需本地安装 PostgreSQL、ClickHouse、Kafka、Redis。命令会构建镜像、执行迁移并等待所有健康检查完成。
 
 打开 `http://127.0.0.1:4173`。如需模拟部署形态，让全部服务都运行在容器中：
 
@@ -39,13 +39,14 @@ pnpm openrum up
 | `pnpm openrum status` | 查看服务位置和就绪状态 |
 | `pnpm openrum logs [service]` | 跟随服务日志 |
 | `pnpm openrum restart <name>` | 重启一个服务并等待恢复 |
+| `pnpm openrum seed` | 向运行中的服务栈加载演示账号和数据 |
 | `pnpm openrum stop` | 停止全部服务，保留容器和数据 |
 | `pnpm openrum down` | 删除容器，保留数据卷 |
 | `pnpm openrum reset` | 确认后删除容器和全部本地数据库 |
 
 端口和凭据来自 `deploy/compose/.env`，没有时回退到已提交的 `.env.example`。后台进程的 PID 和日志位于 git 忽略的 `.openrum/`。
 
-开发账号：
+服务就绪后，执行 `pnpm openrum seed` 加载 Demo 账号和数据（可选，可重复执行）；不执行时首次访问会进入初始化页面。开发账号：
 
 ```text
 Email: demo@openrum.local
@@ -80,7 +81,7 @@ pnpm run test:e2e
 
 ## 迁移与日志
 
-迁移和 Demo Seed 会在每次启动时幂等执行，无需手工重跑。
+迁移会在每次启动时幂等执行，无需手工重跑。Demo 数据不会随启动写入，需要时执行 `pnpm openrum seed`。
 
 ```sh
 pnpm openrum status
@@ -107,5 +108,3 @@ pnpm site:check
 - 写入返回 CSRF 错误时，确认浏览器 Origin 与 `PUBLIC_BASE_URL` 完全一致。
 - 图表初始为空时，等待 ClickHouse 物化视图处理后刷新。
 - 依赖漂移时在仓库根目录运行 `pnpm install --frozen-lockfile`。
-
-重新造数和数据集说明见[确定性 Demo 数据](/zh/docs/getting-started/demo-data/)。

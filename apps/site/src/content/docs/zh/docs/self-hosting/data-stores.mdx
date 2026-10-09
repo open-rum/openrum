@@ -1,0 +1,65 @@
+---
+title: 数据存储
+description: PostgreSQL、ClickHouse、Kafka、Redis 和对象存储各存什么，哪些是真正的数据源。
+appliesTo: Alpha
+---
+
+OpenRUM 有意把控制数据和遥测数据放在不同的存储里。控制数据量小、有关系，且绝不能丢；遥测数据量大、只追加，并以聚合方式查询。下面每个存储只做一件事，其中只有两个是数据源。
+
+| 存储 | 存放 | 是否数据源 |
+| --- | --- | --- |
+| PostgreSQL | 账号、组织、Project、设置和流程状态 | 是，控制数据 |
+| ClickHouse | Event 以及由它们生成的聚合 | 是，遥测数据 |
+| Kafka | 等待 Consumer 处理的已接收 Envelope，以及一个死信主题 | 否，只是缓冲 |
+| Redis | 限流计数器、缓存和连接状态 | 否，可重建 |
+| 对象存储 | Source Map Artifact，可选 | 是，针对 Artifact 文件 |
+
+## PostgreSQL
+
+PostgreSQL 是控制面。表大致分为几组：
+
+| 分组 | 示例 |
+| --- | --- |
+| 身份与访问 | `users`、`sessions`、`auth_providers`、`auth_identities`、`organizations`、`organization_members`、`instance_members` |
+| Project | `projects`、`project_keys`、`project_environments`、`project_upload_tokens` |
+| 交付与 Issue | `releases`、`sourcemap_artifacts`、`issue_states` |
+| 告警 | `alert_rules`、`notification_channels`、`alert_evaluations`、`alert_deliveries` |
+| 实例运维 | `instance_settings`、`instance_secrets`、`maintenance_jobs`、`emergency_cleanup_jobs`、`project_deletions`、`project_data_purges` |
+| 审计 | `audit_logs`、`instance_audit_logs` |
+
+PostgreSQL 不可用意味着没人能登录或改配置，Ingest 也失去了 Project key 和设置的来源。已经在 ClickHouse 里的 Event 不受影响。运维与恢复见 [PostgreSQL 运行手册](/zh/docs/self-hosting/postgres/)。
+
+## ClickHouse
+
+ClickHouse 把每个已存储的 Event 放进同一张原始表 `rum_events`，另有一组聚合表，由物化视图在 Event 插入时保持更新。仪表盘和 Console 读聚合表，排查问题读原始 Event。
+
+| 表 | 用途 |
+| --- | --- |
+| `rum_events` | 每个 Event，带 `ingest_flags` 数组和 Fingerprint |
+| `project_metrics_1m` | 每分钟的 Project 指标 |
+| `behavior_metrics_1m` | Page View、访客和自定义 Event 的聚合 |
+| `measurement_metrics_1m` | Web Vitals 及其他度量 |
+| `api_metrics_1m` | API 请求量、延迟和失败 |
+| `issue_metrics_5m` | Issue 出现次数 |
+| `usage_records`、`usage_metrics_1h` | 用量页展示的各 Project 数据量 |
+| `event_stack_mappings` | 错误的已映射堆栈帧 |
+
+Event 按 Project 的保留策略过期，聚合按它们自己的策略过期，所以原始数据可能比由它生成的图表更早消失。见[数据生命周期](/zh/docs/self-hosting/data-lifecycle/)和 [ClickHouse 运行手册](/zh/docs/self-hosting/clickhouse/)。
+
+## Kafka
+
+Ingest 把已接收的 Envelope 写入事件主题，默认是 `rum-events-v1`，Consumer 以消费组方式读取。失败的条目进入第二个主题，名称是同一个名字加 `.dlq`。默认的 Compose 配置会用 12 个分区创建这两个主题。
+
+Kafka 是唯一一个丢失就意味着丢失已接收 Event 的存储，因为 Ingest 已经返回过 `202`。它也是让 Consumer 可以安全落后的缓冲，所以保留期必须长于你预期的最长 ClickHouse 故障。[容量规划](/zh/docs/self-hosting/capacity/)就从这里算起，积压和恢复见 [Kafka 运行手册](/zh/docs/self-hosting/kafka/)。
+
+## Redis
+
+Redis 保存可以丢失的短期状态：[速率限制](/zh/docs/product/rate-limits/)背后的固定窗口计数器、查询缓存、登录限流，以及接入引导里显示的各 Project 最近一次 SDK 状态。Redis 不可用时，每个 Ingest 进程会在本地按配置值的一半限流，所以限流是降级而不是失效放行。Redis 里没有需要备份的内容。见 [Redis 运行手册](/zh/docs/self-hosting/redis/)。
+
+## 对象存储
+
+对象存储是可选的。它保存每个 Release 上传的 Source Map 文件，元数据则在 PostgreSQL 里。没有它，其他功能都能用，只是无法上传新的 Source Map，压缩后的堆栈帧不会被映射。请使用 OSS 或 S3 兼容存储桶，并为它单独设置生命周期规则，因为 Artifact 不遵循 Event 的保留期。见[对象存储运行手册](/zh/docs/self-hosting/object-storage/)。
+
+## 备份要覆盖哪些存储
+
+PostgreSQL、ClickHouse 和 Artifact 存储桶要作为同一套恢复集合来备份。Kafka 和 Redis 不靠备份恢复；Kafka 只关系到那些已接收但还没存储的 Event。步骤见[备份与恢复](/zh/docs/self-hosting/backup-restore/)。

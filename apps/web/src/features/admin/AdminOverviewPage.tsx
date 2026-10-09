@@ -29,6 +29,16 @@ import { adminOverviewQueryOptions, type AdminOverview } from "@/lib/api/admin";
 import { cn } from "@/lib/utils";
 import { AdminPageLayout } from "./AdminPageLayout";
 
+const dependencyIcons: Record<string, typeof DatabaseIcon> = {
+  api: ServerCogIcon,
+  postgres: DatabaseIcon,
+  clickhouse: DatabaseIcon,
+  redis: DatabaseIcon,
+  kafka: ActivityIcon,
+  "object-storage": HardDriveIcon,
+  worker: ServerCogIcon,
+};
+
 export function AdminOverviewPage() {
   const query = useQuery(adminOverviewQueryOptions());
 
@@ -59,6 +69,7 @@ export function AdminOverviewPage() {
 function AdminOverviewContent({ overview }: { overview: AdminOverview }) {
   const healthy = overview.dependencies.filter((item) => item.status === "healthy").length;
   const unhealthy = overview.dependencies.filter((item) => item.status === "unhealthy").length;
+  const unknown = overview.dependencies.filter((item) => item.status === "unknown").length;
   return (
     <div className="flex flex-col gap-5">
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="实例摘要">
@@ -87,8 +98,14 @@ function AdminOverviewContent({ overview }: { overview: AdminOverview }) {
         <SummaryCard
           icon={ActivityIcon}
           label="依赖健康"
-          value={unhealthy ? `${unhealthy} 项异常` : `${healthy} 项正常`}
-          detail={`${overview.dependencies.length} 项已纳入检查`}
+          value={
+            unhealthy
+              ? `${unhealthy} 项异常`
+              : unknown
+                ? `${unknown} 项待确认`
+                : `${healthy} 项正常`
+          }
+          detail={`${healthy} 项正常 · ${unhealthy} 项异常 · ${unknown} 项待确认`}
           danger={unhealthy > 0}
         />
       </section>
@@ -99,28 +116,33 @@ function AdminOverviewContent({ overview }: { overview: AdminOverview }) {
             <CardTitle>依赖与服务</CardTitle>
             <CardDescription>状态检查失败不会暴露内部地址或认证信息。</CardDescription>
             <CardAction>
-              <Badge variant={unhealthy ? "destructive" : "outline"}>
-                {unhealthy ? "需要处理" : "运行正常"}
+              <Badge variant={unhealthy ? "destructive" : unknown ? "outline" : "success"}>
+                {unhealthy ? "需要处理" : unknown ? "部分待确认" : "运行正常"}
               </Badge>
             </CardAction>
           </CardHeader>
           <CardContent className="-mb-(--card-spacing) divide-y px-0">
-            {overview.dependencies.map((dependency) => (
-              <div
-                key={dependency.id}
-                className="grid gap-2 px-4 py-3 sm:grid-cols-[170px_110px_1fr_auto] sm:items-center"
-              >
-                <div className="flex items-center gap-2 font-medium">
-                  <DatabaseIcon className="size-4 text-muted-foreground" />
-                  {dependency.label}
+            {overview.dependencies.map((dependency) => {
+              const Icon = dependencyIcons[dependency.id] ?? DatabaseIcon;
+              return (
+                <div
+                  key={dependency.id}
+                  className="grid gap-2 px-4 py-3 sm:grid-cols-[170px_110px_1fr_auto] sm:items-center"
+                >
+                  <div className="flex items-center gap-2 font-medium">
+                    <Icon className="size-4 text-muted-foreground" />
+                    {dependency.label}
+                  </div>
+                  <StatusBadge status={dependency.status} />
+                  <p className="text-sm text-muted-foreground">{dependency.detail}</p>
+                  {dependency.latencyMs !== null ? (
+                    <span className="font-mono text-xs text-muted-foreground">
+                      {dependency.latencyMs} ms
+                    </span>
+                  ) : null}
                 </div>
-                <StatusBadge status={dependency.status} />
-                <p className="text-sm text-muted-foreground">{dependency.detail}</p>
-                <span className="font-mono text-xs text-muted-foreground">
-                  {dependency.latencyMs === null ? "—" : `${dependency.latencyMs} ms`}
-                </span>
-              </div>
-            ))}
+              );
+            })}
           </CardContent>
         </Card>
 
@@ -195,7 +217,7 @@ function SummaryCard({
 function StatusBadge({ status }: { status: AdminOverview["dependencies"][number]["status"] }) {
   if (status === "healthy")
     return (
-      <Badge variant="outline">
+      <Badge variant="success">
         <CheckCircle2Icon />
         正常
       </Badge>
@@ -217,7 +239,7 @@ function StatusBadge({ status }: { status: AdminOverview["dependencies"][number]
   return (
     <Badge variant="outline">
       <CircleHelpIcon />
-      {status === "not_configured" ? "未配置" : "未知"}
+      {status === "not_configured" ? "未配置" : "待确认"}
     </Badge>
   );
 }
@@ -258,11 +280,11 @@ function Capacity({ capacity }: { capacity: AdminOverview["pipeline"]["capacity"
       <div className="flex items-start justify-between gap-3">
         <PipelineMetric
           icon={HardDriveIcon}
-          label="ClickHouse 存储"
+          label="ClickHouse 所在磁盘"
           value={
             percent === null
               ? "容量暂不可用"
-              : `${formatBytes(capacity.usedBytes!)} / ${formatBytes(capacity.capacityBytes!)}`
+              : `可用 ${formatBytes(capacity.freeBytes!)} / 总量 ${formatBytes(capacity.capacityBytes!)}`
           }
         />
         <Badge variant={capacity.pressure === "critical" ? "destructive" : "outline"}>
@@ -281,8 +303,8 @@ function Capacity({ capacity }: { capacity: AdminOverview["pipeline"]["capacity"
             />
           </div>
           <div className="flex justify-between text-xs text-muted-foreground">
-            <span>已用 {percent.toFixed(1)}%</span>
-            <span>剩余 {formatBytes(capacity.freeBytes!)}</span>
+            <span>不可用 {percent.toFixed(1)}%</span>
+            <span>占用及预留 {formatBytes(capacity.usedBytes!)}</span>
           </div>
         </>
       ) : null}
@@ -332,9 +354,5 @@ function formatDuration(seconds: number) {
   return days ? `${days} 天 ${hours} 小时` : `${hours} 小时`;
 }
 function formatBytes(value: number) {
-  return new Intl.NumberFormat("zh-CN", {
-    style: "unit",
-    unit: "gigabyte",
-    maximumFractionDigits: 1,
-  }).format(value / 1024 / 1024 / 1024);
+  return `${new Intl.NumberFormat("zh-CN", { maximumFractionDigits: 1 }).format(value / 1024 ** 3)} GiB`;
 }

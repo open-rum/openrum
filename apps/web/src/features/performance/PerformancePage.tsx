@@ -7,8 +7,6 @@ import {
   ConsolePageContent,
   ConsolePageHeader,
 } from "@/components/layout/ConsolePage";
-import { AnalysisFilterSidebar } from "@/components/layout/AnalysisFilterSidebar";
-import { countryLabel, deviceLabel } from "@/features/filters/dimensionLabels";
 import {
   Select,
   SelectContent,
@@ -118,94 +116,54 @@ function ProjectPerformance({ project }: { project: Project }) {
           ),
         ),
       );
-  const facets = query.data?.facets;
-  const fields = [
-    {
-      key: "country",
-      label: "国家 / 地区",
-      value: filters.country,
-      options: (facets?.countries ?? []).map(({ value }) => ({
-        value,
-        label: countryLabel(value),
-      })),
-    },
-    {
-      key: "deviceType",
-      label: "设备类型",
-      value: filters.deviceType,
-      options: (facets?.deviceTypes ?? []).map(({ value }) => ({
-        value,
-        label: deviceLabel(value),
-      })),
-    },
-    {
-      key: "route",
-      label: "路由",
-      value: filters.route,
-      text: true,
-      maxLength: 1024,
-      options: facets?.routes ?? [],
-      description: "精确匹配 SDK 上报的路由；可选择建议或输入完整路径。",
-    },
-    { key: "browser", label: "浏览器", value: filters.browser, options: facets?.browsers ?? [] },
-    {
-      key: "release",
-      label: "版本",
-      value: filters.release,
-      text: true,
-      maxLength: 128,
-      options: facets?.releases ?? [],
-    },
-  ];
   return (
     <ConsolePage width="fluid">
       <ConsolePageHeader title="真实用户性能" />
       <ConsolePageContent className="grid gap-6">
-        <AnalysisFilterSidebar fields={fields} onApply={update}>
-          {query.isLoading ? <PerformanceSkeleton compact /> : null}
-          {query.error ? (
-            <AsyncError
-              error={query.error}
-              title="无法加载性能数据"
-              remediation="当前筛选已保留；缩短时间范围后重新加载。"
-              onRetry={() => void query.refetch()}
-            />
-          ) : null}
-          {query.data?.detail ? (
-            <RouteDetail
-              detail={query.data.detail}
+        {query.isLoading ? <PerformanceSkeleton compact /> : null}
+        {query.error ? (
+          <AsyncError
+            error={query.error}
+            title="无法加载性能数据"
+            remediation="当前筛选已保留；缩短时间范围后重新加载。"
+            onRetry={() => void query.refetch()}
+          />
+        ) : null}
+        {query.data?.detail ? (
+          <RouteDetail
+            detail={query.data.detail}
+            percentile={percentile}
+            onBack={() => update({ route: undefined })}
+            onPercentileChange={(percentile) => update({ percentile })}
+            onMetricChange={(metric) => update({ metric })}
+          />
+        ) : null}
+        {query.data && !query.data.detail && hasSamples ? (
+          <>
+            <PerformanceOverview
+              summary={query.data.summary}
+              trend={query.data.trend}
+              range={query.data}
               percentile={percentile}
-              onBack={() => update({ route: undefined })}
               onPercentileChange={(percentile) => update({ percentile })}
+            />
+            <RoutesTable
+              filters={filters}
+              routes={query.data.routes}
+              onSelect={(route) => update({ route })}
               onMetricChange={(metric) => update({ metric })}
             />
-          ) : null}
-          {query.data && !query.data.detail && hasSamples ? (
-            <>
-              <PerformanceOverview
-                summary={query.data.summary}
-                trend={query.data.trend}
-                percentile={percentile}
-                onPercentileChange={(percentile) => update({ percentile })}
-              />
-              <RoutesTable
-                filters={filters}
-                routes={query.data.routes}
-                onSelect={(route) => update({ route })}
-                onMetricChange={(metric) => update({ metric })}
-              />
-            </>
-          ) : null}
-          {query.data && !hasSamples ? (
-            <div className="border border-border">
-              <EmptyState
-                icon={ActivityIcon}
-                title="当前范围没有性能样本"
-                description="确认 SDK 已启用 Web Vitals，或扩大时间范围后重试。"
-              />
-            </div>
-          ) : null}
-        </AnalysisFilterSidebar>
+          </>
+        ) : null}
+        {query.data && !hasSamples ? (
+          <div className="border border-border">
+            <EmptyState
+              icon={ActivityIcon}
+              title="当前范围没有性能样本"
+              description="确认 SDK 已启用 Web Vitals，或扩大时间范围后重试。"
+            />
+          </div>
+        ) : null}
       </ConsolePageContent>
     </ConsolePage>
   );

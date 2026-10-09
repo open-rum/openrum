@@ -14,8 +14,8 @@ type Preset struct {
 // Presets lists every preset, in the order a UI should offer them.
 func Presets() []Preset {
 	return []Preset{
-		{ID: "storefront", Name: "Storefront browsing and checkout",
-			Description: "A broad mix across browse and checkout: page views, vitals, a wide API surface, errors and funnel events."},
+		{ID: "storefront", Name: "Storefront, full coverage",
+			Description: "One run covers every event type: browse, search, purchase, account and support journeys with returning visitors, signed-in users, traffic sources, a daily rhythm, funnel drop-off and one incident."},
 		{ID: "api-surface", Name: "Wide API surface",
 			Description: "Many endpoints, methods and status codes, including a browser regression and a release regression."},
 		{ID: "failing-release", Name: "Failing release",
@@ -59,10 +59,7 @@ func PresetScenario(id string, from, to time.Time) Scenario {
 		scenario.Sessions = 150
 		scenario.Journeys = []Journey{{Name: "error-burst", Weight: 1, Pages: errorBurstPages()}}
 	default:
-		scenario.Journeys = []Journey{
-			{Name: "browse", Weight: 65, Pages: browsePages()},
-			{Name: "checkout", Weight: 35, Pages: checkoutPages()},
-		}
+		scenario = storefrontScenario(scenario)
 	}
 	return scenario
 }

@@ -26,7 +26,7 @@ This guide runs OpenRUM on your computer so you can change its code. The default
    If you already have the source, enter its root directory. Otherwise:
 
    ```sh
-   git clone https://github.com/openrum/openrum.git
+   git clone https://github.com/open-rum/openrum.git
    cd openrum
    corepack enable
    pnpm install --frozen-lockfile
@@ -60,7 +60,7 @@ This guide runs OpenRUM on your computer so you can change its code. The default
    pnpm openrum dev
    ```
 
-   The command builds required images and the Browser SDK, starts infrastructure and pipeline services, applies migrations and the demo seed, then starts the API and Console from source.
+   The command builds required images and the Browser SDK, starts infrastructure and pipeline services, applies migrations, then starts the API and Console from source.
 
    | Location                          | Services                                                       |
    | --------------------------------- | -------------------------------------------------------------- |
@@ -75,7 +75,13 @@ This guide runs OpenRUM on your computer so you can change its code. The default
 
    **Success:** Dependencies and API are ready, and the Console development server is running with its URL displayed. On failure, use `pnpm openrum logs api` or inspect the affected service.
 
-1. ## Sign in
+1. ## Load demo data and sign in
+
+   ```sh
+   pnpm openrum seed
+   ```
+
+   The command loads the demo account, Project and about 30,000 Sessions across 14 days. It is optional and safe to run again. Without it, the first visit opens the setup page, where you create your own owner.
 
    Open `http://127.0.0.1:4173` with the local demo account:
 

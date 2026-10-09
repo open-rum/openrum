@@ -23,6 +23,9 @@ type ManagedObjectStorage struct {
 	ForcePathStyle  bool   `json:"forcePathStyle"`
 	AccessKeyID     string `json:"accessKeyId"`
 	SecretAccessKey string `json:"secretAccessKey"`
+	// DeleteForbidden records that the save-time probe could write and read but
+	// not delete. Storage still works; deletions then leave objects behind.
+	DeleteForbidden bool `json:"deleteForbidden,omitempty"`
 }
 
 type InstanceSecret struct {
@@ -96,4 +99,16 @@ func (repository *InstanceSecretRepository) GetObjectStorage(ctx context.Context
 		return ManagedObjectStorage{}, InstanceSecret{}, err
 	}
 	return value, secret, nil
+}
+
+// ObjectStorageVersion returns the managed storage row version, or 0 when no
+// managed configuration exists. Every process polls it so a Console change
+// reaches all replicas without decrypting the secret on each check.
+func (repository *InstanceSecretRepository) ObjectStorageVersion(ctx context.Context) (int64, error) {
+	var version int64
+	err := repository.database.QueryRowContext(ctx, `SELECT version FROM instance_secrets WHERE name=$1`, ObjectStorageSecretName).Scan(&version)
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, nil
+	}
+	return version, err
 }

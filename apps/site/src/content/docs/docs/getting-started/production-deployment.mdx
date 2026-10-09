@@ -24,7 +24,7 @@ This guide deploys a shared OpenRUM Instance with Kubernetes and Helm, the recom
    Worker            → Background jobs, alerts, optional Source Map object storage
    ```
 
-   The Helm Chart deploys five application services and a migration job. Prepare databases, Kafka, Redis, TLS certificates and the runtime Secret separately; the Chart does not create them.
+   The Helm Chart deploys five application services, a migration job and, by default, a single Redis. Prepare the databases, Kafka, TLS certificates and the runtime Secret separately; the Chart does not create them.
 
    **Success:** You know who maintains the cluster and each data service, and which public domain the Instance will use.
 
@@ -33,7 +33,7 @@ This guide deploys a shared OpenRUM Instance with Kubernetes and Helm, the recom
    - **Helm and kubectl:** Installed locally and connected to the target cluster
    - **Image registry:** Build machine can push; cluster can pull
    - **Domain and HTTPS:** For example, `rum.example.com` points to the Ingress and has a matching certificate
-   - **Data services:** PostgreSQL, ClickHouse, Kafka and Redis reachable from OpenRUM Pods
+   - **Data services:** PostgreSQL, ClickHouse and Kafka reachable from OpenRUM Pods, plus Redis if you do not use the bundled one
    - **Capacity and persistence:** Persistent storage, backups and capacity alerts sized for expected traffic
 
    ```sh

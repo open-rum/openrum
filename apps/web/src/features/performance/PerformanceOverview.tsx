@@ -51,11 +51,13 @@ const metricDescriptions = {
 export function PerformanceOverview({
   summary,
   trend,
+  range,
   percentile,
   onPercentileChange,
 }: {
   summary: PerformanceResponse["summary"];
   trend: PerformanceResponse["trend"];
+  range?: { from?: string; to?: string; intervalSeconds?: number };
   percentile: PerformancePercentile;
   onPercentileChange: (value: PerformancePercentile) => void;
 }) {
@@ -66,6 +68,7 @@ export function PerformanceOverview({
         <PerformanceScoreCard scoring={scoring} />
         <CombinedVitalTrend
           trend={trend}
+          range={range}
           percentile={percentile}
           onPercentileChange={onPercentileChange}
         />

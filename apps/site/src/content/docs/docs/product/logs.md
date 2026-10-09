@@ -1,9 +1,8 @@
 ---
 title: Logs
 description: Search structured application logs and relate them to browser sessions.
+appliesTo: Alpha
 ---
-
-**Applies to:** Alpha. Status: Alpha implemented.
 
 The Logs page shows diagnostic messages separately from business events and error Issues. Use the shared time/environment controls, severity selector and query search. The chart and list span the page without a dimension sidebar.
 
