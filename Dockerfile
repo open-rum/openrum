@@ -17,7 +17,7 @@ COPY apps/web apps/web
 COPY packages packages
 RUN pnpm --filter @openrum/browser build && pnpm --filter @openrum/web build
 
-FROM --platform=$BUILDPLATFORM golang:1.26.6-alpine AS go-build
+FROM --platform=$BUILDPLATFORM golang:1.26.9-alpine AS go-build
 WORKDIR /src
 ARG TARGETOS
 ARG TARGETARCH
