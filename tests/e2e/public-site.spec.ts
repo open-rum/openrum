@@ -289,7 +289,10 @@ test("start sidebar groups collapse and preserve child pages across languages", 
   await page.getByRole("menuitemradio", { name: "简体中文" }).click();
   await expect(page).toHaveURL(/\/zh\/docs\/getting-started\/local-development\/connect-app\/$/);
   await expect(sidebar.locator('a[aria-current="page"]')).toHaveText("接入与验证");
-  await sidebar.locator("summary").filter({ hasText: /^部署$/ }).click();
+  await sidebar
+    .locator("summary")
+    .filter({ hasText: /^部署$/ })
+    .click();
   await sidebar.getByRole("link", { name: "安装服务", exact: true }).click();
   await expect(page).toHaveURL(/\/zh\/docs\/getting-started\/production-deployment\/install\/$/);
   await expect(
@@ -309,8 +312,14 @@ test("start sidebar groups collapse and preserve child pages across languages", 
 test("Operate holds the sign-in guides in both languages", async ({ page }) => {
   await page.goto("/docs/introduction/");
   const sidebar = page.locator("#starlight__sidebar");
-  await sidebar.locator("summary").filter({ hasText: /^Operate$/ }).click();
-  await sidebar.locator("summary").filter({ hasText: /^Authentication setup$/ }).click();
+  await sidebar
+    .locator("summary")
+    .filter({ hasText: /^Operate$/ })
+    .click();
+  await sidebar
+    .locator("summary")
+    .filter({ hasText: /^Authentication setup$/ })
+    .click();
   await sidebar.getByRole("link", { name: "Sign in with LDAP" }).click();
   await expect(page).toHaveURL(/\/docs\/getting-started\/sign-in\/ldap\/$/);
   await expect(page.locator("h1")).toHaveText("Sign in with LDAP");
@@ -319,9 +328,7 @@ test("Operate holds the sign-in guides in both languages", async ({ page }) => {
   await page.getByRole("menuitemradio", { name: "简体中文" }).click();
   await expect(page).toHaveURL(/\/zh\/docs\/getting-started\/sign-in\/ldap\/$/);
   await expect(page.locator("h1")).toHaveText("使用 LDAP 登录");
-  await expect(
-    sidebar.locator("summary").filter({ hasText: /^认证配置$/ }),
-  ).toBeVisible();
+  await expect(sidebar.locator("summary").filter({ hasText: /^认证配置$/ })).toBeVisible();
 });
 
 for (const [width, theme, prefix] of [
