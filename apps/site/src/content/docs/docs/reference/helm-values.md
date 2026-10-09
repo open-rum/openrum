@@ -16,7 +16,7 @@ nameOverride: ""
 fullnameOverride: ""
 
 image:
-  repository: ghcr.io/openrum/openrum
+  repository: ghcr.io/open-rum/openrum
   tag: "0.1.0"
   pullPolicy: IfNotPresent
 

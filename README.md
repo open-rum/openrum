@@ -13,11 +13,11 @@
   <a href="https://openrum.netlify.app/">Website</a> ·
   <a href="https://openrum.netlify.app/docs/introduction/">Documentation</a> ·
   <a href="#quickstart">Quickstart</a> ·
-  <a href="https://github.com/eijil/openrum/issues">Report an issue</a>
+  <a href="https://github.com/open-rum/openrum/issues">Report an issue</a>
 </p>
 
 <p align="center">
-  <a href="https://github.com/eijil/openrum/actions/workflows/ci.yml"><img src="https://github.com/eijil/openrum/actions/workflows/ci.yml/badge.svg" alt="CI status" /></a>
+  <a href="https://github.com/open-rum/openrum/actions/workflows/ci.yml"><img src="https://github.com/open-rum/openrum/actions/workflows/ci.yml/badge.svg" alt="CI status" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT License" /></a>
   <img src="https://img.shields.io/badge/status-Alpha-ffb020" alt="Alpha" />
 </p>
@@ -46,7 +46,7 @@ The Browser SDK omits raw input values, request/response bodies and headers from
 You need **Git**, **Docker with Compose v2**, and at least **8 GB of memory available to Docker**.
 
 ```sh
-git clone https://github.com/eijil/openrum.git
+git clone https://github.com/open-rum/openrum.git
 cd openrum
 
 docker compose --env-file deploy/compose/.env.example \
@@ -138,7 +138,7 @@ pnpm openrum dev
 
 This runs the API and Console from source, with infrastructure and pipeline services in containers. The Console stays at `http://127.0.0.1:4173`. See [local development](https://openrum.netlify.app/docs/contributing/local-development/) for service commands and troubleshooting.
 
-Bug reports, documentation, tests and code are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md), discuss substantial changes in [GitHub Issues](https://github.com/eijil/openrum/issues), and run `pnpm run check` before opening a pull request. For documentation changes, also run `pnpm site:check`.
+Bug reports, documentation, tests and code are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md), discuss substantial changes in [GitHub Issues](https://github.com/open-rum/openrum/issues), and run `pnpm run check` before opening a pull request. For documentation changes, also run `pnpm site:check`.
 
 Report vulnerabilities privately using the [security reporting guide](https://openrum.netlify.app/docs/self-hosting/security/vulnerability-reporting/).
 

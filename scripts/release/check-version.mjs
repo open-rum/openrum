@@ -37,9 +37,9 @@ for (const [field, actual] of Object.entries(expected)) {
   if (actual !== version)
     throw new Error(`${field} is ${actual ?? "missing"}; expected ${version} from ${tag}`);
 }
-if (imageRepository !== "ghcr.io/openrum/openrum") {
+if (imageRepository !== "ghcr.io/open-rum/openrum") {
   throw new Error(
-    `image.repository must be ghcr.io/openrum/openrum for the public chart; received ${imageRepository ?? "missing"}`,
+    `image.repository must be ghcr.io/open-rum/openrum for the public chart; received ${imageRepository ?? "missing"}`,
   );
 }
 

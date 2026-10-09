@@ -14,7 +14,7 @@ By default it also runs a single Redis instance for the release ([Redis: bundled
 
 **Create the Kafka topic yourself.** Both the producer and the consumer set `AllowAutoTopicCreation: false`, so a missing topic is a runtime failure rather than a self-healing condition. The default topic name is `rum-events-v1`, and ingest only reports durable acceptance after `acks=all`.
 
-**Use an image your cluster can pull.** Helm installs the chart; Kubernetes pulls the referenced container images. The chart defaults to `ghcr.io/openrum/openrum`. This address becomes usable only after the first official versioned release is published and the package is public. Before then, build and publish your own image and override `image.repository` in your own values file rather than editing the chart.
+**Use an image your cluster can pull.** Helm installs the chart; Kubernetes pulls the referenced container images. The chart defaults to `ghcr.io/open-rum/openrum`. This address becomes usable only after the first official versioned release is published and the package is public. Before then, build and publish your own image and override `image.repository` in your own values file rather than editing the chart.
 
 **Decide on a hostname and a TLS certificate.** `config.appEnv: production` makes every service reject a non-HTTPS `PUBLIC_BASE_URL` at startup, and `ingress.tls` is empty by default — see [Routing and TLS](#routing-and-tls).
 
@@ -105,7 +105,7 @@ A bundled Redis restart takes API and Ingest out of service for a few seconds. F
 Once the official `0.1.0` release is available, install its OCI chart and matching default image:
 
 ```sh
-helm upgrade --install openrum oci://ghcr.io/openrum/charts/openrum \
+helm upgrade --install openrum oci://ghcr.io/open-rum/charts/openrum \
   --version 0.1.0 \
   --namespace openrum --create-namespace \
   --values values.production.yaml \

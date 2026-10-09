@@ -13,11 +13,11 @@
   <a href="https://openrum.netlify.app/zh/">官网</a> ·
   <a href="https://openrum.netlify.app/zh/docs/introduction/">文档</a> ·
   <a href="#快速启动">快速启动</a> ·
-  <a href="https://github.com/eijil/openrum/issues">反馈问题</a>
+  <a href="https://github.com/open-rum/openrum/issues">反馈问题</a>
 </p>
 
 <p align="center">
-  <a href="https://github.com/eijil/openrum/actions/workflows/ci.yml"><img src="https://github.com/eijil/openrum/actions/workflows/ci.yml/badge.svg" alt="CI 状态" /></a>
+  <a href="https://github.com/open-rum/openrum/actions/workflows/ci.yml"><img src="https://github.com/open-rum/openrum/actions/workflows/ci.yml/badge.svg" alt="CI 状态" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT 许可证" /></a>
   <img src="https://img.shields.io/badge/status-Alpha-ffb020" alt="Alpha" />
 </p>
@@ -46,7 +46,7 @@ OpenRUM 是面向 Web 产品的自托管真实用户监控（RUM）平台。你�
 准备 **Git**、带有 **Compose v2 的 Docker**，并为 Docker 分配至少 **8 GB 内存**。
 
 ```sh
-git clone https://github.com/eijil/openrum.git
+git clone https://github.com/open-rum/openrum.git
 cd openrum
 
 docker compose --env-file deploy/compose/.env.example \
@@ -138,7 +138,7 @@ pnpm openrum dev
 
 该命令从源码运行 API 和控制台，将基础设施及数据处理服务放在容器中。控制台地址仍为 `http://127.0.0.1:4173`。服务管理命令与排错方法见[本地开发](https://openrum.netlify.app/zh/docs/contributing/local-development/)。
 
-欢迎提交问题、改进文档、补充测试或贡献代码。请先阅读[贡献指南](https://openrum.netlify.app/zh/docs/contributing/)，较大的变更先通过 [GitHub Issues](https://github.com/eijil/openrum/issues) 讨论，提交 Pull Request 前运行 `pnpm run check`。修改文档时，还需运行 `pnpm site:check`。
+欢迎提交问题、改进文档、补充测试或贡献代码。请先阅读[贡献指南](https://openrum.netlify.app/zh/docs/contributing/)，较大的变更先通过 [GitHub Issues](https://github.com/open-rum/openrum/issues) 讨论，提交 Pull Request 前运行 `pnpm run check`。修改文档时，还需运行 `pnpm site:check`。
 
 安全漏洞请按[安全报告指南](https://openrum.netlify.app/zh/docs/self-hosting/security/vulnerability-reporting/)私下反馈。
 

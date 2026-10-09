@@ -4,7 +4,7 @@ import starlight from "@astrojs/starlight";
 import tailwindcss from "@tailwindcss/vite";
 
 const site = process.env.PUBLIC_SITE_URL || "http://localhost:4321";
-const repository = process.env.PUBLIC_REPOSITORY_URL || "https://github.com/openrum/openrum";
+const repository = process.env.PUBLIC_REPOSITORY_URL || "https://github.com/open-rum/openrum";
 
 export default defineConfig({
   site,
