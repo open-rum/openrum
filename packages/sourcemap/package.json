@@ -1,12 +1,12 @@
 {
-  "name": "@openrum/source-map",
+  "name": "@openrum/sourcemap",
   "version": "0.1.0",
   "description": "Upload private Source Maps from a build to an OpenRUM Release, as a library or a Vite plugin.",
   "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/open-rum/openrum.git",
-    "directory": "packages/source-map"
+    "directory": "packages/sourcemap"
   },
   "bugs": {
     "url": "https://github.com/open-rum/openrum/issues"

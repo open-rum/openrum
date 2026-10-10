@@ -300,9 +300,9 @@ importers:
 
   packages/cli:
     devDependencies:
-      '@openrum/source-map':
+      '@openrum/sourcemap':
         specifier: workspace:*
-        version: link:../source-map
+        version: link:../sourcemap
       '@types/node':
         specifier: ^24.0.0
         version: 24.13.3
@@ -328,7 +328,7 @@ importers:
         specifier: ^6.0.3
         version: 6.0.3
 
-  packages/source-map:
+  packages/sourcemap:
     devDependencies:
       '@types/node':
         specifier: ^24.0.0
