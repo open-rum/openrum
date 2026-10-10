@@ -22,10 +22,12 @@ Make one release-preparation PR that updates `deploy/helm/openrum/Chart.yaml` (`
 
 The version is repeated in several places, and the release checks only catch some of them. Change them together in the preparation PR, then search for the old number to find stragglers (for example `git grep -nI "0.1.0" -- . ':!pnpm-lock.yaml'`; ignore application release names such as `storefront@0.1.0` in examples).
 
-| Release                            | Change                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Product `vX.Y.Z` (image and Chart) | `deploy/helm/openrum/Chart.yaml` (`version`, `appVersion`) and `deploy/helm/openrum/values.yaml` (`image.tag`); `check-version.mjs` fails the release if they disagree with the tag. Docs that print the Chart version or `helm install --version` (English and Chinese).                                                                                                                                                                                                                                 |
-| Browser SDK `browser-vX.Y.Z`       | `packages/browser-sdk/package.json` (`version`); `SDK_VERSION` in `packages/browser-sdk/src/transport/sender.ts`; `OPENRUM_BROWSER_SDK_VERSION` in `packages/protocol/src/dsn.ts`; the SDK path constants in `services/api/internal/handlers/browser_sdk.go`; the `appliesTo` front matter and `/sdk/browser/X.Y.Z/` URLs in the SDK docs, English and Chinese. `check-sdk-version.mjs` compares the tag with `package.json`, and `pnpm run sdk:size` compares `package.json` with the protocol constant. |
+| Release                                | Change                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Product `vX.Y.Z` (image and Chart)     | `deploy/helm/openrum/Chart.yaml` (`version`, `appVersion`) and `deploy/helm/openrum/values.yaml` (`image.tag`); `check-version.mjs` fails the release if they disagree with the tag. Docs that print the Chart version or `helm install --version` (English and Chinese).                                                                                                                                                                                                                                     |
+| Browser SDK `browser-vX.Y.Z`           | `packages/browser-sdk/package.json` (`version`); `SDK_VERSION` in `packages/browser-sdk/src/transport/sender.ts`; `OPENRUM_BROWSER_SDK_VERSION` in `packages/protocol/src/dsn.ts`; the SDK path constants in `services/api/internal/handlers/browser_sdk.go`; the `appliesTo` front matter and `/sdk/browser/X.Y.Z/` URLs in the SDK docs, English and Chinese. `check-package-version.mjs` compares the tag with `package.json`, and `pnpm run sdk:size` compares `package.json` with the protocol constant. |
+| Source Map package `source-map-vX.Y.Z` | `packages/source-map/package.json` (`version`); the Source Map docs when the options or the import path change, English and Chinese. `check-package-version.mjs` compares the tag with `package.json`.                                                                                                                                                                                                                                                                                                        |
+| CLI `cli-vX.Y.Z`                       | `packages/cli/package.json` (`version`, printed by `openrum --version`); the Source Map and `openrum` command docs when commands or flags change, English and Chinese.                                                                                                                                                                                                                                                                                                                                        |
 
 The npm package is independent of the product, but the script an Instance serves at `/sdk/browser/X.Y.Z/` is built into its image, so Instances only serve a new SDK path after the next product release.
 
@@ -89,6 +91,31 @@ git push origin browser-v0.1.1
 ```
 
 The workflow refuses an existing npm version, publishes with provenance (only while the repository is public; npm cannot sign provenance for a private repository), and reads the version back from the registry. A plain version publishes under `latest`; a prerelease such as `browser-v0.1.1-alpha.1` publishes under `next`, so `npm install @openrum/browser` never picks it up. npm does not allow republishing a version, so fix a bad release with a new patch version. When both are released together, push the SDK tag first: the documentation tells readers to `npm install @openrum/browser`, so the package should exist before the product release announces it. Verify with `npm view @openrum/browser@0.1.1 version`.
+
+## Publish the CLI and Source Map packages
+
+`@openrum/source-map` (the upload library and Vite plugin) and `@openrum/cli` (the `openrum` command) are versioned independently of the product and of the browser SDK. The CLI bundles the upload code at build time, so it does not depend on `@openrum/source-map` being published first, and each can be released alone. They publish through **Publish CLI and Source Map packages** (`publish-tools.yml`) on tags `source-map-vX.Y.Z` and `cli-vX.Y.Z`.
+
+Bootstrapping a new package. Trusted Publishing is configured on the package's own npm page, so the package has to exist first:
+
+1. From a scratch directory, publish a placeholder `0.0.0` under your own interactive `npm login` (it asks for your 2FA code): a `package.json` with just the name, `"version": "0.0.0"` and `"license": "MIT"`, then `npm publish --access public --tag placeholder`.
+2. On npmjs.com open the package's **Settings → Trusted Publisher → GitHub Actions** and enter organization `open-rum`, repository `openrum`, workflow filename `publish-tools.yml` and environment `public-release`, and tick **Allow npm publish**.
+3. Release the real first version through the workflow, so it carries provenance.
+
+Do this once for each package. To release afterwards:
+
+1. Bump `version` in the package's `package.json`, update the docs, and merge to `main`.
+2. Use **Publish CLI and Source Map packages → Run workflow** with a tag such as `cli-v0.1.0` for a dry run. It checks the tag against the package, type-checks, tests and builds it, then packs the tarball, installs it into an empty project and runs it the way a user would (imports for the library, the installed `openrum` and `openrum-sourcemaps` bins for the CLI). A dry run never publishes.
+3. Run the same pre-tag checks as for a product release (green `main`, clone on the latest `main`, no GitHub web Release), then push the tag:
+
+```sh
+git tag -a cli-v0.1.0 -m "@openrum/cli 0.1.0"
+git push origin cli-v0.1.0
+```
+
+Use `source-map-v0.1.0` for the library. The workflow refuses an existing npm version, publishes with provenance while the repository is public, and reads the version back from the registry. A plain version publishes under `latest`; a prerelease such as `cli-v0.1.0-alpha.1` publishes under `next`.
+
+The `openrum` command inside a checkout of this repository also forwards the local-stack commands to the Go tool, so a change to `cmd/openrum` flags needs no CLI release. A change to the list of forwarded commands (`devStackCommands` in `packages/cli/src/devstack.ts`) does.
 
 ## Deploy separately
 

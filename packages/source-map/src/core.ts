@@ -1,7 +1,6 @@
 import { createHash } from "node:crypto";
 import { readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { relative, resolve, sep } from "node:path";
-import type { Plugin } from "vite";
 
 /** Largest Source Map the server accepts (64 MiB). */
 export const MAX_ARTIFACT_BYTES = 64 * 1024 * 1024;
@@ -102,28 +101,6 @@ type LocalMap = {
   contents?: NonSharedBuffer;
   sizeBytes: number;
 };
-
-export function openRUMSourceMaps(options: OpenRUMSourceMapOptions): Plugin {
-  validateOptions(options);
-  let outDir: string | undefined;
-  let logger: OpenRUMLogger | undefined;
-  return {
-    name: "openrum-sourcemaps",
-    apply: "build",
-    enforce: "post",
-    configResolved(config) {
-      outDir = resolve(config.root, config.build.outDir);
-      logger = config.logger;
-    },
-    async closeBundle() {
-      await uploadSourceMaps({
-        ...options,
-        outDir: options.outDir ?? outDir,
-        logger: options.logger ?? logger,
-      });
-    },
-  };
-}
 
 export async function uploadSourceMaps(
   options: OpenRUMSourceMapOptions,
@@ -263,7 +240,8 @@ async function uploadOne(
   return false;
 }
 
-type Auth = { kind: "token"; token: string } | { kind: "session"; cookie: string; csrf: string };
+export type Auth =
+  { kind: "token"; token: string } | { kind: "session"; cookie: string; csrf: string };
 
 class ApiClient {
   readonly #options: OpenRUMSourceMapOptions;
@@ -422,7 +400,8 @@ function formatBytes(bytes: number): string {
   return `${(bytes / 1024 / 1024).toFixed(1)} MiB`;
 }
 
-function validateOptions(options: OpenRUMSourceMapOptions): Auth {
+/** Throws before any network call when the options cannot work; shared by the CLI and plugins. */
+export function validateOptions(options: OpenRUMSourceMapOptions): Auth {
   const missing: string[] = [];
   if (!/^https?:\/\//.test(options.baseUrl ?? "")) missing.push("baseUrl (http or https URL)");
   if (!options.projectId) missing.push("projectId");
@@ -437,5 +416,3 @@ function validateOptions(options: OpenRUMSourceMapOptions): Auth {
     "OpenRUM Source Map upload requires an upload token: pass `token` or set OPENRUM_UPLOAD_TOKEN. Create one in Settings → Project → Onboarding → Source Map upload tokens.",
   );
 }
-
-export default openRUMSourceMaps;

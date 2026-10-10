@@ -1,12 +1,12 @@
 ---
 title: React (Vite)
-description: Upload Source Maps during the build of a Vite-built React app with @openrum/vite-plugin, and make the SDK report the same Release.
+description: Upload Source Maps during the build of a Vite-built React app with @openrum/source-map, and make the SDK report the same Release.
 appliesTo: Alpha
 ---
 
 import { Aside, Steps } from "@astrojs/starlight/components";
 
-When a React app builds with Vite, `@openrum/vite-plugin` uploads Source Maps automatically at the
+When a React app builds with Vite, `@openrum/source-map` uploads Source Maps automatically at the
 end of `vite build`, with no extra build step. Before you start, [create an upload
 token](/docs/sdk/source-maps/#create-an-upload-token) and store it as the CI secret
 `OPENRUM_UPLOAD_TOKEN`.
@@ -19,15 +19,15 @@ token](/docs/sdk/source-maps/#create-an-upload-token) and store it as the CI sec
    directory into your application:
 
    ```sh
-   pnpm --filter @openrum/vite-plugin build
-   pnpm add -D /path/to/openrum/packages/vite-plugin
+   pnpm --filter @openrum/source-map build
+   pnpm add -D /path/to/openrum/packages/source-map
    ```
 
 1. ## Enable it in the Vite config
 
    ```ts title="vite.config.ts"
    import { defineConfig } from "vite";
-   import { openRUMSourceMaps } from "@openrum/vite-plugin";
+   import { openRUMSourceMaps } from "@openrum/source-map/vite";
 
    export default defineConfig({
      build: { sourcemap: "hidden" },
