@@ -74,7 +74,7 @@ The mutable Docker registry cache entry only stores intermediate build layers ac
 One-time setup:
 
 1. The `openrum` organization on npmjs.com owns the `@openrum` scope.
-2. Create an npm automation (or granular, publish-only, `@openrum`-scoped) access token and store it as the `NPM_TOKEN` secret of the `public-release` GitHub Environment, the same environment that gates the product release. Once the package exists, switch the publish step to npm Trusted Publishing and delete the token.
+2. The package publishes through npm Trusted Publishing, so there is no npm token in GitHub. On npmjs.com open the package's **Settings → Trusted Publisher → GitHub Actions** and enter organization `open-rum`, repository `openrum`, workflow filename `publish-sdk.yml` and environment `public-release`, and tick **Allow npm publish** (without it npm only accepts staged publishing, which the workflow does not use). npm fixes these fields when the connection is created; to change one, delete the connection and create it again. The workflow needs `id-token: write`, which it already declares.
 3. Run the workflow in the official `open-rum/openrum` repository; like the product release it will not publish from a fork.
 
 To release:
