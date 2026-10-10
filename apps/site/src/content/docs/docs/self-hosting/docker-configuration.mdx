@@ -1,0 +1,119 @@
+---
+title: Docker configuration
+description: Every variable in .env.production for the single-host Docker stack, with its default and when to change it.
+appliesTo: Alpha
+---
+
+import { Aside } from "@astrojs/starlight/components";
+
+The single-host stack reads its settings from `deploy/compose/.env.production`, which you create from
+`.env.production.example` in [step 2 of the deployment](/docs/self-hosting/docker-production/).
+Compose refuses to start while a **required** value is empty; every other variable has the default
+shown here and can stay as it is until you have measured a reason to change it.
+
+Check the file before you start the stack:
+
+```sh
+docker compose --env-file deploy/compose/.env.production \
+  -f deploy/compose/production.compose.yml config --quiet
+```
+
+<Aside type="caution" title="Keep this file private">
+  `.env.production` holds database passwords and the setup token. Keep it `chmod 600`, out of Git and
+  out of backups you share. Generate each secret on its own with `openssl rand -hex 24`: hex avoids
+  URL-encoding problems in the PostgreSQL and ClickHouse connection strings.
+</Aside>
+
+## Required
+
+| Variable              | Default | What it does                                                                                                                                                                                  |
+| --------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `OPENRUM_DOMAIN`      | none    | Public DNS name of this host, without `https://`. Caddy serves automatic HTTPS for it, and OpenRUM uses `https://<domain>` as its public base URL. It must resolve to this host.            |
+| `OPENRUM_IMAGE`       | none    | Tag of the application image you build in [step 3](/docs/self-hosting/docker-production/). API, Ingest, Consumer, Worker, Web and migrations all run it. Use a tag that names the revision. |
+| `POSTGRES_PASSWORD`   | none    | Password of the PostgreSQL account OpenRUM uses.                                                                                                                                              |
+| `CLICKHOUSE_PASSWORD` | none    | Password of the ClickHouse account OpenRUM uses.                                                                                                                                              |
+| `BOOTSTRAP_TOKEN`     | none    | Proves you may create the first administrator at `https://<domain>/setup`. Setup closes after that user exists.                                                                              |
+
+Set the two database passwords before the first start and treat them as fixed afterwards. Rotating
+them later is a database operation, not an edit of this file.
+
+## Network
+
+| Variable              | Default         | What it does                                                                                                                                             |
+| --------------------- | --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `OPENRUM_EDGE_SUBNET` | `172.30.77.0/24` | The private Docker subnet that Caddy and the application share.                                                                                          |
+| `OPENRUM_EDGE_IP`     | `172.30.77.10`  | The fixed address Caddy gets inside that subnet. Ingest trusts client-IP headers only from this address, so rate limiting sees the real visitor address. |
+
+Change the two together, and only when the default subnet overlaps your host network.
+
+## Throughput
+
+Tune these against measured traffic and the [capacity guide](/docs/self-hosting/capacity/), not in advance.
+
+| Variable                           | Default | What it does                                                                                                                                                       |
+| ---------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `OPENRUM_KAFKA_RETENTION_DURATION` | `168h`  | How long Kafka keeps accepted Events (7 days). OpenRUM uses it to judge how much time the Consumer has to drain a backlog before data would expire. Match the real topic retention. |
+| `OPENRUM_CONSUMER_WORKERS`         | `4`     | Parallel Consumer workers that turn Kafka messages into ClickHouse writes. Raise it only when Consumer lag stays high.                                              |
+| `OPENRUM_CONSUMER_FLUSH_INTERVAL`  | `10ms`  | How long the Consumer waits to fill a batch before writing it to ClickHouse. A batch also flushes at 1,000 rows or 4 MiB.                                           |
+
+## Disk-pressure guard
+
+ClickHouse runs on the same host, so the guard stays on. It checks ClickHouse's free disk space and
+protects the host before the disk fills. See [Storage pressure](/docs/self-hosting/storage-pressure/)
+for what you see in the Console and how to recover.
+
+| Variable                                  | Default | What it does                                                                                                       |
+| ----------------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------ |
+| `OPENRUM_STORAGE_PRESSURE_GUARD_ENABLED`  | `true`  | Turns the guard on. Leave it on while ClickHouse shares the host's disk.                                           |
+| `OPENRUM_STORAGE_WARNING_FREE_RATIO`      | `0.15`  | Free-space ratio at or below which the Console shows a low-capacity warning (85% used).                            |
+| `OPENRUM_STORAGE_CRITICAL_FREE_RATIO`     | `0.10`  | Free-space ratio at or below which the Browser SDK's sampling is capped at the emergency rate (90% used).          |
+| `OPENRUM_STORAGE_HARD_STOP_FREE_RATIO`    | `0.05`  | Free-space ratio at or below which Ingest stops accepting Events and returns an empty `202` (95% used).            |
+| `OPENRUM_STORAGE_RECOVERY_FREE_RATIO`     | `0.10`  | Free-space ratio the disk must rise above before sampling and Ingest return to normal.                             |
+| `OPENRUM_STORAGE_EMERGENCY_SAMPLE_RATE`   | `0.10`  | Sampling rate applied while the guard is active.                                                                   |
+| `OPENRUM_STORAGE_POLL_INTERVAL`           | `30s`   | How often the guard reads ClickHouse's disk capacity.                                                              |
+
+The ratios must keep this order, or the services refuse to start: hard stop < critical ≤ recovery <
+warning.
+
+## Source Map storage (optional)
+
+Source Map Artifacts need object storage; core monitoring does not. **Leave every variable in this
+section empty when you do not use Source Maps.** The provider, bucket and credentials are explained
+in [Object storage](/docs/self-hosting/object-storage/).
+
+| Variable                                    | Default | What it does                                                                                                       |
+| ------------------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------ |
+| `OBJECT_STORAGE_PROVIDER`                   | empty   | `oss` for Alibaba Cloud OSS or `s3` for Amazon S3 and compatible services.                                         |
+| `OBJECT_STORAGE_ENDPOINT`                   | empty   | A custom endpoint, for S3-compatible services such as MinIO, R2 or Ceph.                                           |
+| `OBJECT_STORAGE_BUCKET`                     | empty   | The bucket that holds the Artifacts. Keep it private.                                                              |
+| `OBJECT_STORAGE_REGION`                     | empty   | The provider region of the bucket.                                                                                 |
+| `OBJECT_STORAGE_FORCE_PATH_STYLE`           | empty   | Set to `true` when the service needs path-style addressing, as some self-hosted S3 services do.                    |
+| `OPENRUM_OBJECT_STORAGE_ENDPOINT_ALLOWLIST` | empty   | Exact hosts allowed as custom endpoints. A production custom endpoint must use HTTPS and appear here.              |
+| `OSS_ACCESS_KEY_ID`, `OSS_ACCESS_KEY_SECRET` | empty  | Static Alibaba Cloud credentials. Set both or neither.                                                             |
+| `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` | empty  | Static S3 credentials. Set both or neither.                                                                        |
+| `AWS_SESSION_TOKEN`                         | empty   | Session token, only for temporary S3 credentials.                                                                  |
+
+## Console-managed credentials (optional)
+
+By default object-storage and alert-channel credentials come only from this file. To let an
+administrator save them in the Console instead, enable managed credentials. They are stored encrypted,
+with a key that lives outside the database.
+
+| Variable                        | Default | What it does                                                                                                           |
+| ------------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `OPENRUM_ALLOW_MANAGED_SECRETS` | `false` | Explicit opt-in for Console-managed encrypted credentials.                                                             |
+| `OPENRUM_MASTER_KEY`            | empty   | Required when managed credentials are on: Base64 of exactly 32 random bytes. Generate it with `openssl rand -base64 32`, and keep it outside PostgreSQL. |
+| `OPENRUM_MASTER_KEY_ID`         | `v1`    | A label for the key, used when you rotate it.                                                                          |
+
+## Applying a change
+
+After editing the file, run the same `up -d --wait` command from the deployment steps. Compose
+recreates the services whose settings changed and leaves the rest running.
+
+For every other setting, including the ones that live in the Console, see the
+[configuration reference](/docs/reference/configuration/).
+
+<Aside type="note" title="Using Kubernetes instead?">
+  The Helm chart exposes the same settings as values, such as `config.storagePressure`. See the
+  [Helm values reference](/docs/reference/helm-values/).
+</Aside>

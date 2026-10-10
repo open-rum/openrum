@@ -36,6 +36,8 @@ import { Aside, LinkCard, Steps } from "@astrojs/starlight/components";
 
    如果 `172.30.77.0/24` 与宿主机网络冲突，需同时修改 `OPENRUM_EDGE_SUBNET` 和其中的 `OPENRUM_EDGE_IP`。Ingest 只信任这个 Caddy 地址提供的客户端 IP，用于限流。
 
+   其他变量都有默认值。完整列表见 [Docker 配置](/zh/docs/self-hosting/docker-configuration/)，其中包括可选的 Source Map 存储和磁盘压力设置。
+
 1. ## 构建并检查配置
 
    ```sh

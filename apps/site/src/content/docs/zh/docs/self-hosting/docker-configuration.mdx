@@ -1,0 +1,109 @@
+---
+title: Docker 配置
+description: 单机 Docker 部署的 .env.production 中每个变量的默认值，以及什么时候需要修改。
+appliesTo: Alpha
+---
+
+import { Aside } from "@astrojs/starlight/components";
+
+单机部署从 `deploy/compose/.env.production` 读取配置，这个文件在[部署第 2 步](/zh/docs/self-hosting/docker-production/)中由
+`.env.production.example` 复制而来。**必填**项为空时 Compose 会拒绝启动；其他变量都有这里列出的默认值，
+在你测量到需要调整之前保持默认即可。
+
+启动之前先检查一下这个文件：
+
+```sh
+docker compose --env-file deploy/compose/.env.production \
+  -f deploy/compose/production.compose.yml config --quiet
+```
+
+<Aside type="caution" title="保管好这个文件">
+  `.env.production` 里有数据库密码和初始化令牌。保持 `chmod 600`，不要提交到 Git，也不要放进会共享的备份里。
+  每个密钥都单独用 `openssl rand -hex 24` 生成：十六进制可以避免 PostgreSQL 和 ClickHouse 连接串里的 URL 转义问题。
+</Aside>
+
+## 必填
+
+| 变量                  | 默认值 | 作用                                                                                                                                           |
+| --------------------- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `OPENRUM_DOMAIN`      | 无     | 这台主机的公网域名，不带 `https://`。Caddy 为它自动签发 HTTPS，OpenRUM 把 `https://<域名>` 作为公开基础地址。域名必须解析到这台主机。           |
+| `OPENRUM_IMAGE`       | 无     | 你在[第 3 步](/zh/docs/self-hosting/docker-production/)构建的应用镜像标签。API、Ingest、Consumer、Worker、Web 和迁移都运行它。标签要能标识所用的版本。 |
+| `POSTGRES_PASSWORD`   | 无     | OpenRUM 使用的 PostgreSQL 账号密码。                                                                                                           |
+| `CLICKHOUSE_PASSWORD` | 无     | OpenRUM 使用的 ClickHouse 账号密码。                                                                                                           |
+| `BOOTSTRAP_TOKEN`     | 无     | 在 `https://<域名>/setup` 创建第一个管理员时用来证明你有权限。第一个用户创建后，初始化页面就会关闭。                                           |
+
+两个数据库密码要在第一次启动前设置好，之后视为固定。以后更换它们是数据库层面的操作，不是改这个文件。
+
+## 网络
+
+| 变量                  | 默认值           | 作用                                                                                                                       |
+| --------------------- | ---------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `OPENRUM_EDGE_SUBNET` | `172.30.77.0/24` | Caddy 和应用共用的私有 Docker 子网。                                                                                       |
+| `OPENRUM_EDGE_IP`     | `172.30.77.10`   | Caddy 在该子网里的固定地址。Ingest 只信任来自这个地址的客户端 IP 头，所以限流看到的是访问者的真实地址。                     |
+
+两个值要一起改，并且只在默认子网和主机网络冲突时才改。
+
+## 吞吐
+
+这些参数要根据实测流量和[容量指南](/zh/docs/self-hosting/capacity/)来调，不要提前调整。
+
+| 变量                               | 默认值 | 作用                                                                                                                         |
+| ---------------------------------- | ------ | ---------------------------------------------------------------------------------------------------------------------------- |
+| `OPENRUM_KAFKA_RETENTION_DURATION` | `168h` | Kafka 保留已接收 Event 的时长（7 天）。OpenRUM 用它判断 Consumer 在数据过期之前还有多少时间消化积压。要和 Topic 的真实保留时间一致。 |
+| `OPENRUM_CONSUMER_WORKERS`         | `4`    | 把 Kafka 消息写入 ClickHouse 的并行 Consumer 工作线程数。只有在 Consumer 延迟持续偏高时才调大。                              |
+| `OPENRUM_CONSUMER_FLUSH_INTERVAL`  | `10ms` | Consumer 攒批后等待多久写入 ClickHouse。一个批次累计到 1,000 行或 4 MiB 时也会立即写入。                                      |
+
+## 磁盘压力保护
+
+ClickHouse 和应用在同一台主机上，所以保护保持开启。它检查 ClickHouse 的剩余磁盘空间，在磁盘写满之前保护主机。
+Console 里会看到什么、如何恢复，见[存储压力](/zh/docs/self-hosting/storage-pressure/)。
+
+| 变量                                     | 默认值 | 作用                                                                                |
+| ---------------------------------------- | ------ | ----------------------------------------------------------------------------------- |
+| `OPENRUM_STORAGE_PRESSURE_GUARD_ENABLED` | `true` | 开启保护。只要 ClickHouse 和主机共用磁盘，就保持开启。                              |
+| `OPENRUM_STORAGE_WARNING_FREE_RATIO`     | `0.15` | 剩余空间比例不高于它时，Console 显示容量偏低警告（已用 85%）。                      |
+| `OPENRUM_STORAGE_CRITICAL_FREE_RATIO`    | `0.10` | 剩余空间比例不高于它时，Browser SDK 的采样率被限制在应急采样率（已用 90%）。        |
+| `OPENRUM_STORAGE_HARD_STOP_FREE_RATIO`   | `0.05` | 剩余空间比例不高于它时，Ingest 停止接收 Event，并返回空的 `202`（已用 95%）。       |
+| `OPENRUM_STORAGE_RECOVERY_FREE_RATIO`    | `0.10` | 剩余空间必须回升到高于它，采样和 Ingest 才会恢复正常。                              |
+| `OPENRUM_STORAGE_EMERGENCY_SAMPLE_RATE`  | `0.10` | 保护生效期间使用的采样率。                                                          |
+| `OPENRUM_STORAGE_POLL_INTERVAL`          | `30s`  | 保护多久读取一次 ClickHouse 的磁盘容量。                                            |
+
+这几个比例必须保持这个顺序，否则服务会拒绝启动：硬停止 < 严重 ≤ 恢复 < 警告。
+
+## Source Map 存储（可选）
+
+Source Map Artifact 需要对象存储，核心监控不需要。**不用 Source Map 时，这一节的变量都留空。**
+服务商、存储桶和凭证的说明见[对象存储](/zh/docs/self-hosting/object-storage/)。
+
+| 变量                                         | 默认值 | 作用                                                                                          |
+| -------------------------------------------- | ------ | --------------------------------------------------------------------------------------------- |
+| `OBJECT_STORAGE_PROVIDER`                    | 空     | `oss` 表示阿里云 OSS，`s3` 表示 Amazon S3 及兼容服务。                                        |
+| `OBJECT_STORAGE_ENDPOINT`                    | 空     | 自定义端点，用于 MinIO、R2、Ceph 等 S3 兼容服务。                                             |
+| `OBJECT_STORAGE_BUCKET`                      | 空     | 存放 Artifact 的存储桶，保持私有。                                                            |
+| `OBJECT_STORAGE_REGION`                      | 空     | 存储桶所在的服务商地域。                                                                      |
+| `OBJECT_STORAGE_FORCE_PATH_STYLE`            | 空     | 服务需要路径风格寻址时设为 `true`，部分自建 S3 服务需要。                                     |
+| `OPENRUM_OBJECT_STORAGE_ENDPOINT_ALLOWLIST`  | 空     | 允许作为自定义端点的精确主机名。生产环境的自定义端点必须使用 HTTPS，并出现在这个列表里。      |
+| `OSS_ACCESS_KEY_ID`、`OSS_ACCESS_KEY_SECRET` | 空     | 阿里云的静态凭证。两个要同时设置，或同时不设置。                                              |
+| `AWS_ACCESS_KEY_ID`、`AWS_SECRET_ACCESS_KEY` | 空     | S3 的静态凭证。两个要同时设置，或同时不设置。                                                 |
+| `AWS_SESSION_TOKEN`                          | 空     | 会话令牌，只在使用 S3 临时凭证时才需要。                                                      |
+
+## Console 托管凭证（可选）
+
+默认情况下，对象存储和告警渠道的凭证只来自这个文件。想让管理员在 Console 里保存它们，就要开启托管凭证。
+它们加密存放，密钥保存在数据库之外。
+
+| 变量                            | 默认值  | 作用                                                                                                         |
+| ------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------ |
+| `OPENRUM_ALLOW_MANAGED_SECRETS` | `false` | 显式开启由 Console 托管的加密凭证。                                                                          |
+| `OPENRUM_MASTER_KEY`            | 空      | 开启托管凭证时必填：恰好 32 个随机字节的 Base64。用 `openssl rand -base64 32` 生成，并保存在 PostgreSQL 之外。 |
+| `OPENRUM_MASTER_KEY_ID`         | `v1`    | 密钥的标识，轮换密钥时使用。                                                                                 |
+
+## 应用修改
+
+修改文件后，重新执行部署步骤里同一条 `up -d --wait` 命令。Compose 只会重建配置发生变化的服务，其余服务继续运行。
+
+其他设置，包括在 Console 里配置的那些，见[配置参考](/zh/docs/reference/configuration/)。
+
+<Aside type="note" title="改用 Kubernetes？">
+  Helm Chart 把同样的设置做成了 values，例如 `config.storagePressure`。见 [Helm values 参考](/zh/docs/reference/helm-values/)。
+</Aside>

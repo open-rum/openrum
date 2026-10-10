@@ -38,6 +38,8 @@ This path runs OpenRUM and its four data services on **one Linux host**. It uses
 
    If `172.30.77.0/24` overlaps your host network, change `OPENRUM_EDGE_SUBNET` and the contained `OPENRUM_EDGE_IP` together. Ingest trusts only that Caddy address for client-IP rate limiting.
 
+   Every other variable has a default. The [Docker configuration](/docs/self-hosting/docker-configuration/) page lists them all, including the optional Source Map storage and disk-pressure settings.
+
 1. ## Build and validate before opening the site
 
    ```sh
