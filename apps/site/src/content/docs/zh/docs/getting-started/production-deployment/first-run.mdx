@@ -4,7 +4,7 @@ description: 初始化管理员，验证真实事件，并配置可选功能和�
 appliesTo: Alpha
 ---
 
-import { Steps, Aside, LinkCard } from "@astrojs/starlight/components";
+import { Steps, CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 先完成[安装服务](/zh/docs/getting-started/production-deployment/install/)，确认服务就绪并准备好 Bootstrap Token。
 
@@ -33,12 +33,37 @@ import { Steps, Aside, LinkCard } from "@astrojs/starlight/components";
    **完成标志：** 浏览器上报经过 Ingest、Kafka、Consumer 后，能在控制台查到。若有问题，先查 Origin、DSN、环境和时间范围，再查管道服务日志。
 
 </Steps>
-## 启用可选功能并安排维护
 
-- **Source Map：** 按[对象存储](/zh/docs/self-hosting/object-storage/)配置 OSS 或 S3 兼容存储，再按 [Source Map](/zh/docs/sdk/source-maps/)上传构建产物。
-- **告警与 IM 通知：** 配置通知渠道，再建立[告警规则](/zh/docs/product/alerts/)。在控制台保存托管凭据前，需要在运行时 Secret 加入 `OPENRUM_MASTER_KEY`，并设置 `config.managedSecrets.enabled: true`。主密钥用 `openssl rand -base64 32` 生成，妥善备份。
-- **数据保留与容量：** 设置保留期，关注[存储压力](/zh/docs/self-hosting/storage-pressure/)通知和 Kafka 积压，按[容量规划](/zh/docs/self-hosting/capacity/)验证实际负载。
-- **备份与恢复：** 配置自动备份并做一次[恢复演练](/zh/docs/self-hosting/backup-restore/)。
-- **升级与回滚：** 保留配置、镜像版本与备份，按[升级指南](/zh/docs/self-hosting/upgrades/)操作。
+## 下一步
 
-Secret 变更不会自动使所有应用重启，轮换后需安排滚动更新。集群资源、扩缩容与网络细节见 [Kubernetes 与 Helm](/zh/docs/self-hosting/kubernetes/)。
+按你的实例需要来选。这些都不会阻塞第一批事件。
+
+<CardGrid>
+  <LinkCard
+    title="Source Map"
+    href="/zh/docs/self-hosting/object-storage/"
+    description="配置 OSS 或 S3 兼容的对象存储，再上传构建产物。"
+  />
+  <LinkCard
+    title="告警与通知"
+    href="/zh/docs/product/alerts/"
+    description="添加通知渠道和告警规则。"
+  />
+  <LinkCard
+    title="容量与保留"
+    href="/zh/docs/self-hosting/capacity/"
+    description="设置保留期，关注存储压力和 Kafka 积压，并验证实际负载。"
+  />
+  <LinkCard
+    title="备份与恢复"
+    href="/zh/docs/self-hosting/backup-restore/"
+    description="配置自动备份并做一次恢复演练。"
+  />
+  <LinkCard
+    title="升级与回滚"
+    href="/zh/docs/self-hosting/upgrades/"
+    description="保留配置、镜像版本与备份，再按支持的顺序操作。"
+  />
+</CardGrid>
+
+想在控制台保存通知凭据而不是放进运行时 Secret，需要在 Secret 里加入 `OPENRUM_MASTER_KEY`，并设置 `config.managedSecrets.enabled: true`。主密钥用 `openssl rand -base64 32` 生成，妥善备份。集群资源、扩缩容与网络细节见 [Kubernetes 与 Helm 参考](/zh/docs/self-hosting/kubernetes/)。

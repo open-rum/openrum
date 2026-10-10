@@ -4,7 +4,7 @@ description: Initialize the administrator, verify real events and arrange option
 appliesTo: Alpha
 ---
 
-import { Steps, Aside, LinkCard } from "@astrojs/starlight/components";
+import { Steps, CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 Complete [Install services](/docs/getting-started/production-deployment/install/), confirm service readiness and have the bootstrap token ready.
 
@@ -33,12 +33,37 @@ Complete [Install services](/docs/getting-started/production-deployment/install/
    **Success:** Telemetry has passed through Ingest, Kafka and Consumer and is queryable. If not, check origin, DSN, Environment and time range before pipeline logs.
 
 </Steps>
-## Enable optional features and arrange maintenance
 
-- **Source Maps:** Configure OSS or S3-compatible [object storage](/docs/self-hosting/object-storage/), then [upload build artifacts](/docs/sdk/source-maps/).
-- **Alerts and IM notifications:** Configure a notification channel and [alert rules](/docs/product/alerts/). To save managed credentials in the Console, add `OPENRUM_MASTER_KEY` to the runtime Secret and set `config.managedSecrets.enabled: true`. Generate the key with `openssl rand -base64 32` and back it up securely.
-- **Retention and capacity:** Set retention, watch [storage pressure](/docs/self-hosting/storage-pressure/) notifications and Kafka lag, and validate your actual load through [capacity planning](/docs/self-hosting/capacity/).
-- **Backup and restore:** Configure automated backups and complete a [restore drill](/docs/self-hosting/backup-restore/).
-- **Upgrades and rollback:** Retain configuration, image versions and backups; follow the [upgrade guide](/docs/self-hosting/upgrades/).
+## Next steps
 
-Secret changes do not automatically restart every application; schedule a rollout after rotation. See [Kubernetes and Helm](/docs/self-hosting/kubernetes/) for resource, scaling and network details.
+Pick what your Instance needs next. None of it blocks the first events.
+
+<CardGrid>
+  <LinkCard
+    title="Source Maps"
+    href="/docs/self-hosting/object-storage/"
+    description="Configure OSS or S3-compatible object storage, then upload build artifacts."
+  />
+  <LinkCard
+    title="Alerts and notifications"
+    href="/docs/product/alerts/"
+    description="Add a notification channel and alert rules."
+  />
+  <LinkCard
+    title="Capacity and retention"
+    href="/docs/self-hosting/capacity/"
+    description="Set retention, watch storage pressure and Kafka lag, and validate your real load."
+  />
+  <LinkCard
+    title="Backup and restore"
+    href="/docs/self-hosting/backup-restore/"
+    description="Automate backups and complete a restore drill."
+  />
+  <LinkCard
+    title="Upgrades and rollback"
+    href="/docs/self-hosting/upgrades/"
+    description="Keep configuration, image versions and backups, then follow the supported sequence."
+  />
+</CardGrid>
+
+To save notification credentials in the Console instead of the runtime Secret, add `OPENRUM_MASTER_KEY` to the Secret and set `config.managedSecrets.enabled: true`. Generate the key with `openssl rand -base64 32` and back it up securely. For resources, scaling and network details, see the [Kubernetes and Helm reference](/docs/self-hosting/kubernetes/).
