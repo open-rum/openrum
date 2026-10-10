@@ -102,7 +102,10 @@ test("docs header uses compact public labels", async () => {
   assert.doesNotMatch(sidebar, /docs-sidebar-topic/);
   assert.match(config, /label: "Get started"/);
   assert.match(config, /translations: \{ zh: "快速开始", "zh-CN": "快速开始" \}/);
-  assert.match(config, /label: "Deploy"/);
+  // Self-hosting holds its overview and one sub-group per deployment path.
+  assert.match(config, /label: "Self-hosting"/);
+  assert.match(config, /label: "Kubernetes \/ Helm \(recommended\)"/);
+  assert.match(config, /label: "Docker \(single host\)"/);
 });
 
 test("robots and Open Graph asset are static and privacy-safe", async () => {
