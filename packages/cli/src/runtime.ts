@@ -1,4 +1,4 @@
-import { uploadSourceMaps } from "@openrum/source-map";
+import { uploadSourceMaps } from "@openrum/sourcemap";
 import type { Context } from "./context.ts";
 import { forwardToGo } from "./devstack.ts";
 

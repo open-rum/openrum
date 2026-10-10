@@ -1,12 +1,12 @@
 ---
 title: React（Vite）
-description: 在 Vite 构建的 React 应用中，用 @openrum/source-map 在构建时上传 Source Map，并让 SDK 上报同一个 Release。
+description: 在 Vite 构建的 React 应用中，用 @openrum/sourcemap 在构建时上传 Source Map，并让 SDK 上报同一个 Release。
 appliesTo: Alpha
 ---
 
 import { Aside, Steps } from "@astrojs/starlight/components";
 
-React 应用用 Vite 构建时，`@openrum/source-map` 会在 `vite build` 结束时自动上传 Source Map，
+React 应用用 Vite 构建时，`@openrum/sourcemap` 会在 `vite build` 结束时自动上传 Source Map，
 不需要额外的构建步骤。开始之前，先按[概览](/zh/docs/sdk/source-maps/#创建上传令牌)创建上传令牌，
 并把它保存为 CI Secret `OPENRUM_UPLOAD_TOKEN`。
 
@@ -17,15 +17,15 @@ React 应用用 Vite 构建时，`@openrum/source-map` 会在 `vite build` 结�
    Alpha 阶段插件尚未发布到 npm。在 OpenRUM 仓库中构建，再把该目录安装到你的应用：
 
    ```sh
-   pnpm --filter @openrum/source-map build
-   pnpm add -D /path/to/openrum/packages/source-map
+   pnpm --filter @openrum/sourcemap build
+   pnpm add -D /path/to/openrum/packages/sourcemap
    ```
 
 1. ## 在 Vite 配置中启用
 
    ```ts title="vite.config.ts"
    import { defineConfig } from "vite";
-   import { openRUMSourceMaps } from "@openrum/source-map/vite";
+   import { openRUMSourceMaps } from "@openrum/sourcemap/vite";
 
    export default defineConfig({
      build: { sourcemap: "hidden" },

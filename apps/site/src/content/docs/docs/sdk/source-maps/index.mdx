@@ -18,7 +18,7 @@ Release, and verify one mapped error. How you upload depends on the build tool:
 <CardGrid>
   <LinkCard
     title="React (Vite)"
-    description="Upload automatically during vite build with the @openrum/source-map plugin."
+    description="Upload automatically during vite build with the @openrum/sourcemap plugin."
     href="/docs/sdk/source-maps/react/"
   />
   <LinkCard
@@ -57,7 +57,7 @@ when each token was last used, so an unused or leaked token is easy to revoke.
 
 Two packages upload Source Maps and behave the same:
 
-- **Plugin** `openRUMSourceMaps` from `@openrum/source-map/vite`: Vite only. It runs automatically at
+- **Plugin** `openRUMSourceMaps` from `@openrum/sourcemap/vite`: Vite only. It runs automatically at
   the end of `vite build`.
 - **Command line** `openrum sourcemaps upload` from `@openrum/cli`: run it with
   `pnpm exec openrum sourcemaps upload`; `--help` lists every flag. Use it for builds that do not go
@@ -68,13 +68,13 @@ The same `openrum` command also drives the local development stack (`openrum up`
 so on), but those commands only work inside a checkout of the OpenRUM repository.
 
 <Aside type="note" title="Install from the repository in the Alpha">
-  `@openrum/source-map` and `@openrum/cli` are not published to npm yet. Build the one you need from an
+  `@openrum/sourcemap` and `@openrum/cli` are not published to npm yet. Build the one you need from an
   OpenRUM checkout and install the directory into your application:
 
 ```sh
 # Vite plugin
-pnpm --filter @openrum/source-map build
-pnpm add -D /path/to/openrum/packages/source-map
+pnpm --filter @openrum/sourcemap build
+pnpm add -D /path/to/openrum/packages/sourcemap
 
 # Command line
 pnpm --filter @openrum/cli build

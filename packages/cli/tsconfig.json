@@ -12,7 +12,7 @@
     "skipLibCheck": true,
     "types": ["node"],
     "paths": {
-      "@openrum/source-map": ["../source-map/src/index.ts"]
+      "@openrum/sourcemap": ["../sourcemap/src/index.ts"]
     }
   },
   "include": ["src", "test"]

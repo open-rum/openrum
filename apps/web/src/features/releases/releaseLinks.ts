@@ -33,7 +33,7 @@ export function expectedArtifactName(scriptUrl: string) {
 
 export function quickStartSnippet(origin: string, projectId: string) {
   return `// vite.config.ts
-import { openRUMSourceMaps } from "@openrum/source-map/vite";
+import { openRUMSourceMaps } from "@openrum/sourcemap/vite";
 
 export default defineConfig({
   build: { sourcemap: "hidden" },
