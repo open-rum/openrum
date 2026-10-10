@@ -291,7 +291,11 @@ test("start sidebar groups collapse and preserve child pages across languages", 
   await expect(sidebar.locator('a[aria-current="page"]')).toHaveText("接入与验证");
   await sidebar
     .locator("summary")
-    .filter({ hasText: /^部署$/ })
+    .filter({ hasText: /^自部署$/ })
+    .click();
+  await sidebar
+    .locator("summary")
+    .filter({ hasText: /^Kubernetes \/ Helm（推荐）$/ })
     .click();
   await sidebar.getByRole("link", { name: "安装服务", exact: true }).click();
   await expect(page).toHaveURL(/\/zh\/docs\/getting-started\/production-deployment\/install\/$/);

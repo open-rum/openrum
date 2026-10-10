@@ -45,16 +45,39 @@ export default defineConfig({
           items: [
             { slug: "docs/introduction" },
             {
-              label: "Deploy",
-              translations: { zh: "部署", "zh-CN": "部署" },
+              label: "Self-hosting",
+              translations: { zh: "自部署", "zh-CN": "自部署" },
               collapsed: true,
               items: [
-                { slug: "docs/self-hosting/overview" },
-                { slug: "docs/getting-started/production-deployment" },
-                { slug: "docs/getting-started/production-deployment/install" },
-                { slug: "docs/getting-started/production-deployment/first-run" },
-                { slug: "docs/self-hosting/kubernetes" },
-                { slug: "docs/self-hosting/docker-production" },
+                {
+                  slug: "docs/self-hosting/overview",
+                  label: "Overview",
+                  translations: { zh: "概览", "zh-CN": "概览" },
+                },
+                {
+                  label: "Kubernetes / Helm (recommended)",
+                  translations: {
+                    zh: "Kubernetes / Helm（推荐）",
+                    "zh-CN": "Kubernetes / Helm（推荐）",
+                  },
+                  collapsed: true,
+                  items: [
+                    { slug: "docs/getting-started/production-deployment" },
+                    { slug: "docs/getting-started/production-deployment/install" },
+                    { slug: "docs/getting-started/production-deployment/first-run" },
+                    { slug: "docs/self-hosting/kubernetes" },
+                  ],
+                },
+                {
+                  label: "Docker (single host)",
+                  translations: { zh: "Docker（单机）", "zh-CN": "Docker（单机）" },
+                  collapsed: true,
+                  items: [
+                    { slug: "docs/self-hosting/docker-production" },
+                    { slug: "docs/self-hosting/docker-configuration" },
+                    { slug: "docs/self-hosting/docker-operations" },
+                  ],
+                },
               ],
             },
             {
@@ -65,7 +88,6 @@ export default defineConfig({
                 { slug: "docs/self-hosting/upgrades" },
                 { slug: "docs/self-hosting/backup-restore" },
                 { slug: "docs/self-hosting/troubleshooting" },
-                { slug: "docs/self-hosting/docker-operations" },
                 { slug: "docs/self-hosting/capacity" },
                 { slug: "docs/self-hosting/dependencies" },
                 { slug: "docs/self-hosting/data-lifecycle" },
