@@ -15,13 +15,14 @@ token](/docs/sdk/source-maps/#create-an-upload-token) and store it as the CI sec
 
 1. ## Install the plugin
 
-   The plugin is not published to npm in the Alpha. Build it from an OpenRUM checkout and install the
-   directory into your application:
+   Add the plugin to your application as a dev dependency:
 
    ```sh
-   pnpm --filter @openrum/sourcemap build
-   pnpm add -D /path/to/openrum/packages/sourcemap
+   pnpm add -D @openrum/sourcemap
    ```
+
+   `npm install --save-dev @openrum/sourcemap` and `yarn add -D @openrum/sourcemap` work the same
+   way.
 
 1. ## Enable it in the Vite config
 

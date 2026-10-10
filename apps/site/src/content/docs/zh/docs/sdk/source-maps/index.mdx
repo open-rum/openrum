@@ -60,20 +60,17 @@ Source Map Artifact 可以把 `index-abc.js:1:48213` 这样的压缩栈帧还原
 同一个 `openrum` 命令也用来管理本地开发栈（`openrum up`、`openrum seed` 等），但这些命令只能在 OpenRUM
 仓库的检出目录中使用。
 
-<Aside type="note" title="Alpha 阶段需要从仓库安装">
-  `@openrum/sourcemap` 和 `@openrum/cli` 尚未发布到 npm。在 OpenRUM 仓库中构建你需要的那个，再把该目录安装到你的应用：
+把你需要的那个装成应用的开发依赖：
 
 ```sh
 # Vite 插件
-pnpm --filter @openrum/sourcemap build
-pnpm add -D /path/to/openrum/packages/sourcemap
+pnpm add -D @openrum/sourcemap
 
 # 命令行
-pnpm --filter @openrum/cli build
-pnpm add -D /path/to/openrum/packages/cli
+pnpm add -D @openrum/cli
 ```
 
-</Aside>
+用 `npm install --save-dev` 或 `yarn add -D` 也一样。
 
 每次构建，插件和命令行会：
 

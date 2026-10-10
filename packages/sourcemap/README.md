@@ -2,7 +2,11 @@
 
 Uploads private Source Map Artifacts from a build to an OpenRUM Release, so errors from minified bundles map back to original source. It is a library (`uploadSourceMaps`) and a Vite plugin (`@openrum/sourcemap/vite`). For builds that do not run through Vite, such as Next.js, use the command line in [`@openrum/cli`](../cli), which runs this same code.
 
-The package is not published to npm yet. Build it from an OpenRUM checkout with `pnpm --filter @openrum/sourcemap build` and install that directory into your application.
+Install it as a dev dependency:
+
+```sh
+pnpm add -D @openrum/sourcemap
+```
 
 ## Authentication
 

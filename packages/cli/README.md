@@ -2,7 +2,11 @@
 
 The `openrum` command.
 
-The package is not published to npm yet. Build it from an OpenRUM checkout with `pnpm --filter @openrum/cli build` and install that directory into your application.
+Install it as a dev dependency:
+
+```sh
+pnpm add -D @openrum/cli
+```
 
 ## Upload Source Maps
 
