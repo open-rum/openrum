@@ -4,49 +4,59 @@ description: Choose recommended Kubernetes/Helm or single-host Docker for produc
 appliesTo: Alpha
 ---
 
-import { Aside, Badge, CardGrid, LinkCard } from "@astrojs/starlight/components";
+import { Aside, CardGrid, LinkCard } from "@astrojs/starlight/components";
 
-OpenRUM runs on infrastructure you control. Choose a deployment path first; the setup and operating responsibilities differ. Both production paths are available in Alpha, without an uptime guarantee.
+OpenRUM runs on infrastructure you control. Both production paths are available in Alpha, without an uptime guarantee. Choose one first; the setup and the operating responsibilities differ.
 
 ## Choose a deployment path
 
-<div class="docs-entry-grid">
-  <CardGrid>
-    <div class="docs-deployment-choice docs-deployment-choice--recommended">
-      <Badge text="Recommended" class="docs-deployment-badge" />
-      <LinkCard
-        title="Kubernetes / Helm"
-        href="/docs/getting-started/production-deployment/"
-        description="Deploy application services to a cluster. Prepare external PostgreSQL, ClickHouse, Kafka, HTTPS, secrets and backups; Redis can be bundled."
-      />
-    </div>
-    <div class="docs-deployment-choice">
-      <LinkCard
-        title="Docker Compose · Single-host production"
-        href="/docs/self-hosting/docker-production/"
-        description="Run the complete stack on one Linux host with private credentials, automatic HTTPS, backups and an explicit single-host failure boundary."
-      />
-    </div>
-  </CardGrid>
-</div>
+<CardGrid>
+  <LinkCard
+    title="Kubernetes / Helm · Recommended"
+    href="/docs/getting-started/production-deployment/"
+    description="Run the application services on a cluster you operate, with PostgreSQL, ClickHouse and Kafka that you provide."
+  />
+  <LinkCard
+    title="Docker · Single host"
+    href="/docs/self-hosting/docker-production/"
+    description="Run the complete stack on one Linux server, with automatic HTTPS, backups and a single failure boundary."
+  />
+</CardGrid>
 
-<Aside type="caution" title="Current support boundary">
-  The Compose stack used for local development includes Demo data and
-  example credentials; do not expose it to real traffic. The separate production Docker stack
-  removes those defaults but remains a single failure domain. The Helm path also needs external data
-  services, TLS and an image registry; it is not a one-command cluster installation.
+|                    | Kubernetes / Helm                                                                    | Docker (single host)                                                    |
+| ------------------ | ------------------------------------------------------------------------------------ | ----------------------------------------------------------------------- |
+| Best for           | A shared Instance for a team that already runs a cluster and managed data services   | One Linux server, a small team, or real traffic on a small budget       |
+| You provide        | Cluster, Ingress and HTTPS, PostgreSQL, ClickHouse (clustered), Kafka, optionally Redis | A Linux host with Docker, and a domain that points at it                |
+| Data services      | Yours, outside the chart                                                             | Bundled in the stack, on the same host                                  |
+| Failure boundary   | Your cluster and your data services                                                  | The one host and its disk: a lost host needs a restore                  |
+| Image and chart    | Published: pull the chart and the image, build nothing                               | You build the image from a checkout of a release tag                    |
+| Start with         | [Deployment preparation](/docs/getting-started/production-deployment/)               | [Single-host Docker production](/docs/self-hosting/docker-production/)  |
+
+## What is released
+
+The current release is `0.1.1`. The application image `ghcr.io/open-rum/openrum:0.1.1` (for `linux/amd64` and `linux/arm64`) and the Helm chart `oci://ghcr.io/open-rum/charts/openrum` at version `0.1.1` are public. The Docker path builds the same release from a checkout of its tag. Release notes are on [GitHub Releases](https://github.com/open-rum/openrum/releases).
+
+<Aside type="caution" title="Not for real traffic">
+  The Compose stack used for local development includes Demo data and example credentials. Never
+  expose it to real traffic; use one of the two production paths above.
 </Aside>
 
 If you want to change OpenRUM's source code or try it from a checkout, follow [Local development](/docs/getting-started/local-development/) instead.
 
 ## What you operate
 
-Self-hosting means your team owns the domain and HTTPS, credentials, capacity, service health, upgrades, and recovery. Start with the [architecture](/docs/self-hosting/architecture/) and [external dependencies](/docs/self-hosting/dependencies/), then plan for:
+Self-hosting means your team owns the domain and HTTPS, credentials, capacity, service health, upgrades, and recovery. Start with the [architecture](/docs/self-hosting/architecture/) and [external dependencies](/docs/self-hosting/dependencies/).
 
-- [Capacity and retention](/docs/self-hosting/capacity/) before accepting real traffic.
-- [Backups and a tested restore](/docs/self-hosting/backup-restore/) before the first upgrade.
-- [Console authentication](/docs/self-hosting/authentication/) when enabling Google, GitHub, OIDC or LDAP sign-in.
-- [Upgrades](/docs/self-hosting/upgrades/), [storage pressure](/docs/self-hosting/storage-pressure/) and [troubleshooting](/docs/self-hosting/troubleshooting/) during operation.
-- The [threat model](/docs/self-hosting/security/threat-model/) before exposing Ingest to the internet.
+**Before accepting real traffic:**
+
+- Size the Instance with [capacity and retention](/docs/self-hosting/capacity/).
+- Set up [backups and complete a tested restore](/docs/self-hosting/backup-restore/) before the first upgrade.
+- Read the [threat model](/docs/self-hosting/security/threat-model/) before exposing Ingest to the internet.
+- Configure [Console authentication](/docs/self-hosting/authentication/) if you want Google, GitHub, OIDC or LDAP sign-in.
+
+**While it runs:**
+
+- Plan [upgrades](/docs/self-hosting/upgrades/) and read how to handle [storage pressure](/docs/self-hosting/storage-pressure/).
+- Keep [troubleshooting](/docs/self-hosting/troubleshooting/) at hand.
 
 Object storage is optional. Core monitoring runs without a Bucket; Source Map Artifacts require Alibaba OSS or an S3-compatible provider.

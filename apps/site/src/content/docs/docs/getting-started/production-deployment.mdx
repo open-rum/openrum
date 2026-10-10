@@ -1,40 +1,50 @@
 ---
 title: Deployment preparation
-description: Understand the architecture and prepare the cluster, databases and Kafka before installation.
+description: Check the requirements, then prepare the cluster, databases and Kafka before installing.
 appliesTo: Alpha
 ---
 
 import { Steps, Aside, LinkCard } from "@astrojs/starlight/components";
 
-This guide deploys a shared OpenRUM Instance with Kubernetes and Helm, the recommended production path. You need access to the cluster, domain and data services. If you have one Linux server instead, follow the separate [single-host Docker production guide](/docs/self-hosting/docker-production/). For an initial local experience, use [Local development](/docs/getting-started/local-development/).
+This guide deploys a shared OpenRUM Instance with Kubernetes and Helm, the recommended production path. You need access to the cluster, domain and data services, but not the OpenRUM source code: the Helm chart and the application image are published. If you have one Linux server instead, follow the separate [single-host Docker production guide](/docs/self-hosting/docker-production/). For an initial local experience, use [Local development](/docs/getting-started/local-development/).
 
 <Aside type="caution" title="Before accepting production traffic">
   OpenRUM is currently Alpha. Complete this procedure in staging before accepting real traffic.
   Replace every example domain, password and registry before running commands.
 </Aside>
 
+## How it fits together
+
+```text
+Monitored browser → HTTPS /ingest → Ingest → Kafka → Consumer → ClickHouse
+Operator browser  → HTTPS /       → Console
+Console           → HTTPS /api    → API → PostgreSQL / ClickHouse / Redis
+Worker            → Background jobs, alerts, optional Source Map object storage
+```
+
+The Helm chart deploys five application services, a migration job and, by default, a single Redis. Prepare the databases, Kafka, TLS certificates and the runtime Secret separately; the chart does not create them. Decide now who maintains the cluster and each data service, and which public domain the Instance will use.
+
+## Requirements
+
+Check every row before you start. The ClickHouse row is the one most often missed.
+
+| What | What you need | Notes |
+| --- | --- | --- |
+| Kubernetes | 1.28 or later | Permission to create Namespaces, Deployments, Services and Jobs |
+| Helm and kubectl | Installed locally and connected to the cluster | Used for the install and the checks |
+| Ingress and HTTPS | An Ingress controller, a domain such as `rum.example.com` pointing at it, and a certificate that covers it | Production requires HTTPS |
+| PostgreSQL | A database and an account that can run schema migrations | Control-plane data |
+| **ClickHouse** | **A cluster definition.** Migrations use `ON CLUSTER openrum_cluster` and replicated tables, so you need Keeper or ZooKeeper and shard and replica macros | A database alone is not enough; see step 2 |
+| Kafka | At least three Brokers for the example topics below, with topic auto-creation not relied on | You create the topics yourself in step 3 |
+| Redis | Optional | The chart runs a single Redis by default; use your own for high availability |
+| Image access | Nodes that can pull from `ghcr.io` | The image is public. You only need your own registry to mirror it or run modified source |
+| Capacity | Persistent storage, backups and capacity alerts sized for the expected traffic | See [capacity planning](/docs/self-hosting/capacity/) |
+
+Prefer managed or highly available services your team already operates, and verify ports, authentication and protocol compatibility with the current OpenRUM configuration before choosing a provider. See the [configuration reference](/docs/reference/configuration/) for connection options.
+
 <Steps>
 
-1. ## Understand the deployment
-
-   ```text
-   Monitored browser → HTTPS /ingest → Ingest → Kafka → Consumer → ClickHouse
-   Operator browser  → HTTPS /       → Console
-   Console           → HTTPS /api    → API → PostgreSQL / ClickHouse / Redis
-   Worker            → Background jobs, alerts, optional Source Map object storage
-   ```
-
-   The Helm Chart deploys five application services, a migration job and, by default, a single Redis. Prepare the databases, Kafka, TLS certificates and the runtime Secret separately; the Chart does not create them.
-
-   **Success:** You know who maintains the cluster and each data service, and which public domain the Instance will use.
-
-1. ## Prepare infrastructure and access
-   - **Kubernetes:** 1.28 or later; permission to create Namespaces, Deployments, Services and Jobs
-   - **Helm and kubectl:** Installed locally and connected to the target cluster
-   - **Image registry:** Build machine can push; cluster can pull
-   - **Domain and HTTPS:** For example, `rum.example.com` points to the Ingress and has a matching certificate
-   - **Data services:** PostgreSQL, ClickHouse and Kafka reachable from OpenRUM Pods, plus Redis if you do not use the bundled one
-   - **Capacity and persistence:** Persistent storage, backups and capacity alerts sized for expected traffic
+1. ## Check access to the cluster
 
    ```sh
    kubectl version
@@ -43,21 +53,25 @@ This guide deploys a shared OpenRUM Instance with Kubernetes and Helm, the recom
    kubectl create namespace openrum
    ```
 
-   Skip the last command if the Namespace exists. Prefer managed or highly available services your team already operates. Verify ports, authentication and protocol compatibility with current OpenRUM configuration before choosing a provider.
+   Skip the last command if the Namespace exists.
 
-   **Success:** Nodes are visible, the Namespace exists and all four dependencies are reachable from the cluster. See the [configuration reference](/docs/reference/configuration/) for connection options.
+   **Success:** Nodes are visible, the Namespace exists, and the domain's DNS and certificate are ready for the Ingress.
 
-1. ## Prepare databases and Kafka topics
+1. ## Prepare databases
 
    Ask the database owner to create separate OpenRUM databases and accounts. PostgreSQL and ClickHouse accounts must be able to execute initial and subsequent schema migrations.
 
-   <Aside type="caution" title="ClickHouse">
+   <Aside type="caution" title="ClickHouse needs a cluster definition">
      **Check ClickHouse compatibility:** Current migrations use `ON CLUSTER openrum_cluster` and
      replicated tables. Provide that cluster definition, Keeper/ZooKeeper and shard/replica macros.
      Creating a database alone is insufficient. The repository's
      `deploy/compose/clickhouse/config.d/openrum-cluster.xml` illustrates the configuration shape;
      the database owner must configure the production topology.
    </Aside>
+
+   **Success:** Both databases accept connections from the cluster, and the ClickHouse cluster definition works.
+
+1. ## Create the Kafka topics
 
    Automatic Kafka topic creation is disabled. Create both `rum-events-v1` and `rum-events-v1.dlq`. This example requires at least three Brokers; size partition counts for your workload:
 
@@ -73,12 +87,12 @@ This guide deploys a shared OpenRUM Instance with Kubernetes and Helm, the recom
 
    Run these where Kafka administration tools and Broker access are available. Replace the address and supply any required administrative authentication configuration. This example retains seven days; the later `kafkaRetentionDuration` must match actual retention. Check existing topics explicitly: `--if-not-exists` does not update their configuration.
 
-   **Success:** Both databases accept connections, the ClickHouse cluster definition works, and both Kafka topics have healthy replicas.
+   **Success:** Both Kafka topics exist and have healthy replicas, and all data services are reachable from the cluster.
 
 </Steps>
 
 <LinkCard
   title="Next: Install services"
   href="/docs/getting-started/production-deployment/install/"
-  description="Build the image, configure credentials and HTTPS, then install with Helm."
+  description="Create the credentials and HTTPS, then install the published Helm chart."
 />
