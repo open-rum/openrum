@@ -84,7 +84,7 @@ test("requires the package to name the repository npm signs provenance for", () 
 
 const packages = {
   browser: ["browser", "packages/browser-sdk", "@openrum/browser"],
-  "source-map": ["source-map", "packages/source-map", "@openrum/source-map"],
+  sourcemap: ["sourcemap", "packages/sourcemap", "@openrum/sourcemap"],
   cli: ["cli", "packages/cli", "@openrum/cli"],
 };
 
@@ -109,7 +109,7 @@ test("a tag cannot publish a package other than the one its prefix names", () =>
 });
 
 test("the new packages publish prereleases under next", () => {
-  for (const [prefix, , name] of [packages["source-map"], packages.cli]) {
+  for (const [prefix, , name] of [packages["sourcemap"], packages.cli]) {
     const result = check(`${prefix}-v1.2.3-alpha.1`, {
       PACKAGE_MANIFEST: manifest({ name, version: "1.2.3-alpha.1" }),
     });

@@ -10,7 +10,7 @@ COPY packages/browser-sdk/package.json packages/browser-sdk/package.json
 COPY packages/design-tokens/package.json packages/design-tokens/package.json
 COPY packages/protocol/package.json packages/protocol/package.json
 COPY packages/ui/package.json packages/ui/package.json
-COPY packages/source-map/package.json packages/source-map/package.json
+COPY packages/sourcemap/package.json packages/sourcemap/package.json
 COPY packages/cli/package.json packages/cli/package.json
 COPY examples/react-vite/package.json examples/react-vite/package.json
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile --no-runtime

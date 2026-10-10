@@ -1,6 +1,6 @@
 // Validates a package release tag against the package manifest and reports the npm dist-tag.
 // Each npm package has its own version and tag prefix, separate from the product's vX.Y.Z tags
-// (see docs/operations/releasing.md): browser-v0.1.1, source-map-v0.1.0, cli-v0.1.0, each
+// (see docs/operations/releasing.md): browser-v0.1.1, sourcemap-v0.1.0, cli-v0.1.0, each
 // optionally with a prerelease such as -alpha.1.
 import { appendFile, readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
@@ -9,18 +9,18 @@ import { fileURLToPath } from "node:url";
 const root = join(dirname(fileURLToPath(import.meta.url)), "../..");
 const packages = {
   browser: { directory: "packages/browser-sdk", name: "@openrum/browser" },
-  "source-map": { directory: "packages/source-map", name: "@openrum/source-map" },
+  sourcemap: { directory: "packages/sourcemap", name: "@openrum/sourcemap" },
   cli: { directory: "packages/cli", name: "@openrum/cli" },
 };
 
 const tag = process.env.RELEASE_TAG ?? "";
 const match =
-  /^(browser|source-map|cli)-v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$/.exec(
+  /^(browser|sourcemap|cli)-v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$/.exec(
     tag,
   );
 if (!match) {
   throw new Error(
-    `RELEASE_TAG must look like browser-v0.1.1, source-map-v0.1.0 or cli-v0.1.0, optionally with a prerelease such as -alpha.1; received ${JSON.stringify(tag)}`,
+    `RELEASE_TAG must look like browser-v0.1.1, sourcemap-v0.1.0 or cli-v0.1.0, optionally with a prerelease such as -alpha.1; received ${JSON.stringify(tag)}`,
   );
 }
 const target = packages[match[1]];

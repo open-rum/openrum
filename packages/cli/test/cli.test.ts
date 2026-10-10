@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import type { OpenRUMSourceMapOptions } from "@openrum/source-map";
+import type { OpenRUMSourceMapOptions } from "@openrum/sourcemap";
 import type { Context } from "../src/context.ts";
 import { findRepositoryRoot } from "../src/devstack.ts";
 import { main } from "../src/main.ts";

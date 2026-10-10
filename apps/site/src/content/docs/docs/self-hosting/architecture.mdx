@@ -69,7 +69,7 @@ See [Local development](/docs/getting-started/local-development/), [Docker produ
 | Logging and metrics | `zerolog`, Prometheus client | Structured JSON logs; `/metrics` on every service |
 | Console | React 19, Vite, TanStack Router and Query, Tailwind CSS 4, Recharts | `apps/web` |
 | Browser SDK | TypeScript | `packages/browser-sdk`, with a shared Event schema in `packages/protocol` |
-| Build plugin and CLI | TypeScript | `packages/source-map` uploads Source Maps; `packages/cli` is the `openrum` command |
+| Build plugin and CLI | TypeScript | `packages/sourcemap` uploads Source Maps; `packages/cli` is the `openrum` command |
 | Documentation site | Astro and Starlight | `apps/site` |
 
 ## Communication between components
@@ -123,7 +123,7 @@ A `202` therefore means *accepted*, not *queryable*. An Instance can absorb a tr
 | `migrations/` | PostgreSQL and ClickHouse schema migrations, embedded into the `migrate` command |
 | `apps/web` | The Console (React) |
 | `apps/site` | This documentation site and the landing page |
-| `packages/browser-sdk`, `packages/source-map`, `packages/cli`, `packages/protocol` | The Browser SDK, the Source Map upload library and Vite plugin, the `openrum` command and the shared Event schema |
+| `packages/browser-sdk`, `packages/sourcemap`, `packages/cli`, `packages/protocol` | The Browser SDK, the Source Map upload library and Vite plugin, the `openrum` command and the shared Event schema |
 | `packages/ui`, `packages/design-tokens` | Shared components and design tokens for the Console and the site |
 | `cmd/openrum` | The `openrum` command for starting and checking a local development stack. See [CLI](/docs/getting-started/local-development/cli/) |
 | `deploy/` | Compose files, the Helm chart, Prometheus rules, Grafana dashboards and the container image's nginx configuration |

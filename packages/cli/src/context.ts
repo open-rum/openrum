@@ -1,4 +1,4 @@
-import type { OpenRUMSourceMapOptions, SourceMapUploadResult } from "@openrum/source-map";
+import type { OpenRUMSourceMapOptions, SourceMapUploadResult } from "@openrum/sourcemap";
 
 /** Everything the commands touch outside their own logic, so tests can replace it. */
 export type Context = {
