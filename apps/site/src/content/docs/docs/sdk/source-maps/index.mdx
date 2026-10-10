@@ -67,21 +67,17 @@ Two packages upload Source Maps and behave the same:
 The same `openrum` command also drives the local development stack (`openrum up`, `openrum seed` and
 so on), but those commands only work inside a checkout of the OpenRUM repository.
 
-<Aside type="note" title="Install from the repository in the Alpha">
-  `@openrum/sourcemap` and `@openrum/cli` are not published to npm yet. Build the one you need from an
-  OpenRUM checkout and install the directory into your application:
+Install the one you need as a dev dependency of your application:
 
 ```sh
 # Vite plugin
-pnpm --filter @openrum/sourcemap build
-pnpm add -D /path/to/openrum/packages/sourcemap
+pnpm add -D @openrum/sourcemap
 
 # Command line
-pnpm --filter @openrum/cli build
-pnpm add -D /path/to/openrum/packages/cli
+pnpm add -D @openrum/cli
 ```
 
-</Aside>
+`npm install --save-dev` and `yarn add -D` work the same way.
 
 On each build the plugin and the command line:
 
