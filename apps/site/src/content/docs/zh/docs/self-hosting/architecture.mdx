@@ -68,7 +68,7 @@ OpenRUM 采用"一个镜像、多个进程"的布局：五个应用服务构建�
 | 日志与指标 | `zerolog`、Prometheus 客户端 | 结构化 JSON 日志；每个服务都有 `/metrics` |
 | Console | React 19、Vite、TanStack Router 与 Query、Tailwind CSS 4、Recharts | `apps/web` |
 | Browser SDK | TypeScript | `packages/browser-sdk`，共享的 Event schema 在 `packages/protocol` |
-| 构建插件 | TypeScript | `packages/vite-plugin` 负责上传 Source Map |
+| 构建插件与命令行 | TypeScript | `packages/source-map` 负责上传 Source Map；`packages/cli` 是 `openrum` 命令 |
 | 文档站点 | Astro 与 Starlight | `apps/site` |
 
 ## 组件之间的通信
@@ -121,7 +121,7 @@ OpenRUM 采用"一个镜像、多个进程"的布局：五个应用服务构建�
 | `migrations/` | PostgreSQL 与 ClickHouse 的表结构迁移，会被嵌入 `migrate` 命令 |
 | `apps/web` | Console（React） |
 | `apps/site` | 本文档站点和落地页 |
-| `packages/browser-sdk`、`packages/vite-plugin`、`packages/protocol` | Browser SDK、Source Map 上传插件和共享的 Event schema |
+| `packages/browser-sdk`、`packages/source-map`、`packages/cli`、`packages/protocol` | Browser SDK、Source Map 上传库与 Vite 插件、`openrum` 命令和共享的 Event schema |
 | `packages/ui`、`packages/design-tokens` | Console 和站点共用的组件与设计令牌 |
 | `cmd/openrum` | 用于启动和检查本地开发环境的 `openrum` 命令，见 [CLI](/zh/docs/getting-started/local-development/cli/) |
 | `deploy/` | Compose 文件、Helm chart、Prometheus 规则、Grafana 仪表盘，以及镜像里的 nginx 配置 |

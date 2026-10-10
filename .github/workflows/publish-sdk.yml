@@ -39,7 +39,7 @@ jobs:
         id: version
         env:
           RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.version || github.ref_name }}
-        run: node scripts/release/check-sdk-version.mjs
+        run: node scripts/release/check-package-version.mjs
       - uses: pnpm/setup@v2
         with:
           runtime: node@24
@@ -52,7 +52,7 @@ jobs:
           pnpm --filter @openrum/browser test
           pnpm --filter @openrum/browser build
       - name: Prove the tarball installs and type-checks from a clean project
-        run: node scripts/release/verify-sdk-package.mjs
+        run: node scripts/release/verify-package.mjs packages/browser-sdk
 
   publish:
     # A manual run only validates; publishing needs a pushed tag in the official repository.

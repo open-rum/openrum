@@ -8,6 +8,8 @@ import { Aside } from "@astrojs/starlight/components";
 
 `openrum` 是源码仓库里的开发栈工具。它同时启动容器和宿主机进程，等每个服务真正就绪，而不是只等进程启动，并把两部分的状态汇总在一起。它用于开发 OpenRUM，或者在检出的源码里评估产品。它不是生产工具，也不随 SDK 发布。
 
+npm 包 `@openrum/cli` 也会安装一个同名命令 `openrum`，用来在你自己的构建中上传 Source Map（`openrum sourcemaps upload`）。在本仓库的检出目录里，它也接受下面这些命令，并转交给这个工具，所以 `openrum dev` 和 `pnpm openrum dev` 效果相同。在检出目录之外，只有 Source Map 相关命令可用。
+
 在仓库根目录通过 pnpm 运行：
 
 ```sh

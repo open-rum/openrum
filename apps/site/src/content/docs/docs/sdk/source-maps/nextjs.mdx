@@ -1,13 +1,13 @@
 ---
 title: Next.js
-description: Have Next.js emit browser Source Maps, upload them with openrum-sourcemaps after next build, and make the SDK report the same Release.
+description: Have Next.js emit browser Source Maps, upload them with openrum sourcemaps upload after next build, and make the SDK report the same Release.
 appliesTo: Alpha
 ---
 
 import { Aside, Steps } from "@astrojs/starlight/components";
 
 Next.js has its own build pipeline with no place for a Vite plugin. Have Next emit browser Source
-Maps, then run `openrum-sourcemaps` after `next build`. Before you start, [create an upload
+Maps, then run `openrum sourcemaps upload` after `next build`. Before you start, [create an upload
 token](/docs/sdk/source-maps/#create-an-upload-token) and store it as the CI secret
 `OPENRUM_UPLOAD_TOKEN`.
 
@@ -15,16 +15,17 @@ token](/docs/sdk/source-maps/#create-an-upload-token) and store it as the CI sec
 
 1. ## Install the command line
 
-   `openrum-sourcemaps` ships in the `@openrum/vite-plugin` package. It is not published to npm in the
-   Alpha; build it from an OpenRUM checkout and install the directory into your application:
+   `openrum` ships in the `@openrum/cli` package. It is not published to npm in the Alpha; build it
+   from an OpenRUM checkout and install the directory into your application:
 
    ```sh
-   pnpm --filter @openrum/vite-plugin build
-   pnpm add -D /path/to/openrum/packages/vite-plugin
+   pnpm --filter @openrum/cli build
+   pnpm add -D /path/to/openrum/packages/cli
    ```
 
-   Run `pnpm exec openrum-sourcemaps --help` to confirm the command is available. The package pulls
-   in Vite as a dependency, but a Next.js project only uses its command line.
+   Run `pnpm exec openrum sourcemaps upload --help` to confirm the command is available. The
+   package has no Vite dependency. The earlier `openrum-sourcemaps` command is still installed and
+   does the same thing.
 
 1. ## Emit Source Maps and upload after the build
 
@@ -41,7 +42,7 @@ token](/docs/sdk/source-maps/#create-an-upload-token) and store it as the CI sec
    ```json title="package.json"
    {
      "scripts": {
-       "build": "next build && openrum-sourcemaps --out-dir .next/static --url-prefix _next/static/"
+       "build": "next build && openrum sourcemaps upload --out-dir .next/static --url-prefix _next/static/"
      }
    }
    ```

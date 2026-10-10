@@ -1,0 +1,36 @@
+{
+  "name": "@openrum/cli",
+  "version": "0.1.0",
+  "description": "The openrum command: upload Source Maps to an OpenRUM Release and drive the local development stack.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/open-rum/openrum.git",
+    "directory": "packages/cli"
+  },
+  "bugs": {
+    "url": "https://github.com/open-rum/openrum/issues"
+  },
+  "type": "module",
+  "bin": {
+    "openrum": "./dist/openrum.js",
+    "openrum-sourcemaps": "./dist/openrum-sourcemaps.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsup src/openrum.ts src/openrum-sourcemaps.ts --format esm --clean",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test test/*.test.ts"
+  },
+  "devDependencies": {
+    "@openrum/source-map": "workspace:*",
+    "@types/node": "^24.0.0",
+    "tsup": "^8.5.1",
+    "typescript": "^6.0.3"
+  }
+}
