@@ -92,7 +92,8 @@ jobs:
           pnpm --filter @openrum/browser publish --access public $PROVENANCE --tag "$NPM_TAG" --no-git-checks
       - name: Verify the published package
         run: |
-          for attempt in 1 2 3 4 5 6 7 8 9 10 11 12; do
+          # A new version can take a few minutes to appear; wait up to 10 minutes.
+          for attempt in $(seq 1 60); do
             if npm view "@openrum/browser@${{ needs.verify.outputs.version }}" version; then exit 0; fi
             sleep 10
           done
