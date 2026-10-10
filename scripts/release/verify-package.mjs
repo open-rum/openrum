@@ -35,16 +35,16 @@ const smoke = {
     types:
       'import { init, type EventV1 } from "@openrum/browser";\nexport const probe: EventV1 | undefined = undefined;\nvoid init;\n',
   },
-  "@openrum/source-map": {
-    // `@openrum/source-map/vite` has `vite` as an optional peer; a Vite user always has it.
+  "@openrum/sourcemap": {
+    // `@openrum/sourcemap/vite` has `vite` as an optional peer; a Vite user always has it.
     alongside: ["vite@6", "@types/node@24"],
     required: ["dist/index.js", "dist/index.d.ts", "dist/vite.js", "dist/vite.d.ts"],
     imports: [
-      ["@openrum/source-map", ["uploadSourceMaps", "normalizeUrlPrefix"]],
-      ["@openrum/source-map/vite", ["openRUMSourceMaps"]],
+      ["@openrum/sourcemap", ["uploadSourceMaps", "normalizeUrlPrefix"]],
+      ["@openrum/sourcemap/vite", ["openRUMSourceMaps"]],
     ],
     types:
-      'import { uploadSourceMaps, type OpenRUMSourceMapOptions } from "@openrum/source-map";\nimport { openRUMSourceMaps } from "@openrum/source-map/vite";\nexport const options: OpenRUMSourceMapOptions | undefined = undefined;\nvoid uploadSourceMaps;\nvoid openRUMSourceMaps;\n',
+      'import { uploadSourceMaps, type OpenRUMSourceMapOptions } from "@openrum/sourcemap";\nimport { openRUMSourceMaps } from "@openrum/sourcemap/vite";\nexport const options: OpenRUMSourceMapOptions | undefined = undefined;\nvoid uploadSourceMaps;\nvoid openRUMSourceMaps;\n',
   },
   "@openrum/cli": {
     required: ["dist/openrum.js", "dist/openrum-sourcemaps.js"],

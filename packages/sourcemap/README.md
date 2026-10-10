@@ -1,8 +1,8 @@
-# `@openrum/source-map`
+# `@openrum/sourcemap`
 
-Uploads private Source Map Artifacts from a build to an OpenRUM Release, so errors from minified bundles map back to original source. It is a library (`uploadSourceMaps`) and a Vite plugin (`@openrum/source-map/vite`). For builds that do not run through Vite, such as Next.js, use the command line in [`@openrum/cli`](../cli), which runs this same code.
+Uploads private Source Map Artifacts from a build to an OpenRUM Release, so errors from minified bundles map back to original source. It is a library (`uploadSourceMaps`) and a Vite plugin (`@openrum/sourcemap/vite`). For builds that do not run through Vite, such as Next.js, use the command line in [`@openrum/cli`](../cli), which runs this same code.
 
-The package is not published to npm yet. Build it from an OpenRUM checkout with `pnpm --filter @openrum/source-map build` and install that directory into your application.
+The package is not published to npm yet. Build it from an OpenRUM checkout with `pnpm --filter @openrum/sourcemap build` and install that directory into your application.
 
 ## Authentication
 
@@ -13,7 +13,7 @@ The earlier `sessionCookie` / `csrfToken` options still work but are deprecated 
 ## Vite plugin
 
 ```ts
-import { openRUMSourceMaps } from "@openrum/source-map/vite";
+import { openRUMSourceMaps } from "@openrum/sourcemap/vite";
 import { defineConfig } from "vite";
 
 export default defineConfig({
@@ -76,7 +76,7 @@ When a map with the same name but different contents is already uploaded, that f
 `openrum sourcemaps upload` in [`@openrum/cli`](../cli) runs the same implementation, with the same options as flags and environment variables. To call it from your own script, import it from the package root:
 
 ```ts
-import { uploadSourceMaps } from "@openrum/source-map";
+import { uploadSourceMaps } from "@openrum/sourcemap";
 
 await uploadSourceMaps({
   baseUrl: "https://rum.example.com",

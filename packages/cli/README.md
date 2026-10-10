@@ -14,7 +14,7 @@ OPENRUM_UPLOAD_TOKEN=orut_... \
 pnpm exec openrum sourcemaps upload --out-dir dist --url-prefix static/app/
 ```
 
-It uses the same implementation as the Vite plugin in [`@openrum/source-map`](../source-map); see that README for what a build does, how Artifact names are formed and how `--replace` behaves. Use the command line for builds that do not run through Vite, such as Next.js.
+It uses the same implementation as the Vite plugin in [`@openrum/sourcemap`](../sourcemap); see that README for what a build does, how Artifact names are formed and how `--replace` behaves. Use the command line for builds that do not run through Vite, such as Next.js.
 
 | Flag           | Environment variable   |
 | -------------- | ---------------------- |

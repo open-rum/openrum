@@ -18,7 +18,7 @@ Source Map Artifact 可以把 `index-abc.js:1:48213` 这样的压缩栈帧还原
 <CardGrid>
   <LinkCard
     title="React（Vite）"
-    description="在 vite build 中用 @openrum/source-map 插件自动上传。"
+    description="在 vite build 中用 @openrum/sourcemap 插件自动上传。"
     href="/zh/docs/sdk/source-maps/react/"
   />
   <LinkCard
@@ -52,7 +52,7 @@ Source Map Artifact 可以把 `index-abc.js:1:48213` 这样的压缩栈帧还原
 
 两个包都可以上传 Source Map，行为相同：
 
-- **插件** `@openrum/source-map/vite` 中的 `openRUMSourceMaps`：只用于 Vite，在 `vite build` 结束时自动运行。
+- **插件** `@openrum/sourcemap/vite` 中的 `openRUMSourceMaps`：只用于 Vite，在 `vite build` 结束时自动运行。
 - **命令行** `@openrum/cli` 中的 `openrum sourcemaps upload`：用 `pnpm exec openrum sourcemaps upload` 运行，
   `--help` 可以查看全部参数。适用于不经过 Vite 的构建，例如 Next.js。早先的 `openrum-sourcemaps` 命令仍然可用，
   效果相同。
@@ -61,12 +61,12 @@ Source Map Artifact 可以把 `index-abc.js:1:48213` 这样的压缩栈帧还原
 仓库的检出目录中使用。
 
 <Aside type="note" title="Alpha 阶段需要从仓库安装">
-  `@openrum/source-map` 和 `@openrum/cli` 尚未发布到 npm。在 OpenRUM 仓库中构建你需要的那个，再把该目录安装到你的应用：
+  `@openrum/sourcemap` 和 `@openrum/cli` 尚未发布到 npm。在 OpenRUM 仓库中构建你需要的那个，再把该目录安装到你的应用：
 
 ```sh
 # Vite 插件
-pnpm --filter @openrum/source-map build
-pnpm add -D /path/to/openrum/packages/source-map
+pnpm --filter @openrum/sourcemap build
+pnpm add -D /path/to/openrum/packages/sourcemap
 
 # 命令行
 pnpm --filter @openrum/cli build

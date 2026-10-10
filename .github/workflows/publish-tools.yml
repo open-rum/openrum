@@ -1,15 +1,15 @@
 name: Publish CLI and Source Map packages
 
-# @openrum/source-map and @openrum/cli each have their own version, separate from the product's
-# vX.Y.Z tags and from the browser SDK. Tag the commit source-map-vX.Y.Z or cli-vX.Y.Z (add
+# @openrum/sourcemap and @openrum/cli each have their own version, separate from the product's
+# vX.Y.Z tags and from the browser SDK. Tag the commit sourcemap-vX.Y.Z or cli-vX.Y.Z (add
 # -alpha.N for a prerelease). The browser SDK has its own workflow, publish-sdk.yml.
 on:
   push:
-    tags: ["source-map-v*", "cli-v*"]
+    tags: ["sourcemap-v*", "cli-v*"]
   workflow_dispatch:
     inputs:
       version:
-        description: "Tag to validate without publishing, for example cli-v0.1.0 or source-map-v0.1.0"
+        description: "Tag to validate without publishing, for example cli-v0.1.0 or sourcemap-v0.1.0"
         required: true
         type: string
 
