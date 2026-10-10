@@ -135,26 +135,6 @@
   text-decoration-color: currentColor;
 }
 
-.docs-deployment-choice {
-  position: relative;
-  min-width: 0;
-}
-.docs-deployment-badge.sl-badge {
-  position: absolute;
-  top: -0.75rem;
-  right: 1rem;
-  z-index: 1;
-  padding: 0.2rem 0.65rem;
-  border-color: var(--ds-primary);
-  border-radius: 999px;
-  color: var(--ds-primary-foreground);
-  background: var(--ds-primary);
-  font-family: inherit;
-  font-size: 0.75rem;
-  font-weight: 650;
-  pointer-events: none;
-}
-
 /* Starlight caps prose at 45rem and, when there is spare room, splits it between the
    article and the "On this page" column, so the article hugged the table of contents
    and the TOC drifted towards the middle on wide screens. Docs pages instead give

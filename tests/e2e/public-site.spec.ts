@@ -296,7 +296,7 @@ test("start sidebar groups collapse and preserve child pages across languages", 
   await sidebar.getByRole("link", { name: "安装服务", exact: true }).click();
   await expect(page).toHaveURL(/\/zh\/docs\/getting-started\/production-deployment\/install\/$/);
   await expect(
-    page.locator(".expressive-code .header").filter({ hasText: "runtime-secret.yaml" }),
+    page.locator(".expressive-code .header").filter({ hasText: "runtime.env" }),
   ).toBeVisible();
   await expect(
     page.locator(".expressive-code .header").filter({ hasText: "values.production.yaml" }),
