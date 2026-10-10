@@ -80,20 +80,19 @@ jobs:
           fi
       - name: Publish to npm
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           NPM_TAG: ${{ needs.verify.outputs.npm_tag }}
           # npm refuses to sign provenance for a private source repository, so the flag
           # is only passed once the repository is public.
           PROVENANCE: ${{ github.event.repository.private == false && '--provenance' || '' }}
         run: |
-          test -n "$NODE_AUTH_TOKEN" || { echo "The NPM_TOKEN secret is missing from the public-release environment." >&2; exit 1; }
-          printf '//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}\n' > "$RUNNER_TEMP/npmrc"
-          export NPM_CONFIG_USERCONFIG="$RUNNER_TEMP/npmrc"
+          # Trusted Publishing: npm trusts this workflow's OIDC identity (repository, workflow
+          # file and the public-release environment, configured on npmjs.com), so no token is
+          # stored. pnpm exchanges the identity for a short-lived publish credential.
           pnpm --filter @openrum/browser build
           pnpm --filter @openrum/browser publish --access public $PROVENANCE --tag "$NPM_TAG" --no-git-checks
       - name: Verify the published package
         run: |
-          for attempt in 1 2 3 4 5 6; do
+          for attempt in 1 2 3 4 5 6 7 8 9 10 11 12; do
             if npm view "@openrum/browser@${{ needs.verify.outputs.version }}" version; then exit 0; fi
             sleep 10
           done
