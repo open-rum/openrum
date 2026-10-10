@@ -14,12 +14,10 @@ Next.js 使用自己的构建流程，没有 Vite 插件的位置。做法是让
 
 1. ## 安装命令行工具
 
-   `openrum` 命令在 `@openrum/cli` 包里。Alpha 阶段它尚未发布到 npm，在 OpenRUM 仓库中构建，再把该目录
-   安装到你的应用：
+   `openrum` 命令在 `@openrum/cli` 包里。把它装成应用的开发依赖：
 
    ```sh
-   pnpm --filter @openrum/cli build
-   pnpm add -D /path/to/openrum/packages/cli
+   pnpm add -D @openrum/cli
    ```
 
    安装后可以用 `pnpm exec openrum sourcemaps upload --help` 确认命令可用。这个包不依赖 Vite。早先的

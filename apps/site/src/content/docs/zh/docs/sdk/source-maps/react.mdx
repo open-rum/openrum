@@ -14,12 +14,13 @@ React 应用用 Vite 构建时，`@openrum/sourcemap` 会在 `vite build` 结束
 
 1. ## 安装插件
 
-   Alpha 阶段插件尚未发布到 npm。在 OpenRUM 仓库中构建，再把该目录安装到你的应用：
+   把插件装成应用的开发依赖：
 
    ```sh
-   pnpm --filter @openrum/sourcemap build
-   pnpm add -D /path/to/openrum/packages/sourcemap
+   pnpm add -D @openrum/sourcemap
    ```
+
+   用 `npm install --save-dev @openrum/sourcemap` 或 `yarn add -D @openrum/sourcemap` 也一样。
 
 1. ## 在 Vite 配置中启用
 
