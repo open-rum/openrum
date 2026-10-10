@@ -18,12 +18,12 @@ Source Map Artifact 可以把 `index-abc.js:1:48213` 这样的压缩栈帧还原
 <CardGrid>
   <LinkCard
     title="React（Vite）"
-    description="在 vite build 中用 @openrum/vite-plugin 插件自动上传。"
+    description="在 vite build 中用 @openrum/source-map 插件自动上传。"
     href="/zh/docs/sdk/source-maps/react/"
   />
   <LinkCard
     title="Next.js"
-    description="让 Next 生成 Source Map，在 next build 之后运行 openrum-sourcemaps。"
+    description="让 Next 生成 Source Map，在 next build 之后运行 openrum sourcemaps upload。"
     href="/zh/docs/sdk/source-maps/nextjs/"
   />
 </CardGrid>
@@ -50,21 +50,27 @@ Source Map Artifact 可以把 `index-abc.js:1:48213` 这样的压缩栈帧还原
 
 ## 插件和命令行
 
-两种上传方式来自同一个包 `@openrum/vite-plugin`，行为相同：
+两个包都可以上传 Source Map，行为相同：
 
-- **插件** `openRUMSourceMaps`：只用于 Vite，在 `vite build` 结束时自动运行。
-- **命令行** `openrum-sourcemaps`：包的 `bin`，安装后用 `pnpm exec openrum-sourcemaps` 运行，
-  `--help` 可以查看全部参数。适用于不经过 Vite 的构建，例如 Next.js。
+- **插件** `@openrum/source-map/vite` 中的 `openRUMSourceMaps`：只用于 Vite，在 `vite build` 结束时自动运行。
+- **命令行** `@openrum/cli` 中的 `openrum sourcemaps upload`：用 `pnpm exec openrum sourcemaps upload` 运行，
+  `--help` 可以查看全部参数。适用于不经过 Vite 的构建，例如 Next.js。早先的 `openrum-sourcemaps` 命令仍然可用，
+  效果相同。
 
-`openrum-sourcemaps` 和本地开发用的 `openrum` 命令（`openrum up`、`openrum seed` 等）是两个独立的
-工具，目前没有并入 `openrum`。
+同一个 `openrum` 命令也用来管理本地开发栈（`openrum up`、`openrum seed` 等），但这些命令只能在 OpenRUM
+仓库的检出目录中使用。
 
 <Aside type="note" title="Alpha 阶段需要从仓库安装">
-  `@openrum/vite-plugin` 尚未发布到 npm。在 OpenRUM 仓库中构建，再把该目录安装到你的应用：
+  `@openrum/source-map` 和 `@openrum/cli` 尚未发布到 npm。在 OpenRUM 仓库中构建你需要的那个，再把该目录安装到你的应用：
 
 ```sh
-pnpm --filter @openrum/vite-plugin build
-pnpm add -D /path/to/openrum/packages/vite-plugin
+# Vite 插件
+pnpm --filter @openrum/source-map build
+pnpm add -D /path/to/openrum/packages/source-map
+
+# 命令行
+pnpm --filter @openrum/cli build
+pnpm add -D /path/to/openrum/packages/cli
 ```
 
 </Aside>

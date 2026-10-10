@@ -106,7 +106,8 @@ For production custom endpoints, use HTTPS and add the exact host to `OPENRUM_OB
 - `apps/web`: React console, routes and design system
 - `packages/browser-sdk`: browser telemetry SDK
 - `packages/protocol`: event contract and generated validators
-- `packages/vite-plugin`: release and Source Map integration
+- `packages/source-map`: Source Map upload library and Vite plugin
+- `packages/cli`: the `openrum` command (Source Map upload, and a front door to the local stack tool)
 - `services/api`: control plane and query API
 - `services/ingest`: public event intake
 - `services/consumer`: Kafka-to-ClickHouse pipeline
