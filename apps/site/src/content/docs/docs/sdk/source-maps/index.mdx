@@ -18,12 +18,12 @@ Release, and verify one mapped error. How you upload depends on the build tool:
 <CardGrid>
   <LinkCard
     title="React (Vite)"
-    description="Upload automatically during vite build with the @openrum/vite-plugin plugin."
+    description="Upload automatically during vite build with the @openrum/source-map plugin."
     href="/docs/sdk/source-maps/react/"
   />
   <LinkCard
     title="Next.js"
-    description="Have Next emit Source Maps, then run openrum-sourcemaps after next build."
+    description="Have Next emit Source Maps, then run openrum sourcemaps upload after next build."
     href="/docs/sdk/source-maps/nextjs/"
   />
 </CardGrid>
@@ -55,23 +55,30 @@ when each token was last used, so an unused or leaked token is easy to revoke.
 
 ## The plugin and the command line
 
-Both ways to upload come from one package, `@openrum/vite-plugin`, and behave the same:
+Two packages upload Source Maps and behave the same:
 
-- **Plugin** `openRUMSourceMaps`: Vite only. It runs automatically at the end of `vite build`.
-- **Command line** `openrum-sourcemaps`: the package's `bin`. After installing, run it with
-  `pnpm exec openrum-sourcemaps`; `--help` lists every flag. Use it for builds that do not go
-  through Vite, such as Next.js.
+- **Plugin** `openRUMSourceMaps` from `@openrum/source-map/vite`: Vite only. It runs automatically at
+  the end of `vite build`.
+- **Command line** `openrum sourcemaps upload` from `@openrum/cli`: run it with
+  `pnpm exec openrum sourcemaps upload`; `--help` lists every flag. Use it for builds that do not go
+  through Vite, such as Next.js. The earlier `openrum-sourcemaps` command still works and does the
+  same thing.
 
-`openrum-sourcemaps` is a separate tool from the `openrum` command used for local development
-(`openrum up`, `openrum seed` and so on), and is not part of `openrum` today.
+The same `openrum` command also drives the local development stack (`openrum up`, `openrum seed` and
+so on), but those commands only work inside a checkout of the OpenRUM repository.
 
 <Aside type="note" title="Install from the repository in the Alpha">
-  `@openrum/vite-plugin` is not published to npm yet. Build it from an OpenRUM checkout and install
-  the directory into your application:
+  `@openrum/source-map` and `@openrum/cli` are not published to npm yet. Build the one you need from an
+  OpenRUM checkout and install the directory into your application:
 
 ```sh
-pnpm --filter @openrum/vite-plugin build
-pnpm add -D /path/to/openrum/packages/vite-plugin
+# Vite plugin
+pnpm --filter @openrum/source-map build
+pnpm add -D /path/to/openrum/packages/source-map
+
+# Command line
+pnpm --filter @openrum/cli build
+pnpm add -D /path/to/openrum/packages/cli
 ```
 
 </Aside>

@@ -74,7 +74,7 @@ jobs:
           git diff --exit-code -- internal/event/schema_gen.go
 
       - name: Test release metadata validation
-        run: node --test scripts/release/check-version.test.mjs scripts/release/check-sdk-version.test.mjs
+        run: node --test scripts/release/check-version.test.mjs scripts/release/check-package-version.test.mjs
 
       - name: Verify generated documentation and public-site content
         run: |

@@ -8,6 +8,8 @@ import { Aside } from "@astrojs/starlight/components";
 
 `openrum` is the development-stack tool in the source repository. It starts the containers and the host processes together, waits until each one is ready rather than merely launched, and reports both halves in one place. It is for working on OpenRUM or evaluating it from a checkout. It is not a production tool and is not shipped with the SDK.
 
+The npm package `@openrum/cli` installs a command with the same name, `openrum`, for uploading Source Maps from your own build (`openrum sourcemaps upload`). Inside a checkout of this repository it also accepts the commands below and hands them to this tool, so `openrum dev` and `pnpm openrum dev` do the same thing. Outside a checkout, only the Source Map commands are available.
+
 Run it from the repository root through pnpm:
 
 ```sh

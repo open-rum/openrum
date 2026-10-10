@@ -1,14 +1,15 @@
-name: Publish browser SDK
+name: Publish CLI and Source Map packages
 
-# The SDK has its own version lifecycle, separate from the product's vX.Y.Z tags.
-# Tag the commit browser-vX.Y.Z (or browser-vX.Y.Z-alpha.N for a prerelease).
+# @openrum/source-map and @openrum/cli each have their own version, separate from the product's
+# vX.Y.Z tags and from the browser SDK. Tag the commit source-map-vX.Y.Z or cli-vX.Y.Z (add
+# -alpha.N for a prerelease). The browser SDK has its own workflow, publish-sdk.yml.
 on:
   push:
-    tags: ["browser-v*"]
+    tags: ["source-map-v*", "cli-v*"]
   workflow_dispatch:
     inputs:
       version:
-        description: "SDK tag to validate without publishing, for example browser-v0.1.1"
+        description: "Tag to validate without publishing, for example cli-v0.1.0 or source-map-v0.1.0"
         required: true
         type: string
 
@@ -16,7 +17,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: publish-sdk-${{ github.ref }}
+  group: publish-tools-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -26,6 +27,8 @@ jobs:
     outputs:
       version: ${{ steps.version.outputs.version }}
       npm_tag: ${{ steps.version.outputs.npm_tag }}
+      name: ${{ steps.version.outputs.name }}
+      directory: ${{ steps.version.outputs.directory }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -35,7 +38,7 @@ jobs:
         run: |
           git fetch origin main:refs/remotes/origin/main
           git merge-base --is-ancestor HEAD origin/main
-      - name: Validate the tag against the package version
+      - name: Validate the tag against the package
         id: version
         env:
           RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.version || github.ref_name }}
@@ -45,14 +48,17 @@ jobs:
           runtime: node@24
           cache: true
           require-lockfile: true
-      - name: Lint, type-check, test and build the SDK
+      - name: Type-check, test and build the package
+        env:
+          PACKAGE: ${{ steps.version.outputs.name }}
         run: |
-          pnpm --filter @openrum/browser lint
-          pnpm --filter @openrum/browser typecheck
-          pnpm --filter @openrum/browser test
-          pnpm --filter @openrum/browser build
-      - name: Prove the tarball installs and type-checks from a clean project
-        run: node scripts/release/verify-package.mjs packages/browser-sdk
+          pnpm --filter "$PACKAGE" typecheck
+          pnpm --filter "$PACKAGE" test
+          pnpm --filter "$PACKAGE" build
+      - name: Prove the tarball installs and works from a clean project
+        env:
+          DIRECTORY: ${{ steps.version.outputs.directory }}
+        run: node scripts/release/verify-package.mjs "$DIRECTORY"
 
   publish:
     # A manual run only validates; publishing needs a pushed tag in the official repository.
@@ -63,7 +69,8 @@ jobs:
     environment: public-release
     permissions:
       contents: read
-      # Lets npm sign a provenance statement linking the package to this workflow run.
+      # Lets npm sign a provenance statement and exchange this run's identity for a publish
+      # credential (Trusted Publishing).
       id-token: write
     steps:
       - uses: actions/checkout@v7
@@ -73,28 +80,35 @@ jobs:
           cache: true
           require-lockfile: true
       - name: Reject a previously published npm version
+        env:
+          PACKAGE: ${{ needs.verify.outputs.name }}
+          VERSION: ${{ needs.verify.outputs.version }}
         run: |
-          if npm view "@openrum/browser@${{ needs.verify.outputs.version }}" version >/dev/null 2>&1; then
-            echo "@openrum/browser@${{ needs.verify.outputs.version }} already exists on npm; publish a new version instead of overwriting it." >&2
+          if npm view "$PACKAGE@$VERSION" version >/dev/null 2>&1; then
+            echo "$PACKAGE@$VERSION already exists on npm; publish a new version instead of overwriting it." >&2
             exit 1
           fi
       - name: Publish to npm
         env:
+          PACKAGE: ${{ needs.verify.outputs.name }}
           NPM_TAG: ${{ needs.verify.outputs.npm_tag }}
           # npm refuses to sign provenance for a private source repository, so the flag
           # is only passed once the repository is public.
           PROVENANCE: ${{ github.event.repository.private == false && '--provenance' || '' }}
         run: |
           # Trusted Publishing: npm trusts this workflow's OIDC identity (repository, workflow
-          # file and the public-release environment, configured on npmjs.com), so no token is
-          # stored. pnpm exchanges the identity for a short-lived publish credential.
-          pnpm --filter @openrum/browser build
-          pnpm --filter @openrum/browser publish --access public $PROVENANCE --tag "$NPM_TAG" --no-git-checks
+          # file and the public-release environment, configured on npmjs.com per package), so
+          # no token is stored.
+          pnpm --filter "$PACKAGE" build
+          pnpm --filter "$PACKAGE" publish --access public $PROVENANCE --tag "$NPM_TAG" --no-git-checks
       - name: Verify the published package
+        env:
+          PACKAGE: ${{ needs.verify.outputs.name }}
+          VERSION: ${{ needs.verify.outputs.version }}
         run: |
           for attempt in 1 2 3 4 5 6 7 8 9 10 11 12; do
-            if npm view "@openrum/browser@${{ needs.verify.outputs.version }}" version; then exit 0; fi
+            if npm view "$PACKAGE@$VERSION" version; then exit 0; fi
             sleep 10
           done
-          echo "@openrum/browser@${{ needs.verify.outputs.version }} did not appear on npm." >&2
+          echo "$PACKAGE@$VERSION did not appear on npm." >&2
           exit 1

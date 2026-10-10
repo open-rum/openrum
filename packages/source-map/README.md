@@ -1,8 +1,8 @@
-# `@openrum/vite-plugin`
+# `@openrum/source-map`
 
-Vite build plugin and CLI that create an OpenRUM Release and upload private Source Map Artifacts, so errors from minified bundles map back to original source.
+Uploads private Source Map Artifacts from a build to an OpenRUM Release, so errors from minified bundles map back to original source. It is a library (`uploadSourceMaps`) and a Vite plugin (`@openrum/source-map/vite`). For builds that do not run through Vite, such as Next.js, use the command line in [`@openrum/cli`](../cli), which runs this same code.
 
-The package is not published to npm yet (`"private": true`). Build it from an OpenRUM checkout with `pnpm --filter @openrum/vite-plugin build` and install that directory into your application, or run the CLI from the checkout.
+The package is not published to npm yet. Build it from an OpenRUM checkout with `pnpm --filter @openrum/source-map build` and install that directory into your application.
 
 ## Authentication
 
@@ -13,7 +13,7 @@ The earlier `sessionCookie` / `csrfToken` options still work but are deprecated 
 ## Vite plugin
 
 ```ts
-import { openRUMSourceMaps } from "@openrum/vite-plugin";
+import { openRUMSourceMaps } from "@openrum/source-map/vite";
 import { defineConfig } from "vite";
 
 export default defineConfig({
@@ -71,30 +71,21 @@ If Vite `base` is a sub-path or CDN URL, set `urlPrefix` to its path. A full URL
 
 When a map with the same name but different contents is already uploaded, that file fails with `ARTIFACT_EXISTS`. Use a new Release for a changed build. To overwrite deliberately, set `replace: true` or pass `--replace`.
 
-## CLI
+## Command line and library use
 
-The CLI uses the same implementation for builds that do not run through Vite.
+`openrum sourcemaps upload` in [`@openrum/cli`](../cli) runs the same implementation, with the same options as flags and environment variables. To call it from your own script, import it from the package root:
 
-```sh
-OPENRUM_BASE_URL=https://rum.example.com \
-OPENRUM_PROJECT_ID=00000000-0000-4000-8000-000000000000 \
-OPENRUM_RELEASE=storefront@1.8.0 \
-OPENRUM_UPLOAD_TOKEN=orut_... \
-pnpm exec openrum-sourcemaps --out-dir dist --url-prefix static/app/
+```ts
+import { uploadSourceMaps } from "@openrum/source-map";
+
+await uploadSourceMaps({
+  baseUrl: "https://rum.example.com",
+  projectId: "00000000-0000-4000-8000-000000000000",
+  release: "storefront@1.8.0",
+  outDir: "dist",
+});
 ```
 
-| Flag           | Environment variable   |
-| -------------- | ---------------------- |
-| `--base-url`   | `OPENRUM_BASE_URL`     |
-| `--project-id` | `OPENRUM_PROJECT_ID`   |
-| `--release`    | `OPENRUM_RELEASE`      |
-| `--dist`       | `OPENRUM_DIST`         |
-| `--commit-sha` | `OPENRUM_COMMIT_SHA`   |
-| `--out-dir`    | `OPENRUM_OUT_DIR`      |
-| `--url-prefix` | `OPENRUM_URL_PREFIX`   |
-| `--replace`    | `OPENRUM_REPLACE=true` |
-| `--token`      | `OPENRUM_UPLOAD_TOKEN` |
-
-Prefer the environment variable for the token so it does not appear in process listings or shell history. The command exits with status `1` when any file fails.
+The same options as the plugin apply, and `outDir` is required when you are not inside a Vite build.
 
 Object storage must be configured on the Instance for Source Map Artifacts. Core event ingestion and queries continue to work without it.
