@@ -4,34 +4,32 @@ description: Chart resource, routing, scaling, security and upgrade reference fo
 appliesTo: Alpha
 ---
 
-The chart under `deploy/helm/openrum` deploys the five OpenRUM workloads — `api`, `ingest`, `consumer`, `worker` and `web` — with rolling updates, health probes, autoscaling and a schema migration hook. For a new Kubernetes Instance, follow the three-step [production deployment](/docs/getting-started/production-deployment/) tutorial first. This page is the Chart reference for configuration, security and operation details.
+The chart, published as `oci://ghcr.io/open-rum/charts/openrum` with its source in `deploy/helm/openrum`, deploys the five OpenRUM workloads — `api`, `ingest`, `consumer`, `worker` and `web` — with rolling updates, health probes, autoscaling and a schema migration hook. For a new Kubernetes Instance, follow the three-step [production deployment](/docs/getting-started/production-deployment/) guide, which is the only place the install procedure is written down. This page is the Chart reference for configuration, security and operation details.
 
 By default it also runs a single Redis instance for the release ([Redis: bundled or external](#redis-bundled-or-external)). It does **not** provision PostgreSQL, ClickHouse or Kafka, create the Kafka topic, issue TLS certificates or create the Secret it reads. Those are prerequisites. Missing the Secret or the two databases fails the install outright; a missing Kafka topic installs cleanly and then drops events at runtime, which is the harder one to notice.
 
-## Before you install
+## Requirements
 
-**Provision PostgreSQL, ClickHouse and Kafka.** The Compose topology is for local development only. Use managed or HA services, and decide whether Redis is bundled or your own. Size them with [Capacity planning](/docs/self-hosting/capacity/) before you take production traffic. See [External dependencies](/docs/self-hosting/dependencies/) for what each one holds.
+The [deployment preparation](/docs/getting-started/production-deployment/) page has the full requirements table. The points that explain this chart's behaviour:
 
-**Create the Kafka topic yourself.** Both the producer and the consumer set `AllowAutoTopicCreation: false`, so a missing topic is a runtime failure rather than a self-healing condition. The default topic name is `rum-events-v1`, and ingest only reports durable acceptance after `acks=all`.
+- **PostgreSQL, ClickHouse and Kafka are yours to provide.** The Compose topology is for local development only. Use managed or HA services, and decide whether Redis is bundled or your own. Size them with [Capacity planning](/docs/self-hosting/capacity/) before you take production traffic. See [External dependencies](/docs/self-hosting/dependencies/) for what each one holds.
+- **Create the Kafka topic yourself.** Both the producer and the consumer set `AllowAutoTopicCreation: false`, so a missing topic is a runtime failure rather than a self-healing condition. The default topic name is `rum-events-v1`, and ingest only reports durable acceptance after `acks=all`.
+- **Decide on a hostname and a TLS certificate.** `config.appEnv: production` makes every service reject a non-HTTPS `PUBLIC_BASE_URL` at startup, and `ingress.tls` is empty by default; see [Routing and TLS](#routing-and-tls).
+- **Use Kubernetes 1.28 or later.** The chart declares `kubeVersion: ">=1.28.0-0"` and uses `autoscaling/v2` and `policy/v1`, so older clusters are not supported.
 
-**Use an image your cluster can pull.** Helm installs the chart; Kubernetes pulls the referenced container images. The chart defaults to `ghcr.io/open-rum/openrum`. This address becomes usable only after the first official versioned release is published and the package is public. Before then, build and publish your own image and override `image.repository` in your own values file rather than editing the chart.
+## Chart and image
 
-**Decide on a hostname and a TLS certificate.** `config.appEnv: production` makes every service reject a non-HTTPS `PUBLIC_BASE_URL` at startup, and `ingress.tls` is empty by default — see [Routing and TLS](#routing-and-tls).
+The chart is public at `oci://ghcr.io/open-rum/charts/openrum`, and its default image is the matching `ghcr.io/open-rum/openrum` tag (`0.1.1` for chart `0.1.1`), built for `linux/amd64` and `linux/arm64`. A default install needs no source checkout and no registry credentials. Always pin `--version`.
 
-The chart declares `kubeVersion: ">=1.28.0-0"`; it uses `autoscaling/v2` and `policy/v1`, so older clusters are not supported.
+To use an internal mirror, add `image.repository: registry.example.com/openrum` and `image.tag: "0.1.1"` to your values file, using the exact image version paired with the chart. For a private registry, create an image-pull Secret in the same namespace and add `imagePullSecrets: [{ name: your-registry-secret }]`. The chart passes it to the application Deployments, the pre-install migration Job, and the Helm test Pod. If the cluster cannot pull the default `busybox:1.37` test image, also override `smokeTest.image`.
 
-## 1. Create the runtime Secret
+To run modified source, build your own image from the repository root, push it and override `image.repository` and `image.tag` in your values file; do not edit the chart. See [Install services](/docs/getting-started/production-deployment/install/).
 
-The chart never creates this Secret; it only references the name in `config.existingSecret` (default `openrum-runtime`). **Create it before `helm install`**, because the migration Job runs as a `pre-install` hook and reads the two DSNs from it. A missing Secret fails the release before any workload is scheduled.
+## Runtime Secret
 
-```sh
-kubectl -n openrum create secret generic openrum-runtime \
-  --from-literal=POSTGRES_DSN='postgres://openrum:...@postgres:5432/openrum?sslmode=require' \
-  --from-literal=CLICKHOUSE_DSN='clickhouse://openrum:...@clickhouse:9000/openrum' \
-  --from-literal=BOOTSTRAP_TOKEN="$(openssl rand -hex 32)"
-```
+The chart never creates this Secret; it only references the name in `config.existingSecret` (default `openrum-runtime`). **Create it before `helm install`**, because the migration Job runs as a `pre-install` hook and reads the two DSNs from it. A missing Secret fails the release before any workload is scheduled. The commands are in [Install services](/docs/getting-started/production-deployment/install/); a secret manager such as External Secrets or Sealed Secrets can create it instead, because the chart only needs the name.
 
-Only `POSTGRES_DSN` and `CLICKHOUSE_DSN` are mandatory. Every other key is mounted with `optional: true`, so it can be absent — which is exactly why `BOOTSTRAP_TOKEN` is easy to forget and why [step 5](#5-create-the-first-administrator) explains what omitting it costs you.
+Only `POSTGRES_DSN` and `CLICKHOUSE_DSN` are mandatory. Every other key is mounted with `optional: true`, so it can be absent, which is exactly why `BOOTSTRAP_TOKEN` is easy to forget and why [the first administrator](#the-first-administrator) explains what omitting it costs you.
 
 | Secret key | Required | Purpose |
 | --- | --- | --- |
@@ -46,35 +44,11 @@ Key names are configurable under `config.secretKeys` if your secret manager impo
 
 `OPENRUM_MASTER_KEY` must be base64 for **exactly 32 bytes**; anything else is rejected at startup rather than ignored. It is only read when `config.managedSecrets.enabled` is `true`, and without it the Console returns `503 MANAGED_SECRETS_REQUIRED` when someone tries to save a notification channel.
 
-## 2. Write a values file
+## Values
 
-Keep your environment in its own file rather than editing the chart. These values are specific to your deployment:
+Keep your environment in its own values file rather than editing the chart; [Install services](/docs/getting-started/production-deployment/install/) shows a complete one.
 
-```yaml
-config:
-  appEnv: production
-  publicBaseURL: https://rum.example.com
-  kafkaBrokers: kafka-0.kafka:9092,kafka-1.kafka:9092
-  existingSecret: openrum-runtime
-
-# Omit this block to use the bundled Redis.
-redis:
-  mode: external
-  external:
-    address: redis-master.data:6379
-
-ingress:
-  enabled: true
-  className: nginx
-  host: rum.example.com
-  tls:
-    - hosts: [rum.example.com]
-      secretName: openrum-tls
-```
-
-To use an internal mirror, add `image.repository: registry.example.com/openrum` and `image.tag: "0.1.1"` to this file, using the exact image version paired with the Chart. For a private registry, create an image-pull Secret in the same namespace and add `imagePullSecrets: [{ name: your-registry-secret }]`. The chart passes it to the application Deployments, the pre-install migration Job, and the Helm test Pod. If the cluster cannot pull the default `busybox:1.37` test image, also override `smokeTest.image`.
-
-`publicBaseURL` must be an absolute `http(s)` URL, and under `appEnv: production` it must be HTTPS. It is the origin the Console and the SDK are told to use, so it has to be the address users actually reach — not an internal Service name.
+`publicBaseURL` must be an absolute `http(s)` URL, and under `appEnv: production` it must be HTTPS. It is the origin the Console and the SDK are told to use, so it has to be the address users actually reach, not an internal Service name.
 
 Object storage is optional, but it is all-or-nothing: if you set any of `endpoint`, `bucket` or `region` while leaving `provider` empty, every pod exits with `OBJECT_STORAGE_PROVIDER is required when object storage fields are configured`. Set `provider` to `oss` or `s3`, or leave the whole block empty. See [Object storage](/docs/self-hosting/object-storage/).
 
@@ -100,19 +74,9 @@ A bundled Redis restart takes API and Ingest out of service for a few seconds. F
 
 `config.redisAddress` from earlier chart versions has been removed. A values file that still sets it fails to render with a message pointing to `redis.external.address`.
 
-## 3. Install
+## Install and migrations
 
-Once the official `0.1.1` release is available, install its OCI chart and matching default image:
-
-```sh
-helm upgrade --install openrum oci://ghcr.io/open-rum/charts/openrum \
-  --version 0.1.1 \
-  --namespace openrum --create-namespace \
-  --values values.production.yaml \
-  --wait --timeout 15m
-```
-
-Before the first official release, use `deploy/helm/openrum` in place of the OCI chart and point `image.repository` at an image you published. Publishing a Chart does not install it into your cluster.
+The install command is in [Install services](/docs/getting-started/production-deployment/install/). What it does on your cluster:
 
 The `pre-install,pre-upgrade` hook runs `/app/migrate up all` — PostgreSQL migrations, then ClickHouse — at hook weight `-5`, so the schema is in place before any workload starts. It retries twice (`migration.backoffLimit`) inside a 600-second Job deadline, but the binary imposes its own two-minute context timeout, so a genuinely long migration fails on that limit first.
 
@@ -124,20 +88,15 @@ A failed migration fails the release. The Job is kept (`hook-delete-policy: befo
 kubectl -n openrum logs -l app.kubernetes.io/component=migration --tail=-1
 ```
 
-## 4. Verify the rollout
-
-```sh
-helm test openrum --namespace openrum
-kubectl -n openrum get deploy,hpa,ingress -l app.kubernetes.io/instance=openrum
-```
+## Verify the rollout
 
 `helm test` runs a smoke-test pod that requests the liveness endpoint of `api`, `ingest` and `web` through their Services, which confirms in-cluster routing rather than just pod readiness.
 
 Each service exposes `/health/ready` and `/health/live`; `web` also answers both plus a `/metrics` stub from its nginx front end. Readiness is polled every 2 seconds, liveness every 20, and a startup probe allows 30 failures at 2-second intervals — about a minute for a cold start before the kubelet gives up.
 
-## 5. Create the first administrator
+## The first administrator
 
-Open `https://rum.example.com/setup`, then follow [First use and maintenance](/docs/getting-started/production-deployment/first-run/) and [Create your first project](/docs/getting-started/create-first-project/).
+Open `https://<your-domain>/setup` and follow [First use and maintenance](/docs/getting-started/production-deployment/first-run/).
 
 ### Set BOOTSTRAP_TOKEN before the ingress is reachable
 
@@ -221,5 +180,7 @@ These are real gaps, not oversights to work around silently:
 ## Upgrades and rollback
 
 `helm upgrade` re-runs the migration hook before the new pods roll. Migrations are forward-only in practice: `/app/migrate down` refuses any target other than `postgres`, so a `helm rollback` reverts workloads and configuration but **not** the schema. Read [Upgrades](/docs/self-hosting/upgrades/) for the supported sequence, and confirm [Backup and restore](/docs/self-hosting/backup-restore/) works before your first production upgrade.
+
+Secret changes do not restart the application automatically. After rotating a Secret, schedule a rollout, for example `kubectl -n openrum rollout restart deployment -l app.kubernetes.io/instance=openrum`.
 
 When something is wrong after a rollout, start from [Troubleshooting](/docs/self-hosting/troubleshooting/).

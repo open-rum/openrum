@@ -1,40 +1,50 @@
 ---
 title: 部署准备
-description: 了解架构，准备集群、数据库和 Kafka，再继续安装服务。
+description: 先核对前置要求，再准备集群、数据库和 Kafka，然后安装服务。
 appliesTo: Alpha
 ---
 
 import { Steps, Aside, LinkCard } from "@astrojs/starlight/components";
 
-本教程使用推荐的 Kubernetes 与 Helm 路径部署一套团队共享的 OpenRUM。你需要能管理集群、域名和数据服务。如果只有一台 Linux 服务器，请使用独立的[单机 Docker 生产部署指南](/zh/docs/self-hosting/docker-production/)；如果只是先体验功能，请使用[本地开发](/zh/docs/getting-started/local-development/)。
+本指南使用推荐的 Kubernetes 与 Helm 路径部署一套团队共享的 OpenRUM。你需要能管理集群、域名和数据服务，但不需要 OpenRUM 源码：Helm Chart 和应用镜像都已经发布。如果只有一台 Linux 服务器，请使用独立的[单机 Docker 生产部署指南](/zh/docs/self-hosting/docker-production/)；如果只是先体验功能，请使用[本地开发](/zh/docs/getting-started/local-development/)。
 
 <Aside type="caution" title="接入生产流量前">
   当前产品处于
-  Alpha。先在预发布环境走通本教程，再接入真实流量。文中的域名、密码和镜像仓库都是示例，执行前必须替换。
+  Alpha。先在预发布环境走通本指南，再接入真实流量。文中的域名、密码和镜像仓库都是示例，执行前必须替换。
 </Aside>
+
+## 整体结构
+
+```text
+被监控的浏览器应用 → HTTPS /ingest → Ingest → Kafka → Consumer → ClickHouse
+运维人员的浏览器   → HTTPS /       → 控制台
+控制台            → HTTPS /api    → API → PostgreSQL / ClickHouse / Redis
+Worker            → 后台任务、告警、可选的 Source Map 对象存储
+```
+
+Helm Chart 部署五个 OpenRUM 应用服务、数据库迁移任务，默认还会运行一个单实例 Redis。数据库、Kafka、TLS 证书和运行时 Secret 需要提前准备，Chart 不会替你创建它们。现在就要明确：集群和各数据服务由谁维护，实例使用哪个公开域名。
+
+## 前置要求
+
+动手之前逐项核对。ClickHouse 这一行最容易被漏掉。
+
+| 项目 | 需要什么 | 说明 |
+| --- | --- | --- |
+| Kubernetes | 1.28 或以上 | 能创建 Namespace、Deployment、Service 和 Job |
+| Helm、kubectl | 本地已安装，且能够访问目标集群 | 用于安装和检查 |
+| Ingress 与 HTTPS | 一个 Ingress Controller、指向它的域名（如 `rum.example.com`），以及覆盖该域名的证书 | 生产环境要求 HTTPS |
+| PostgreSQL | 一个数据库，以及能执行 Schema 迁移的账号 | 控制平面数据 |
+| **ClickHouse** | **需要集群定义。** 迁移使用 `ON CLUSTER openrum_cluster` 和复制表，所以要有 Keeper 或 ZooKeeper，以及 shard 和 replica 宏 | 只建一个数据库不够，见第 2 步 |
+| Kafka | 下面示例的主题至少需要三个 Broker，且不要依赖自动建主题 | 第 3 步自己创建主题 |
+| Redis | 可选 | Chart 默认运行一个单实例 Redis；需要高可用时使用你自己的 |
+| 镜像访问 | 节点能从 `ghcr.io` 拉取 | 镜像是公开的。只有要把镜像同步到自己的仓库，或运行修改过的源码时，才需要你自己的仓库 |
+| 容量 | 持久化存储、备份和容量告警，并按预期流量预留空间 | 见[容量规划](/zh/docs/self-hosting/capacity/) |
+
+优先使用团队已经维护的托管或高可用服务，并先核对服务端口、认证和协议是否兼容当前 OpenRUM 配置，不能只凭供应商名称判断。连接选项见[配置参考](/zh/docs/reference/configuration/)。
 
 <Steps>
 
-1. ## 了解部署结构
-
-   ```text
-   被监控的浏览器应用 → HTTPS /ingest → Ingest → Kafka → Consumer → ClickHouse
-   运维人员的浏览器   → HTTPS /       → 控制台
-   控制台            → HTTPS /api    → API → PostgreSQL / ClickHouse / Redis
-   Worker            → 后台任务、告警、可选的 Source Map 对象存储
-   ```
-
-   Helm Chart 部署五个 OpenRUM 应用服务、数据库迁移任务，默认还会运行一个单实例 Redis。数据库、Kafka、TLS 证书和运行时 Secret 需要提前准备，Chart 不会替你创建它们。
-
-   **完成标志：** 已明确集群和各数据服务由谁维护，以及实例使用的公开域名。
-
-1. ## 准备基础设施与权限
-   - **Kubernetes：** 1.28 或以上；能创建 Namespace、Deployment、Service 和 Job
-   - **Helm、kubectl：** 本地已安装，且能够访问目标集群
-   - **镜像仓库：** 构建者能推送，集群能拉取
-   - **域名与 HTTPS：** 例如 `rum.example.com`，指向 Ingress，证书覆盖该域名
-   - **数据服务：** PostgreSQL、ClickHouse、Kafka，网络允许 OpenRUM Pod 访问；不使用自带 Redis 时还需要 Redis
-   - **容量与持久化：** 存储持久化、备份、容量告警；按预期流量预留空间
+1. ## 确认能访问集群
 
    ```sh
    kubectl version
@@ -43,20 +53,24 @@ import { Steps, Aside, LinkCard } from "@astrojs/starlight/components";
    kubectl create namespace openrum
    ```
 
-   Namespace 已存在时跳过最后一条。优先使用团队已经维护的托管或高可用服务，并先核对服务端口、认证和协议是否兼容当前 OpenRUM 配置，不能只凭供应商名称判断。
+   Namespace 已存在时跳过最后一条。
 
-   **完成标志：** 节点可见，Namespace 存在，从集群能访问四个数据服务。具体连接选项见[配置参考](/zh/docs/reference/configuration/)。
+   **完成标志：** 节点可见，Namespace 存在，域名的 DNS 和证书已为 Ingress 准备好。
 
-1. ## 准备数据库与 Kafka 主题
+1. ## 准备数据库
 
    请数据库负责人为 OpenRUM 创建独立数据库和账号。PostgreSQL、ClickHouse 账号需要能执行首次迁移中的建表及后续迁移。
 
-   <Aside type="caution" title="ClickHouse">
+   <Aside type="caution" title="ClickHouse 需要集群定义">
      **ClickHouse 需要特别确认：** 当前迁移使用 `ON CLUSTER openrum_cluster`
      和复制表。部署必须提供对应集群定义、复制表所需的 Keeper/ZooKeeper 以及 shard/replica
      宏；仅创建一个同名数据库还不够。配置形态可参考仓库
      `deploy/compose/clickhouse/config.d/openrum-cluster.xml`，生产节点拓扑由数据库负责人配置。
    </Aside>
+
+   **完成标志：** 两个数据库都能从集群连接，ClickHouse 集群定义有效。
+
+1. ## 创建 Kafka 主题
 
    Kafka 自动建主题已关闭。提前创建 `rum-events-v1` 和 `rum-events-v1.dlq`。下面示例适用于至少三个 Broker 的集群，分区数需按实际负载规划：
 
@@ -72,12 +86,12 @@ import { Steps, Aside, LinkCard } from "@astrojs/starlight/components";
 
    命令在能访问 Broker、安装有 Kafka 管理工具的环境运行；替换 Broker 地址，并按集群要求提供管理工具认证配置。这里保留期为 7 天，稍后的 `kafkaRetentionDuration` 必须与实际配置一致。已有主题要核对其配置，`--if-not-exists` 不会更新它。
 
-   **完成标志：** 两个数据库可连接，ClickHouse 集群定义有效，两个 Kafka 主题存在且副本健康。
+   **完成标志：** 两个 Kafka 主题存在且副本健康，所有数据服务都能从集群访问。
 
 </Steps>
 
 <LinkCard
   title="下一步：安装服务"
   href="/zh/docs/getting-started/production-deployment/install/"
-  description="构建镜像、配置凭据和 HTTPS，然后通过 Helm 安装。"
+  description="创建凭据和 HTTPS，然后安装已发布的 Helm Chart。"
 />

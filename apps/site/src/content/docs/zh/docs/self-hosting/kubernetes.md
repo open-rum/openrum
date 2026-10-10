@@ -4,34 +4,32 @@ description: 生产 Kubernetes 部署的 Chart 资源、路由、扩缩容、安
 appliesTo: Alpha
 ---
 
-`deploy/helm/openrum` 下的 Chart 会部署 OpenRUM 的五个工作负载——`api`、`ingest`、`consumer`、`worker` 和 `web`——并带上滚动更新、健康探针、自动扩缩容和一个数据库迁移 Hook。新建 Kubernetes 实例时，请先完成三步[部署生产](/zh/docs/getting-started/production-deployment/)教程；本页只作为配置、安全和日常运营细节的 Chart 参考。
+Chart 以 `oci://ghcr.io/open-rum/charts/openrum` 发布，源码在 `deploy/helm/openrum`，它会部署 OpenRUM 的五个工作负载——`api`、`ingest`、`consumer`、`worker` 和 `web`——并带上滚动更新、健康探针、自动扩缩容和一个数据库迁移 Hook。新建 Kubernetes 实例时，请先看三步[生产部署](/zh/docs/getting-started/production-deployment/)指南，安装步骤只在那里写；本页只作为配置、安全和日常运营细节的 Chart 参考。
 
 默认情况下它还会为这个 Release 运行一个单实例 Redis（见 [Redis：自带或外部](#redis自带或外部)）。它**不会**帮你创建 PostgreSQL、ClickHouse 或 Kafka，不会创建 Kafka 主题，不会签发 TLS 证书，也不会创建它要读取的 Secret。这些都是前置条件。漏掉 Secret 或两个数据库会让安装直接失败；而漏掉 Kafka 主题则会安装成功、运行时才丢事件，这一种更难被发现。
 
-## 安装前的准备
+## 前置要求
 
-**自行准备 PostgreSQL、ClickHouse 和 Kafka。** Compose 拓扑只用于本地开发。生产环境请使用托管版或高可用的服务，并决定 Redis 用 Chart 自带的还是你自己的。在承接生产流量前用[容量规划](/zh/docs/self-hosting/capacity/)确定规格。各依赖分别存什么，见[外部依赖](/zh/docs/self-hosting/dependencies/)。
+完整的前置要求表在[部署准备](/zh/docs/getting-started/production-deployment/)页。下面这几点能解释这个 Chart 的行为：
 
-**Kafka 主题必须自己建。** 生产者和消费者都设置了 `AllowAutoTopicCreation: false`，所以主题不存在是一个运行时故障，不会自动恢复。默认主题名是 `rum-events-v1`，并且 ingest 只在 `acks=all` 之后才报告持久化接收成功。
+- **PostgreSQL、ClickHouse 和 Kafka 需要你自己提供。** Compose 拓扑只用于本地开发。生产环境请使用托管版或高可用的服务，并决定 Redis 用 Chart 自带的还是你自己的。在承接生产流量前用[容量规划](/zh/docs/self-hosting/capacity/)确定规格。各依赖分别存什么，见[外部依赖](/zh/docs/self-hosting/dependencies/)。
+- **Kafka 主题必须自己建。** 生产者和消费者都设置了 `AllowAutoTopicCreation: false`，所以主题不存在是一个运行时故障，不会自动恢复。默认主题名是 `rum-events-v1`，并且 ingest 只在 `acks=all` 之后才报告持久化接收成功。
+- **先定好域名和 TLS 证书。** `config.appEnv: production` 会让所有服务在启动时拒绝非 HTTPS 的 `PUBLIC_BASE_URL`，而 `ingress.tls` 默认是空的，见[路由与 TLS](#路由与-tls)。
+- **使用 Kubernetes 1.28 或更高版本。** Chart 声明了 `kubeVersion: ">=1.28.0-0"`，并使用 `autoscaling/v2` 和 `policy/v1`，因此不支持更旧的集群。
 
-**确保集群能够拉取镜像。** Helm 负责安装 Chart，容器镜像由 Kubernetes 按 Chart 中的地址拉取。Chart 默认使用 `ghcr.io/open-rum/openrum`；只有首个正式版本发布且软件包公开后，这个默认地址才可使用。在此之前，请自行构建并发布镜像，在自己的 values 文件里覆盖 `image.repository`，不要修改 Chart 源文件。
+## Chart 与镜像
 
-**先定好域名和 TLS 证书。** `config.appEnv: production` 会让所有服务在启动时拒绝非 HTTPS 的 `PUBLIC_BASE_URL`，而 `ingress.tls` 默认是空的——见[路由与 TLS](#路由与-tls)。
+Chart 公开在 `oci://ghcr.io/open-rum/charts/openrum`，默认镜像是与之配套的 `ghcr.io/open-rum/openrum` 标签（Chart `0.1.1` 对应 `0.1.1`），同时提供 `linux/amd64` 和 `linux/arm64`。默认安装不需要源码，也不需要镜像仓库凭据。请始终固定 `--version`。
 
-Chart 声明了 `kubeVersion: ">=1.28.0-0"`，它使用 `autoscaling/v2` 和 `policy/v1`，因此不支持更旧的集群。
+如果使用内网镜像仓库，在 values 文件中补上 `image.repository: registry.example.com/openrum` 和 `image.tag: "0.1.1"`，版本应与 Chart 匹配。如果仓库是私有的，先在同一命名空间创建镜像拉取 Secret，再添加 `imagePullSecrets: [{ name: your-registry-secret }]`。Chart 会将其传给业务 Deployment、安装前的迁移 Job 和 Helm 测试 Pod。如果集群也无法拉取默认的 `busybox:1.37` 测试镜像，还需覆盖 `smokeTest.image`。
 
-## 1. 创建运行时 Secret
+要运行修改过的源码，请在仓库根目录自行构建镜像并推送，然后在 values 文件里覆盖 `image.repository` 和 `image.tag`，不要修改 Chart 源文件。见[安装服务](/zh/docs/getting-started/production-deployment/install/)。
 
-Chart 从不创建这个 Secret，只会引用 `config.existingSecret` 里的名字（默认 `openrum-runtime`）。**必须在 `helm install` 之前建好**，因为迁移 Job 是 `pre-install` Hook，要从里面读两个 DSN。Secret 不存在时，Release 会在任何工作负载被调度之前就失败。
+## 运行时 Secret
 
-```sh
-kubectl -n openrum create secret generic openrum-runtime \
-  --from-literal=POSTGRES_DSN='postgres://openrum:...@postgres:5432/openrum?sslmode=require' \
-  --from-literal=CLICKHOUSE_DSN='clickhouse://openrum:...@clickhouse:9000/openrum' \
-  --from-literal=BOOTSTRAP_TOKEN="$(openssl rand -hex 32)"
-```
+Chart 从不创建这个 Secret，只会引用 `config.existingSecret` 里的名字（默认 `openrum-runtime`）。**必须在 `helm install` 之前建好**，因为迁移 Job 是 `pre-install` Hook，要从里面读两个 DSN。Secret 不存在时，Release 会在任何工作负载被调度之前就失败。创建命令见[安装服务](/zh/docs/getting-started/production-deployment/install/)；也可以用 External Secrets 或 Sealed Secrets 这类密钥管理工具来创建，因为 Chart 只需要这个名字。
 
-只有 `POSTGRES_DSN` 和 `CLICKHOUSE_DSN` 是必需的。其余所有键都以 `optional: true` 挂载，也就是可以缺失——这正是 `BOOTSTRAP_TOKEN` 容易被忘掉的原因，而漏掉它的代价见[第 5 步](#5-创建第一个管理员)。
+只有 `POSTGRES_DSN` 和 `CLICKHOUSE_DSN` 是必需的。其余所有键都以 `optional: true` 挂载，也就是可以缺失，这正是 `BOOTSTRAP_TOKEN` 容易被忘掉的原因，而漏掉它的代价见[第一个管理员](#第一个管理员)。
 
 | Secret 键 | 是否必需 | 用途 |
 | --- | --- | --- |
@@ -46,33 +44,9 @@ kubectl -n openrum create secret generic openrum-runtime \
 
 `OPENRUM_MASTER_KEY` 必须是**恰好 32 字节**的 base64；长度不对会在启动时直接报错，而不是被忽略。它只在 `config.managedSecrets.enabled` 为 `true` 时才会被读取；没有它，用户在 Console 里保存通知渠道会收到 `503 MANAGED_SECRETS_REQUIRED`。
 
-## 2. 写一份 values 文件
+## Values
 
-把环境配置放进独立文件，不要直接改 Chart。下面这些值需要按你的部署环境填写：
-
-```yaml
-config:
-  appEnv: production
-  publicBaseURL: https://rum.example.com
-  kafkaBrokers: kafka-0.kafka:9092,kafka-1.kafka:9092
-  existingSecret: openrum-runtime
-
-# 使用 Chart 自带的 Redis 时，删掉这一段即可。
-redis:
-  mode: external
-  external:
-    address: redis-master.data:6379
-
-ingress:
-  enabled: true
-  className: nginx
-  host: rum.example.com
-  tls:
-    - hosts: [rum.example.com]
-      secretName: openrum-tls
-```
-
-如果使用内网镜像仓库，在这份文件中补上 `image.repository: registry.example.com/openrum` 和 `image.tag: "0.1.1"`，版本应与 Chart 匹配。如果仓库是私有的，先在同一命名空间创建镜像拉取 Secret，再添加 `imagePullSecrets: [{ name: your-registry-secret }]`。Chart 会将其传给业务 Deployment、安装前的迁移 Job 和 Helm 测试 Pod。如果集群也无法拉取默认的 `busybox:1.37` 测试镜像，还需覆盖 `smokeTest.image`。
+把你的环境配置放在单独的 values 文件里，不要修改 Chart；[安装服务](/zh/docs/getting-started/production-deployment/install/)给出了一份完整示例。
 
 `publicBaseURL` 必须是绝对的 `http(s)` URL，在 `appEnv: production` 下还必须是 HTTPS。它是 Console 和 SDK 被告知要使用的源，所以必须填用户真正访问的地址，而不是集群内部的 Service 名。
 
@@ -100,19 +74,9 @@ ingress:
 
 早期 Chart 版本的 `config.redisAddress` 已移除。values 文件里仍然设置它时，渲染会失败，并提示改用 `redis.external.address`。
 
-## 3. 安装
+## 安装与迁移
 
-官方 `0.1.1` 版本发布后，可用 OCI Chart 和配套的默认镜像安装：
-
-```sh
-helm upgrade --install openrum oci://ghcr.io/open-rum/charts/openrum \
-  --version 0.1.1 \
-  --namespace openrum --create-namespace \
-  --values values.production.yaml \
-  --wait --timeout 15m
-```
-
-在首个官方版本发布前，把上述 OCI Chart 地址替换为 `deploy/helm/openrum`，并将 `image.repository` 指向你自己发布的镜像。发布 Chart 本身不会将它安装到你的集群。
+安装命令见[安装服务](/zh/docs/getting-started/production-deployment/install/)。它在你的集群里做的事：
 
 `pre-install,pre-upgrade` Hook 会执行 `/app/migrate up all`——先 PostgreSQL 迁移，再 ClickHouse——Hook 权重是 `-5`，因此在任何工作负载启动之前 Schema 就已就位。它会重试两次（`migration.backoffLimit`），Job 的截止时间是 600 秒，但二进制自身还有一个两分钟的 context 超时，所以真正耗时很久的迁移会先撞上这个限制。
 
@@ -124,20 +88,15 @@ helm upgrade --install openrum oci://ghcr.io/open-rum/charts/openrum \
 kubectl -n openrum logs -l app.kubernetes.io/component=migration --tail=-1
 ```
 
-## 4. 验证发布结果
-
-```sh
-helm test openrum --namespace openrum
-kubectl -n openrum get deploy,hpa,ingress -l app.kubernetes.io/instance=openrum
-```
+## 验证发布结果
 
 `helm test` 会运行一个 smoke-test Pod，通过 Service 请求 `api`、`ingest` 和 `web` 的存活端点，这验证的是集群内路由是否通，而不只是 Pod 是否 Ready。
 
 每个服务都提供 `/health/ready` 和 `/health/live`；`web` 由前置的 nginx 同时提供这两个端点和一个 `/metrics` 桩。就绪探针每 2 秒轮询一次，存活探针每 20 秒一次，启动探针允许 30 次失败、间隔 2 秒——也就是冷启动大约有一分钟的余量。
 
-## 5. 创建第一个管理员
+## 第一个管理员
 
-打开 `https://rum.example.com/setup`，按[首次使用与维护](/zh/docs/getting-started/production-deployment/first-run/)中的管理员初始化步骤和[创建第一个项目](/zh/docs/getting-started/create-first-project/)操作。
+打开 `https://<你的域名>/setup`，按[首次使用与维护](/zh/docs/getting-started/production-deployment/first-run/)操作。
 
 ### 在 ingress 可被访问之前设置 BOOTSTRAP_TOKEN
 
@@ -219,5 +178,7 @@ config:
 ## 升级与回滚
 
 `helm upgrade` 会在新 Pod 滚动之前重新执行迁移 Hook。迁移在实践中是单向的：`/app/migrate down` 只接受 `postgres` 这一个目标，所以 `helm rollback` 能回退工作负载和配置，但**不会**回退 Schema。支持的操作顺序见[升级](/zh/docs/self-hosting/upgrades/)；在第一次生产升级之前，请先确认[备份与恢复](/zh/docs/self-hosting/backup-restore/)确实可用。
+
+Secret 变更不会自动使应用重启。轮换 Secret 后需要安排一次滚动更新，例如 `kubectl -n openrum rollout restart deployment -l app.kubernetes.io/instance=openrum`。
 
 发布之后出现问题，请从[故障排查](/zh/docs/self-hosting/troubleshooting/)开始。

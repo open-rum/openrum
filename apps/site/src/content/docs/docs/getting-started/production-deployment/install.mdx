@@ -1,63 +1,69 @@
 ---
 title: Install services
-description: Build an image, configure credentials and HTTPS, and install and verify with Helm.
+description: Install the published Helm chart with your credentials and HTTPS, then verify it.
 appliesTo: Alpha
 ---
 
 import { Steps, Aside, LinkCard } from "@astrojs/starlight/components";
 
-Complete [Deployment preparation](/docs/getting-started/production-deployment/) and obtain the source version you will deploy. Run commands from the repository root.
+Complete [Deployment preparation](/docs/getting-started/production-deployment/) first. You do not need the source code: the chart and the application image are published, and these steps use them directly. Replace every example domain, address and credential before running a command.
 
 <Steps>
 
-1. ## Build and push the application image
+1. ## Choose the version
 
-   Check out the source revision you intend to deploy and run from the repository root. Use a unique image tag for every deployment and record its Git commit:
+   Pick the release to install and check that its chart is reachable from your machine:
 
    ```sh
-   docker login registry.example.com
-   docker build --platform linux/amd64 \
-     -t registry.example.com/openrum:alpha-deploy-001 .
-   docker push registry.example.com/openrum:alpha-deploy-001
+   helm show chart oci://ghcr.io/open-rum/charts/openrum --version 0.1.1
    ```
 
-   This targets AMD64 nodes; use `linux/arm64` for ARM64 nodes. One image contains all five services, the migration tool, Console and Browser SDK.
+   The chart's default image is the matching `ghcr.io/open-rum/openrum:0.1.1`, built for AMD64 and ARM64 nodes. One image contains all five services, the migration tool, the Console and the Browser SDK, so there is nothing to build or push. Always pin `--version`, and use the same version in every later command.
 
-   The Chart default `ghcr.io/example/openrum` is a placeholder. Replace it with your pushed image. For private registries configure the cluster pull Secret through `imagePullSecrets`.
+   <Aside type="note" title="Using your own image">
+     Build your own image only for an internal mirror, an air-gapped cluster or modified source. From
+     the repository root, use a unique tag for every deployment and record its Git commit:
 
-   **Success:** The image is pushed and the cluster can pull it. Go and pnpm run inside Docker build stages, so this build does not require host installations.
+     ```sh
+     docker login registry.example.com
+     docker build --platform linux/amd64 \
+       -t registry.example.com/openrum:alpha-deploy-001 .
+     docker push registry.example.com/openrum:alpha-deploy-001
+     ```
 
-1. ## Configure runtime credentials and HTTPS
+     Use `linux/arm64` for ARM64 nodes. Then add the `image` block shown in the next steps to your
+     values file, configure `imagePullSecrets` for a private registry, and install from
+     `deploy/helm/openrum` in that checkout if you also changed the chart.
+   </Aside>
 
-   Generate a token for first-time initialization and save it in your team's password manager:
+   **Success:** `helm show chart` prints `version: 0.1.1` and `appVersion: "0.1.1"`.
+
+1. ## Create the runtime Secret and the HTTPS certificate
+
+   Generate the token for first-time initialization and save it in your team's password manager:
 
    ```sh
    openssl rand -hex 32
    ```
 
-   Create `runtime-secret.yaml` in a secure local directory and replace all three values:
+   Put the three values in a private file and replace every placeholder:
 
-   ```yaml title="runtime-secret.yaml"
-   apiVersion: v1
-   kind: Secret
-   metadata:
-     name: openrum-runtime
-     namespace: openrum
-   type: Opaque
-   stringData:
-     POSTGRES_DSN: "postgres://openrum:REPLACE_PASSWORD@postgres.example:5432/openrum?sslmode=require"
-     CLICKHOUSE_DSN: "clickhouse://openrum:REPLACE_PASSWORD@clickhouse.example:9000/openrum"
-     BOOTSTRAP_TOKEN: "REPLACE_WITH_GENERATED_TOKEN"
+   ```ini title="runtime.env"
+   POSTGRES_DSN=postgres://openrum:REPLACE_PASSWORD@postgres.example:5432/openrum?sslmode=require
+   CLICKHOUSE_DSN=clickhouse://openrum:REPLACE_PASSWORD@clickhouse.example:9000/openrum
+   BOOTSTRAP_TOKEN=REPLACE_WITH_GENERATED_TOKEN
    ```
 
-   URL-encode special characters in connection credentials. Match ClickHouse port and TLS parameters to the database configuration. This file contains real credentials; do not commit it.
+   URL-encode special characters in connection credentials. Match the ClickHouse port and TLS parameters to the database configuration. Create the Secret from the file, then delete the file, because it contains real credentials and must never be committed:
 
    ```sh
-   kubectl apply -f runtime-secret.yaml
+   chmod 600 runtime.env
+   kubectl -n openrum create secret generic openrum-runtime --from-env-file=runtime.env
    kubectl -n openrum get secret openrum-runtime
+   rm runtime.env
    ```
 
-   Import the domain certificate into the same Namespace, or use the Secret produced by your certificate controller:
+   The chart only references the Secret by name, so a secret manager such as External Secrets or Sealed Secrets can create `openrum-runtime` instead. Then import the domain certificate into the same Namespace, or use the Secret produced by your certificate controller:
 
    ```sh
    kubectl -n openrum create secret tls openrum-tls \
@@ -71,10 +77,6 @@ Complete [Deployment preparation](/docs/getting-started/production-deployment/) 
    Create `values.production.yaml`:
 
    ```yaml title="values.production.yaml"
-   image:
-     repository: registry.example.com/openrum
-     tag: alpha-deploy-001
-
    config:
      appEnv: production
      publicBaseURL: https://rum.example.com
@@ -85,7 +87,7 @@ Complete [Deployment preparation](/docs/getting-started/production-deployment/) 
      # Replace with the actual Ingress proxy range you operate.
      ingestTrustedProxies: "10.42.0.0/16"
 
-   # The Chart runs its own Redis by default. To use yours instead:
+   # The chart runs its own Redis by default. To use yours instead:
    # redis:
    #   mode: external
    #   external:
@@ -98,24 +100,39 @@ Complete [Deployment preparation](/docs/getting-started/production-deployment/) 
      tls:
        - hosts: [rum.example.com]
          secretName: openrum-tls
+
+   # Only if you use your own image or a mirror:
+   # image:
+   #   repository: registry.example.com/openrum
+   #   tag: alpha-deploy-001
    ```
 
-   - `repository/tag`: the image from the image build step.
-   - `publicBaseURL/host`: the domain browsers actually visit; production requires HTTPS.
+   - `publicBaseURL` and `host`: the domain browsers actually visit; production requires HTTPS.
    - Kafka address, and Redis address if you use your own: endpoints reachable from Pods, not your development machine's `localhost`. The bundled Redis is a single instance; see [Redis: bundled or external](/docs/self-hosting/kubernetes/#redis-bundled-or-external).
    - `ingestTrustedProxies`: only proxy ranges you operate, allowing rate limits to identify the real caller IP.
-   - `className`: your installed Ingress Controller.
+   - `className`: your installed Ingress controller.
+   - `image`: leave it out to use the published image that matches the chart version.
 
    Leave object-storage fields empty initially. See [Helm values](/docs/reference/helm-values/) for more options.
 
-   **Success:** Every placeholder is replaced, DNS points to the Ingress, and Secret names match the credentials step.
+   **Success:** Every placeholder is replaced, DNS points to the Ingress, and the Secret names match the previous step.
 
-1. ## Install and verify services
+1. ## Install and verify
+
+   Render the chart first. A mistake in the values file fails here, before anything reaches the cluster:
 
    ```sh
-   helm lint deploy/helm/openrum -f values.production.yaml
-   helm upgrade --install openrum deploy/helm/openrum \
-     --namespace openrum --values values.production.yaml \
+   helm template openrum oci://ghcr.io/open-rum/charts/openrum \
+     --version 0.1.1 --namespace openrum \
+     --values values.production.yaml > /dev/null
+   ```
+
+   Then install, run the chart's tests and look at what came up:
+
+   ```sh
+   helm upgrade --install openrum oci://ghcr.io/open-rum/charts/openrum \
+     --version 0.1.1 --namespace openrum \
+     --values values.production.yaml \
      --wait --timeout 15m
    helm test openrum --namespace openrum
    kubectl -n openrum get pods,deploy,ingress

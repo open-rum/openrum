@@ -4,49 +4,58 @@ description: 生产环境可选择推荐的 Kubernetes/Helm，或单机 Docker�
 appliesTo: Alpha
 ---
 
-import { Aside, Badge, CardGrid, LinkCard } from "@astrojs/starlight/components";
+import { Aside, CardGrid, LinkCard } from "@astrojs/starlight/components";
 
-OpenRUM 运行在你自己管理的基础设施中。先选择部署路径；两条路径的准备工作与运维责任不同。两种生产部署均处于 Alpha 阶段，不提供可用性保证。
+OpenRUM 运行在你自己管理的基础设施中。两种生产部署均处于 Alpha 阶段，不提供可用性保证。先选一条路径；两条路径的准备工作与运维责任不同。
 
 ## 选择部署方式
 
-<div class="docs-entry-grid">
-  <CardGrid>
-    <div class="docs-deployment-choice docs-deployment-choice--recommended">
-      <Badge text="推荐" class="docs-deployment-badge" />
-      <LinkCard
-        title="Kubernetes / Helm"
-        href="/zh/docs/getting-started/production-deployment/"
-        description="将应用服务部署到集群，并自行准备外部 PostgreSQL、ClickHouse、Kafka、HTTPS、密钥和备份；Redis 可由 Chart 自带。"
-      />
-    </div>
-    <div class="docs-deployment-choice">
-      <LinkCard
-        title="Docker Compose · 单机生产部署"
-        href="/zh/docs/self-hosting/docker-production/"
-        description="在一台 Linux 主机上运行完整服务，配置私有凭据、自动 HTTPS 与备份，并接受单机故障边界。"
-      />
-    </div>
-  </CardGrid>
-</div>
+<CardGrid>
+  <LinkCard
+    title="Kubernetes / Helm · 推荐"
+    href="/zh/docs/getting-started/production-deployment/"
+    description="在你管理的集群上运行应用服务，PostgreSQL、ClickHouse 和 Kafka 由你自己提供。"
+  />
+  <LinkCard
+    title="Docker · 单机"
+    href="/zh/docs/self-hosting/docker-production/"
+    description="在一台 Linux 服务器上运行完整服务，自动 HTTPS、备份，并接受单机故障边界。"
+  />
+</CardGrid>
 
-<Aside type="caution" title="当前支持边界">
-  本地开发使用的 Compose
-  配置带演示数据和示例凭据，不可接入真实流量。独立的生产 Docker
-  配置移除了这些默认值，但仍是单点故障。Helm 路径也要求事先准备外部数据服务、TLS
-  与镜像仓库，并非一条命令就能完成的集群安装。
+|            | Kubernetes / Helm                                                        | Docker（单机）                                      |
+| ---------- | ------------------------------------------------------------------------ | --------------------------------------------------- |
+| 适合       | 已经有集群和托管数据服务、需要一套团队共享实例的团队                     | 一台 Linux 服务器、小团队，或预算有限的真实流量     |
+| 你需要提供 | 集群、Ingress 与 HTTPS、PostgreSQL、ClickHouse（集群）、Kafka，可选 Redis | 一台装有 Docker 的 Linux 主机，以及指向它的域名     |
+| 数据服务   | 由你提供，在 Chart 之外                                                  | 随这套服务一起部署，在同一台主机上                  |
+| 故障边界   | 你的集群和你的数据服务                                                   | 这一台主机和它的磁盘：主机丢失需要从备份恢复        |
+| 镜像与 Chart | 已发布：拉取 Chart 和镜像，不需要构建                                  | 从发布标签的源码检出里自己构建镜像                  |
+| 从这里开始 | [部署准备](/zh/docs/getting-started/production-deployment/)              | [单机 Docker 生产部署](/zh/docs/self-hosting/docker-production/) |
+
+## 已发布的内容
+
+当前版本是 `0.1.1`。应用镜像 `ghcr.io/open-rum/openrum:0.1.1`（提供 `linux/amd64` 和 `linux/arm64`）和版本为 `0.1.1` 的 Helm Chart `oci://ghcr.io/open-rum/charts/openrum` 都是公开的。Docker 路径从同一发布标签的源码检出里构建同一版本。发布说明见 [GitHub Releases](https://github.com/open-rum/openrum/releases)。
+
+<Aside type="caution" title="不可用于真实流量">
+  本地开发使用的 Compose 配置带演示数据和示例凭据，不要让它接入真实流量；请使用上面两条生产路径之一。
 </Aside>
 
 如果你要修改 OpenRUM 源码，或想在检出的源码里先试用，请阅读[本地开发](/zh/docs/getting-started/local-development/)。
 
 ## 自部署意味着什么
 
-你的团队需要负责域名与 HTTPS、凭据、容量、服务健康、升级和故障恢复。先了解[架构](/zh/docs/self-hosting/architecture/)与[外部依赖](/zh/docs/self-hosting/dependencies/)，再安排：
+你的团队需要负责域名与 HTTPS、凭据、容量、服务健康、升级和故障恢复。先了解[架构](/zh/docs/self-hosting/architecture/)与[外部依赖](/zh/docs/self-hosting/dependencies/)。
 
-- 接入真实流量前的[容量与保留规划](/zh/docs/self-hosting/capacity/)。
-- 首次升级前的[备份与恢复演练](/zh/docs/self-hosting/backup-restore/)。
-- 启用 Google、GitHub、OIDC 或 LDAP 登录时的[控制台认证配置](/zh/docs/self-hosting/authentication/)。
-- 日常[升级](/zh/docs/self-hosting/upgrades/)、[存储压力处理](/zh/docs/self-hosting/storage-pressure/)与[故障排查](/zh/docs/self-hosting/troubleshooting/)。
-- 将 Ingest 暴露到公网前阅读[威胁模型](/zh/docs/self-hosting/security/threat-model/)。
+**接入真实流量之前：**
+
+- 用[容量与保留规划](/zh/docs/self-hosting/capacity/)确定规格。
+- 首次升级之前，配置[备份并完成一次恢复演练](/zh/docs/self-hosting/backup-restore/)。
+- 把 Ingest 暴露到公网之前，阅读[威胁模型](/zh/docs/self-hosting/security/threat-model/)。
+- 想启用 Google、GitHub、OIDC 或 LDAP 登录，配置[控制台认证](/zh/docs/self-hosting/authentication/)。
+
+**运行期间：**
+
+- 规划[升级](/zh/docs/self-hosting/upgrades/)，并了解如何处理[存储压力](/zh/docs/self-hosting/storage-pressure/)。
+- 备好[故障排查](/zh/docs/self-hosting/troubleshooting/)。
 
 对象存储是可选的：没有 Bucket 时核心监控仍能运行；Source Map Artifact 需要 Alibaba OSS 或 S3 兼容服务。
