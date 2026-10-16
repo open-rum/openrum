@@ -1,7 +1,7 @@
 import { CheckCircle2Icon, KeyRoundIcon } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { docsUrl } from "@/lib/docs";
-import { quickStartSnippet, uploadTokensPath } from "./releaseLinks";
+import { quickStartSnippet } from "./releaseLinks";
 
 export function QuickStart({ projectId }: { projectId: string }) {
   return (
@@ -20,7 +20,6 @@ export function QuickStart({ projectId }: { projectId: string }) {
           <KeyRoundIcon />
           <span>
             在 CI 中把上传令牌设为 <code>OPENRUM_UPLOAD_TOKEN</code>。
-            <a href={uploadTokensPath(projectId)}>管理上传令牌</a>
           </span>
         </p>
         <p className="release-security">

@@ -97,6 +97,12 @@
       "propertyNames": { "type": "string", "minLength": 1, "maxLength": 64 },
       "additionalProperties": { "type": "string", "maxLength": 512 }
     },
+    "headers": {
+      "type": "object",
+      "maxProperties": 20,
+      "propertyNames": { "type": "string", "minLength": 1, "maxLength": 64 },
+      "additionalProperties": { "type": "string", "maxLength": 512 }
+    },
     "measurements": {
       "type": "object",
       "maxProperties": 20,
@@ -241,7 +247,11 @@
         "status": { "type": "integer", "minimum": 0, "maximum": 599 },
         "duration_ms": { "type": "number", "minimum": 0, "maximum": 3600000 },
         "transfer_size": { "type": "integer", "minimum": 0 },
-        "failure": { "enum": ["network", "timeout", "abort", "http"] }
+        "failure": { "enum": ["network", "timeout", "abort", "http"] },
+        "request_headers": { "$ref": "#/$defs/headers" },
+        "response_headers": { "$ref": "#/$defs/headers" },
+        "request_body": { "type": "string", "maxLength": 8192 },
+        "response_body": { "type": "string", "maxLength": 8192 }
       }
     },
     "customEvent": {

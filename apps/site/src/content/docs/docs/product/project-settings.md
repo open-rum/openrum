@@ -12,10 +12,10 @@ Project settings define how a monitored web product sends and retains telemetry.
 - **Client DSNs** with Origin allowlists, rotation and revocation
 - **Sampling** for Events, API Requests and errors
 - **Retention** for raw and aggregate data
-- **Source Map upload tokens** that let CI upload Source Map Artifacts for this Project
+- **Source Map** versions, files and upload tokens that let CI upload Source Map Artifacts for this Project
 
-Releases and their Source Map Artifacts are not a setting: open **Releases** in the Project's
-main navigation (`/projects/<id>/releases`).
+Source Map management is project setup rather than something you observe, so it is a project
+setting and not a main-navigation page. Older `/projects/<id>/releases` links redirect to it.
 
 ## Where to change them
 
@@ -24,8 +24,9 @@ names its scope in the path, so a link is unambiguous about which of account, or
 project or instance it belongs to:
 
 - **General** (`/settings/project/<id>/general`) — name, SDK platform, allowed Origins, retention days, and a danger zone to disable, re-enable or delete the project.
-- **Onboarding** (`/projects/<id>/onboarding`) — copy the Project's default DSN and platform-specific integration code, and manage **Source Map upload tokens**. Owners and Admins create and revoke tokens; the secret is shown once. See [Source Maps](/docs/sdk/source-maps/).
-- **Data management** — one entry for sampling, rate limits, inbound filters, URL normalization and privacy scrubbing. Switch between the page's tabs; each setting saves independently and applies across the Project's environments.
+- **Onboarding** (`/projects/<id>/onboarding`) — copy the Project's default DSN and platform-specific integration code.
+- **Source Map** (`/settings/project/<id>/sourcemaps`) — the Releases that have Source Maps, the files of the selected Release, a match tester, and the **upload tokens** CI uses. A Project with no Release yet opens on a three-step setup: create a token, add the build plugin, build. Owners and Admins create and revoke tokens; the secret is shown once. See [Source Maps](/docs/sdk/source-maps/).
+- **Data management** — one entry for sampling, rate limits, inbound filters, API header and body capture, URL normalization and privacy scrubbing. Switch between the page's tabs; each setting saves independently and applies across the Project's environments.
 - **Usage statistics** (`/settings/project/<id>/usage`) — accepted volume, estimated source volume and processing outcomes, with CSV export. Sampling configuration is separate from this report.
 
 ### Data management tabs
@@ -35,6 +36,7 @@ project or instance it belongs to:
 | Sampling | Configure the proportion retained by the SDK for Events, API Requests and errors before reporting. Preview the impact using the last seven days across all event types. | `/settings/project/<id>/sampling` |
 | Rate limits | Limit Ingest requests per second and choose the over-limit strategy; separate from routine SDK sampling. | `/settings/project/<id>/quota` |
 | Inbound filters | Exclude crawlers, extensions, localhost traffic and custom patterns. | `/settings/project/<id>/filters` |
+| API headers | Opt specific APIs in to recording the request and response headers you name, and optionally redacted request and response bodies. Off by default; stored for 3 days. See [API monitoring](/docs/product/api-monitoring/#request-and-response-headers-and-bodies). | `/settings/project/<id>/api-capture` |
 | URL normalization | Group dynamic addresses under stable route templates. | `/settings/project/<id>/url-rules` |
 | Privacy scrubbing | Add sensitive keys and patterns to the built-in redaction rules. | `/settings/project/<id>/scrubbing` |
 

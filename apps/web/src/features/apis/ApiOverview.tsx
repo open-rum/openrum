@@ -1,17 +1,13 @@
 import { MinusIcon, TrendingDownIcon, TrendingUpIcon } from "lucide-react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   apiFailureRate,
   formatAPIDuration,
-  type APIsResponse,
   type APISummary,
   type APITrendPoint,
 } from "@/lib/api/apis";
-import { ApiScatter } from "./ApiScatter";
-import { ApiTimeSpent } from "./ApiTimeSpent";
-import { ApiTrend } from "./ApiTrend";
-
-type Endpoint = APIsResponse["endpoints"][number];
+import { ApiCharts } from "./ApiCharts";
+import type { ApiTrendRange } from "./plotData";
 
 /** Whether a rising value should read as a regression or as neutral growth. */
 type Direction = "inverse" | "neutral";
@@ -20,14 +16,12 @@ export function ApiOverview({
   summary,
   previous,
   trend,
-  endpoints,
-  onSelect,
+  range,
 }: {
   summary: APISummary;
   previous?: APISummary;
   trend: readonly APITrendPoint[];
-  endpoints: readonly Endpoint[];
-  onSelect: (endpoint: Endpoint) => void;
+  range: ApiTrendRange;
 }) {
   const failureRate = apiFailureRate(summary);
   const previousFailureRate = previous ? apiFailureRate(previous) : undefined;
@@ -63,50 +57,7 @@ export function ApiOverview({
           direction="inverse"
         />
       </div>
-      <Card className="api-trend-card">
-        <CardHeader>
-          <div>
-            <CardTitle>请求量与失败趋势</CardTitle>
-            <CardDescription>
-              覆盖当前筛选下的全部 {summary.endpoints.toLocaleString()} 个
-              endpoint。堆叠高度即该时段请求量，失败与 4xx 贴零轴便于看出变化；悬停可看各段占比与
-              P95。
-            </CardDescription>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <ApiTrend trend={trend} label="全部 endpoint " size="lg" />
-        </CardContent>
-      </Card>
-      <div className="api-priority-grid">
-        <Card>
-          <CardHeader>
-            <div>
-              <CardTitle>请求量与 P95 分布</CardTitle>
-              <CardDescription>
-                两轴均为对数刻度。右上角同时高频且慢的 endpoint 最值得先修；失败率超过 5%
-                标红，空心点的分位数样本偏少。
-              </CardDescription>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <ApiScatter endpoints={endpoints} overallP95={summary.p95} onSelect={onSelect} />
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <div>
-              <CardTitle>耗时占比</CardTitle>
-              <CardDescription>
-                按请求量 × P95 加权，用于比较相对权重，而非真实累计耗时。
-              </CardDescription>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <ApiTimeSpent endpoints={endpoints} onSelect={onSelect} />
-          </CardContent>
-        </Card>
-      </div>
+      <ApiCharts trend={trend} range={range} scope="全部 endpoint" />
     </section>
   );
 }

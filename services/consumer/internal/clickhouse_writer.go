@@ -22,7 +22,8 @@ project_id,event_id,event_type,timestamp,received_at,raw_expires_at,aggregate_ex
 page_url,page_url_normalized,route,referrer,title,navigation_type,sdk_name,sdk_version,schema_version,sample_rate,
 browser,browser_version,os,os_version,device_type,country,trace_id,span_id,error_type,error_message,error_stack,
 error_mechanism,fingerprint,fingerprint_version,handled,api_method,api_url_normalized,api_status,api_failure,duration_ms,transfer_size,
-metric_name,metric_value,metric_delta,metric_rating,custom_name,attributes,measurements,breadcrumbs,ingest_flags,log_level,log_message,log_logger
+metric_name,metric_value,metric_delta,metric_rating,custom_name,attributes,measurements,breadcrumbs,ingest_flags,log_level,log_message,log_logger,
+api_request_headers,api_response_headers,api_request_body,api_response_body
 )`
 
 var ErrClickHouseWriterClosed = errors.New("ClickHouse writer is closed")
@@ -268,11 +269,22 @@ func (writer *BufferedClickHouseWriter) insert(ctx context.Context, events []eve
 			current.MetricName, current.MetricValue, current.MetricDelta, current.MetricRating, current.CustomName,
 			current.Attributes, current.Measurements, current.Breadcrumbs, current.IngestFlags,
 			current.LogLevel, current.LogMessage, current.LogLogger,
+			nonNilHeaders(current.APIRequestHeaders), nonNilHeaders(current.APIResponseHeaders),
+			current.APIRequestBody, current.APIResponseBody,
 		); err != nil {
 			return err
 		}
 	}
 	return batch.Send()
+}
+
+// nonNilHeaders gives the driver an empty map rather than a nil one, which most
+// rows have: nothing is captured unless a project opted an endpoint in.
+func nonNilHeaders(headers map[string]string) map[string]string {
+	if headers == nil {
+		return map[string]string{}
+	}
+	return headers
 }
 
 func eventBatchToken(events []event.CanonicalEvent) string {
@@ -288,9 +300,15 @@ func estimateEventsBytes(events []event.CanonicalEvent) int {
 	total := 0
 	for _, current := range events {
 		total += 512 + len(current.PageURL) + len(current.PageURLNormalized) + len(current.Title) +
-			len(current.ErrorMessage) + len(current.ErrorStack) + len(current.APIURLNormalized) + len(current.LogMessage) + len(current.LogLogger)
+			len(current.ErrorMessage) + len(current.ErrorStack) + len(current.APIURLNormalized) + len(current.LogMessage) + len(current.LogLogger) +
+			len(current.APIRequestBody) + len(current.APIResponseBody)
 		for key, value := range current.Attributes {
 			total += len(key) + len(value)
+		}
+		for _, headers := range []map[string]string{current.APIRequestHeaders, current.APIResponseHeaders} {
+			for key, value := range headers {
+				total += len(key) + len(value)
+			}
 		}
 		for _, breadcrumb := range current.Breadcrumbs {
 			total += len(breadcrumb)

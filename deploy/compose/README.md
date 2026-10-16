@@ -38,4 +38,4 @@ docker compose --env-file deploy/compose/.env.example -f deploy/compose/docker-c
 
 Add `--volumes` only when you intentionally want a complete local reset. Example credentials and single-node dependencies must never be used for production.
 
-For Vite hot reload and running the Go API from source against these dependencies, see [local development](../../docs/local-development.md).
+For Vite hot reload and running the Go API from source against these dependencies, see [local development](https://openrum.netlify.app/docs/getting-started/local-development/).

@@ -56,6 +56,73 @@ func TestNormalizeQueuedEnvelopeProducesScrubbedCanonicalEvents(t *testing.T) {
 	}
 }
 
+func TestNormalizeScrubsAPIHeaderSnapshots(t *testing.T) {
+	envelope := fixtureEnvelope(t)
+	envelope.Events[3].Request.RequestHeaders = map[string]string{
+		"X-Request-Id": "r-1", "Authorization": "Bearer abc.def", "Cookie": "sid=1", "x-contact": "ops@example.com",
+	}
+	envelope.Events[3].Request.ResponseHeaders = map[string]string{"content-type": "application/json", "set-cookie": "sid=2"}
+
+	canonical, failures, err := event.NormalizeQueuedEnvelope(queuedPayload(t, envelope, event.QueueSchemaVersion))
+	if err != nil || len(failures) != 0 {
+		t.Fatalf("failures=%+v error=%v", failures, err)
+	}
+	api := canonical[3]
+	if api.APIRequestHeaders["x-request-id"] != "r-1" || api.APIResponseHeaders["content-type"] != "application/json" {
+		t.Fatalf("headers lost: %+v %+v", api.APIRequestHeaders, api.APIResponseHeaders)
+	}
+	if api.APIRequestHeaders["x-contact"] != "[REDACTED_EMAIL]" {
+		t.Fatalf("value not scrubbed: %+v", api.APIRequestHeaders)
+	}
+	for _, name := range []string{"authorization", "cookie"} {
+		if _, kept := api.APIRequestHeaders[name]; kept {
+			t.Fatalf("%s survived normalization", name)
+		}
+	}
+	if _, kept := api.APIResponseHeaders["set-cookie"]; kept {
+		t.Fatal("set-cookie survived normalization")
+	}
+	if !slices.Contains(api.IngestFlags, "pii_scrubbed") {
+		t.Fatalf("flags = %v, want pii_scrubbed", api.IngestFlags)
+	}
+}
+
+func TestNormalizeScrubsAPIBodySnapshots(t *testing.T) {
+	envelope := fixtureEnvelope(t)
+	envelope.Events[3].Request.RequestBody = `{"items":[{"sku":"A-1"}],"contact":{"email":"buyer@example.com"},"payment":{"cardNumber":"4242 4242 4242 4242","token":"tok_abc"}}`
+	envelope.Events[3].Request.ResponseBody = `{"orderId":"o-1","status":"created"}`
+
+	canonical, failures, err := event.NormalizeQueuedEnvelope(queuedPayload(t, envelope, event.QueueSchemaVersion))
+	if err != nil || len(failures) != 0 {
+		t.Fatalf("failures=%+v error=%v", failures, err)
+	}
+	api := canonical[3]
+	for _, leaked := range []string{"buyer@example.com", "4242", "tok_abc"} {
+		if strings.Contains(api.APIRequestBody, leaked) {
+			t.Fatalf("%q survived normalization: %s", leaked, api.APIRequestBody)
+		}
+	}
+	if !strings.Contains(api.APIRequestBody, `"sku":"A-1"`) || api.APIResponseBody != `{"orderId":"o-1","status":"created"}` {
+		t.Fatalf("bodies = %q / %q", api.APIRequestBody, api.APIResponseBody)
+	}
+	if !slices.Contains(api.IngestFlags, "pii_scrubbed") {
+		t.Fatalf("flags = %v, want pii_scrubbed", api.IngestFlags)
+	}
+}
+
+func TestNormalizeAPIWithoutHeadersLeavesThemEmpty(t *testing.T) {
+	canonical, _, err := event.NormalizeQueuedEnvelope(queuedPayload(t, fixtureEnvelope(t), event.QueueSchemaVersion))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if canonical[3].APIRequestBody != "" || canonical[3].APIResponseBody != "" {
+		t.Fatalf("a body appeared from nothing: %q %q", canonical[3].APIRequestBody, canonical[3].APIResponseBody)
+	}
+	if canonical[3].APIRequestHeaders != nil || canonical[3].APIResponseHeaders != nil {
+		t.Fatalf("headers appeared from nothing: %+v %+v", canonical[3].APIRequestHeaders, canonical[3].APIResponseHeaders)
+	}
+}
+
 func TestNormalizeQueuedEnvelopeSupportsPreviousQueueAndEventSchema(t *testing.T) {
 	envelope := fixtureEnvelope(t)
 	envelope.SchemaVersion = "0.9"

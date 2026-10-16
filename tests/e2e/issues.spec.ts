@@ -16,7 +16,7 @@ test("issues filters, rows and themes remain usable", async ({ page }) => {
   await page.getByRole("combobox", { name: "问题状态" }).click();
   await page.getByRole("option", { name: "待处理" }).click();
   await expect(page).toHaveURL(/status=unresolved/);
-  const search = page.getByRole("textbox", { name: "搜索错误或添加筛选条件" });
+  const search = page.getByRole("combobox", { name: "搜索错误或添加筛选条件" });
   await search.fill("checkout");
   await search.press("Enter");
   await expect(rows).toHaveCount(1);

@@ -18,6 +18,7 @@ import (
 	openrumcrypto "openrum/internal/crypto"
 	"openrum/internal/httpx"
 	"openrum/internal/ingest"
+	"openrum/internal/mailservice"
 	"openrum/internal/metadata"
 	"openrum/internal/migrate"
 	"openrum/internal/observability"
@@ -146,6 +147,8 @@ func registerRoutes(ctx context.Context, router *httpx.Router, configuration con
 	projectKeyHandler := handlers.NewProjectKeyHandler(projectKeyRepository, configuration.IngestEnvelopeURL(), logger)
 	projectFilterHandler := handlers.NewProjectFilterHandler(projectRepository,
 		metadata.NewProjectFilterRepository(database), logger)
+	projectCaptureHandler := handlers.NewProjectCaptureHandler(projectRepository,
+		metadata.NewProjectCaptureRepository(database), logger)
 	projectProcessingHandler := handlers.NewProjectProcessingHandler(projectRepository,
 		metadata.NewProjectProcessingRepository(database), logger)
 	sdkConfigHandler := handlers.NewSDKConfigHandler(projectKeyRepository, projectConfigRepository, logger, pressureMonitor)
@@ -173,6 +176,7 @@ func registerRoutes(ctx context.Context, router *httpx.Router, configuration con
 	var instanceSecretRepository *metadata.InstanceSecretRepository
 	var authKeyring *openrumcrypto.Keyring
 	var storageSecrets sourcemap.ManagedStorageSource
+	var emailManaged mailservice.ManagedStore
 	// Nil until managed secrets are configured. Alert rules work regardless;
 	// only notification channels need to seal a webhook secret at rest.
 	var channelCodec metadata.EnvelopeCodec
@@ -185,12 +189,20 @@ func registerRoutes(ctx context.Context, router *httpx.Router, configuration con
 		channelCodec = keyring
 		instanceSecretRepository = metadata.NewInstanceSecretRepository(database, keyring)
 		storageSecrets = instanceSecretRepository
+		emailManaged = instanceSecretRepository
 	}
 	// Every consumer holds the switcher, so the refresher can replace the client
 	// when the managed configuration changes on any replica.
 	storageSwitcher := sourcemap.NewSwitchableStorage(nil, nil)
 	adminStorageHandler := handlers.NewAdminStorageHandler(instanceMemberRepository, sessionManager, storageSwitcher, configuration, logger)
 	adminStorageHandler.EnableArtifactUsage(issueStateRepository)
+	// One service decides which mail server applies, so alerts and invitations added later
+	// send through the same configuration the Console shows.
+	mailService := mailservice.New(configuration.SMTP, emailManaged, nil)
+	adminEmailHandler := handlers.NewAdminEmailHandler(instanceMemberRepository, sessionManager, mailService, logger)
+	if instanceSecretRepository != nil {
+		adminEmailHandler.EnableManagedSecrets(instanceSecretRepository)
+	}
 	externalAuthHandler := handlers.NewExternalAuthHandler(auth.NewExternalStore(database, authKeyring), sessionManager,
 		redisClient, failureLimiter, instanceMemberRepository, configuration.PublicBaseURL, secureCookie, logger)
 	if instanceSecretRepository != nil {
@@ -267,6 +279,10 @@ func registerRoutes(ctx context.Context, router *httpx.Router, configuration con
 	router.Handle("GET /api/v1/admin/object-storage", requireSession(http.HandlerFunc(adminStorageHandler.Get)))
 	router.Handle("POST /api/v1/admin/object-storage/test", requireSession(adminMutationAudit(requireCSRF(http.HandlerFunc(adminStorageHandler.Test)))))
 	router.Handle("PUT /api/v1/admin/object-storage/managed", requireSession(adminMutationAudit(requireCSRF(http.HandlerFunc(adminStorageHandler.PutManaged)))))
+	router.Handle("GET /api/v1/admin/email", requireSession(http.HandlerFunc(adminEmailHandler.Get)))
+	router.Handle("PUT /api/v1/admin/email/managed", requireSession(adminMutationAudit(requireCSRF(http.HandlerFunc(adminEmailHandler.PutManaged)))))
+	router.Handle("DELETE /api/v1/admin/email/managed", requireSession(adminMutationAudit(requireCSRF(http.HandlerFunc(adminEmailHandler.DeleteManaged)))))
+	router.Handle("POST /api/v1/admin/email/test", requireSession(adminMutationAudit(requireCSRF(http.HandlerFunc(adminEmailHandler.Test)))))
 	router.Handle("GET /api/v1/organizations/{orgId}/projects", requireSession(http.HandlerFunc(projectHandler.List)))
 	router.Handle("POST /api/v1/organizations/{orgId}/projects", requireSession(requireCSRF(http.HandlerFunc(projectHandler.Create))))
 	router.Handle("GET /api/v1/projects/{projectId}", requireSession(http.HandlerFunc(projectHandler.Get)))
@@ -276,6 +292,8 @@ func registerRoutes(ctx context.Context, router *httpx.Router, configuration con
 	router.Handle("POST /api/v1/projects/{projectId}/data-purge", requireSession(requireCSRF(http.HandlerFunc(projectHandler.CreateDataPurge))))
 	router.Handle("GET /api/v1/projects/{projectId}/filters", requireSession(http.HandlerFunc(projectFilterHandler.Get)))
 	router.Handle("PUT /api/v1/projects/{projectId}/filters", requireSession(requireCSRF(http.HandlerFunc(projectFilterHandler.Put))))
+	router.Handle("GET /api/v1/projects/{projectId}/api-capture", requireSession(http.HandlerFunc(projectCaptureHandler.Get)))
+	router.Handle("PUT /api/v1/projects/{projectId}/api-capture", requireSession(requireCSRF(http.HandlerFunc(projectCaptureHandler.Put))))
 	router.Handle("GET /api/v1/projects/{projectId}/url-rules", requireSession(http.HandlerFunc(projectProcessingHandler.GetURLRules)))
 	router.Handle("PUT /api/v1/projects/{projectId}/url-rules", requireSession(requireCSRF(http.HandlerFunc(projectProcessingHandler.PutURLRules))))
 	router.Handle("GET /api/v1/projects/{projectId}/scrub-rules", requireSession(http.HandlerFunc(projectProcessingHandler.GetScrubRules)))
@@ -304,6 +322,7 @@ func registerRoutes(ctx context.Context, router *httpx.Router, configuration con
 	router.Handle("GET /api/v1/projects/{projectId}/performance", requireSession(http.HandlerFunc(performanceHandler.Get)))
 	router.Handle("GET /api/v1/projects/{projectId}/logs", requireSession(http.HandlerFunc(logHandler.List)))
 	router.Handle("GET /api/v1/projects/{projectId}/apis", requireSession(http.HandlerFunc(apiHandler.Get)))
+	router.Handle("GET /api/v1/projects/{projectId}/apis/samples", requireSession(http.HandlerFunc(apiHandler.Samples)))
 	router.Handle("GET /api/v1/projects/{projectId}/usage", requireSession(http.HandlerFunc(usageHandler.Get)))
 	router.Handle("GET /api/v1/projects/{projectId}/usage.csv", requireSession(http.HandlerFunc(usageHandler.CSV)))
 	router.Handle("GET /api/v1/projects/{projectId}/issues", requireSession(http.HandlerFunc(issueHandler.List)))

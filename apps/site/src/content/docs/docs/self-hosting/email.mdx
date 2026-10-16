@@ -1,0 +1,106 @@
+---
+title: Email service
+description: Configure the SMTP server an OpenRUM Instance sends mail with, in the Console or in the deployment.
+appliesTo: Alpha
+---
+
+import { Aside, Steps } from "@astrojs/starlight/components";
+
+An Instance sends mail through one SMTP server. Configure it once and every feature that sends email uses it. Today the Console uses it for the test message; features that send alerts or invitations by email will use the same server. Without it, everything else works as before.
+
+## Choose where to configure it
+
+You can configure the server in the Console or in the deployment. The deployment wins when both exist.
+
+| | Console | Deployment |
+| --- | --- | --- |
+| Where | **System Settings → Email service** | `SMTP_*` environment variables, or Helm `config.smtp` |
+| Password | Encrypted in PostgreSQL | Runtime Secret or private `.env` file |
+| Needs | [Encrypted secrets](/docs/self-hosting/authentication/) (`OPENRUM_ALLOW_MANAGED_SECRETS` and `OPENRUM_MASTER_KEY`) | Nothing extra |
+| Change it | In the Console, takes effect on every replica at once | Edit the deployment and restart |
+| Console shows it as | Editable | Read-only |
+
+If the deployment sets `SMTP_HOST`, the Console shows that server read-only and refuses to save another one. A server saved in the Console earlier stays stored, and the page tells you it is not in use. It applies again if you remove the deployment's `SMTP_*` settings.
+
+## Before you start
+
+Have these ready from your mail provider:
+
+- The server host name, for example `smtp.example.com`, and its port.
+- The security mode it expects, and a username and password if it requires login. Many providers need a dedicated SMTP password or an app password, not the account's sign-in password.
+- A sender address on a domain you control, such as `no-reply@example.com`.
+- SPF, DKIM and DMARC records for that domain. Without them, mail from a transactional provider often lands in spam.
+- Outbound network access from the API service to the server's port. Many clouds block port 25.
+
+For system mail, a transactional provider such as Resend, SendGrid or Amazon SES is usually more reliable than a personal mailbox. The Console page lists the host and port for common providers.
+
+## Security modes
+
+| Mode | Default port | Behavior |
+| --- | --- | --- |
+| `starttls` (default) | 587 | Connects in plain text, then upgrades to TLS. OpenRUM refuses to continue if the server does not offer STARTTLS |
+| `tls` | 465 | Encrypts from the first byte (SMTPS) |
+| `none` | 25 | No encryption. Only for a trusted internal relay. It cannot carry a username or password |
+
+Certificates are always verified in `starttls` and `tls` mode, and verification cannot be turned off. TLS 1.2 or newer is required.
+
+## Set it up
+
+<Steps>
+
+1. ## Configure the server
+
+   **In the Console.** Sign in as an Instance Owner and open **System Settings → Email service**. Enter the server, sender, security mode, username and password, then choose **Verify connection and save**. OpenRUM connects to the server and signs in, without sending any mail, and saves only if that succeeds. Saving needs your OpenRUM password again within five minutes and is written to the audit log. A blank password keeps the stored one only while the username and host are unchanged.
+
+   **In the deployment.** Use the variables in the [configuration reference](/docs/reference/configuration/#email-smtp). With Helm, put the non-secret values in your values file and the password in the runtime Secret:
+
+   ```yaml title="values.production.yaml"
+   config:
+     smtp:
+       host: smtp.example.com
+       security: starttls
+       username: mailer@example.com
+       from: "OpenRUM <no-reply@example.com>"
+   ```
+
+   ```sh
+   # Read the password without echoing it or saving it in shell history.
+   read -rs SMTP_PASSWORD; echo
+   # Add it to the existing runtime Secret. base64 keeps special characters intact.
+   kubectl -n openrum patch secret openrum-runtime --type merge \
+     -p "{\"data\":{\"SMTP_PASSWORD\":\"$(printf %s "$SMTP_PASSWORD" | base64 | tr -d '\n')\"}}"
+   # Apply the values, then restart so the Secret change is picked up.
+   helm upgrade openrum oci://ghcr.io/open-rum/charts/openrum \
+     --version 0.1.1 --namespace openrum \
+     --values values.production.yaml --wait
+   kubectl -n openrum rollout restart deployment -l app.kubernetes.io/instance=openrum
+   ```
+
+   With Docker Compose, set the `SMTP_*` lines in `deploy/compose/.env.production`, then run `docker compose --env-file deploy/compose/.env.production -f deploy/compose/production.compose.yml up -d`.
+
+   **Success:** the Console page shows the server and its source: **Deployment environment** or **Console managed**.
+
+1. ## Send a test message
+
+   Choose **Send test email**. The message goes to the email address of the account you are signed in with. You cannot pick another recipient, and the button allows one message every five seconds.
+
+   **Success:** the page says the message was sent and it arrives in your inbox. Check the spam folder if it does not.
+
+</Steps>
+
+## If it fails
+
+A failed save or test names the stage that stopped and shows the server's own reply. The password never appears in an error.
+
+| Stage | Meaning | What to check |
+| --- | --- | --- |
+| `connect` | Could not reach the server | Host name, port, DNS, firewall and outbound rules |
+| `tls` | The encrypted connection failed | The mode matches the port (`tls` on 465, `starttls` on 587) and the server certificate is trusted |
+| `auth` | The server refused the login | Username, and whether the provider needs an SMTP or app-specific password |
+| `sender` | The sender address was refused | The sender is a verified address or domain for this account |
+| `recipient` | The recipient was refused | The address exists and the provider allows sending to it |
+| `send` | The message was refused or interrupted | The provider's sending limits and the server's reply |
+
+<Aside type="note" title="If the Console cannot save">
+  The Console can only save a server when encrypted secrets are enabled. If **Email service** says that managed secrets are not enabled, either follow [Console authentication](/docs/self-hosting/authentication/) to enable them, or configure the server in the deployment instead.
+</Aside>

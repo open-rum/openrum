@@ -133,6 +133,7 @@ function ChartTooltipContent({
   color,
   nameKey,
   labelKey,
+  itemFilter,
 }: React.ComponentProps<typeof RechartsPrimitive.Tooltip> &
   React.ComponentProps<"div"> & {
     hideLabel?: boolean;
@@ -140,6 +141,11 @@ function ChartTooltipContent({
     indicator?: "line" | "dot" | "dashed";
     nameKey?: string;
     labelKey?: string;
+    /** Leaves an item out of the tooltip; it is given every item so one can depend on another. */
+    itemFilter?: (
+      item: NonNullable<typeof payload>[number],
+      items: NonNullable<typeof payload>,
+    ) => boolean;
   } & Omit<
     RechartsPrimitive.DefaultTooltipContentProps<TooltipValueType, TooltipNameType>,
     "accessibilityLayer"
@@ -186,7 +192,7 @@ function ChartTooltipContent({
       {!nestLabel ? tooltipLabel : null}
       <div className="grid gap-1.5">
         {payload
-          .filter((item) => item.type !== "none")
+          .filter((item) => item.type !== "none" && (!itemFilter || itemFilter(item, payload)))
           .map((item, index) => {
             const key = `${nameKey ?? item.name ?? item.dataKey ?? "value"}`;
             const itemConfig = getPayloadConfigFromPayload(config, item, key);

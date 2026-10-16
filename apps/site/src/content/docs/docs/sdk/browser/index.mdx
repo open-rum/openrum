@@ -147,8 +147,10 @@ than once.
 | API Requests    | fetch and XHR timing, excluding OpenRUM's own ingest and config endpoints.               |
 | Core Web Vitals | Collected through `web-vitals`, which is bundled into the package.                       |
 
-Query strings, URL fragments, request and response bodies, headers and raw input values
-are stripped in the browser before an Event is queued.
+Query strings, URL fragments and raw input values are stripped in the browser before an
+Event is queued. Headers and bodies are not read at all unless the Project opted that API
+in, and a body that is read is redacted first; see
+[API monitoring](/docs/product/api-monitoring/#request-and-response-headers-and-bodies).
 
 ## Structured logs
 

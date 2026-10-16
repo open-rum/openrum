@@ -5,7 +5,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { Release } from "@/lib/api/releases";
-import { formatDateTime } from "./format";
 
 export function ReleaseCountBadge({ release }: { release: Release }) {
   if (!release.artifactCount) return <Badge variant="outline">无 Source Map</Badge>;
@@ -45,7 +44,7 @@ export function ReleaseList({
     <Card>
       <CardHeader>
         <CardTitle>版本</CardTitle>
-        <CardDescription>选择一个版本查看、上传或删除它的 Source Map。</CardDescription>
+        <CardDescription>选择一个版本，在右侧查看、上传或删除它的 Source Map。</CardDescription>
       </CardHeader>
       <CardContent className="grid gap-3">
         <label className="release-search">
@@ -81,11 +80,6 @@ export function ReleaseList({
                   <small>{release.dist ? `dist ${release.dist}` : "默认 dist"}</small>
                 </span>
                 <ReleaseCountBadge release={release} />
-                <code>{release.commitSha ? release.commitSha.slice(0, 12) : "—"}</code>
-                <time dateTime={release.deployedAt ?? release.createdAt}>
-                  {release.deployedAt ? "部署于 " : "登记于 "}
-                  {formatDateTime(release.deployedAt ?? release.createdAt)}
-                </time>
               </button>
             ))}
           </div>

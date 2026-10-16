@@ -15,12 +15,15 @@ export function SlidingIndicator({
   activeSelector: string;
   className?: string;
 }) {
+  const indicatorRef = React.useRef<HTMLSpanElement>(null);
   const [box, setBox] = React.useState<{ left: number; width: number } | null>(null);
   // The first placement must not animate in from the left edge.
   const [ready, setReady] = React.useState(false);
 
   React.useLayoutEffect(() => {
-    const container = containerRef.current;
+    // A child's layout effect runs before its parent's ref is attached, so the container
+    // ref can still be empty on the first pass; the indicator's own parent is the same node.
+    const container = containerRef.current ?? indicatorRef.current?.parentElement;
     if (!container) return;
     const measure = () => {
       const active = container.querySelector<HTMLElement>(activeSelector);
@@ -45,17 +48,19 @@ export function SlidingIndicator({
     };
   }, [containerRef, activeSelector]);
 
-  if (!box) return null;
+  // Rendered even before the first measurement so the effect above can find its container.
   return (
     <span
+      ref={indicatorRef}
       aria-hidden="true"
       data-slot="sliding-indicator"
       className={cn(
         "pointer-events-none absolute inset-y-[3px] left-0 z-0 rounded-full bg-background shadow-sm dark:bg-input",
         ready && "transition-[transform,width] duration-200 ease-out motion-reduce:transition-none",
+        !box && "hidden",
         className,
       )}
-      style={{ width: box.width, transform: `translateX(${box.left}px)` }}
+      style={box ? { width: box.width, transform: `translateX(${box.left}px)` } : undefined}
     />
   );
 }

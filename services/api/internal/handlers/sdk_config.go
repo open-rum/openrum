@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 
+	"openrum/internal/capture"
 	"openrum/internal/httpx"
 	"openrum/internal/metadata"
 )
@@ -49,6 +50,10 @@ type sdkConfigResponse struct {
 	EmergencySampleRate *float64 `json:"emergencySampleRate,omitempty"`
 	EmergencyExpiresAt  *string  `json:"emergencyExpiresAt,omitempty"`
 	EmergencyReason     string   `json:"emergencyReason,omitempty"`
+	// APICapture lists the endpoints whose headers a browser may read. Always
+	// present, and empty by default, so an SDK never has to guess whether the
+	// server predates the feature.
+	APICapture capture.Settings `json:"apiCapture"`
 }
 
 func NewSDKConfigHandler(keys sdkConfigKeys, config sdkConfigReader, logger zerolog.Logger, emergency ...emergencySamplingProvider) *SDKConfigHandler {
@@ -85,6 +90,7 @@ func (handler *SDKConfigHandler) Get(writer http.ResponseWriter, request *http.R
 		EventSampleRate:     config.EventSampleRate,
 		APISampleRate:       config.APISampleRate,
 		ErrorSampleRate:     config.ErrorSampleRate,
+		APICapture:          config.APICapture,
 	}
 	if config.EmergencySampleRate != nil && config.EmergencyExpiresAt != nil {
 		response.Emergency = true

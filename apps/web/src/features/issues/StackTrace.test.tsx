@@ -121,7 +121,7 @@ describe("StackTrace frames", () => {
 });
 
 describe("StackTrace source map guidance", () => {
-  it("links to the Releases page with the event's release and dist preselected", () => {
+  it("links to the Source Map page with the event's release and dist preselected", () => {
     const view = render(<StackTrace event={event({ mappedStack: failedStack })} />);
     const note = view.getByRole("note", { name: "Source Map 下一步" });
     expect(within(note).getByText("为版本 web@1.2.3（dist browser）上传 Source Map")).toBeTruthy();
@@ -130,7 +130,7 @@ describe("StackTrace source map guidance", () => {
       within(note)
         .getByRole("link", { name: /上传 Source Map/ })
         .getAttribute("href"),
-    ).toBe("/projects/project-1/releases?release=web%401.2.3&dist=browser");
+    ).toBe("/settings/project/project-1/sourcemaps?release=web%401.2.3&dist=browser");
   });
 
   it("shows each unmapped frame's own failure reason", () => {
@@ -163,7 +163,7 @@ describe("StackTrace source map guidance", () => {
     const note = view.getByRole("note", { name: "Source Map 下一步" });
     expect(within(note).getByText("为版本 web@1.2.3 上传 Source Map")).toBeTruthy();
     expect(within(note).getByRole("link").getAttribute("href")).toBe(
-      "/projects/project-1/releases?release=web%401.2.3",
+      "/settings/project/project-1/sourcemaps?release=web%401.2.3",
     );
   });
 

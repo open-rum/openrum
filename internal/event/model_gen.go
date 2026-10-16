@@ -103,6 +103,12 @@ type APIRequest struct {
 	DurationMS   float64 `json:"duration_ms"`
 	TransferSize *int64  `json:"transfer_size,omitempty"`
 	Failure      string  `json:"failure,omitempty"`
+	// Header snapshots the project opted in to capture; see internal/capture.
+	RequestHeaders  map[string]string `json:"request_headers,omitempty"`
+	ResponseHeaders map[string]string `json:"response_headers,omitempty"`
+	// Body snapshots the project opted in to capture; see internal/capture.
+	RequestBody  string `json:"request_body,omitempty"`
+	ResponseBody string `json:"response_body,omitempty"`
 }
 
 func DecodeEnvelopeV1(data []byte) (EnvelopeV1, error) {

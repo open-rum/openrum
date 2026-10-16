@@ -42,7 +42,13 @@ export function LogFilterComposer({
         { label: "警告日志", onSelect: () => onChange({ level: "warn" }) },
         { label: "有 Trace", onSelect: () => appendQuery("trace_id:*") },
       ]}
+      searchLabel="日志正文与属性"
+      // The query already understands field:value with quoting and `*`; reading it again here
+      // would quote a wildcard such as trace_id:* and change what it matches.
+      fieldTerms={false}
+      syntaxHint={'可直接输入查询词，例如 user.id:"customer-123" 或 trace_id:*'}
       onSearch={appendQuery}
+      onClear={() => onChange({ q: undefined, level: undefined })}
       onSelect={(key, value) => {
         if (key === "level") {
           onChange({ level: String(value) });
@@ -161,9 +167,16 @@ function logFields(items?: LogEntry[]): FilterSearchField[] {
 }
 
 function logTokens(filters: LogFilters, terms: string[]): FilterSearchToken[] {
-  const tokens = terms.map((term, index) => ({ key: `q:${index}`, label: formatTerm(term) }));
+  const tokens: FilterSearchToken[] = terms.map((term, index) => ({
+    key: `q:${index}`,
+    label: formatTerm(term),
+  }));
   if (filters.level)
-    tokens.unshift({ key: "level", label: `级别：${filters.level.toUpperCase()}` });
+    tokens.unshift({
+      key: "level",
+      fieldKey: "level",
+      label: `级别：${filters.level.toUpperCase()}`,
+    });
   return tokens;
 }
 

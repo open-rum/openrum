@@ -1,101 +1,265 @@
 ---
-title: 环境与启动
-description: 准备工具、获取代码、启动本地开发环境并登录控制台。
+title: 本地开发
+description: 从源码运行 OpenRUM、登录、接入应用，以及修改代码时用到的命令和检查。
 appliesTo: Alpha
 ---
 
-import { Steps, Aside, LinkCard } from "@astrojs/starlight/components";
+import { Aside } from "@astrojs/starlight/components";
 
-本教程帮助你在电脑上运行 OpenRUM 并修改代码。完成后，控制台默认地址为 `http://127.0.0.1:4173`。
+本页带你从全新克隆走到一套可以随意修改的运行中服务，之后也可以作为日常参考。控制台地址是 `http://127.0.0.1:4173`。
 
-<Steps>
+## 前置条件
 
-1. ## 准备工具
-   - **Git：** 用于获取代码；检查：`git --version`
-   - **Docker：** Docker Engine 或 Desktop，支持 Compose v2；检查：`docker info`、`docker compose version`
-   - **Node.js：** 24；检查：`node --version`
-   - **pnpm：** 11.11.0；检查：`pnpm --version`
-   - **Go：** 1.26，精确工具链见仓库 `go.mod`；检查：`go version`
+| 工具    | 版本                                          | 检查                                    |
+| ------- | --------------------------------------------- | --------------------------------------- |
+| Git     | 任意较新版本                                  | `git --version`                         |
+| Docker  | Engine 或 Desktop，含 Compose v2，内存 8 GB 以上 | `docker info`、`docker compose version` |
+| Node.js | 24                                            | `node --version`                        |
+| pnpm    | 11.11.0，通过 Corepack                        | `pnpm --version`                        |
+| Go      | 1.26；具体工具链见 `go.mod`                   | `go version`                            |
 
-   先启动 Docker。建议为 Docker 环境分配至少 8 GB 内存，并预留镜像和数据库磁盘空间。命令管理器支持 macOS、Linux；Windows 请在 WSL 中运行。
+先启动 Docker，并为镜像和数据库留足磁盘空间。`openrum` 命令支持 macOS 和 Linux；Windows 请使用 WSL。
 
-   **成功标志：** Docker 可以连接，其他命令能输出版本。无法连接 Docker 时，先启动 Docker Desktop 或 Docker 服务。
+## 获取代码
 
-1. ## 获取代码与安装依赖
+```sh
+git clone https://github.com/open-rum/openrum.git
+cd openrum
+corepack enable
+pnpm install --frozen-lockfile
+```
 
-   如果已经有源码，直接进入仓库根目录；否则执行：
+之后的命令都在仓库根目录执行，那里有 `package.json`、`go.mod` 和 `deploy/`。
 
-   ```sh
-   git clone https://github.com/open-rum/openrum.git
-   cd openrum
-   corepack enable
-   pnpm install --frozen-lockfile
-   ```
+## 配置与端口
 
-   仓库根目录同时包含 `package.json`、`go.mod` 和 `deploy/`。后续命令都在这里执行。
+首次运行不需要填写数据库或对象存储凭据。命令读取 `deploy/compose/.env`，没有时回退到仓库里提交的 `deploy/compose/.env.example` 默认值。需要自定义时复制一份示例文件（如果 `.env` 已经存在，直接编辑它，不要覆盖）：
 
-   **成功标志：** 依赖安装完成，没有错误退出。首次安装需要下载依赖。
+```sh
+cp deploy/compose/.env.example deploy/compose/.env
+```
 
-1. ## 检查本地配置
+控制台使用 `4173` 端口，宿主机 API 使用 `8080`。依赖服务使用 `5433`、`8123`、`9000`、`9092` 和 `6379`，Ingest 使用 `8081`。两部分服务读取同一个文件，所以修改 `CONSOLE_PORT` 会让控制台在两种模式下一起换端口。如果端口被占用，`openrum` 会指出占用它的进程并停止，而不是再启动第二份；它自己启动的进程会被自动清理，其他进程留给你决定。
 
-   首次体验无需填写数据库或对象存储凭据。命令优先读取 `deploy/compose/.env`；没有时使用 `.env.example` 中的本地默认值。
+## 启动服务
 
-   <Aside type="caution" title="保留已有配置">
-     如果 `.env` 已存在，直接编辑，不要用复制命令覆盖。
-   </Aside>
+```sh
+pnpm openrum dev
+```
 
-   需要修改配置且 `.env` 不存在时，执行：
+`dev` 会构建所需镜像和 Browser SDK，在 Docker 里启动基础设施和数据管道服务，应用迁移，然后从源码运行 API 和控制台。这样既有控制台热更新和快速的 Go 重启，又不用在本机安装 PostgreSQL、ClickHouse、Kafka 或 Redis。首次运行要下载镜像并编译代码，需要一些时间。
 
-   ```sh
-   cp deploy/compose/.env.example deploy/compose/.env
-   ```
+| 位置                | 服务                                                           |
+| ------------------- | -------------------------------------------------------------- |
+| Docker 容器         | PostgreSQL、ClickHouse、Kafka、Redis、Ingest、Consumer、Worker |
+| 本机的源码进程      | API、控制台开发服务器                                          |
 
-   控制台默认端口为 `4173`，宿主机 API 使用 `8080`。依赖还会占用 `5433`、`8123`、`9000`、`9092`、`6379`，Ingest 使用 `8081`。发生冲突时先查看命令报告的占用进程，再调整支持配置的端口。
+想按部署的方式运行产品，让所有服务都在容器里，改用 `up`：
 
-   **成功标志：** 配置准备完成。默认凭据仅用于本地开发。
+| | `dev` | `up` |
+| --- | --- | --- |
+| API 与控制台 | 在宿主机上从源码运行，带热更新和快速的 Go 重启 | 在容器里运行，和部署一致 |
+| 基础设施与数据管道 | 容器 | 容器 |
+| 用途 | 修改 OpenRUM 代码 | 体验产品，或检查构建的表现是否和部署一致 |
 
-1. ## 启动开发环境
+两种模式使用同一个地址，所以不会同时运行。进入其中一个模式会停掉另一个模式的那一半：`dev` 停掉 API 和代理容器，`up` 停掉宿主机进程。让两套服务连同一组数据库，看起来会像数据问题，而不是配置失误。
 
-   ```sh
-   pnpm openrum dev
-   ```
+用 `status` 查看运行情况。`dev` 或 `up` 成功，意味着控制台能响应，而不只是进程已经启动：
 
-   该命令构建所需镜像与 Browser SDK，启动基础设施和数据管道，执行数据库迁移，再从源码启动 API 和控制台。
+```text
+mode dev, environment deploy/compose/.env.example
 
-   | 运行位置             | 服务                                                           |
-   | -------------------- | -------------------------------------------------------------- |
-   | Docker 容器          | PostgreSQL、ClickHouse、Kafka、Redis、Ingest、Consumer、Worker |
-   | 当前电脑上的源码进程 | API、控制台开发服务器                                          |
+SERVICE     WHERE      STATE    DETAIL
+postgres    container  ready    127.0.0.1:5433
+clickhouse  container  ready    127.0.0.1:9000
+kafka       container  ready    127.0.0.1:9092
+redis       container  ready    127.0.0.1:6379
+ingest      container  ready    127.0.0.1:8081
+consumer    container  ready
+worker      container  ready
+api         host       ready    pid 22424, 127.0.0.1:8080
+web         host       running  http://127.0.0.1:4173
+```
 
-   首次启动需要下载镜像和编译。等待命令输出服务状态表，再检查：
+有服务没就绪时，最后一行会列出阻塞项，例如 `not ready yet: …`。
 
-   ```sh
-   pnpm openrum status
-   ```
+## 演示数据与登录
 
-   **成功标志：** 依赖及 API 就绪，控制台开发服务器运行并显示访问地址。失败时执行 `pnpm openrum logs api` 或查看对应服务日志。
+```sh
+pnpm openrum seed
+```
 
-1. ## 加载演示数据并登录
+它会加载一份可重复的电商数据集：一个演示 Owner、一个 Organization、一个 Project，以及跨 14 天的约 30,000 个 Session。这一步可选，重复执行也安全；如果这个实例的 Owner 是你自己创建的，它什么也不会做。启动时不会自动生成数据，所以不执行它的话，首次访问会打开初始化页面，你在那里创建自己的 Owner。
 
-   ```sh
-   pnpm openrum seed
-   ```
+打开 `http://127.0.0.1:4173` 并登录：
 
-   该命令加载演示账号、项目，以及 14 天内约 30,000 个会话。这一步可选，重复执行是安全的。不执行时，首次访问会进入初始化页面，由你自己创建所有者账号。
+```text title="本地演示账号" frame="none"
+Email: demo@openrum.local
+Password: OpenRUM-demo-2026!
+```
 
-   打开 `http://127.0.0.1:4173`，使用本地演示账号：
+这些凭据和 DSN 只是本地示例，不要在 Compose 环境之外复用。保持访问来源一致，因为在 `localhost`、`127.0.0.1` 或不同端口之间切换，可能无法通过同源检查。
 
-   ```text title="本地演示账号" frame="none"
-   Email: demo@openrum.local
-   Password: OpenRUM-demo-2026!
-   ```
+## 连接示例应用
 
-   **成功标志：** 进入项目列表，并能打开演示项目。保持访问地址一致，混用 `localhost`、`127.0.0.1` 或不同端口可能导致同源检查失败。
+按[创建第一个项目](/zh/docs/getting-started/create-first-project/)创建一个 React 项目，添加 `development` 环境，并从接入页复制它的 DSN。然后在仓库根目录执行：
 
-</Steps>
+```sh
+cp examples/react-vite/.env.example examples/react-vite/.env.local
+```
 
-<LinkCard
-  title="下一步：接入与验证"
-  href="/zh/docs/getting-started/local-development/connect-app/"
-  description="接入示例应用，验证第一条事件和会话。"
-/>
+把 `VITE_OPENRUM_DSN` 替换成完整的 DSN，然后启动示例：
+
+```sh
+pnpm --filter @openrum/example-react-vite dev --host 127.0.0.1
+```
+
+打开 Vite 打印的地址，例如 `http://127.0.0.1:5173`，并把这个来源加入项目的允许列表，不带路径和结尾的斜杠。点击 **Custom Event**，它会发送 `demo_checkout`。在控制台选择你的项目、`development` 和“最近 15 分钟”，搜索事件 `demo_checkout` 并打开它的会话。**Error** 按钮可以顺便验证错误路径。
+
+如果概览是空的，先检查项目、环境和时间范围，再看事件列表和 Consumer 日志。
+
+## 日常开发
+
+| 改动                                 | 如何更新                                                              |
+| ------------------------------------ | --------------------------------------------------------------------- |
+| `apps/web` 里的控制台                | 开发模式下通常会热更新                                                |
+| API 或它引用的 Go 代码               | `pnpm openrum restart api` 重新编译并启动                             |
+| Ingest、Consumer、Worker 或迁移      | 重新执行 `pnpm openrum dev`，构建镜像并运行启动流程                   |
+| Browser SDK                          | `pnpm --filter @openrum/browser build`，然后刷新或重启示例            |
+| 文档站                               | 另外运行 `pnpm site:dev`                                              |
+
+重启容器不会重新构建镜像。迁移在每次启动时运行，使用本地构建的镜像，所以新增迁移会重新构建镜像、重建迁移任务并应用新文件，不需要手动再跑一次。
+
+```sh
+pnpm openrum logs api
+pnpm openrum logs ingest consumer worker
+pnpm openrum restart api
+```
+
+`dev` 模式下 `api` 和 `web` 运行在宿主机上，所以 `logs api` 查看的是它们在 `.openrum/log/` 下自己的日志文件；其他服务都是容器，使用 Compose 日志。宿主机进程和启动它们的终端分离，关闭终端不会让服务停止。它们的进程 ID 和日志保存在 `.openrum/` 下，git 会忽略这个目录。
+
+最后三个命令保留的内容不同：
+
+| 命令 | 容器 | 卷与数据 |
+| --- | --- | --- |
+| `stop` | 保留，下次启动很快 | 保留 |
+| `down` | 删除 | 保留 |
+| `reset` | 删除 | 删除 |
+
+<Aside type="caution" title="reset 会删除所有本地数据库">
+  `pnpm openrum reset` 会删除本地所有 PostgreSQL、ClickHouse、Kafka 和 Redis 的卷，执行前会先请你确认；
+  加 `--yes` 可以跳过确认。下次启动会应用迁移并从空数据开始，需要演示数据时再执行 `pnpm openrum seed`。
+</Aside>
+
+## openrum 命令
+
+`openrum` 同时启动容器和宿主机进程，等每个服务真正就绪，而不是只等进程启动，并把两部分的状态汇总在一起。在仓库根目录通过 pnpm 运行：
+
+| 命令                          | 作用                                           |
+| ----------------------------- | ---------------------------------------------- |
+| `pnpm openrum dev`            | API 和控制台从源码运行，其余服务在容器中       |
+| `pnpm openrum up`             | 所有服务都在容器中                             |
+| `pnpm openrum status`         | 查看哪些在运行，哪些还没就绪                   |
+| `pnpm openrum logs [service]` | 跟随日志；宿主机服务读取它自己的日志文件       |
+| `pnpm openrum restart <name>` | 重启一个服务并等它恢复                         |
+| `pnpm openrum seed`           | 向运行中的服务加载演示账号和数据集             |
+| `pnpm openrum stop`           | 停止全部服务，保留容器及其数据                 |
+| `pnpm openrum down`           | 删除容器，保留卷                               |
+| `pnpm openrum reset`          | 删除容器并删除所有本地数据库，执行前会确认     |
+
+`openrum` 脚本运行的是 `go run ./cmd/openrum`，所以每个命令（包括 `up`）都要求安装 Go。命令还需要带 Compose v2 的 Docker 和正在运行的 Docker 守护进程，`dev` 另外需要 `pnpm` 在路径里，用于宿主机上的控制台。`pnpm openrum help` 会打印同样的列表。底层的 Compose 命令仍然可以通过 `deploy/compose/docker-compose.yml` 使用；`openrum` 补上的是 Compose 表达不了的部分：等待就绪、监管宿主机那一半，以及推导两部分必须一致的端口和凭据。
+
+npm 包 `@openrum/cli` 也会安装一个同名命令 `openrum`，用来在你自己的构建中上传 Source Map（`openrum sourcemaps upload`）。在本仓库的检出目录里，它也接受上面这些命令，并转交给这个工具，所以 `openrum dev` 和 `pnpm openrum dev` 效果相同。在检出目录之外，只有 Source Map 相关命令可用。每个命令、选项和退出码见 [CLI 参考](/zh/docs/reference/cli/)。
+
+## 生成测试数据
+
+在调试查询或页面时，想按需生成流量，可以使用本地控制台右下角的悬浮烧瓶按钮（**造数据**）。它跟随当前选择的项目、环境和范围，自动使用默认 DSN，并在投递后检查样本是否能被查询到。它通过真实的 ingest 端点写入，所以这些数据经过的标准化和聚合与生产流量完全相同。先生成少量数据，看过验证结果之后再加大规模。各个场景的设计见[生成器的设计说明](https://github.com/open-rum/openrum/blob/main/docs/dev-data.md)。
+
+## 可选：对象存储
+
+对象存储默认关闭，行为分析、错误、性能和 API 监控都不需要它。要测试 Source Map，在 API 和 Worker 的环境里配置一个服务商：
+
+```sh
+# 阿里云 OSS 原生 API；使用 ECS/ACK RAM Role 时两个密钥都不用填。
+OBJECT_STORAGE_PROVIDER=oss
+OBJECT_STORAGE_ENDPOINT=https://oss-cn-hangzhou.aliyuncs.com
+OBJECT_STORAGE_BUCKET=your-test-bucket
+OBJECT_STORAGE_REGION=cn-hangzhou
+OSS_ACCESS_KEY_ID=...
+OSS_ACCESS_KEY_SECRET=...
+
+# 或者 Amazon S3 / MinIO / R2 / Ceph。自定义端点默认使用路径风格请求。
+OBJECT_STORAGE_PROVIDER=s3
+OBJECT_STORAGE_ENDPOINT=http://127.0.0.1:9000
+OBJECT_STORAGE_BUCKET=your-test-bucket
+OBJECT_STORAGE_REGION=us-east-1
+AWS_ACCESS_KEY_ID=...
+AWS_SECRET_ACCESS_KEY=...
+```
+
+生产环境的自定义端点必须使用 HTTPS，并把精确的主机名加入 `OPENRUM_OBJECT_STORAGE_ENDPOINT_ALLOWLIST`。Amazon S3 可以不填端点，使用地域默认值。优先使用工作负载角色，而不是静态密钥。详情见[对象存储](/zh/docs/self-hosting/object-storage/)。
+
+## 检查你的改动
+
+```sh
+# 聚焦前端开发
+pnpm --filter @openrum/web test:unit
+pnpm --filter @openrum/web typecheck
+pnpm --filter @openrum/web lint
+
+# Go 开发
+go test ./...
+go vet ./...
+
+# 完整的仓库校验
+pnpm run check
+
+# 隔离的 PostgreSQL、ClickHouse、Kafka 和 Redis 集成测试
+pnpm run test:integration
+
+# 浏览器端到端的产品流程
+pnpm run test:e2e
+```
+
+提交 Pull Request 之前运行 `pnpm run check`。它包括格式、Lint、类型检查、测试、协议生成检查、构建和体积预算。`pnpm run test:integration` 会启动所需的 Compose 依赖，创建只监听本机的 `openrum_test` 数据库和专用的 `openrum-integration-v1` Kafka 主题，应用迁移，并运行所有带 `integration` 标记的 Go 测试。
+
+## 仓库结构
+
+- `apps/web`：React 控制台、路由和设计系统
+- `apps/site`：公开站点和文档
+- `packages/browser-sdk`：浏览器遥测 SDK
+- `packages/protocol`：事件契约和生成的校验器
+- `packages/sourcemap`：Source Map 上传库和 Vite 插件
+- `packages/cli`：`openrum` 命令（上传 Source Map，也是本地开发栈工具的入口）
+- `services/api`：控制平面和查询 API
+- `services/ingest`：公开的事件入口
+- `services/consumer`：Kafka 到 ClickHouse 的数据管道
+- `services/worker`：后台任务和 Source Map 任务
+- `internal`：共享的 Go 包
+- `migrations`：PostgreSQL 和 ClickHouse 迁移
+
+## 文档站
+
+`apps/site` 里的公开站点和文档不属于运行时服务，`openrum` 不管理它们。它们没有基础设施依赖，通过自己的静态构建发布：
+
+```sh
+pnpm site:dev
+pnpm site:check
+```
+
+修改公开站点或文档之后、请求评审之前运行 `site:check`。它会检查生成的参考文档、拼写、演示证据、静态构建、链接和站点性能预算。中英文页面要一起修改。
+
+## 故障排查
+
+| 现象                         | 先检查                                                                                                                   |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| 镜像或依赖包下载失败         | 镜像仓库的连通性和代理设置                                                                                               |
+| 端口被占用                   | `openrum` 指出的进程；它自己启动的会被自动清理，其他的留给你决定                                                         |
+| 登录或 CSRF 失败             | 浏览器来源必须和 `PUBLIC_BASE_URL` 完全一致。两种模式都在 `CONSOLE_PORT` 上提供控制台，打开了别的端口是最常见的原因      |
+| 宿主机服务启动失败           | `.openrum/log/api.log` 或 `.openrum/log/web.log`，它的输出都写在那里                                                     |
+| SDK 投递失败                 | DSN、允许的来源和 Ingest 日志                                                                                            |
+| 已接收的数据缺失，或图表为空 | 项目、环境和时间范围，然后是 Consumer 和 ClickHouse 的健康状态。首次启动之后，等物化视图就绪再刷新                        |
+| 代码改动看不到               | 当前模式，以及上面的更新表                                                                                               |
+| 已安装的依赖不一致           | 在仓库根目录执行 `pnpm install --frozen-lockfile`                                                                        |
+
+关于 Issue 和 Pull Request 的要求，请阅读[参与贡献](/zh/docs/contributing/)。

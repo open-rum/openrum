@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useParams } from "@tanstack/react-router";
 import { ListTreeIcon, RefreshCwIcon } from "lucide-react";
@@ -14,6 +15,7 @@ import {
 import { useBehaviorFilters } from "@/features/analytics/useBehaviorFilters";
 import { getBehaviorAnalytics } from "@/lib/api/analytics";
 import { listOrganizations, listProjects, type Project } from "@/lib/api/projects";
+import { TIME_SERIES_MAX_POINTS } from "@/lib/charts/timeSeries";
 import { EventExplorer } from "./EventExplorer";
 import { EventFilterComposer } from "./EventFilterComposer";
 
@@ -43,9 +45,12 @@ export function EventsPage() {
 
 function ProjectEvents({ project }: { project: Project }) {
   const { filters, update } = useBehaviorFilters(project.id);
+  // The shared point budget is part of the request, and so of the cache key, but not of the
+  // page's URL: it is the Console's policy, not something a person chose.
+  const request = useMemo(() => ({ ...filters, maxPoints: TIME_SERIES_MAX_POINTS }), [filters]);
   const query = useQuery({
-    queryKey: ["event-explorer", filters],
-    queryFn: ({ signal }) => getBehaviorAnalytics(filters, signal),
+    queryKey: ["event-explorer", request],
+    queryFn: ({ signal }) => getBehaviorAnalytics(request, signal),
     // Changing a filter keeps the previous figures on screen, dimmed, instead of blanking
     // the whole page to a skeleton on every click.
     placeholderData: keepPreviousData,
@@ -86,10 +91,7 @@ function ProjectEvents({ project }: { project: Project }) {
             filters={filters}
             isFetching={query.isFetching}
             onSelectEvent={(eventKind, eventName) => update({ eventKind, eventName })}
-            onSelectProperty={(name) =>
-              update({ dimension: name ? `property:${name}` : "country" })
-            }
-            onSelectMeasurement={(measurement) => update({ measurement })}
+            onChangeDimension={(dimension) => update({ dimension })}
           />
         ) : null}
       </ConsolePageContent>

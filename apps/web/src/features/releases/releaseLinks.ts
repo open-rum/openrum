@@ -1,16 +1,21 @@
-// URL and naming helpers shared by the Releases page, project settings and the Issue stack view.
+// URL and naming helpers shared by the Source Map page, project settings and the Issue stack view.
 
 export const OBJECT_STORAGE_SETTINGS_PATH = "/settings/instance/object-storage";
 
-export function uploadTokensPath(projectId: string) {
-  return `/projects/${encodeURIComponent(projectId)}/onboarding#upload-tokens`;
+export function sourceMapSettingsPath(projectId: string) {
+  return `/settings/project/${encodeURIComponent(projectId)}/sourcemaps`;
 }
 
-/** Releases page with a release preselected (or prefilled for registration when missing). */
+/** Where upload tokens are managed: the Source Map page, since they only upload Source Maps. */
+export function uploadTokensPath(projectId: string) {
+  return `${sourceMapSettingsPath(projectId)}#upload-tokens`;
+}
+
+/** Source Map page with a release preselected (or prefilled for registration when missing). */
 export function releaseUploadPath(projectId: string, version: string, dist?: string) {
   const parameters = new URLSearchParams({ release: version });
   if (dist) parameters.set("dist", dist);
-  return `/projects/${encodeURIComponent(projectId)}/releases?${parameters.toString()}`;
+  return `${sourceMapSettingsPath(projectId)}?${parameters.toString()}`;
 }
 
 /** Reads `?release=&dist=` from a search string. */

@@ -1,9 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Trash2Icon } from "lucide-react";
+import { Trash2Icon, TriangleAlertIcon } from "lucide-react";
 import { toast } from "sonner";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { HoldButton } from "@/components/ui/hold-button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   Table,
   TableBody,
@@ -20,19 +22,23 @@ import {
   type SourceMapStatus,
 } from "@/lib/api/releases";
 import { ArtifactStatus } from "./ArtifactStatus";
+import { formatDateTime } from "./format";
 import { ArtifactUploader } from "./ArtifactUploader";
 import { formatBytes } from "./format";
+import { OBJECT_STORAGE_SETTINGS_PATH } from "./releaseLinks";
 import { ReleaseCountBadge } from "./ReleaseList";
 
 export function ReleaseArtifactsCard({
   projectId,
   release,
   status,
+  instanceAdmin,
   onDeleted,
 }: {
   projectId: string;
   release: Release;
   status?: SourceMapStatus;
+  instanceAdmin: boolean;
   onDeleted: (release: Release) => void;
 }) {
   const client = useQueryClient();
@@ -58,6 +64,9 @@ export function ReleaseArtifactsCard({
     },
   });
   const storage = status?.storage;
+  // Working storage that refuses deletes. Uploads and mapping are unaffected, so this is a
+  // quiet note beside the controls it concerns, not a warning for the page.
+  const deleteLimited = storage === "ready" && status?.deleteAllowed === false;
   const disabledReason =
     storage === "not_configured"
       ? "实例尚未配置对象存储，暂时无法上传。"
@@ -77,7 +86,12 @@ export function ReleaseArtifactsCard({
           </CardTitle>
           <CardDescription className="flex flex-wrap items-center gap-2">
             <ReleaseCountBadge release={release} />
+            {deleteLimited ? <DeleteLimitedBadge /> : null}
             {release.commitSha ? <code>{release.commitSha}</code> : null}
+            <time dateTime={release.deployedAt ?? release.createdAt}>
+              {release.deployedAt ? "部署于 " : "登记于 "}
+              {formatDateTime(release.deployedAt ?? release.createdAt)}
+            </time>
           </CardDescription>
         </div>
       </CardHeader>
@@ -152,6 +166,21 @@ export function ReleaseArtifactsCard({
           <div>
             <strong>删除版本</strong>
             <p>删除版本记录和全部 Source Map 文件；已上报的原始堆栈会保留。</p>
+            {deleteLimited ? (
+              <p>
+                当前存储没有删除权限，存储桶中的文件会保留。
+                {instanceAdmin ? (
+                  <>
+                    {" "}
+                    <a className="underline" href={OBJECT_STORAGE_SETTINGS_PATH}>
+                      检查对象存储设置
+                    </a>
+                  </>
+                ) : (
+                  "如需开启删除，请联系实例管理员。"
+                )}
+              </p>
+            ) : null}
             {removeRelease.error ? (
               <p className="release-form__error" role="alert">
                 {removeRelease.error.message}
@@ -171,5 +200,27 @@ export function ReleaseArtifactsCard({
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+/**
+ * "删除受限" in the system settings' wording, in the warning colour but as a badge, not a banner:
+ * the whole story is one hover or focus away.
+ */
+function DeleteLimitedBadge() {
+  return (
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Badge variant="warning" className="gap-1" tabIndex={0}>
+            <TriangleAlertIcon aria-hidden="true" />
+            删除受限
+          </Badge>
+        </TooltipTrigger>
+        <TooltipContent side="bottom" sideOffset={8}>
+          上传和堆栈还原不受影响。删除文件或版本只移除记录，存储桶里的文件会保留，需要自行清理，或配置生命周期规则。
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   );
 }

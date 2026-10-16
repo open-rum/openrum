@@ -105,7 +105,7 @@ Bootstrapping a new package. Trusted Publishing is configured on the package's o
 Do this once for each package. To release afterwards:
 
 1. Bump `version` in the package's `package.json`, update the docs, and merge to `main`.
-2. Use **Publish CLI and Source Map packages → Run workflow** with a tag such as `cli-v0.1.0` for a dry run. It checks the tag against the package, type-checks, tests and builds it, then packs the tarball, installs it into an empty project and runs it the way a user would (imports for the library, the installed `openrum` and `openrum-sourcemaps` bins for the CLI). A dry run never publishes.
+2. Use **Publish CLI and Source Map packages → Run workflow** with a tag such as `cli-v0.1.0` for a dry run. It checks the tag against the package, type-checks, tests and builds it, then packs the tarball, installs it into an empty project and runs it the way a user would (imports for the library, the installed `openrum` bin for the CLI). A dry run never publishes.
 3. Run the same pre-tag checks as for a product release (green `main`, clone on the latest `main`, no GitHub web Release), then push the tag:
 
 ```sh

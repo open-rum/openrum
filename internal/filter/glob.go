@@ -52,3 +52,14 @@ func (pattern glob) match(value string) bool {
 	// pattern like `a*a` does not match a lone "a" by reusing one character.
 	return strings.HasSuffix(rest, trailing)
 }
+
+// Glob is a compiled single-wildcard pattern for packages outside this one that
+// must match with exactly the same syntax, so a pattern means one thing whether
+// it is written as a filter rule or as an API capture rule.
+type Glob struct{ compiled glob }
+
+// CompileGlob compiles a pattern whose only metacharacter is `*`.
+func CompileGlob(pattern string) Glob { return Glob{compiled: compileGlob(pattern)} }
+
+// Match reports whether the value matches, ignoring case.
+func (pattern Glob) Match(value string) bool { return pattern.compiled.match(value) }

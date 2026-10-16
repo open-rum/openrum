@@ -40,7 +40,7 @@ function Harness() {
 describe("session filter composer", () => {
   it("focuses and opens with / outside editable controls", async () => {
     render(<Harness />);
-    const search = screen.getByRole("textbox", { name: "搜索会话或添加筛选条件" });
+    const search = screen.getByRole("combobox", { name: "搜索会话或添加筛选条件" });
 
     fireEvent.keyDown(window, { key: "/" });
 
@@ -68,9 +68,9 @@ describe("session filter composer", () => {
     const user = userEvent.setup();
     render(<Harness />);
 
-    await user.click(screen.getByRole("textbox", { name: "搜索会话或添加筛选条件" }));
-    await user.click(screen.getByRole("button", { name: /国家 \/ 地区/ }));
-    await user.click(screen.getByRole("button", { name: /JP/ }));
+    await user.click(screen.getByRole("combobox", { name: "搜索会话或添加筛选条件" }));
+    await user.click(screen.getByRole("option", { name: /国家 \/ 地区/ }));
+    await user.click(screen.getByRole("option", { name: /JP/ }));
 
     expect(screen.getByText("国家：JP")).toBeTruthy();
     await user.click(screen.getByRole("button", { name: "移除筛选：国家：JP" }));

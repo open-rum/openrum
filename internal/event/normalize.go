@@ -67,20 +67,29 @@ type CanonicalEvent struct {
 	APIURLNormalized   string
 	APIStatus          uint16
 	APIFailure         string
-	DurationMS         float64
-	TransferSize       uint64
-	MetricName         string
-	MetricValue        float64
-	MetricDelta        float64
-	MetricRating       string
-	CustomName         string
-	LogLevel           string
-	LogMessage         string
-	LogLogger          string
-	Attributes         map[string]string
-	Measurements       map[string]float64
-	Breadcrumbs        []string
-	IngestFlags        []string
+	// APIRequestHeaders and APIResponseHeaders are scrubbed here but not yet
+	// authorized: the consumer keeps them only for an endpoint a project opted
+	// in to capture, and clears them otherwise.
+	APIRequestHeaders  map[string]string
+	APIResponseHeaders map[string]string
+	// APIRequestBody and APIResponseBody are scrubbed and capped here, and authorized
+	// by the consumer exactly like the headers.
+	APIRequestBody  string
+	APIResponseBody string
+	DurationMS      float64
+	TransferSize    uint64
+	MetricName      string
+	MetricValue     float64
+	MetricDelta     float64
+	MetricRating    string
+	CustomName      string
+	LogLevel        string
+	LogMessage      string
+	LogLogger       string
+	Attributes      map[string]string
+	Measurements    map[string]float64
+	Breadcrumbs     []string
+	IngestFlags     []string
 }
 
 type EventFailure struct {
@@ -278,6 +287,15 @@ func normalizeEvent(input normalizeInput) (CanonicalEvent, error) {
 		result.DurationMS = input.event.Request.DurationMS
 		if input.event.Request.TransferSize != nil && *input.event.Request.TransferSize >= 0 {
 			result.TransferSize = uint64(*input.event.Request.TransferSize)
+		}
+		requestHeaders, requestChanged := privacy.ScrubHeaders(input.event.Request.RequestHeaders)
+		responseHeaders, responseChanged := privacy.ScrubHeaders(input.event.Request.ResponseHeaders)
+		result.APIRequestHeaders, result.APIResponseHeaders = requestHeaders, responseHeaders
+		requestBody, requestBodyChanged := privacy.ScrubBody(input.event.Request.RequestBody)
+		responseBody, responseBodyChanged := privacy.ScrubBody(input.event.Request.ResponseBody)
+		result.APIRequestBody, result.APIResponseBody = requestBody, responseBody
+		if requestChanged || responseChanged || requestBodyChanged || responseBodyChanged {
+			result.IngestFlags = appendFlag(result.IngestFlags, "pii_scrubbed")
 		}
 	case EventTypeLog:
 		if !ValidLogLevel(input.event.Level) || strings.TrimSpace(input.event.Message) == "" {

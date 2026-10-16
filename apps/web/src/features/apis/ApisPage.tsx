@@ -20,6 +20,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
+  apiFailureLevel,
   apiFailureRate,
   defaultAPIFilters,
   formatAPIDuration,
@@ -127,8 +128,11 @@ function ProjectAPIs({ project }: { project: Project }) {
             summary={query.data.summary}
             previous={query.data.previous}
             trend={query.data.trend}
-            endpoints={query.data.endpoints}
-            onSelect={(endpoint) => update({ method: endpoint.method, url: endpoint.url })}
+            range={{
+              from: query.data.from,
+              to: query.data.to,
+              interval: query.data.interval,
+            }}
           />
         ) : null}
         {query.error ? (
@@ -183,7 +187,7 @@ function ProjectAPIs({ project }: { project: Project }) {
                       </small>
                     </TableCell>
                     <TableCell>
-                      <span data-failing={endpoint.failures > 0}>
+                      <span data-level={apiFailureLevel(apiFailureRate(endpoint))}>
                         {apiFailureRate(endpoint).toFixed(2)}%
                       </span>
                       <small>{endpoint.clientErrors} 次 4xx 未计入</small>
@@ -226,6 +230,12 @@ function ProjectAPIs({ project }: { project: Project }) {
         {query.data?.detail ? (
           <ApiDetail
             detail={query.data.detail}
+            filters={filters}
+            range={{
+              from: query.data.from,
+              to: query.data.to,
+              interval: query.data.interval,
+            }}
             projectId={project.id}
             onClose={() => update({ method: undefined, url: undefined })}
           />

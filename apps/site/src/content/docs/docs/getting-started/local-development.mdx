@@ -1,101 +1,266 @@
 ---
-title: Environment and startup
-description: Prepare tools, get the source, start local development and sign in.
+title: Local development
+description: Run OpenRUM from source, sign in, connect an app, and the commands and checks you use while changing the code.
 appliesTo: Alpha
 ---
 
-import { Steps, Aside, LinkCard } from "@astrojs/starlight/components";
+import { Aside } from "@astrojs/starlight/components";
 
-This guide runs OpenRUM on your computer so you can change its code. The default Console URL is `http://127.0.0.1:4173`.
+This page takes you from a fresh clone to a running stack you can change, and stays useful as a day-to-day reference. The Console runs at `http://127.0.0.1:4173`.
 
-<Steps>
+## Prerequisites
 
-1. ## Prepare your tools
-   - **Git:** Fetch the source — check: `git --version`
-   - **Docker:** Engine or Desktop with Compose v2 — check: `docker info`, `docker compose version`
-   - **Node.js:** 24 — check: `node --version`
-   - **pnpm:** 11.11.0 — check: `pnpm --version`
-   - **Go:** 1.26; see `go.mod` for the exact toolchain — check: `go version`
+| Tool    | Version                                      | Check                                         |
+| ------- | -------------------------------------------- | --------------------------------------------- |
+| Git     | Any recent version                           | `git --version`                               |
+| Docker  | Engine or Desktop with Compose v2, 8 GB or more of memory | `docker info`, `docker compose version`       |
+| Node.js | 24                                           | `node --version`                              |
+| pnpm    | 11.11.0, through Corepack                    | `pnpm --version`                              |
+| Go      | 1.26; see `go.mod` for the exact toolchain   | `go version`                                  |
 
-   Start Docker first. Allocate at least 8 GB of memory to the local Docker environment and leave disk space for images and databases. The command manager supports macOS and Linux; use WSL on Windows.
+Start Docker first and leave disk space for images and databases. The `openrum` command supports macOS and Linux; on Windows, use WSL.
 
-   **Success:** Docker responds and the other commands print versions. If Docker cannot connect, start Docker Desktop or the Docker service.
+## Get the code
 
-1. ## Get the code and install dependencies
+```sh
+git clone https://github.com/open-rum/openrum.git
+cd openrum
+corepack enable
+pnpm install --frozen-lockfile
+```
 
-   If you already have the source, enter its root directory. Otherwise:
+Run every later command from the repository root, which holds `package.json`, `go.mod` and `deploy/`.
 
-   ```sh
-   git clone https://github.com/open-rum/openrum.git
-   cd openrum
-   corepack enable
-   pnpm install --frozen-lockfile
-   ```
+## Configuration and ports
 
-   The repository root contains `package.json`, `go.mod` and `deploy/`. Run subsequent commands there.
+The first run needs no database or object-storage credentials. Commands read `deploy/compose/.env` and fall back to the committed defaults in `deploy/compose/.env.example`. To change something, copy the example (and edit the existing file instead if `.env` already exists):
 
-   **Success:** Dependency installation finishes without errors. The first installation downloads packages.
+```sh
+cp deploy/compose/.env.example deploy/compose/.env
+```
 
-1. ## Check local configuration
+The Console uses port `4173` and the host API `8080`. Dependencies use `5433`, `8123`, `9000`, `9092` and `6379`, and Ingest `8081`. Both halves of the stack read the same file, so changing `CONSOLE_PORT` moves the Console in both modes. If a port is taken, `openrum` names the process holding it and stops instead of starting a second copy; a process it started itself is cleared automatically, anything else is left for you to decide.
 
-   No database or object-storage credentials need to be filled in for the first run. Commands prefer `deploy/compose/.env`, falling back to the local defaults in `.env.example`.
+## Start the stack
 
-   <Aside type="caution" title="Keep existing configuration">
-     If `.env` already exists, edit it rather than overwriting it with the copy command.
-   </Aside>
+```sh
+pnpm openrum dev
+```
 
-   To customize configuration when `.env` does not exist:
+`dev` builds the required images and the Browser SDK, starts the infrastructure and pipeline services in Docker, applies migrations, then runs the API and the Console from source. That gives you Console hot reload and fast Go restarts without a locally installed PostgreSQL, ClickHouse, Kafka or Redis. The first run downloads images and compiles code, so it takes a while.
 
-   ```sh
-   cp deploy/compose/.env.example deploy/compose/.env
-   ```
+| Where                              | Services                                                       |
+| ---------------------------------- | -------------------------------------------------------------- |
+| Docker containers                  | PostgreSQL, ClickHouse, Kafka, Redis, Ingest, Consumer, Worker |
+| Source processes on your computer  | API, Console development server                                |
 
-   The Console uses port `4173` and the host API uses `8080`. Dependencies also use `5433`, `8123`, `9000`, `9092` and `6379`; Ingest uses `8081`. For a conflict, inspect the reported process before changing a configurable port.
+To run the product the way a deployment does, with every service in a container, use `up` instead:
 
-   **Success:** Configuration is ready. Default credentials are for local development only.
+| | `dev` | `up` |
+| --- | --- | --- |
+| API and Console | From source on the host, with hot reload and fast Go restarts | In containers, as a deployment runs them |
+| Infrastructure and pipeline | Containers | Containers |
+| Use it to | Change OpenRUM code | Evaluate the product, or check that a build behaves like a deployment |
 
-1. ## Start development
+Both modes serve the Console at the same address, so they never run at the same time. Entering one stops the other's half: `dev` stops the API and proxy containers, and `up` stops the host processes. Two stacks against one set of databases would read as a data bug, not as a setup mistake.
 
-   ```sh
-   pnpm openrum dev
-   ```
+Check what is running with `status`. A successful `dev` or `up` means the Console answers, not only that the processes launched:
 
-   The command builds required images and the Browser SDK, starts infrastructure and pipeline services, applies migrations, then starts the API and Console from source.
+```text
+mode dev, environment deploy/compose/.env.example
 
-   | Location                          | Services                                                       |
-   | --------------------------------- | -------------------------------------------------------------- |
-   | Docker containers                 | PostgreSQL, ClickHouse, Kafka, Redis, Ingest, Consumer, Worker |
-   | Source processes on your computer | API, Console development server                                |
+SERVICE     WHERE      STATE    DETAIL
+postgres    container  ready    127.0.0.1:5433
+clickhouse  container  ready    127.0.0.1:9000
+kafka       container  ready    127.0.0.1:9092
+redis       container  ready    127.0.0.1:6379
+ingest      container  ready    127.0.0.1:8081
+consumer    container  ready
+worker      container  ready
+api         host       ready    pid 22424, 127.0.0.1:8080
+web         host       running  http://127.0.0.1:4173
+```
 
-   The first run downloads images and compiles code. Wait for the service status table, then check:
+When something is not ready, a final line lists what is blocking, for example `not ready yet: …`.
 
-   ```sh
-   pnpm openrum status
-   ```
+## Demo data and sign-in
 
-   **Success:** Dependencies and API are ready, and the Console development server is running with its URL displayed. On failure, use `pnpm openrum logs api` or inspect the affected service.
+```sh
+pnpm openrum seed
+```
 
-1. ## Load demo data and sign in
+This loads a repeatable ecommerce dataset: a demo owner, an Organization, a Project and about 30,000 Sessions across 14 days. It is optional and safe to run again, and it does nothing on an Instance whose owner you created yourself. Nothing seeds on start, so without it the first visit opens the setup page, where you create your own owner.
 
-   ```sh
-   pnpm openrum seed
-   ```
+Open `http://127.0.0.1:4173` and sign in:
 
-   The command loads the demo account, Project and about 30,000 Sessions across 14 days. It is optional and safe to run again. Without it, the first visit opens the setup page, where you create your own owner.
+```text title="Local demo account" frame="none"
+Email: demo@openrum.local
+Password: OpenRUM-demo-2026!
+```
 
-   Open `http://127.0.0.1:4173` with the local demo account:
+These credentials and DSNs are local examples; do not reuse them outside the Compose environment. Keep the origin consistent, because switching between `localhost`, `127.0.0.1` or ports can fail same-origin checks.
 
-   ```text title="Local demo account" frame="none"
-   Email: demo@openrum.local
-   Password: OpenRUM-demo-2026!
-   ```
+## Connect the example app
 
-   **Success:** You can open the project list and demo Project. Keep the origin consistent: switching between `localhost`, `127.0.0.1` or ports can fail same-origin checks.
+Follow [Create your first project](/docs/getting-started/create-first-project/) to create a React Project, add the `development` Environment and copy its DSN from onboarding. Then, from the repository root:
 
-</Steps>
+```sh
+cp examples/react-vite/.env.example examples/react-vite/.env.local
+```
 
-<LinkCard
-  title="Next: Connect and verify"
-  href="/docs/getting-started/local-development/connect-app/"
-  description="Connect the example app and verify the first Event and Session."
-/>
+Replace `VITE_OPENRUM_DSN` with the complete DSN and start the example:
+
+```sh
+pnpm --filter @openrum/example-react-vite dev --host 127.0.0.1
+```
+
+Open the URL Vite prints, for example `http://127.0.0.1:5173`, and add that origin to the Project's allowlist without a path or trailing slash. Click **Custom Event**, which sends `demo_checkout`. In the Console select your Project, `development` and the last 15 minutes, then search Events for `demo_checkout` and open its Session. The **Error** button exercises the error path too.
+
+If the overview is empty, check the Project, Environment and time range first, then Events and the Consumer logs.
+
+## Day-to-day development
+
+| Change                                 | How to update                                                               |
+| -------------------------------------- | --------------------------------------------------------------------------- |
+| Console in `apps/web`                  | Development mode normally hot-reloads                                       |
+| API or Go code it imports              | `pnpm openrum restart api` recompiles and starts it                         |
+| Ingest, Consumer, Worker or migrations | Rerun `pnpm openrum dev` to build images and run startup                    |
+| Browser SDK                            | `pnpm --filter @openrum/browser build`, then refresh or restart the example |
+| Documentation site                     | Run `pnpm site:dev` separately                                              |
+
+Restarting a container does not rebuild its image. Migrations run on every start from the locally built image, so adding a migration rebuilds the image, recreates the job and applies the new file; there is nothing to rerun by hand.
+
+```sh
+pnpm openrum logs api
+pnpm openrum logs ingest consumer worker
+pnpm openrum restart api
+```
+
+In `dev` mode `api` and `web` run on the host, so `logs api` tails their own file under `.openrum/log/`; everything else is a container and uses Compose logs. Host processes are detached from the terminal that started them, so closing it does not stop the stack. Their process IDs and logs live in `.openrum/`, which git ignores.
+
+The last three commands differ in how much they keep:
+
+| Command | Containers | Volumes and data |
+| --- | --- | --- |
+| `stop` | Kept, so the next start is quick | Kept |
+| `down` | Removed | Kept |
+| `reset` | Removed | Deleted |
+
+<Aside type="caution" title="reset deletes every local database">
+  `pnpm openrum reset` removes all local PostgreSQL, ClickHouse, Kafka and Redis volumes and asks
+  for confirmation first; pass `--yes` to skip the prompt. The next start applies migrations and
+  begins empty, so run `pnpm openrum seed` to load the demo dataset again.
+</Aside>
+
+## The openrum command
+
+`openrum` starts the containers and the host processes together, waits until each one is ready rather than merely launched, and reports both halves in one place. Run it from the repository root through pnpm:
+
+| Command                       | Effect                                                                  |
+| ----------------------------- | ----------------------------------------------------------------------- |
+| `pnpm openrum dev`            | API and Console from source, everything else in containers              |
+| `pnpm openrum up`             | Every service in a container                                            |
+| `pnpm openrum status`         | What is running, and what is not ready yet                              |
+| `pnpm openrum logs [service]` | Follow logs; a host service tails its own file                          |
+| `pnpm openrum restart <name>` | Restart one service and wait for it to come back                        |
+| `pnpm openrum seed`           | Load the demo account and dataset into a running stack                  |
+| `pnpm openrum stop`           | Stop everything, keeping the containers and their data                  |
+| `pnpm openrum down`           | Remove the containers, keeping the volumes                              |
+| `pnpm openrum reset`          | Remove the containers and delete every local database, after confirming |
+
+The `openrum` script runs `go run ./cmd/openrum`, so Go must be installed for every command, including `up`. Commands also need Docker with Compose v2 and a running Docker daemon, and `dev` additionally needs `pnpm` on the path for the host Console. `pnpm openrum help` prints the same list. The underlying Compose commands remain available through `deploy/compose/docker-compose.yml`; `openrum` adds what Compose cannot express: waiting for readiness, supervising the host half, and deriving the ports and credentials both halves must agree on.
+
+The npm package `@openrum/cli` installs a command with the same name, `openrum`, for uploading Source Maps from your own build (`openrum sourcemaps upload`). Inside a checkout of this repository it also accepts the commands above and hands them to this tool, so `openrum dev` and `pnpm openrum dev` do the same thing. Outside a checkout, only the Source Map commands are available. The [CLI reference](/docs/reference/cli/) lists every command, option and exit code.
+
+## Generate test data
+
+To generate traffic on demand while you work on a query or a page, use the floating flask button at the bottom-right of the local Console (**造数据**). It follows the selected Project, Environment and range, uses the default DSN automatically, and checks that a sample is queryable after delivery. It posts through the real ingest endpoint, so the rows have been through the same normalization and aggregation as production traffic. Start with a small batch and inspect the verification result before raising the volume. The [generator's design notes](https://github.com/open-rum/openrum/blob/main/docs/dev-data.md) describe the scenarios.
+
+## Optional: object storage
+
+Object storage is off by default and is not needed for behavior analytics, errors, performance or API monitoring. To test Source Maps, configure one provider in the API and Worker environments:
+
+```sh
+# Alibaba OSS native API; omit both keys when using an ECS/ACK RAM Role.
+OBJECT_STORAGE_PROVIDER=oss
+OBJECT_STORAGE_ENDPOINT=https://oss-cn-hangzhou.aliyuncs.com
+OBJECT_STORAGE_BUCKET=your-test-bucket
+OBJECT_STORAGE_REGION=cn-hangzhou
+OSS_ACCESS_KEY_ID=...
+OSS_ACCESS_KEY_SECRET=...
+
+# Or Amazon S3 / MinIO / R2 / Ceph. Custom endpoints default to path-style requests.
+OBJECT_STORAGE_PROVIDER=s3
+OBJECT_STORAGE_ENDPOINT=http://127.0.0.1:9000
+OBJECT_STORAGE_BUCKET=your-test-bucket
+OBJECT_STORAGE_REGION=us-east-1
+AWS_ACCESS_KEY_ID=...
+AWS_SECRET_ACCESS_KEY=...
+```
+
+For production custom endpoints, use HTTPS and add the exact host to `OPENRUM_OBJECT_STORAGE_ENDPOINT_ALLOWLIST`. Amazon S3 can omit the endpoint and use the regional default. Workload roles are preferred over static keys. See [object storage](/docs/self-hosting/object-storage/) for the details.
+
+## Check your changes
+
+```sh
+# Focused frontend development
+pnpm --filter @openrum/web test:unit
+pnpm --filter @openrum/web typecheck
+pnpm --filter @openrum/web lint
+
+# Go development
+go test ./...
+go vet ./...
+
+# Complete repository validation
+pnpm run check
+
+# Isolated PostgreSQL, ClickHouse, Kafka and Redis integration suite
+pnpm run test:integration
+
+# Browser product journeys
+pnpm run test:e2e
+```
+
+Run `pnpm run check` before opening a pull request. It covers formatting, linting, type checks, tests, protocol generation checks, builds and size budgets. `pnpm run test:integration` starts the required Compose dependencies, creates localhost-only `openrum_test` databases and a dedicated `openrum-integration-v1` Kafka topic, applies migrations and runs every Go test tagged `integration`.
+
+## Repository map
+
+- `apps/web`: React Console, routes and design system
+- `apps/site`: the public site and documentation
+- `packages/browser-sdk`: browser telemetry SDK
+- `packages/protocol`: event contract and generated validators
+- `packages/sourcemap`: Source Map upload library and Vite plugin
+- `packages/cli`: the `openrum` command (Source Map upload, and a front door to the local stack tool)
+- `services/api`: control plane and query API
+- `services/ingest`: public event intake
+- `services/consumer`: Kafka-to-ClickHouse pipeline
+- `services/worker`: background and Source Map jobs
+- `internal`: shared Go packages
+- `migrations`: PostgreSQL and ClickHouse migrations
+
+## The documentation site
+
+The public site and documentation in `apps/site` are not part of the runtime stack and `openrum` does not manage them. They have no infrastructure dependencies and ship through their own static build:
+
+```sh
+pnpm site:dev
+pnpm site:check
+```
+
+Run `site:check` before requesting review for public-site or documentation changes. It checks generated references, spelling, Demo evidence, the static build, links and the site performance budget. English and Simplified Chinese pages change together.
+
+## Troubleshooting
+
+| Symptom                                    | Check first                                                                                                                                      |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Image or package download fails            | Registry connectivity and proxy settings                                                                                                         |
+| Port occupied                              | The process `openrum` names; one it started is cleared automatically, anything else is left to you                                               |
+| Login or CSRF failure                      | The browser origin must exactly match `PUBLIC_BASE_URL`. Both modes serve the Console on `CONSOLE_PORT`, so opening a different port is the usual cause |
+| A host service fails to start              | `.openrum/log/api.log` or `.openrum/log/web.log`, where its output goes                                                                           |
+| SDK delivery fails                         | DSN, allowed origin and Ingest logs                                                                                                              |
+| Accepted data is missing, or charts are empty | Project, Environment and time range, then Consumer and ClickHouse health. Right after the first start, wait for the materialized views and refresh |
+| Code changes are invisible                 | The current mode and the update table above                                                                                                      |
+| Installed dependencies drift               | `pnpm install --frozen-lockfile` from the repository root                                                                                        |
+
+For Issue and pull request expectations, read [Contributing](/docs/contributing/).

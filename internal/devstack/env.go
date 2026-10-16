@@ -71,6 +71,12 @@ var passthrough = []string{
 	"AWS_ACCESS_KEY_ID",
 	"AWS_SECRET_ACCESS_KEY",
 	"AWS_SESSION_TOKEN",
+	"SMTP_HOST",
+	"SMTP_PORT",
+	"SMTP_SECURITY",
+	"SMTP_USERNAME",
+	"SMTP_PASSWORD",
+	"SMTP_FROM",
 }
 
 // Environment is the resolved Compose environment: the file's values with the

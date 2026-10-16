@@ -33,15 +33,15 @@ Source Map Artifact 可以把 `index-abc.js:1:48213` 这样的压缩栈帧还原
 <Aside type="note" title="需要对象存储">
   核心监控不依赖对象存储。Source Map 的上传和还原需要 Instance 配置 OSS 或 S3 兼容 Bucket，参见
   [对象存储](/zh/docs/self-hosting/object-storage/)。存储未配置或不可用时，Console
-  的「发布」页会显示提示横幅。
+  的「Source Map」页会显示提示横幅。
 </Aside>
 
 ## 创建上传令牌
 
 所有框架都先做这一步。
 
-1. 在 Console 中打开 **设置 → 项目 → 接入指引**（`/projects/<id>/onboarding`）。
-2. 在 **Source Map 上传令牌** 区块新建令牌，名称建议写明使用它的流水线，例如
+1. 在 Console 中打开 **设置 → 项目 → Source Map**（`/settings/project/<id>/sourcemaps`）。
+2. 在 **Source Map 上传令牌** 区块（新项目是第一步，已有版本后在 **接入与上传令牌** 折叠区里）新建令牌，名称建议写明使用它的流水线，例如
    `github-actions-storefront`。只有 Owner 和 Admin 可以创建或吊销令牌，其他成员可以查看列表。
 3. 立即复制明文（`orut_…`），它只显示一次。把它保存为名为 `OPENRUM_UPLOAD_TOKEN` 的 CI Secret。
 
@@ -54,8 +54,7 @@ Source Map Artifact 可以把 `index-abc.js:1:48213` 这样的压缩栈帧还原
 
 - **插件** `@openrum/sourcemap/vite` 中的 `openRUMSourceMaps`：只用于 Vite，在 `vite build` 结束时自动运行。
 - **命令行** `@openrum/cli` 中的 `openrum sourcemaps upload`：用 `pnpm exec openrum sourcemaps upload` 运行，
-  `--help` 可以查看全部参数。适用于不经过 Vite 的构建，例如 Next.js。早先的 `openrum-sourcemaps` 命令仍然可用，
-  效果相同。
+  `--help` 可以查看全部参数。适用于不经过 Vite 的构建，例如 Next.js。
 
 同一个 `openrum` 命令也用来管理本地开发栈（`openrum up`、`openrum seed` 等），但这些命令只能在 OpenRUM
 仓库的检出目录中使用。
@@ -94,14 +93,14 @@ pnpm add -D @openrum/cli
 
 ## 验证还原
 
-- 在主导航打开 **发布**，选择对应 Release。徽标显示已上传文件中可用的数量。
+- 打开 **设置 → 项目 → Source Map**，选择对应 Release。徽标显示已上传文件中可用的数量。
 - 使用匹配测试器：填入生产错误中生成代码的帧 URL、行和列，确认能还原到预期的源文件和行号。
 - 在已部署的构建中触发一个已知错误，从 **错误** 打开它。还原后的堆栈保留生成代码帧，并补充
   源文件路径、行和列；无法还原的帧会显示原因，参见[栈帧没有还原的原因](#栈帧没有还原的原因)。
 
 ## 插件与 CLI 选项
 
-插件接收选项；CLI 用命令行参数或环境变量传入相同的值。令牌建议用环境变量传入，避免出现在进程列表里。
+插件接收选项；CLI 用命令行参数或环境变量传入相同的值（见 [CLI 参考](/zh/docs/reference/cli/)）。令牌建议用环境变量传入，避免出现在进程列表里。
 
 | 插件选项      | CLI 参数       | CLI 环境变量           | 说明                                                           |
 | ------------- | -------------- | ---------------------- | -------------------------------------------------------------- |

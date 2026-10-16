@@ -91,7 +91,7 @@ func AdminMutationAudit(audit instanceAuditStore, logger zerolog.Logger) func(ht
 }
 
 func auditResourceType(path string) string {
-	for _, value := range []string{"retention", "object-storage", "members", "configuration"} {
+	for _, value := range []string{"retention", "object-storage", "email", "members", "configuration"} {
 		if strings.Contains(path, value) {
 			return value
 		}

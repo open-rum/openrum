@@ -136,7 +136,7 @@ pnpm install --frozen-lockfile
 pnpm openrum dev
 ```
 
-该命令从源码运行 API 和控制台，将基础设施及数据处理服务放在容器中。控制台地址仍为 `http://127.0.0.1:4173`。服务管理命令与排错方法见[本地开发](https://openrum.netlify.app/zh/docs/contributing/local-development/)。
+该命令从源码运行 API 和控制台，将基础设施及数据处理服务放在容器中。控制台地址仍为 `http://127.0.0.1:4173`。服务管理命令与排错方法见[本地开发](https://openrum.netlify.app/zh/docs/getting-started/local-development/)。
 
 欢迎提交问题、改进文档、补充测试或贡献代码。请先阅读[贡献指南](https://openrum.netlify.app/zh/docs/contributing/)，较大的变更先通过 [GitHub Issues](https://github.com/open-rum/openrum/issues) 讨论，提交 Pull Request 前运行 `pnpm run check`。修改文档时，还需运行 `pnpm site:check`。
 

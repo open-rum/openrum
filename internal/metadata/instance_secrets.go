@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 
 	openrumcrypto "openrum/internal/crypto"
+	"openrum/internal/mailer"
 )
 
 const ObjectStorageSecretName = "object-storage"
@@ -46,6 +47,47 @@ func NewInstanceSecretRepository(database *sql.DB, keyring *openrumcrypto.Keyrin
 }
 
 func (repository *InstanceSecretRepository) PutObjectStorage(ctx context.Context, actorID uuid.UUID, value ManagedObjectStorage) (InstanceSecret, error) {
+	return repository.putSecret(ctx, actorID, ObjectStorageSecretName, value)
+}
+
+func (repository *InstanceSecretRepository) GetObjectStorage(ctx context.Context) (ManagedObjectStorage, InstanceSecret, error) {
+	var value ManagedObjectStorage
+	secret, err := repository.getSecret(ctx, ObjectStorageSecretName, &value)
+	if err != nil {
+		return ManagedObjectStorage{}, InstanceSecret{}, err
+	}
+	return value, secret, nil
+}
+
+// SMTPSecretName is the row that holds the Console-managed mail server.
+const SMTPSecretName = "smtp"
+
+func (repository *InstanceSecretRepository) PutSMTP(ctx context.Context, actorID uuid.UUID, value mailer.Settings) (InstanceSecret, error) {
+	return repository.putSecret(ctx, actorID, SMTPSecretName, value)
+}
+
+func (repository *InstanceSecretRepository) GetSMTP(ctx context.Context) (mailer.Settings, InstanceSecret, error) {
+	var value mailer.Settings
+	secret, err := repository.getSecret(ctx, SMTPSecretName, &value)
+	if err != nil {
+		return mailer.Settings{}, InstanceSecret{}, err
+	}
+	return value, secret, nil
+}
+
+// DeleteSMTP removes the Console-managed mail server. It reports whether a row existed.
+func (repository *InstanceSecretRepository) DeleteSMTP(ctx context.Context) (bool, error) {
+	result, err := repository.database.ExecContext(ctx, `DELETE FROM instance_secrets WHERE name=$1`, SMTPSecretName)
+	if err != nil {
+		return false, err
+	}
+	affected, err := result.RowsAffected()
+	return affected > 0, err
+}
+
+// putSecret seals any JSON-encodable value under the row name, which is also the AEAD context,
+// so a ciphertext cannot be replayed into another row.
+func (repository *InstanceSecretRepository) putSecret(ctx context.Context, actorID uuid.UUID, name string, value any) (InstanceSecret, error) {
 	if repository.keyring == nil {
 		return InstanceSecret{}, errors.New("managed secrets are disabled")
 	}
@@ -53,7 +95,7 @@ func (repository *InstanceSecretRepository) PutObjectStorage(ctx context.Context
 	if err != nil {
 		return InstanceSecret{}, err
 	}
-	encrypted, keyID, err := repository.keyring.Seal(plaintext, []byte(ObjectStorageSecretName))
+	encrypted, keyID, err := repository.keyring.Seal(plaintext, []byte(name))
 	for index := range plaintext {
 		plaintext[index] = 0
 	}
@@ -65,40 +107,40 @@ func (repository *InstanceSecretRepository) PutObjectStorage(ctx context.Context
 		(name,encrypted_value,key_id,updated_by) VALUES ($1,$2,$3,$4)
 		ON CONFLICT (name) DO UPDATE SET encrypted_value=EXCLUDED.encrypted_value,key_id=EXCLUDED.key_id,
 		version=instance_secrets.version+1,updated_by=EXCLUDED.updated_by,updated_at=now()
-		RETURNING name,key_id,version,updated_by,updated_at`, ObjectStorageSecretName, encrypted, keyID, actorID).
+		RETURNING name,key_id,version,updated_by,updated_at`, name, encrypted, keyID, actorID).
 		Scan(&secret.Name, &secret.KeyID, &secret.Version, &secret.UpdatedBy, &secret.UpdatedAt)
 	return secret, err
 }
 
-func (repository *InstanceSecretRepository) GetObjectStorage(ctx context.Context) (ManagedObjectStorage, InstanceSecret, error) {
+// getSecret decrypts the row into destination. It returns ErrNotFound when the row is absent.
+func (repository *InstanceSecretRepository) getSecret(ctx context.Context, name string, destination any) (InstanceSecret, error) {
 	if repository.keyring == nil {
-		return ManagedObjectStorage{}, InstanceSecret{}, errors.New("managed secrets are disabled")
+		return InstanceSecret{}, errors.New("managed secrets are disabled")
 	}
 	var secret InstanceSecret
 	var encrypted []byte
 	err := repository.database.QueryRowContext(ctx, `SELECT name,encrypted_value,key_id,version,updated_by,updated_at
-		FROM instance_secrets WHERE name=$1`, ObjectStorageSecretName).
+		FROM instance_secrets WHERE name=$1`, name).
 		Scan(&secret.Name, &encrypted, &secret.KeyID, &secret.Version, &secret.UpdatedBy, &secret.UpdatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
-		return ManagedObjectStorage{}, InstanceSecret{}, ErrNotFound
+		return InstanceSecret{}, ErrNotFound
 	}
 	if err != nil {
-		return ManagedObjectStorage{}, InstanceSecret{}, err
+		return InstanceSecret{}, err
 	}
-	plaintext, keyID, err := repository.keyring.Open(encrypted, []byte(ObjectStorageSecretName))
+	plaintext, keyID, err := repository.keyring.Open(encrypted, []byte(name))
 	if err != nil {
-		return ManagedObjectStorage{}, InstanceSecret{}, fmt.Errorf("decrypt managed object storage using key %s: %w", keyID, err)
+		return InstanceSecret{}, fmt.Errorf("decrypt %s using key %s: %w", name, keyID, err)
 	}
 	defer func() {
 		for index := range plaintext {
 			plaintext[index] = 0
 		}
 	}()
-	var value ManagedObjectStorage
-	if err := json.Unmarshal(plaintext, &value); err != nil {
-		return ManagedObjectStorage{}, InstanceSecret{}, err
+	if err := json.Unmarshal(plaintext, destination); err != nil {
+		return InstanceSecret{}, err
 	}
-	return value, secret, nil
+	return secret, nil
 }
 
 // ObjectStorageVersion returns the managed storage row version, or 0 when no

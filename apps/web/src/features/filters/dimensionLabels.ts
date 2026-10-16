@@ -20,3 +20,17 @@ export function deviceLabel(value: string) {
     )[value] ?? value
   );
 }
+
+/** Names of the catalog's grouping dimensions, as the dashboard and the Events page show them. */
+export const catalogDimensionLabels: Record<string, string> = {
+  route: "页面路由",
+  release: "版本",
+  country: "国家/地区",
+  browser: "浏览器",
+  device: "设备类型",
+  api: "API",
+  apiMethod: "请求方法",
+  errorType: "错误类型",
+  source: "来源",
+  eventName: "事件名称",
+};

@@ -20,8 +20,7 @@ Next.js 使用自己的构建流程，没有 Vite 插件的位置。做法是让
    pnpm add -D @openrum/cli
    ```
 
-   安装后可以用 `pnpm exec openrum sourcemaps upload --help` 确认命令可用。这个包不依赖 Vite。早先的
-   `openrum-sourcemaps` 命令也还在，效果相同。
+   安装后可以用 `pnpm exec openrum sourcemaps upload --help` 确认命令可用。这个包不依赖 Vite。
 
 1. ## 让 Next 生成 Source Map，并在构建后上传
 
@@ -105,7 +104,7 @@ Next.js 使用自己的构建流程，没有 Vite 插件的位置。做法是让
 
 1. ## 验证还原
 
-   部署后按[概览](/zh/docs/sdk/source-maps/#验证还原)验证：在 **发布** 页确认 Artifact 可用，用匹配测试器
+   部署后按[概览](/zh/docs/sdk/source-maps/#验证还原)验证：在 **Source Map** 页确认 Artifact 可用，用匹配测试器
    检查一个真实的帧，再触发一个已知错误。栈帧没有还原时，先对比栈帧 URL 路径和 Artifact 名称，见
    [栈帧没有还原的原因](/zh/docs/sdk/source-maps/#栈帧没有还原的原因)。
 

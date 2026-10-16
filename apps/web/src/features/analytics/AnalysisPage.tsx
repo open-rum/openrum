@@ -23,7 +23,9 @@ import { getBehaviorAnalytics } from "@/lib/api/analytics";
 import { listOrganizations, listProjects, type Project } from "@/lib/api/projects";
 import { BehaviorControls } from "./BehaviorControls";
 import { BehaviorMetric } from "./BehaviorMetric";
-import { BehaviorTrendChart } from "./BehaviorTrendChart";
+import { PlotChart } from "@/components/charts/PlotChart";
+import { TIME_SERIES_MAX_POINTS } from "@/lib/charts/timeSeries";
+import { behaviorTrendPlot } from "./plotData";
 import { AnalysisTabs } from "./AnalysisTabs";
 import {
   dimensionLabel,
@@ -62,8 +64,9 @@ export function AnalysisPage() {
 function ProjectAnalysis({ project }: { project: Project }) {
   const { filters, update } = useBehaviorFilters(project.id);
   const query = useQuery({
-    queryKey: ["behavior-analysis", filters],
-    queryFn: ({ signal }) => getBehaviorAnalytics(filters, signal),
+    queryKey: ["behavior-analysis", filters, TIME_SERIES_MAX_POINTS],
+    queryFn: ({ signal }) =>
+      getBehaviorAnalytics({ ...filters, maxPoints: TIME_SERIES_MAX_POINTS }, signal),
   });
   const data = query.data;
   return (
@@ -139,7 +142,7 @@ function ProjectAnalysis({ project }: { project: Project }) {
               </div>
               <span>{intervalLabel(data.interval)}</span>
             </div>
-            <BehaviorTrendChart data={data.trend} />
+            <PlotChart data={behaviorTrendPlot(data)} view="area" title="事件趋势" />
           </section>
           <div className="behavior-grid">
             <BreakdownTable data={data} />

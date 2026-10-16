@@ -1,6 +1,10 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  groups as configurationGroups,
+  variables as configurationVariables,
+} from "./configuration-catalog.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "../..");
 const outputDirectory = join(root, "apps/site/src/content/docs/docs/reference");
@@ -11,132 +15,454 @@ await mkdir(outputDirectory, { recursive: true });
 await mkdir(chineseOutputDirectory, { recursive: true });
 
 const configSource = await readFile(join(root, "internal/config/config.go"), "utf8");
-const variableNames = [
-  ...new Set([...configSource.matchAll(/values\("([A-Z][A-Z0-9_]+)"\)/g)].map((match) => match[1])),
-].sort();
-const descriptions = {
-  APP_ENV: "Runtime environment: development, test, staging or production.",
-  PUBLIC_BASE_URL: "Canonical Console origin; HTTPS is required in production.",
-  POSTGRES_DSN: "Control-plane PostgreSQL connection string.",
-  CLICKHOUSE_DSN: "Event and aggregate ClickHouse connection string.",
-  KAFKA_BROKERS: "Comma-separated Kafka brokers.",
-  REDIS_ADDR: "Redis address for quotas, status and caches.",
-  GEO_COUNTRY_HEADER:
-    "Header carrying the visitor country, injected by the edge proxy (for example CF-IPCountry). Unset disables country resolution and stores ZZ.",
-  GEO_TRUSTED_PROXIES:
-    "Comma-separated CIDRs or addresses whose forwarded country header is believed. Required when GEO_COUNTRY_HEADER is set; never widen this to the public internet.",
-  INGEST_TRUSTED_PROXIES:
-    "Comma-separated CIDRs or addresses of the proxies that terminate ingest traffic. Unset keeps the rate-limit identity on the socket peer, so every caller behind a shared proxy counts as one. Setting it reads X-Forwarded-For from those peers only; never widen this to the public internet, because whoever matches can choose the identity they are limited on.",
-  OBJECT_STORAGE_PROVIDER: "Optional oss or s3 provider.",
-  OPENRUM_ALLOW_MANAGED_SECRETS: "Explicit opt-in for console-managed encrypted credentials.",
-  OPENRUM_MASTER_KEY: "Base64 for exactly 32 external key bytes; never stored in PostgreSQL.",
-  OPENRUM_KAFKA_RETENTION_DURATION:
-    "Real Event-topic retention used to calculate remaining Consumer drain headroom.",
-  OPENRUM_STORAGE_PRESSURE_GUARD_ENABLED:
-    "Enables automatic Browser SDK sampling protection from low ClickHouse free space.",
-  OPENRUM_STORAGE_WARNING_FREE_RATIO: "Free-space ratio that reports storage pressure.",
-  OPENRUM_STORAGE_CRITICAL_FREE_RATIO: "Free-space ratio that activates emergency sampling.",
-  OPENRUM_STORAGE_HARD_STOP_FREE_RATIO: "Free-space ratio that stops Ingest acceptance.",
-  OPENRUM_STORAGE_RECOVERY_FREE_RATIO: "Free-space ratio required to release emergency sampling.",
-  OPENRUM_STORAGE_EMERGENCY_SAMPLE_RATE:
-    "Temporary Browser SDK sampling cap while the guard is active.",
-  OPENRUM_STORAGE_POLL_INTERVAL: "Interval between ClickHouse system.disks capacity checks.",
-};
-// Translated alongside the English text so that a Chinese reader looking up a variable is
-// not dropped into English. Anything missing here falls back to the generic sentence.
-const chineseDescriptions = {
-  APP_ENV: "运行环境：development、test、staging 或 production。",
-  PUBLIC_BASE_URL: "Console 的规范 origin；生产环境必须使用 HTTPS。",
-  POSTGRES_DSN: "控制面 PostgreSQL 连接串。",
-  CLICKHOUSE_DSN: "Event 与聚合结果的 ClickHouse 连接串。",
-  KAFKA_BROKERS: "以逗号分隔的 Kafka broker 列表。",
-  REDIS_ADDR: "用于配额、状态和缓存的 Redis 地址。",
-  GEO_COUNTRY_HEADER:
-    "由边缘代理注入、携带访客国家的 header（例如 CF-IPCountry）。留空则关闭国家解析并存为 ZZ。",
-  GEO_TRUSTED_PROXIES:
-    "以逗号分隔的 CIDR 或地址，只有它们转发的国家 header 才被信任。设置了 GEO_COUNTRY_HEADER 时必填；切勿放宽到公网。",
-  INGEST_TRUSTED_PROXIES:
-    "以逗号分隔的 CIDR 或地址，指明终结上报流量的代理。留空则限流身份继续绑定 socket 对端，此时共享代理后面的所有调用方会被算作同一个。填写后只读取来自这些对端的 X-Forwarded-For；切勿放宽到公网，因为匹配到的一方就能自行决定被限流的身份。",
-  OBJECT_STORAGE_PROVIDER: "可选的 oss 或 s3 provider。",
-  OPENRUM_ALLOW_MANAGED_SECRETS: "显式开启由 Console 托管的加密凭据。",
-  OPENRUM_MASTER_KEY: "恰好 32 字节外部密钥的 Base64 值；绝不存入 PostgreSQL。",
-  OPENRUM_KAFKA_RETENTION_DURATION: "真实 Event topic 保留期，用于计算 Consumer 剩余排空时间。",
-  OPENRUM_STORAGE_PRESSURE_GUARD_ENABLED: "启用 ClickHouse 低容量时的 Browser SDK 自动采样保护。",
-  OPENRUM_STORAGE_WARNING_FREE_RATIO: "进入存储压力提示的剩余空间比例。",
-  OPENRUM_STORAGE_CRITICAL_FREE_RATIO: "启动紧急采样的剩余空间比例。",
-  OPENRUM_STORAGE_HARD_STOP_FREE_RATIO: "停止 Ingest 接入的剩余空间比例。",
-  OPENRUM_STORAGE_RECOVERY_FREE_RATIO: "解除硬熔断和紧急采样所需的剩余空间比例。",
-  OPENRUM_STORAGE_EMERGENCY_SAMPLE_RATE: "保护生效期间的 Browser SDK 临时采样上限。",
-  OPENRUM_STORAGE_POLL_INTERVAL: "检查 ClickHouse system.disks 容量的间隔。",
-};
+const systemSource = await readFile(join(root, "internal/config/system.go"), "utf8");
 
-function configurationPage({ title, description, generatedFrom, columns, fallback, notes }) {
-  const rows = variableNames
-    .map((name) => `| \`${name}\` | ${notes[name] || fallback} |`)
+// ---- Configuration ------------------------------------------------------------------
+// Names, per-service requirements and listen defaults come from the Go source; the catalog adds
+// the explanation. Any disagreement between the two fails generation instead of shipping a page
+// that lists a removed variable or omits a new one.
+const serviceKeys = {
+  ServiceAPI: "api",
+  ServiceIngest: "ingest",
+  ServiceConsumer: "consumer",
+  ServiceWorker: "worker",
+};
+const serviceBlock = (name) => {
+  const match = configSource.match(
+    new RegExp(`var ${name} = map\\[Service\\][^{]+\\{([\\s\\S]*?)\\n\\}`),
+  );
+  if (!match)
+    throw new Error(
+      `internal/config/config.go no longer defines ${name}; update the configuration generator.`,
+    );
+  return match[1];
+};
+const requiredByService = Object.fromEntries(
+  [...serviceBlock("serviceRequirements").matchAll(/(Service\w+):\s*\{([^}]*)\}/g)].map((match) => [
+    serviceKeys[match[1]],
+    [...match[2].matchAll(/"([A-Z0-9_]+)"/g)].map((name) => name[1]),
+  ]),
+);
+const listenDefaults = Object.fromEntries(
+  [...serviceBlock("serviceDefaults").matchAll(/(Service\w+):\s*"([^"]+)"/g)].map((match) => [
+    serviceKeys[match[1]],
+    match[2],
+  ]),
+);
+if (
+  !configSource.includes('[]string{"APP_ENV", "PUBLIC_BASE_URL"}') ||
+  !configSource.includes('"_HTTP_ADDR"')
+) {
+  throw new Error(
+    "internal/config/config.go changed how common requirements or listen addresses are read; update the configuration generator.",
+  );
+}
+const sourceNames = new Set([
+  ...[...(configSource + systemSource).matchAll(/values\("([A-Z][A-Z0-9_]+)"\)/g)].map(
+    (match) => match[1],
+  ),
+  // Variables read through a table or a loop instead of a direct values("...") call.
+  ...[...(configSource + systemSource).matchAll(/"(OPENRUM_[A-Z0-9_]+)"/g)].map(
+    (match) => match[1],
+  ),
+  ...Object.keys(listenDefaults).map((service) => `${service.toUpperCase()}_HTTP_ADDR`),
+]);
+const catalogNames = new Set(configurationVariables.map((entry) => entry.name));
+const unlisted = [...sourceNames].filter((name) => !catalogNames.has(name)).sort();
+const stale = [...catalogNames].filter((name) => !sourceNames.has(name)).sort();
+if (unlisted.length || stale.length) {
+  throw new Error(
+    `scripts/docs/configuration-catalog.mjs is out of date. Add: ${unlisted.join(", ") || "none"}. Remove: ${stale.join(", ") || "none"}.`,
+  );
+}
+
+const configurationText = {
+  en: {
+    title: "Configuration reference",
+    description:
+      "Every environment variable the OpenRUM services read, with its default, whether it is required and what it does.",
+    generated: "Generated from `internal/config`; do not edit by hand.",
+    intro:
+      "These are the environment variables the OpenRUM services read. With the Helm chart you normally set them through [Helm values](/docs/reference/helm-values/) and the runtime Secret instead of by hand. Values containing credentials belong in a Secret, never in a values file you commit.",
+    columns: ["Variable", "Required", "Default", "Description"],
+    all: "All services",
+    no: "No",
+    separator: ", ",
+  },
+  zh: {
+    title: "配置参考",
+    description: "OpenRUM 各服务读取的全部环境变量，包含默认值、是否必填和用途。",
+    generated: "由 `internal/config` 生成，请勿手工编辑。",
+    intro:
+      "这里是 OpenRUM 各服务读取的环境变量。使用 Helm Chart 时，通常通过 [Helm values](/zh/docs/reference/helm-values/) 和运行时 Secret 来设置，不需要手动写这些变量。带凭据的值应放进 Secret，不要写进会提交的 values 文件。",
+    columns: ["变量", "必填", "默认值", "说明"],
+    all: "所有服务",
+    no: "否",
+    separator: "、",
+  },
+};
+const requiredCell = (entry, locale, text) => {
+  if (entry.required) return entry.required[locale];
+  const services = Object.keys(requiredByService).filter((service) =>
+    requiredByService[service].includes(entry.name),
+  );
+  if (["APP_ENV", "PUBLIC_BASE_URL"].includes(entry.name)) return text.all;
+  if (services.length === Object.keys(requiredByService).length) return text.all;
+  if (services.length) return services.map((service) => `\`${service}\``).join(text.separator);
+  return text.no;
+};
+const defaultCell = (entry, locale) => {
+  if (entry.listenService) return `\`${listenDefaults[entry.listenService]}\``;
+  return locale === "zh" && entry.zhDefault ? entry.zhDefault : entry.default;
+};
+const escapeCell = (value) => value.replaceAll("|", "\\|");
+
+function configurationPage(locale) {
+  const text = configurationText[locale];
+  const sections = configurationGroups
+    .map((group) => {
+      const entries = configurationVariables.filter((entry) => entry.group === group.id);
+      if (!entries.length) throw new Error(`Configuration group ${group.id} has no variables.`);
+      const rows = entries
+        .map(
+          (entry) =>
+            `| \`${entry.name}\` | ${escapeCell(requiredCell(entry, locale, text))} | ${escapeCell(defaultCell(entry, locale))} | ${escapeCell(entry[locale])} |`,
+        )
+        .join("\n");
+      return `## ${group[locale].title}\n\n${group[locale].intro}\n\n| ${text.columns.join(" | ")} |\n| --- | --- | --- | --- |\n${rows}\n`;
+    })
     .join("\n");
   return `---
-title: ${title}
-description: ${description}
+title: ${text.title}
+description: ${text.description}
 appliesTo: Alpha
 ---
 
 <!-- GENERATED: scripts/docs/generate-reference.mjs -->
 
-${generatedFrom}
+${text.generated}
 
-| ${columns.join(" | ")} |
-| --- | --- |
-${rows}
-`;
+${text.intro}
+
+${sections}`;
 }
 
-const configuration = configurationPage({
-  title: "Configuration reference",
-  description: "Generated environment-variable reference for OpenRUM services.",
-  generatedFrom: "Generated from `internal/config/config.go`; do not edit by hand.",
-  columns: ["Variable", "Purpose"],
-  fallback: "Optional service or feature configuration; see source validation for constraints.",
-  notes: descriptions,
-});
-const chineseConfiguration = configurationPage({
-  title: "配置参考",
-  description: "OpenRUM 各服务的环境变量参考，自动生成。",
-  generatedFrom: "由 `internal/config/config.go` 生成，请勿手工编辑。",
-  columns: ["变量", "用途"],
-  fallback: "可选的服务或特性配置；约束条件见源码中的校验逻辑。",
-  notes: chineseDescriptions,
-});
+const configuration = configurationPage("en");
+const chineseConfiguration = configurationPage("zh");
 
 const schema = JSON.parse(
   await readFile(join(root, "packages/protocol/schema/envelope-v1.json"), "utf8"),
 );
+// ---- Event schema -------------------------------------------------------------------
+// The canonical JSON Schema is the only source: every field, type and limit below is read from
+// it. Five of the six events are written as `allOf [eventBase, {...}]`, and the second element
+// carries the complete property list and required list, so that is what gets rendered.
 const eventRefs = schema.properties.events.items.oneOf.map((item) => item.$ref.split("/").at(-1));
-const eventRows = eventRefs
-  .map((name) => {
-    const definition = schema.$defs[name];
-    const type = definition?.properties?.type?.const ?? name;
-    const required = (definition?.required ?? []).map((value) => `\`${value}\``).join(", ");
-    return `| \`${type}\` | ${required || "—"} |`;
-  })
-  .join("\n");
-const eventSchema = `---
-title: Event schema
-description: Generated summary of the canonical OpenRUM Envelope V1 schema.
+const resolveRef = (node) => {
+  let current = node;
+  while (current?.$ref) current = schema.$defs[current.$ref.split("/").at(-1)];
+  return current;
+};
+const refName = (node) => node?.$ref?.split("/").at(-1);
+const flatten = (definition) => (definition.allOf ? definition.allOf.at(-1) : definition);
+const eventTypes = eventRefs.map((name) => {
+  const object = flatten(schema.$defs[name]);
+  return { name, type: object.properties.type.const, object };
+});
+const commonEventFields = ["event_id", "type", "timestamp", "sample_rate"];
+
+const schemaText = {
+  en: {
+    title: "Event schema",
+    description:
+      "The OpenRUM Envelope V1 schema, expanded to every field, type and limit of the data a Browser SDK sends.",
+    generated: "Generated from `packages/protocol/schema/envelope-v1.json`; do not edit by hand.",
+    intro: (version, required, min, max) =>
+      `Schema version \`${version}\`. A Browser SDK sends one **Envelope** per request. An Envelope requires ${required}, and carries between ${min} and ${max} Events.`,
+    columns: ["Field", "Type", "Required", "Limits"],
+    yes: "Yes",
+    no: "No",
+    envelope: "Envelope",
+    envelopeNote: "The request body.",
+    sdk: "`sdk`",
+    sdkNote: "Which SDK produced the Envelope.",
+    context: "`context`",
+    contextNote: "What applies to every Event in the Envelope.",
+    contextOf: (name) => `\`context.${name}\``,
+    events: "Events",
+    eventsNote: (count) =>
+      `\`events\` holds ${count} kinds of Event, told apart by \`type\`. Every Event carries the common fields below, and each kind adds its own.`,
+    common: "Common fields",
+    eventColumns: ["`type`", "What it records", "Fields it adds (required in bold)"],
+    kinds: {
+      page_view: "A page view or a route change",
+      error: "A captured error, with its stack and the actions that led to it",
+      web_vital: "A Core Web Vitals measurement",
+      api: "A request the browser made",
+      custom: "A project-defined business Event with attributes and measurements",
+      log: "A structured diagnostic log line",
+    },
+    list: ", ",
+    stop: ".",
+    limitSeparator: "; ",
+    nested: (name) => `\`${name}\` fields`,
+    itemOf: (name) => `\`${name}\` item fields`,
+    footer:
+      "The canonical JSON Schema is the authority for bounds and formats. Generated Go validation is verified by `pnpm run protocol:check`.",
+    arrayOf: (item) => `array of ${item}`,
+    eventWord: "Event",
+    eachKind: "each is one of the Event kinds below",
+    always: (value) => `always \`${value}\``,
+    oneOf: (values) => `one of ${values}`,
+    chars: (min, max) =>
+      min !== undefined && max !== undefined
+        ? `${min}–${max} characters`
+        : max !== undefined
+          ? `up to ${max} characters`
+          : `at least ${min} characters`,
+    items: (min, max) =>
+      min !== undefined && max !== undefined
+        ? `${min}–${max} items`
+        : max !== undefined
+          ? `up to ${max} items`
+          : `at least ${min} items`,
+    entries: (max) => `up to ${max} entries`,
+    keys: (limit) => `keys ${limit}`,
+    values: (limit) => `values ${limit}`,
+    each: (limit) => `each item ${limit}`,
+    pattern: (value) => `matches \`${value}\``,
+    listed: "fields listed below",
+    itemsListed: "each item's fields are listed below",
+    numbers: "numbers",
+    belowOrEqual: (value) => `≤ ${value}`,
+    atLeast: (value) => `≥ ${value}`,
+    above: (value) => `> ${value}`,
+    range: (min, max) => `${min}–${max}`,
+  },
+  zh: {
+    title: "Event Schema",
+    description:
+      "OpenRUM Envelope V1 Schema 的完整展开：Browser SDK 发送的数据中每个字段、类型和限制。",
+    generated: "本页根据 `packages/protocol/schema/envelope-v1.json` 生成，请勿手工修改。",
+    intro: (version, required, min, max) =>
+      `Schema 版本 \`${version}\`。Browser SDK 每次请求发送一个 **Envelope**。Envelope 必须包含 ${required}，并携带 ${min}–${max} 个 Event。`,
+    columns: ["字段", "类型", "必填", "限制"],
+    yes: "是",
+    no: "否",
+    envelope: "Envelope",
+    envelopeNote: "请求体。",
+    sdk: "`sdk`",
+    sdkNote: "是哪个 SDK 生成了这个 Envelope。",
+    context: "`context`",
+    contextNote: "对 Envelope 里每个 Event 都适用的信息。",
+    contextOf: (name) => `\`context.${name}\``,
+    events: "Event",
+    eventsNote: (count) =>
+      `\`events\` 里有 ${count} 种 Event，用 \`type\` 区分。每个 Event 都带有下面的公共字段，每种再各自增加字段。`,
+    common: "公共字段",
+    eventColumns: ["`type`", "记录什么", "增加的字段（必填的加粗）"],
+    kinds: {
+      page_view: "一次页面访问或路由切换",
+      error: "捕获到的错误，包括堆栈和导致它的操作",
+      web_vital: "一项 Core Web Vitals 指标",
+      api: "浏览器发出的一次请求",
+      custom: "项目自定义的业务 Event，带属性和度量",
+      log: "一条结构化的诊断日志",
+    },
+    list: "、",
+    stop: "。",
+    limitSeparator: "；",
+    nested: (name) => `\`${name}\` 的字段`,
+    itemOf: (name) => `\`${name}\` 每一项的字段`,
+    footer:
+      "边界和格式以权威 JSON Schema 为准；`pnpm run protocol:check` 会验证生成的 Go 校验代码。",
+    arrayOf: (item) => `${item} 数组`,
+    eventWord: "Event",
+    eachKind: "每一项是下面某一种 Event",
+    always: (value) => `固定为 \`${value}\``,
+    oneOf: (values) => `取值：${values}`,
+    chars: (min, max) =>
+      min !== undefined && max !== undefined
+        ? `${min}–${max} 个字符`
+        : max !== undefined
+          ? `最多 ${max} 个字符`
+          : `至少 ${min} 个字符`,
+    items: (min, max) =>
+      min !== undefined && max !== undefined
+        ? `${min}–${max} 项`
+        : max !== undefined
+          ? `最多 ${max} 项`
+          : `至少 ${min} 项`,
+    entries: (max) => `最多 ${max} 项`,
+    keys: (limit) => `键 ${limit}`,
+    values: (limit) => `值 ${limit}`,
+    each: (limit) => `每一项 ${limit}`,
+    pattern: (value) => `匹配 \`${value}\``,
+    listed: "字段见下方",
+    itemsListed: "每一项的字段见下方",
+    numbers: "数字",
+    belowOrEqual: (value) => `≤ ${value}`,
+    atLeast: (value) => `≥ ${value}`,
+    above: (value) => `> ${value}`,
+    range: (min, max) => `${min}–${max}`,
+  },
+};
+
+function describeSchemaNode(node, t) {
+  const target = resolveRef(node);
+  const named = refName(node);
+  if (target.const !== undefined) return { type: "string", limits: [t.always(target.const)] };
+  if (target.enum) {
+    return {
+      type: "string",
+      limits: [t.oneOf(target.enum.map((value) => `\`${value}\``).join(t.list))],
+    };
+  }
+  if (target.type === "array" && target.items.oneOf) {
+    // `events`: each item is one of the Event kinds described below.
+    return {
+      type: t.arrayOf(t.eventWord),
+      limits: [t.items(target.minItems, target.maxItems), t.eachKind],
+    };
+  }
+  if (target.type === "array") {
+    const item = describeSchemaNode(target.items, t);
+    const limits = [];
+    if (target.minItems !== undefined || target.maxItems !== undefined)
+      limits.push(t.items(target.minItems, target.maxItems));
+    if (item.limits.length === 1 && item.limits[0] === t.listed) limits.push(t.itemsListed);
+    else if (item.limits.length) limits.push(t.each(item.limits.join(", ")));
+    return { type: t.arrayOf(item.type), limits };
+  }
+  if (target.type === "object" && target.properties) {
+    return { type: "object", limits: [t.listed] };
+  }
+  if (target.type === "object") {
+    const limits = [t.entries(target.maxProperties)];
+    const key = describeSchemaNode(target.propertyNames, t);
+    const value = describeSchemaNode(target.additionalProperties, t);
+    limits.push(t.keys(key.limits.join(", ")));
+    limits.push(value.type === "number" ? t.values(t.numbers) : t.values(value.limits.join(", ")));
+    return { type: `\`map<string, ${value.type}>\``, limits };
+  }
+  const limits = [];
+  let type = target.type;
+  if (target.format) type = target.format;
+  if (target.type === "string") {
+    if (target.minLength !== undefined || target.maxLength !== undefined)
+      limits.push(t.chars(target.minLength, target.maxLength));
+    if (target.pattern) limits.push(t.pattern(target.pattern.replaceAll("|", "\\|")));
+  }
+  if (target.type === "number" || target.type === "integer") {
+    if (target.minimum !== undefined && target.maximum !== undefined)
+      limits.push(t.range(target.minimum, target.maximum));
+    else if (target.maximum !== undefined) limits.push(t.belowOrEqual(target.maximum));
+    else if (target.minimum !== undefined) limits.push(t.atLeast(target.minimum));
+    if (target.exclusiveMinimum !== undefined) {
+      limits.push(
+        target.maximum !== undefined
+          ? `${t.above(target.exclusiveMinimum)}, ${t.belowOrEqual(target.maximum)}`
+          : t.above(target.exclusiveMinimum),
+      );
+      if (target.maximum !== undefined)
+        limits.splice(limits.indexOf(t.belowOrEqual(target.maximum)), 1);
+    }
+  }
+  return { type, limits };
+}
+
+function fieldTable(object, t, skip = []) {
+  const rows = Object.entries(object.properties)
+    .filter(([name]) => !skip.includes(name))
+    .map(([name, node]) => {
+      const { type, limits } = describeSchemaNode(node, t);
+      const required = (object.required ?? []).includes(name) ? t.yes : t.no;
+      return `| \`${name}\` | ${type} | ${required} | ${limits.join(t.limitSeparator) || "—"} |`;
+    });
+  const [field, type, required, limits] = t.columns;
+  return `| ${field} | ${type} | ${required} | ${limits} |\n| --- | --- | --- | --- |\n${rows.join("\n")}`;
+}
+
+// Objects that deserve their own table: a property that is a named object, or an array of them.
+function nestedObjects(object) {
+  return Object.entries(object.properties).flatMap(([name, node]) => {
+    const direct = resolveRef(node);
+    if (direct?.type === "object" && direct.properties)
+      return [{ name, kind: "object", object: direct }];
+    const item = direct?.type === "array" ? resolveRef(direct.items) : undefined;
+    if (item?.type === "object" && item.properties) return [{ name, kind: "item", object: item }];
+    return [];
+  });
+}
+
+function eventSchemaPage(locale) {
+  const t = schemaText[locale];
+  const required = schema.required.map((value) => `\`${value}\``).join(t.list);
+  const context = resolveRef(schema.properties.context);
+  const sections = [];
+  sections.push(`## ${t.envelope}\n\n${t.envelopeNote}\n\n${fieldTable(schema, t)}`);
+  sections.push(
+    `## ${t.sdk}\n\n${t.sdkNote}\n\n${fieldTable(resolveRef(schema.properties.sdk), t)}`,
+  );
+  const contextParts = [`## ${t.context}\n\n${t.contextNote}\n\n${fieldTable(context, t)}`];
+  for (const nested of nestedObjects(context)) {
+    contextParts.push(`### ${t.contextOf(nested.name)}\n\n${fieldTable(nested.object, t)}`);
+  }
+  sections.push(contextParts.join("\n\n"));
+
+  const overview = eventTypes
+    .map(({ type, object }) => {
+      const added = Object.keys(object.properties)
+        .filter((name) => !commonEventFields.includes(name))
+        .map((name) => ((object.required ?? []).includes(name) ? `**\`${name}\`**` : `\`${name}\``))
+        .join(", ");
+      return `| \`${type}\` | ${t.kinds[type]} | ${added || "—"} |`;
+    })
+    .join("\n");
+  const eventBase = schema.$defs.eventBase;
+  const commonObject = {
+    required: eventBase.required,
+    properties: {
+      ...eventBase.properties,
+      // `type` is a free string in the base, but each Event narrows it to its own kind.
+      type: { enum: eventTypes.map((event) => event.type) },
+    },
+  };
+  const eventParts = [
+    `## ${t.events}\n\n${t.eventsNote(eventTypes.length)}\n\n| ${t.eventColumns.join(" | ")} |\n| --- | --- | --- |\n${overview}`,
+    `### ${t.common}\n\n${fieldTable(commonObject, t)}`,
+  ];
+  for (const { type, object } of eventTypes) {
+    const part = [
+      `### \`${type}\`\n\n${t.kinds[type]}${t.stop}\n\n${fieldTable(object, t, commonEventFields)}`,
+    ];
+    for (const nested of nestedObjects(object)) {
+      const heading = nested.kind === "item" ? t.itemOf(nested.name) : t.nested(nested.name);
+      part.push(`#### ${heading}\n\n${fieldTable(nested.object, t)}`);
+    }
+    eventParts.push(part.join("\n\n"));
+  }
+  sections.push(eventParts.join("\n\n"));
+
+  return `---
+title: ${t.title}
+description: ${t.description}
 appliesTo: schema ${schema.properties.schema_version.const}
 ---
 
 <!-- GENERATED: scripts/docs/generate-reference.mjs -->
 
-Generated from \`packages/protocol/schema/envelope-v1.json\`; do not edit by hand.
+${t.generated}
 
-An Envelope requires ${schema.required.map((value) => `\`${value}\``).join(", ")}. It contains between ${schema.properties.events.minItems} and ${schema.properties.events.maxItems} Events.
+${t.intro(schema.properties.schema_version.const, required, schema.properties.events.minItems, schema.properties.events.maxItems)}
 
-| Event type | Event-specific required fields |
-| --- | --- |
-${eventRows}
+${sections.join("\n\n")}
 
-The canonical JSON Schema defines all bounds and formats. Generated Go validation is verified by \`pnpm run protocol:check\`.
+${t.footer}
 `;
+}
+const eventSchema = eventSchemaPage("en");
+const chineseEventSchema = eventSchemaPage("zh");
 
 const helmSource = await readFile(join(root, "deploy/helm/openrum/values.yaml"), "utf8");
 const helmValues = `---
@@ -284,6 +610,7 @@ integration turns off automatic Page Views.
 
 await emit("configuration.md", configuration);
 await emit("event-schema.md", eventSchema);
+await emit("event-schema.md", chineseEventSchema, chineseOutputDirectory);
 await emit("helm-values.md", helmValues);
 await emit("sdk-options.md", sdkOptionsReference);
 await emit("configuration.md", chineseConfiguration, chineseOutputDirectory);

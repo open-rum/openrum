@@ -19,12 +19,20 @@ import {
   type EventPriority,
   type SamplingOptions,
 } from "./sampling.ts";
+import {
+  compileCapture,
+  type CaptureSettings,
+  type CompiledCapture,
+  type CaptureSelection,
+} from "./capture.ts";
 import { compileFilters, type CompiledFilters, type FilterSettings } from "./filters.ts";
 import { runSafely, runSafelyAsync, type Diagnostics } from "./safety.ts";
 import { createUUID, SessionManager, type SessionDependencies } from "./session.ts";
 
 /** The environments a Project can enable: 开发, 测试, 灰度 and 生产. */
 export type Environment = "development" | "test" | "staging" | "production";
+
+const noHeaders: ReadonlySet<string> = new Set();
 
 export interface ClientOptions {
   /** Public connection string copied from the Project's onboarding page. */
@@ -111,6 +119,7 @@ export class OpenRUMClient {
   readonly #onClose?: () => void;
   #sampling: SamplingOptions;
   #filters: CompiledFilters | undefined;
+  #capture: CompiledCapture | undefined;
   readonly #teardowns: Array<() => void> = [];
   readonly #breadcrumbs: Breadcrumb[] = [];
   #state: "running" | "closed" = "running";
@@ -265,6 +274,29 @@ export class OpenRUMClient {
     runSafely(this.#diagnostics, undefined, () => {
       this.#filters = compileFilters(settings);
     });
+  }
+
+  /**
+   * Replaces the API header capture rules. Called by remote configuration. Unlike the
+   * filters, an unreadable document is applied as "no rules": stale rules would keep
+   * reading headers a project had switched off.
+   */
+  updateCapture(settings: CaptureSettings | undefined): void {
+    runSafely(this.#diagnostics, undefined, () => {
+      this.#capture = compileCapture(settings);
+    });
+  }
+
+  /** What to read for one request, or undefined when the project opted in to nothing. */
+  captureSelection(method: string, url: string): CaptureSelection | undefined {
+    return runSafely<CaptureSelection | undefined>(this.#diagnostics, undefined, () =>
+      this.#capture?.select(method, url),
+    );
+  }
+
+  /** Request header names XMLHttpRequest must record as they are set. Empty by default. */
+  capturableRequestHeaders(): ReadonlySet<string> {
+    return this.#capture?.requestNames ?? noHeaders;
   }
 
   updateSampling(options: Partial<SamplingOptions>): void {

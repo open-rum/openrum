@@ -47,11 +47,10 @@ const smoke = {
       'import { uploadSourceMaps, type OpenRUMSourceMapOptions } from "@openrum/sourcemap";\nimport { openRUMSourceMaps } from "@openrum/sourcemap/vite";\nexport const options: OpenRUMSourceMapOptions | undefined = undefined;\nvoid uploadSourceMaps;\nvoid openRUMSourceMaps;\n',
   },
   "@openrum/cli": {
-    required: ["dist/openrum.js", "dist/openrum-sourcemaps.js"],
+    required: ["dist/openrum.js"],
     commands: [
       ["openrum", ["--version"], (output) => output.trim() === manifest.version],
       ["openrum", ["sourcemaps", "upload", "--help"], (output) => output.includes("--project-id")],
-      ["openrum-sourcemaps", ["--help"], (output) => output.includes("Usage: openrum-sourcemaps")],
     ],
   },
 };

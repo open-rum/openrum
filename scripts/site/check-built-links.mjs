@@ -22,21 +22,30 @@ const htmlByPage = new Map(
   await Promise.all(pages.map(async (page) => [page, await readFile(page, "utf8")])),
 );
 const failures = [];
+// A redirect stub (Astro's `redirects`) keeps an old address working. It has no canonical of
+// its own, no build marker and no reason to be linked to, but its destination must exist,
+// fragment included, so its link is still checked below.
+const isRedirect = (html) => /<meta\s+http-equiv=["']refresh["']/i.test(html);
 
 for (const page of pages) {
   const html = htmlByPage.get(page);
-  const canonicals = [
-    ...html.matchAll(/<link\b(?=[^>]*\brel=["']canonical["'])[^>]*\bhref=["']([^"']+)["'][^>]*>/gi),
-  ].map((match) => match[1]);
-  if (canonicals.length !== 1) {
+  const redirect = isRedirect(html);
+  const canonicals = redirect
+    ? []
+    : [
+        ...html.matchAll(
+          /<link\b(?=[^>]*\brel=["']canonical["'])[^>]*\bhref=["']([^"']+)["'][^>]*>/gi,
+        ),
+      ].map((match) => match[1]);
+  if (!redirect && canonicals.length !== 1) {
     failures.push(`${display(page)}: expected one canonical link, found ${canonicals.length}`);
-  } else {
+  } else if (!redirect) {
     const owners = canonicalOwners.get(canonicals[0]) ?? [];
     owners.push(page);
     canonicalOwners.set(canonicals[0], owners);
   }
 
-  if (!html.includes("data-openrum-build")) {
+  if (!redirect && !html.includes("data-openrum-build")) {
     failures.push(`${display(page)}: missing Release/commit build marker`);
   }
 
@@ -51,7 +60,7 @@ for (const page of pages) {
       failures.push(`${display(page)}: missing internal target ${href}`);
       continue;
     }
-    if (pageSet.has(target) && target !== page) inbound.get(target).add(page);
+    if (!redirect && pageSet.has(target) && target !== page) inbound.get(target).add(page);
     if (fragment && pageSet.has(target)) {
       const decoded = decodeURIComponent(fragment);
       const targetHTML = htmlByPage.get(target);
@@ -71,7 +80,7 @@ for (const [canonical, owners] of canonicalOwners) {
 for (const page of pages) {
   const route = routeFor(page);
   if (route === "/" || /\/404(?:\.html)?\/?$/.test(route)) continue;
-  if (inbound.get(page).size === 0)
+  if (!isRedirect(htmlByPage.get(page)) && inbound.get(page).size === 0)
     failures.push(`${display(page)}: orphan page has no inbound link`);
 }
 

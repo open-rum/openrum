@@ -34,7 +34,17 @@ export function ApiFilterBar({
         { label: "POST", onSelect: () => addMethod("POST", filters, onChange) },
         { label: "失败率排序", onSelect: () => onChange({ sort: "failureRate" }) },
       ]}
+      searchLabel="Endpoint"
       onSearch={(search) => onChange({ search })}
+      onClear={() =>
+        onChange({
+          search: undefined,
+          methods: [],
+          release: undefined,
+          route: undefined,
+          sort: "requests",
+        })
+      }
       onSelect={(key, value) => {
         const selected = String(value);
         if (key === "method") addMethod(selected, filters, onChange);
@@ -108,13 +118,22 @@ function apiFields(facets?: Facets): FilterSearchField[] {
 
 function apiTokens(filters: APIFilters): FilterSearchToken[] {
   const tokens: FilterSearchToken[] = [];
+  // Methods stack, and the endpoint text has no field of its own: those can be removed but not
+  // edited in place.
   if (filters.search) tokens.push({ key: "search", label: `Endpoint：${filters.search}` });
   for (const method of filters.methods)
     tokens.push({ key: `method:${method}`, label: `方法：${method}` });
-  if (filters.release) tokens.push({ key: "release", label: `版本：${filters.release}` });
-  if (filters.route) tokens.push({ key: "route", label: `Route：${filters.route}` });
+  if (filters.release)
+    tokens.push({ key: "release", fieldKey: "release", label: `版本：${filters.release}` });
+  if (filters.route)
+    tokens.push({
+      key: "route",
+      fieldKey: "route",
+      value: filters.route,
+      label: `Route：${filters.route}`,
+    });
   if (filters.sort !== "requests")
-    tokens.push({ key: "sort", label: `排序：${apiSortLabels[filters.sort]}` });
+    tokens.push({ key: "sort", fieldKey: "sort", label: `排序：${apiSortLabels[filters.sort]}` });
   return tokens;
 }
 

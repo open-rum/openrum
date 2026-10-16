@@ -1,5 +1,5 @@
 import { z, type ZodType } from "zod";
-import { HTTPError, csrfHeaders, redirectToLogin } from "@/lib/auth/session";
+import { HTTPError, csrfHeaders, isSessionExpired, redirectToLogin } from "@/lib/auth/session";
 import type { OverviewFilters } from "@/lib/filters/schema";
 
 const errorEnvelopeSchema = z.object({
@@ -141,7 +141,8 @@ export async function requestJSONWithStatus<T>(
   if (!response.ok) {
     const parsed = errorEnvelopeSchema.safeParse(payload);
     const detail = parsed.success ? parsed.data.error : undefined;
-    if (response.status === 401 && redirectOnUnauthorized) redirectToLogin(true);
+    if (redirectOnUnauthorized && isSessionExpired(response.status, detail?.code))
+      redirectToLogin(true);
     throw new HTTPError(
       response.status,
       detail?.code ?? "REQUEST_FAILED",
@@ -177,7 +178,7 @@ export async function requestNoContent(
   const payload: unknown = await response.json().catch(() => null);
   const parsed = errorEnvelopeSchema.safeParse(payload);
   const detail = parsed.success ? parsed.data.error : undefined;
-  if (response.status === 401) redirectToLogin(true);
+  if (isSessionExpired(response.status, detail?.code)) redirectToLogin(true);
   throw new HTTPError(
     response.status,
     detail?.code ?? "REQUEST_FAILED",

@@ -53,14 +53,14 @@ docker compose -f deploy/compose/docker-compose.yml logs --tail=100 api ingest c
 | `ARTIFACT_TOO_LARGE`（400） | 单个 Source Map 超过 64 MiB。插件会在上传前拒绝这类文件。 | 拆分产物，例如使用 `build.rollupOptions.output.manualChunks`，让每个 Source Map 更小。 |
 | `ARTIFACT_EXISTS`（409） | 该 Release 已有同名且可用的 Source Map，但内容不同，通常是内容变化的构建沿用了旧 Release 版本号。 | 为变化后的构建使用新 Release。确实需要覆盖时，设置 `replace: true` 或传入 `--replace`。内容相同的重复上传会被跳过，不会触发此错误。 |
 | `ARTIFACT_MISMATCH`（422） | 存储中对象的大小或 SHA-256 与插件声明的不一致，例如代理改写了请求体或上传被截断。 | 重新上传。若反复出现，检查 CI Runner 与对象存储之间的代理，以及 Bucket 的转换或压缩设置。 |
-| `INVALID_UPLOAD_TOKEN`（401） | 令牌格式错误、不存在或已吊销。 | 在 **设置 → 项目 → 接入指引 → Source Map 上传令牌** 新建令牌，并更新 CI Secret `OPENRUM_UPLOAD_TOKEN`。 |
+| `INVALID_UPLOAD_TOKEN`（401） | 令牌格式错误、不存在或已吊销。 | 在 **设置 → 项目 → Source Map → 上传令牌** 新建令牌，并更新 CI Secret `OPENRUM_UPLOAD_TOKEN`。 |
 | `NOT_FOUND`（404） | 项目 ID 错误，或令牌属于另一个项目。 | 使用签发该令牌的项目的 ID。 |
 
 ### 上传成功但栈帧仍未还原
 
 从 **错误** 打开该错误，每个未还原的帧都会显示原因：
 
-- **`missing_artifact`** 几乎都是命名不匹配。Artifact 名称必须等于脚本 URL 的路径（去掉协议、域名、查询参数和开头的 `/`）加 `.map`。在 **发布** 页对比栈帧 URL 与该 Release 已上传的名称。站点部署在子路径或 CDN 前缀下时，设置 `urlPrefix` 让名称包含该前缀。可用发布页的匹配测试器检查单个栈帧。
+- **`missing_artifact`** 几乎都是命名不匹配。Artifact 名称必须等于脚本 URL 的路径（去掉协议、域名、查询参数和开头的 `/`）加 `.map`。在 **Source Map** 页对比栈帧 URL 与该 Release 已上传的名称。站点部署在子路径或 CDN 前缀下时，设置 `urlPrefix` 让名称包含该前缀。可用发布页的匹配测试器检查单个栈帧。
 - **`missing_release`** 表示事件没有 `release`，需要在 SDK `init()` 中设置 `release`。
 - **`ambiguous_artifact`**，或 Source Map 上传到了另一个 Release：SDK 的 `release` 和 `dist` 必须与插件使用的值完全一致。
 

@@ -15,6 +15,7 @@ import (
 
 type apiQueries interface {
 	Get(context.Context, query.APIFilters) (query.APIResult, error)
+	Samples(context.Context, query.APIFilters) (query.APISamples, error)
 }
 
 type APIHandler struct {
@@ -79,6 +80,46 @@ func parseAPIFilters(request *http.Request, projectID uuid.UUID) (query.APIFilte
 		ProjectID: projectID, From: from, To: to, Environment: values.Get("environment"),
 		Release: values.Get("release"), Route: values.Get("route"), Methods: values["methods"],
 		Method: values.Get("method"), URL: values.Get("url"), Search: values.Get("search"),
-		Sort: values.Get("sort"), Compare: values.Get("compare") == "previous",
+		User: values.Get("user"), Sort: values.Get("sort"), Compare: values.Get("compare") == "previous",
 	})
+}
+
+// Samples lists one endpoint's individual requests, optionally only those of a user whose
+// anonymous or business ID starts with the `user` parameter.
+func (handler *APIHandler) Samples(writer http.ResponseWriter, request *http.Request) {
+	principal, ok := httpx.PrincipalFromContext(request.Context())
+	if !ok {
+		httpx.WriteError(writer, request, http.StatusUnauthorized, "UNAUTHENTICATED", "Authentication is required.")
+		return
+	}
+	projectID, ok := parsePathUUID(writer, request, "projectId")
+	if !ok {
+		return
+	}
+	if _, err := handler.projects.GetForUser(request.Context(), principal.UserID, projectID); err != nil {
+		writeControlPlaneError(writer, request, handler.logger, err)
+		return
+	}
+	filters, err := parseAPIFilters(request, projectID)
+	if err != nil {
+		httpx.WriteError(writer, request, http.StatusBadRequest, "VALIDATION_ERROR", "A valid UTC range up to 30 days and bounded API filters are required.")
+		return
+	}
+	ctx, cancel := context.WithTimeout(request.Context(), 10*time.Second)
+	defer cancel()
+	result, err := handler.queries.Samples(ctx, filters)
+	if err != nil {
+		if errors.Is(err, query.ErrInvalidAPIFilters) {
+			httpx.WriteError(writer, request, http.StatusBadRequest, "VALIDATION_ERROR", "An endpoint and valid filters are required.")
+			return
+		}
+		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+			httpx.WriteError(writer, request, http.StatusUnprocessableEntity, "QUERY_TOO_EXPENSIVE", "The sample query exceeded its time budget.")
+			return
+		}
+		handler.logger.Error().Err(err).Str("project_id", projectID.String()).Msg("API sample query failed")
+		httpx.WriteError(writer, request, http.StatusServiceUnavailable, "QUERY_UNAVAILABLE", "API samples are temporarily unavailable.")
+		return
+	}
+	writeJSON(writer, http.StatusOK, result)
 }

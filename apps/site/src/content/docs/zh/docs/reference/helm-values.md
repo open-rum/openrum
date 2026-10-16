@@ -121,6 +121,18 @@ config:
     region: ""
     forcePathStyle: ""
     endpointAllowlist: ""
+  # Outgoing mail (SMTP) for alerts and invitations. Leave host empty to configure the
+  # server in the Console instead; setting it here makes the Console show it read-only.
+  # The password never goes in values: put SMTP_PASSWORD in the runtime Secret.
+  smtp:
+    host: ""
+    # Empty uses the default for the security mode: 587, 465 or 25.
+    port: ""
+    # "starttls" (default), "tls" for implicit TLS, or "none" for a trusted relay without credentials.
+    security: ""
+    username: ""
+    # Sender address, for example no-reply@example.com or "OpenRUM <no-reply@example.com>".
+    from: ""
   managedSecrets:
     enabled: false
     masterKeyID: v1
@@ -134,6 +146,7 @@ config:
     awsAccessKeyID: AWS_ACCESS_KEY_ID
     awsSecretAccessKey: AWS_SECRET_ACCESS_KEY
     awsSessionToken: AWS_SESSION_TOKEN
+    smtpPassword: SMTP_PASSWORD
     managedSecretsMasterKey: OPENRUM_MASTER_KEY
 
 # Redis holds rate-limit counters, login throttling, dashboard caches and short-lived

@@ -23,7 +23,8 @@ export function EventFilterComposer({
 }) {
   return (
     <FilterSearchComposer
-      ariaLabel="搜索事件或添加筛选条件"
+      ariaLabel="添加事件筛选条件"
+      placeholder="添加筛选条件…"
       fields={eventFields(data)}
       tokens={eventTokens(filters)}
       shortcuts={[
@@ -52,6 +53,14 @@ export function EventFilterComposer({
         }
         if (key === "measurement") onChange({ measurement: selected });
       }}
+      onClear={() =>
+        onChange({
+          eventKind: undefined,
+          eventName: undefined,
+          dimension: "country",
+          measurement: undefined,
+        })
+      }
       onRemove={(key) => {
         if (key === "event") onChange({ eventKind: undefined, eventName: undefined });
         if (key === "dimension") onChange({ dimension: "country" });
@@ -123,15 +132,24 @@ function eventTokens(filters: BehaviorFilters): FilterSearchToken[] {
   if (filters.eventKind) {
     tokens.push({
       key: "event",
+      fieldKey: "event",
       label: filters.eventName
         ? `事件：${eventLabel(filters.eventKind, filters.eventName)}`
         : `事件：${eventKindLabel(filters.eventKind)}`,
     });
   }
   if (filters.dimension !== "country")
-    tokens.push({ key: "dimension", label: `分群：${dimensionLabel(filters.dimension)}` });
+    tokens.push({
+      key: "dimension",
+      fieldKey: "dimension",
+      label: `分群：${dimensionLabel(filters.dimension)}`,
+    });
   if (filters.measurement)
-    tokens.push({ key: "measurement", label: `测量值：${filters.measurement}` });
+    tokens.push({
+      key: "measurement",
+      fieldKey: "measurement",
+      label: `测量值：${filters.measurement}`,
+    });
   return tokens;
 }
 

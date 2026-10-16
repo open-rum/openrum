@@ -14,7 +14,7 @@ From the repository root, run:
 docker compose --env-file deploy/compose/.env.example -f deploy/compose/docker-compose.yml up -d --build
 ```
 
-If you are developing from source rather than evaluating, use `pnpm openrum up` instead; it drives the same containers but waits for readiness and reports the whole stack in one table. It needs the Go and Node toolchains, so this page stays on Compose. See [local development](local-development.md).
+If you are developing from source rather than evaluating, use `pnpm openrum up` instead; it drives the same containers but waits for readiness and reports the whole stack in one table. It needs the Go and Node toolchains, so this page stays on Compose. See [local development](https://openrum.netlify.app/docs/getting-started/local-development/).
 
 Wait until `docker compose --env-file deploy/compose/.env.example -f deploy/compose/docker-compose.yml ps` shows the long-running services as healthy, then load the demo dataset. The step is optional and safe to run again; `pnpm openrum seed` is the same command:
 
@@ -56,4 +56,4 @@ The local stack uses example secrets, a single Kafka broker and single-node Clic
 
 Object storage is not required for this quickstart. Configure it separately only when you need live Source Map uploads or future Session Replay blobs.
 
-For source development with Vite hot reload and a locally running Go API, continue with the [local development guide](local-development.md).
+For source development with Vite hot reload and a locally running Go API, continue with the [local development guide](https://openrum.netlify.app/docs/getting-started/local-development/).

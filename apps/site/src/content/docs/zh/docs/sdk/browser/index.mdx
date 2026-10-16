@@ -139,8 +139,8 @@ ingest 和聚合彼此一致；如果四个视图都有数据但 Session ID 不�
 | API Request     | fetch 与 XHR 时序，排除 OpenRUM 自身的 ingest 和配置地址。                               |
 | Core Web Vitals | 通过打包进来的 `web-vitals` 采集。                                                       |
 
-query、URL fragment、请求与响应 body、header、输入框原始值，都会在 Event 入队之前于浏览器侧
-清除。
+query、URL fragment、输入框原始值，都会在 Event 入队之前于浏览器侧清除。
+除非项目为某个 API 开启，否则根本不会读取 header 和请求/响应 body；读取到的 body 会先脱敏，参见 [API 监控](/zh/docs/product/api-monitoring/#请求头响应头和请求响应体)。
 
 ## 结构化日志
 

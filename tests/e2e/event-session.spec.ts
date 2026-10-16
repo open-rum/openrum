@@ -7,13 +7,13 @@ test("event filters use the shared search composer and URL-backed tokens", async
   await expect(page.getByRole("heading", { name: "事件管理与探索" })).toBeVisible();
 
   await page.keyboard.press("/");
-  const search = page.getByRole("textbox", { name: "搜索事件或添加筛选条件" });
+  const search = page.getByRole("combobox", { name: "添加事件筛选条件" });
   await expect(search).toBeFocused();
-  await page.getByRole("button", { name: /^事件 / }).click();
-  await page.getByRole("button", { name: "全部点击", exact: true }).click();
+  await page.getByRole("option", { name: /^事件 / }).click();
+  await page.getByRole("option", { name: "全部点击", exact: true }).click();
 
   await expect(page).toHaveURL(/eventKind=click/);
-  await expect(page.getByText("事件：全部点击")).toBeVisible();
+  await expect(page.getByText("事件：全部点击", { exact: true })).toBeVisible();
   await expect(page.getByRole("combobox", { name: "行为事件" })).toHaveCount(0);
 });
 
@@ -23,7 +23,12 @@ test("an event sample opens its complete session with the selected event anchore
   await page.setViewportSize({ width: 1440, height: 1024 });
   await mockOpenRUM(page, { projectExists: true });
 
-  await page.goto(`/projects/${projectId}/events?eventKind=click&eventName=click`);
+  await page.goto(`/projects/${projectId}/events`);
+  // An event opens in a drawer that holds its recent samples; the page filters stay as they were.
+  await page
+    .getByRole("region", { name: "事件列表" })
+    .getByRole("row", { name: /元素点击/ })
+    .click();
   await expect(page.getByRole("heading", { name: "原始样本" })).toBeVisible();
   await page
     .getByRole("row", { name: /checkout/ })

@@ -78,6 +78,8 @@ spec:
               valueFrom: { secretKeyRef: { name: {{ $.Values.config.existingSecret }}, key: {{ $.Values.config.secretKeys.awsSecretAccessKey }}, optional: true } }
             - name: AWS_SESSION_TOKEN
               valueFrom: { secretKeyRef: { name: {{ $.Values.config.existingSecret }}, key: {{ $.Values.config.secretKeys.awsSessionToken }}, optional: true } }
+            - name: SMTP_PASSWORD
+              valueFrom: { secretKeyRef: { name: {{ $.Values.config.existingSecret }}, key: {{ $.Values.config.secretKeys.smtpPassword }}, optional: true } }
             - name: OPENRUM_MASTER_KEY
               valueFrom: { secretKeyRef: { name: {{ $.Values.config.existingSecret }}, key: {{ $.Values.config.secretKeys.managedSecretsMasterKey }}, optional: true } }
           readinessProbe:

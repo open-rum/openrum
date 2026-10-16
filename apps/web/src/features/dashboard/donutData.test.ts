@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { adaptPlot, type PlotData } from "./adapters";
-import { donutData, donutShare } from "./donutData";
+import { donutData, donutShare } from "@/components/charts/donutData";
 import { createWidget, widgetSchema, withBreakdownDimension } from "./model";
 import type { DashboardData } from "./queries";
 

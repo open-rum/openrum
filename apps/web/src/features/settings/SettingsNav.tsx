@@ -6,7 +6,9 @@ import {
   ClipboardListIcon,
   ChartColumnIcon,
   DatabaseIcon,
+  FileArchiveIcon,
   HardDriveIcon,
+  MailIcon,
   PlugZapIcon,
   ServerCogIcon,
   SlidersHorizontalIcon,
@@ -83,6 +85,13 @@ export function SettingsNav({
               >
                 接入指引
               </NavItem>
+              <NavItem
+                to="/settings/project/$projectId/sourcemaps"
+                params={{ projectId: project.id }}
+                icon={<FileArchiveIcon />}
+              >
+                Source Map
+              </NavItem>
 
               <NavItem
                 to="/settings/project/$projectId/sampling"
@@ -119,6 +128,9 @@ export function SettingsNav({
           </NavItem>
           <NavItem to="/settings/instance/object-storage" icon={<HardDriveIcon />}>
             对象存储
+          </NavItem>
+          <NavItem to="/settings/instance/email" icon={<MailIcon />}>
+            邮件服务
           </NavItem>
           {instanceOwner ? (
             <NavItem to="/settings/instance/authentication" icon={<ServerCogIcon />}>

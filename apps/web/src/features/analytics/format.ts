@@ -1,3 +1,5 @@
+import { countryLabel } from "@/features/filters/dimensionLabels";
+
 // Number, time and dimension formatting shared by the behavior analysis and the
 // Events page, so both read the same figure the same way.
 
@@ -27,11 +29,8 @@ export function dimensionLabel(value: string) {
 }
 
 export function displayDimension(value: string, dimension: string) {
-  if (dimension === "country")
-    return (
-      ({ CN: "中国", US: "美国", JP: "日本", SG: "新加坡", DE: "德国" } as Record<string, string>)[
-        value
-      ] ?? value
-    );
+  // Every code reads as a name, not just the few that were hand-mapped; the code stays in
+  // brackets for anyone matching it against a log.
+  if (dimension === "country") return countryLabel(value);
   return value === "unknown" ? "未知" : value === "direct" ? "直接访问" : value;
 }

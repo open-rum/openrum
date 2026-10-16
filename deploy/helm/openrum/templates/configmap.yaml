@@ -27,5 +27,10 @@ data:
   OBJECT_STORAGE_REGION: {{ .Values.config.objectStorage.region | quote }}
   OBJECT_STORAGE_FORCE_PATH_STYLE: {{ .Values.config.objectStorage.forcePathStyle | quote }}
   OPENRUM_OBJECT_STORAGE_ENDPOINT_ALLOWLIST: {{ .Values.config.objectStorage.endpointAllowlist | quote }}
+  SMTP_HOST: {{ .Values.config.smtp.host | quote }}
+  SMTP_PORT: {{ .Values.config.smtp.port | quote }}
+  SMTP_SECURITY: {{ .Values.config.smtp.security | quote }}
+  SMTP_USERNAME: {{ .Values.config.smtp.username | quote }}
+  SMTP_FROM: {{ .Values.config.smtp.from | quote }}
   OPENRUM_ALLOW_MANAGED_SECRETS: {{ .Values.config.managedSecrets.enabled | quote }}
   OPENRUM_MASTER_KEY_ID: {{ .Values.config.managedSecrets.masterKeyID | quote }}

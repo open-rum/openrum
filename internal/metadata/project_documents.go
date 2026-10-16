@@ -21,6 +21,7 @@ const (
 	columnInboundFilters projectDocumentColumn = "inbound_filters"
 	columnURLRules       projectDocumentColumn = "url_rules"
 	columnScrubRules     projectDocumentColumn = "scrub_rules"
+	columnAPICapture     projectDocumentColumn = "api_capture_rules"
 )
 
 // readProjectDocument returns one settings document. A project that has never

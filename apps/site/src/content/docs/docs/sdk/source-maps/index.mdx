@@ -34,7 +34,7 @@ command line.
 <Aside type="note" title="Object storage is required">
   Core monitoring works without object storage. Source Map upload and mapping need an OSS or
   S3-compatible Bucket configured on the Instance; see [Object
-  storage](/docs/self-hosting/object-storage/). The Console's **Releases** page shows a banner when
+  storage](/docs/self-hosting/object-storage/). The Console's **Source Map** page shows a banner when
   storage is not configured or unavailable.
 </Aside>
 
@@ -42,8 +42,8 @@ command line.
 
 Every framework starts here.
 
-1. In the Console, open **Settings → Project → Onboarding** (`/projects/<id>/onboarding`).
-2. In **Source Map upload tokens**, create a token named after the pipeline that uses it, such as
+1. In the Console, open **Settings → Project → Source Map** (`/settings/project/<id>/sourcemaps`).
+2. In **Source Map upload tokens** (the first step on a new Project, under **Access and upload tokens** once Releases exist), create a token named after the pipeline that uses it, such as
    `github-actions-storefront`. Only Owners and Admins can create or revoke tokens; other members
    can see the list.
 3. Copy the secret (`orut_…`) immediately; it is shown only once. Store it as a CI secret named
@@ -61,8 +61,7 @@ Two packages upload Source Maps and behave the same:
   the end of `vite build`.
 - **Command line** `openrum sourcemaps upload` from `@openrum/cli`: run it with
   `pnpm exec openrum sourcemaps upload`; `--help` lists every flag. Use it for builds that do not go
-  through Vite, such as Next.js. The earlier `openrum-sourcemaps` command still works and does the
-  same thing.
+  through Vite, such as Next.js.
 
 The same `openrum` command also drives the local development stack (`openrum up`, `openrum seed` and
 so on), but those commands only work inside a checkout of the OpenRUM repository.
@@ -103,7 +102,7 @@ Browser SDK must receive exactly the same values. Set both from one CI variable 
 
 ## Verify mapping
 
-- Open **Releases** in the main navigation and select the Release. The badge shows how many of the
+- Open **Settings → Project → Source Map** and select the Release. The badge shows how many of the
   uploaded files are ready.
 - Use the match tester: enter a generated-code frame URL, line and column from a production error
   and confirm it maps to the expected source file and line.
@@ -113,7 +112,7 @@ Browser SDK must receive exactly the same values. Set both from one CI variable 
 
 ## Plugin and CLI options
 
-The plugin takes options; the CLI takes the same values as flags or environment variables. Pass the
+The plugin takes options; the CLI takes the same values as flags or environment variables (see the [CLI reference](/docs/reference/cli/)). Pass the
 token through the environment so it stays out of process lists.
 
 | Plugin option | CLI flag       | CLI environment variable | Notes                                                                         |

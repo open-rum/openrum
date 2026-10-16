@@ -80,6 +80,85 @@ html[data-landing-palette] body {
 .lp-nav-links > a:not(.lp-button):hover {
   color: var(--lp-fg);
 }
+/* GitHub: the mark in the foreground colour, with the cat cut out of it, and the star count
+   beside it once there are enough stars to show. */
+.lp-nav-links > a.lp-nav-github {
+  color: var(--lp-fg);
+  gap: 8px;
+}
+.lp-nav-stars {
+  font-variant-numeric: tabular-nums;
+  color: var(--lp-muted);
+  transition: color 150ms ease;
+}
+.lp-nav-github:hover .lp-nav-stars {
+  color: var(--lp-fg);
+}
+/* Language: an icon that opens a short menu on hover or keyboard focus. The menu starts right
+   under the icon, with padding instead of a gap, so the pointer never leaves the hover area. */
+.lp-lang {
+  position: relative;
+  display: flex;
+}
+.lp-lang-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--lp-muted);
+  cursor: pointer;
+  transition:
+    color 150ms ease,
+    background-color 150ms ease;
+}
+.lp-lang:hover .lp-lang-trigger,
+.lp-lang:focus-within .lp-lang-trigger {
+  color: var(--lp-fg);
+}
+.lp-lang-menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: 20;
+  display: none;
+  min-width: 140px;
+  margin-top: 6px;
+  padding: 6px;
+  border: 1px solid var(--lp-line);
+  border-radius: 10px;
+  background: var(--lp-bg);
+  box-shadow: 0 12px 32px color-mix(in srgb, var(--lp-bg) 70%, black);
+}
+.lp-lang-menu::before {
+  content: "";
+  position: absolute;
+  inset: -8px 0 auto;
+  height: 8px;
+}
+.lp-lang:hover .lp-lang-menu,
+.lp-lang:focus-within .lp-lang-menu {
+  display: block;
+}
+.lp-lang-menu a {
+  display: block;
+  padding: 8px 12px;
+  border-radius: 6px;
+  color: var(--lp-muted);
+  white-space: nowrap;
+}
+.lp-lang-menu a:hover,
+.lp-lang-menu a:focus-visible {
+  color: var(--lp-fg);
+  background: color-mix(in srgb, var(--lp-fg) 8%, transparent);
+}
+.lp-lang-menu a[aria-current] {
+  color: var(--lp-fg);
+  font-weight: 600;
+}
 /* Buttons */
 .lp-button {
   display: inline-flex;
@@ -906,8 +985,7 @@ html[data-landing-palette] body {
 
 /* Narrow screens */
 @media (max-width: 860px) {
-  .lp-nav-links > a:not(.lp-button):not(:first-child) span,
-  .lp-nav-links > a[lang] {
+  .lp-nav-links > a:not(.lp-button):not(:first-child) span {
     display: none;
   }
   .lp-nav-links {

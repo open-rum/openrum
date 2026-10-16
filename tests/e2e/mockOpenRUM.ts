@@ -216,6 +216,12 @@ export async function mockOpenRUM(
       }
       return json(route, inboundFilters);
     }
+    // The environment switcher asks which environments have reported; one is enough here.
+    if (
+      path === `/api/v1/projects/${projectId}/environments` ||
+      path === `/api/v1/projects/${secondProjectId}/environments`
+    )
+      return json(route, { environments: [{ name: "production", lastSeenAt: now }] });
     if (path === `/api/v1/projects/${projectId}/connection-status`)
       return json(route, {
         keyConfigured: true,

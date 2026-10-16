@@ -41,3 +41,11 @@ Before changing alert rules, evaluation, delivery, notification channels, or the
 ### Storage pressure
 
 Before changing ClickHouse capacity thresholds, emergency sampling, hard-stop behavior, or emergency cleanup, read `docs/agents/storage-pressure.md`.
+
+### API header capture
+
+Before changing which HTTP headers an API Request may carry, the capture rules or their Console page, the SDK's header reading, or how long stored headers live, read `docs/agents/api-capture.md`.
+
+### Tests
+
+Do not add Playwright end-to-end tests (`tests/e2e`) unless the user explicitly asks for them. Cover new behavior with unit, component and integration tests instead. Existing e2e specs stay as they are unless the user asks to change them.

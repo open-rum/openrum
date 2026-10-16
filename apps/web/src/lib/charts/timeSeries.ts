@@ -12,6 +12,28 @@ export function intervalLabel(seconds: number) {
   return `${seconds / 60} 分钟`;
 }
 
+/**
+ * Which edge buckets cover less than a whole interval. The first bucket starts before `from`
+ * when the range is not aligned, and the last ends after `to` while its interval is still
+ * running; either holds fewer events than a full bucket would, so the chart marks them
+ * instead of drawing a fall or a rise that did not happen. `buckets` are bucket start times
+ * in milliseconds, ascending. Unknown intervals mark nothing rather than guess.
+ */
+export function partialBucketEdges(
+  buckets: number[],
+  seconds: number,
+  from: number,
+  to: number,
+): { first: boolean; last: boolean } {
+  if (!seconds || buckets.length < 2 || !Number.isFinite(from) || !Number.isFinite(to)) {
+    return { first: false, last: false };
+  }
+  return {
+    first: buckets[0] < from,
+    last: buckets[buckets.length - 1] + seconds * 1000 > to,
+  };
+}
+
 export type TimeSeriesRow = Record<string, string | number | null>;
 export type TimeSeriesRange = { from?: string; to?: string; intervalSeconds?: number };
 

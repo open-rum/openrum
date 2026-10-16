@@ -86,6 +86,9 @@
   --ds-text-secondary: oklch(0.439 0 0);
   --ds-text-muted: oklch(0.439 0 0);
   --ds-muted-foreground: oklch(0.439 0 0);
+  /* Hint text inside an empty field. Lighter than muted text on purpose: it has to read as "not
+     filled in", and at muted-foreground it looked like a real value. */
+  --ds-placeholder: oklch(0.62 0 0);
   --ds-border: oklch(0.922 0 0);
   --ds-border-soft: oklch(0.95 0 0);
   --ds-input: oklch(0.87 0 0);
@@ -193,6 +196,7 @@
   --ds-text-secondary: oklch(0.87 0 0);
   --ds-text-muted: oklch(0.7 0 0);
   --ds-muted-foreground: var(--ds-text-muted);
+  --ds-placeholder: oklch(0.56 0 0);
   --ds-border: oklch(0.269 0 0);
   --ds-border-soft: oklch(0.235 0 0);
   --ds-input: oklch(0.371 0 0);

@@ -13,8 +13,7 @@
   },
   "type": "module",
   "bin": {
-    "openrum": "./dist/openrum.js",
-    "openrum-sourcemaps": "./dist/openrum-sourcemaps.js"
+    "openrum": "./dist/openrum.js"
   },
   "files": [
     "dist"
@@ -23,7 +22,7 @@
     "node": ">=20"
   },
   "scripts": {
-    "build": "tsup src/openrum.ts src/openrum-sourcemaps.ts --format esm --clean",
+    "build": "tsup src/openrum.ts --format esm --clean",
     "typecheck": "tsc --noEmit",
     "test": "node --test test/*.test.ts"
   },

@@ -16,7 +16,7 @@ import { Sparkline } from "@/lib/charts/Sparkline";
 import type { OverviewFilters } from "@/lib/filters/schema";
 import { formatDetailedMetric, formatMetric, type Unit } from "./adapters";
 import type { MatrixData, RankedData } from "./adaptCatalog";
-import { donutShare } from "./donutData";
+import { donutShare } from "@/components/charts/donutData";
 import { drilldownURL } from "./drilldown";
 import { catalogDimensionLabels } from "./model";
 

@@ -6,6 +6,16 @@ import { effectiveOverviewFilters, type DashboardData } from "./queries";
 import { continuousRows, intervalSeconds } from "./chartDensity";
 import { categoryColor } from "@/lib/charts/palette";
 import {
+  formatDetailedMetric,
+  formatMetric,
+  type PlotData,
+  type SeriesDefinition,
+  type Unit,
+} from "@/lib/charts/plotData";
+
+export { formatDetailedMetric, formatMetric };
+export type { PlotData, SeriesDefinition, Unit };
+import {
   adaptCatalogPlot,
   adaptCatalogStat,
   adaptMetricTable,
@@ -14,7 +24,6 @@ import {
   type RankedData,
 } from "./adaptCatalog";
 
-export type Unit = "count" | "percent" | "ms" | "score" | "number";
 export type ScalarData = {
   kind: "scalar";
   value: number | null;
@@ -26,63 +35,12 @@ export type ScalarData = {
   /** Which way is better, from the catalog. Classic metrics fall back to a fixed list. */
   direction?: "up" | "down" | "neutral";
 };
-export type SeriesDefinition = {
-  key: string;
-  label: string;
-  unit: Unit;
-  color: string;
-  ink: string;
-  role?: "current" | "previous" | "other";
-};
-export type PlotData = {
-  kind: "series" | "categories";
-  rows: Array<Record<string, string | number | null>>;
-  series: SeriesDefinition[];
-  note: string;
-  empty: boolean;
-  thresholds?: { good: number; poor: number };
-  intervalSeconds?: number;
-  rangeMs?: number;
-  stacked?: boolean;
-  comparison?: { from: string; to: string };
-  distribution?: {
-    dimension: string;
-    limitReached: boolean;
-    rowLimit: number;
-    nonAdditive: boolean;
-    /** False for rates, percentiles and distinct counts: their groups are not parts of a whole. */
-    shareable?: boolean;
-  };
-};
 export type AdaptedData =
   | ScalarData
   | PlotData
   | { kind: "issues"; issues: OverviewResponse["topIssues"]; filters: OverviewFilters }
   | RankedData
   | MatrixData;
-
-const counts = new Intl.NumberFormat("zh-CN", { notation: "compact", maximumFractionDigits: 2 });
-export function formatMetric(value: number | null, unit: Unit): string {
-  if (value === null) return "—";
-  if (unit === "percent") return `${value.toFixed(2)}%`;
-  if (unit === "score") return value.toFixed(3);
-  if (unit === "ms")
-    return value >= 1000 ? `${(value / 1000).toFixed(2)}s` : `${Math.round(value)}ms`;
-  return counts.format(value);
-}
-
-const numbers = new Intl.NumberFormat("zh-CN", { maximumFractionDigits: 2 });
-
-/** Detail tables retain full counts and milliseconds, without compact-unit rounding. */
-export function formatDetailedMetric(value: number | null, unit: Unit): string {
-  if (value === null || !Number.isFinite(value)) return "—";
-  if (unit === "number") return numbers.format(value);
-  if (unit === "count" || unit === "ms") {
-    const number = value.toLocaleString("zh-CN", { maximumFractionDigits: 2 });
-    return unit === "ms" ? `${number} ms` : number;
-  }
-  return formatMetric(value, unit);
-}
 
 function definition(widget: Widget, key: string, index: number): SeriesDefinition {
   const unit = widget.data.source === "overview" ? unitFor(key) : "count";
@@ -162,7 +120,7 @@ export function adaptStat(widget: Widget, data: DashboardData): ScalarData {
   else if (metric === "uniqueUsers")
     detail = `${kpis.uniqueUsers.samples.toLocaleString()} 个会话样本${kpis.uniqueUsers.approximate ? " · 近似去重" : ""}`;
   else if (metric === "errorRate")
-    detail = `${counts.format(kpis.errorRate.numerator)} 错误 / ${counts.format(kpis.errorRate.denominator)} PV`;
+    detail = `${formatMetric(kpis.errorRate.numerator, "count")} 错误 / ${formatMetric(kpis.errorRate.denominator, "count")} PV`;
   else if (metric === "apiFailureRate")
     detail = `${kpis.apiFailureRate.numeratorSamples.toLocaleString()} 失败 / ${kpis.apiFailureRate.denominatorSamples.toLocaleString()} 请求`;
   else if (metric === "lcp" || metric === "inp" || metric === "cls") {

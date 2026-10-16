@@ -1,4 +1,5 @@
 import type { ResolvedClientOptions } from "./client.ts";
+import { parseCaptureSettings, type CaptureSettings } from "./capture.ts";
 import { parseFilterSettings, type FilterSettings } from "./filters.ts";
 import type { SamplingOptions } from "./sampling.ts";
 
@@ -8,6 +9,7 @@ const minimumRefreshMs = 10 * 1000;
 export interface SamplingTarget {
   updateSampling(options: Partial<SamplingOptions>): void;
   updateFilters(settings: FilterSettings | undefined): void;
+  updateCapture(settings: CaptureSettings | undefined): void;
 }
 
 export interface ConfigRuntime {
@@ -30,6 +32,11 @@ export interface RemoteSDKConfig extends SamplingOptions {
    * the same input it uses. Absent means filter nothing here.
    */
   filters?: FilterSettings;
+  /**
+   * The endpoints whose HTTP headers the project opted in to capture. Absent or
+   * unreadable means none: the SDK reads no header.
+   */
+  apiCapture?: CaptureSettings;
   emergencySampleRate?: number;
   emergencyExpiresAt?: string;
 }
@@ -83,6 +90,7 @@ export function startRemoteConfig(
         cap === undefined ? config.errorSampleRate : Math.min(config.errorSampleRate, cap),
     });
     target.updateFilters(config.filters);
+    target.updateCapture(config.apiCapture);
   };
 
   const queue = (config: RemoteSDKConfig | undefined) => {
@@ -155,7 +163,12 @@ export function parseRemoteConfig(value: unknown): RemoteSDKConfig | undefined {
     (!validRate(candidate.emergencySampleRate) || !validTimestamp(candidate.emergencyExpiresAt))
   )
     return undefined;
-  return { ...(candidate as unknown as RemoteSDKConfig), filters };
+  // Parsed on its own and never a reason to reject the response: see parseCaptureSettings.
+  return {
+    ...(candidate as unknown as RemoteSDKConfig),
+    filters,
+    apiCapture: parseCaptureSettings(candidate.apiCapture),
+  };
 }
 
 function readCache(

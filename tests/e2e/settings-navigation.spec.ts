@@ -196,20 +196,26 @@ test("a saved collapsed preference cannot hide a directly opened secondary menu"
   await expect(page.getByRole("navigation", { name: "设置 · 项目" })).toBeVisible();
 });
 
-test("project usage lives in project settings while releases stay in the main navigation", async ({
+test("project usage and Source Map live in project settings, not the main navigation", async ({
   page,
 }) => {
   await mockOpenRUM(page, { projectExists: true, role: "owner" });
   await page.goto(`/projects/${projectId}/overview`);
 
+  // Source Map is project setup, not something to observe: it is no longer a main-navigation item.
   const mainNav = page.getByRole("navigation", { name: "主导航" });
-  await mainNav.getByRole("link", { name: "发布", exact: true }).click();
-  await expect(page).toHaveURL(new RegExp(`/projects/${projectId}/releases$`));
-  // They are reports, so they no longer carry the settings rail.
-  await expect(page.getByRole("navigation", { name: "设置 · 项目" })).toHaveCount(0);
+  await expect(mainNav.getByRole("link", { name: "发布", exact: true })).toHaveCount(0);
+  await page
+    .getByRole("navigation", { name: "设置与快捷入口" })
+    .getByRole("link", { name: "设置", exact: true })
+    .click();
+  const rail = page.getByRole("navigation", { name: "设置 · 项目" });
+  await rail.getByRole("link", { name: "Source Map", exact: true }).click();
+  await expect(page).toHaveURL(new RegExp(`/settings/project/${projectId}/sourcemaps$`));
+  await expect(page.getByRole("heading", { name: "Source Map", exact: true })).toBeVisible();
+  await expect(rail).toBeVisible();
 
   await expect(mainNav.getByRole("link", { name: "用量", exact: true })).toHaveCount(0);
-  await mainNav.getByRole("link", { name: "项目设置", exact: true }).click();
   const projectSettings = page.getByRole("navigation", { name: "设置 · 项目" });
   await projectSettings.getByRole("link", { name: "用量统计", exact: true }).click();
   await expect(page).toHaveURL(new RegExp(`/settings/project/${projectId}/usage$`));
@@ -218,6 +224,17 @@ test("project usage lives in project settings while releases stay in the main na
   await page.getByRole("link", { name: "配置采样", exact: true }).click();
   await expect(page).toHaveURL(new RegExp(`/settings/project/${projectId}/sampling$`));
   await expect(page.getByRole("heading", { name: "采样配置", exact: true })).toBeVisible();
+});
+
+test("old Releases links land on the Source Map page and keep the release they name", async ({
+  page,
+}) => {
+  await mockOpenRUM(page, { projectExists: true, role: "owner" });
+  await page.goto(`/projects/${projectId}/releases?release=web%402.0.0&dist=b`);
+  await expect(page).toHaveURL(
+    new RegExp(`/settings/project/${projectId}/sourcemaps\\?release=web%402\\.0\\.0&dist=b$`),
+  );
+  await expect(page.getByRole("heading", { name: "Source Map", exact: true })).toBeVisible();
 });
 
 test("legacy project usage links keep their filters when redirected into settings", async ({

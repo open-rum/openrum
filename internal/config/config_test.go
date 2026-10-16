@@ -249,3 +249,66 @@ func mapLookup(values map[string]string) lookupEnv {
 		return value, ok
 	}
 }
+
+func smtpBase() map[string]string {
+	return map[string]string{
+		"APP_ENV": "test", "PUBLIC_BASE_URL": "http://localhost:8080",
+		"POSTGRES_DSN": "postgres://openrum:test@127.0.0.1/openrum", "CLICKHOUSE_DSN": "clickhouse://127.0.0.1/openrum",
+		"KAFKA_BROKERS": "127.0.0.1:9092", "REDIS_ADDR": "127.0.0.1:6379",
+	}
+}
+
+func TestLoadSMTPIsOffByDefault(t *testing.T) {
+	configuration, err := load(ServiceAPI, mapLookup(smtpBase()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if configuration.SMTP.Configured() {
+		t.Fatalf("SMTP = %+v, want unconfigured", configuration.SMTP)
+	}
+}
+
+func TestLoadSMTPAppliesDefaults(t *testing.T) {
+	environment := smtpBase()
+	environment["SMTP_HOST"] = "smtp.example.com"
+	environment["SMTP_FROM"] = "no-reply@example.com"
+	configuration, err := load(ServiceAPI, mapLookup(environment))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := configuration.SMTP; got.Port != 587 || got.Security != "starttls" || got.Username != "" {
+		t.Fatalf("SMTP = %+v, want STARTTLS on 587 without credentials", got)
+	}
+	environment["SMTP_SECURITY"] = "TLS"
+	environment["SMTP_USERNAME"], environment["SMTP_PASSWORD"] = "mailer", "secret"
+	configuration, err = load(ServiceAPI, mapLookup(environment))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := configuration.SMTP; got.Port != 465 || got.Security != "tls" || got.Password != "secret" {
+		t.Fatalf("SMTP = %+v, want TLS on 465 with credentials", got)
+	}
+}
+
+func TestLoadSMTPRejectsInvalidSettings(t *testing.T) {
+	cases := map[string]map[string]string{
+		"SMTP_HOST is required":      {"SMTP_FROM": "no-reply@example.com"},
+		"SMTP_PORT must be":          {"SMTP_HOST": "smtp.example.com", "SMTP_FROM": "a@example.com", "SMTP_PORT": "abc"},
+		"from must be":               {"SMTP_HOST": "smtp.example.com"},
+		"security must be":           {"SMTP_HOST": "smtp.example.com", "SMTP_FROM": "a@example.com", "SMTP_SECURITY": "ssl"},
+		"set together":               {"SMTP_HOST": "smtp.example.com", "SMTP_FROM": "a@example.com", "SMTP_USERNAME": "u"},
+		"would be sent in the clear": {"SMTP_HOST": "smtp.example.com", "SMTP_FROM": "a@example.com", "SMTP_SECURITY": "none", "SMTP_USERNAME": "u", "SMTP_PASSWORD": "p"},
+	}
+	for want, extra := range cases {
+		t.Run(want, func(t *testing.T) {
+			environment := smtpBase()
+			for key, value := range extra {
+				environment[key] = value
+			}
+			_, err := load(ServiceAPI, mapLookup(environment))
+			if err == nil || !strings.Contains(err.Error(), want) {
+				t.Fatalf("error = %v, want containing %q", err, want)
+			}
+		})
+	}
+}

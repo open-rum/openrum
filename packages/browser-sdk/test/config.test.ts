@@ -50,7 +50,11 @@ void test("applies remote sampling, caps refresh at five minutes, and expires em
     clearTimeout: (() => undefined) as typeof clearTimeout,
   };
   const stop = startRemoteConfig(
-    { updateSampling: (sampling) => updates.push(sampling), updateFilters: () => undefined },
+    {
+      updateSampling: (sampling) => updates.push(sampling),
+      updateFilters: () => undefined,
+      updateCapture: () => undefined,
+    },
     { endpoint: "https://rum.example.test/ingest/v1/envelope", writeKey: "orr_pk_test" },
     runtime,
   );
@@ -77,7 +81,11 @@ void test("applies remote sampling, caps refresh at five minutes, and expires em
 void test("keeps local sampling when remote payload is invalid", async () => {
   const updates: Partial<SamplingOptions>[] = [];
   startRemoteConfig(
-    { updateSampling: (sampling) => updates.push(sampling), updateFilters: () => undefined },
+    {
+      updateSampling: (sampling) => updates.push(sampling),
+      updateFilters: () => undefined,
+      updateCapture: () => undefined,
+    },
     { endpoint: "https://rum.example.test/ingest/v1/envelope", writeKey: "orr_pk_test" },
     {
       fetch: async () =>
@@ -89,4 +97,79 @@ void test("keeps local sampling when remote payload is invalid", async () => {
   );
   await new Promise((resolve) => setImmediate(resolve));
   assert.deepEqual(updates, []);
+});
+
+function remoteConfig(extra: Record<string, unknown> = {}) {
+  return {
+    version: 2,
+    effectiveAt: "2026-10-13T07:59:00Z",
+    expiresAt: "2026-10-13T09:00:00Z",
+    refreshAfterSeconds: 300,
+    eventSampleRate: 1,
+    apiSampleRate: 1,
+    errorSampleRate: 1,
+    emergency: false,
+    ...extra,
+  };
+}
+
+async function appliedCapture(payload: Record<string, unknown>) {
+  const applied: unknown[] = [];
+  startRemoteConfig(
+    {
+      updateSampling: () => undefined,
+      updateFilters: () => undefined,
+      updateCapture: (settings) => applied.push(settings),
+    },
+    { endpoint: "https://rum.example.test/ingest/v1/envelope", writeKey: "orr_pk_test" },
+    {
+      fetch: async () => new Response(JSON.stringify(payload), { status: 200 }),
+      now: () => Date.parse("2026-10-13T08:00:00Z"),
+      setTimeout: (() => 1) as unknown as typeof setTimeout,
+      clearTimeout: (() => undefined) as typeof clearTimeout,
+    },
+  );
+  await new Promise((resolve) => setImmediate(resolve));
+  return applied;
+}
+
+void test("hands the project's API capture rules to the client", async () => {
+  const rules = [
+    {
+      id: "orders",
+      method: "get",
+      pattern: "https://api.example.com/orders/*",
+      requestHeaders: ["x-request-id"],
+      responseHeaders: ["etag"],
+    },
+  ];
+  const applied = await appliedCapture(remoteConfig({ apiCapture: { rules } }));
+  assert.deepEqual(applied.at(-1), {
+    rules: [
+      {
+        id: "orders",
+        method: "GET",
+        pattern: "https://api.example.com/orders/*",
+        requestHeaders: ["x-request-id"],
+        responseHeaders: ["etag"],
+        requestBody: false,
+        responseBody: false,
+      },
+    ],
+  });
+});
+
+void test("a server without the feature, or an empty project, captures nothing", async () => {
+  assert.deepEqual((await appliedCapture(remoteConfig())).at(-1), {});
+  assert.deepEqual((await appliedCapture(remoteConfig({ apiCapture: {} }))).at(-1), {});
+});
+
+void test("an unreadable capture document switches capture off instead of rejecting the config", async () => {
+  const applied = await appliedCapture(
+    remoteConfig({
+      apiCapture: { rules: [{ id: "r", method: "GET", pattern: "x", requestHeaders: ["cookie"] }] },
+    }),
+  );
+  // The sampling half is still applied, and the rules are empty, not stale.
+  assert.deepEqual(applied.at(-1), {});
 });

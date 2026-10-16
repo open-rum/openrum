@@ -10,6 +10,7 @@ import (
 
 	"github.com/segmentio/kafka-go"
 
+	"openrum/internal/capture"
 	"openrum/internal/event"
 	"openrum/internal/fingerprint"
 	"openrum/internal/metadata"
@@ -53,6 +54,7 @@ type Consumer struct {
 	retention   RetentionPolicyProvider
 	filters     FilterSettingsProvider
 	processing  ProcessingSettingsProvider
+	capture     APICaptureSettingsProvider
 }
 
 type ConsumerOption func(*Consumer)
@@ -77,6 +79,13 @@ func WithInboundFilters(provider FilterSettingsProvider) ConsumerOption {
 // the behaviour of a deployment that has not been migrated yet.
 func WithProcessingRules(provider ProcessingSettingsProvider) ConsumerOption {
 	return func(consumer *Consumer) { consumer.processing = provider }
+}
+
+// WithAPICapture enables storing the HTTP headers a project opted in to. Without
+// it every header is discarded, so a consumer that does not know about the
+// feature can never store one.
+func WithAPICapture(provider APICaptureSettingsProvider) ConsumerOption {
+	return func(consumer *Consumer) { consumer.capture = provider }
 }
 
 func NewConsumer(source MessageSource, events EventSink, deadLetters DeadLetterSink, options ...ConsumerOption) *Consumer {
@@ -187,6 +196,23 @@ func (consumer *Consumer) processMessage(ctx context.Context, message kafka.Mess
 		default:
 			applyProcessingRules(normalized, compiled, consumer.metrics)
 		}
+	}
+	// Header capture runs after URL rewriting so a rule is matched against the
+	// endpoint the Console shows. Without a provider the rules are empty, which
+	// clears every header: capture is opt-in and fails closed.
+	if len(normalized) > 0 {
+		var compiled *capture.Compiled
+		if consumer.capture != nil {
+			var err error
+			compiled, err = consumer.capture.Get(ctx, normalized[0].ProjectID)
+			switch {
+			case errors.Is(err, metadata.ErrNotFound):
+				normalized = consumer.dropInactiveProject(normalized)
+			case err != nil:
+				return fmt.Errorf("resolve API capture rules: %w", err)
+			}
+		}
+		applyAPICapture(normalized, compiled)
 	}
 	var policy metadata.ProjectRetentionPolicy
 	if len(normalized) > 0 {

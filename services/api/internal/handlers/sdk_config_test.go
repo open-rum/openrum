@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 
+	"openrum/internal/capture"
 	"openrum/internal/metadata"
 )
 
@@ -122,5 +123,39 @@ func TestSDKConfigRejectsInvalidKeyAndSupportsPreflight(t *testing.T) {
 	handler.Options(response, httptest.NewRequestWithContext(context.Background(), http.MethodOptions, "/api/v1/sdk/config", nil))
 	if response.Code != http.StatusNoContent || response.Header().Get("Access-Control-Allow-Headers") != "X-OpenRUM-Key" {
 		t.Fatalf("status=%d headers=%v", response.Code, response.Header())
+	}
+}
+
+func TestSDKConfigServesCaptureRulesAndDefaultsToNone(t *testing.T) {
+	now := time.Date(2026, 10, 13, 8, 0, 0, 0, time.UTC)
+	projectID := uuid.New()
+	get := func(value metadata.ProjectSDKConfig) map[string]any {
+		handler := NewSDKConfigHandler(
+			fakeSDKConfigKeys{access: metadata.ProjectKeyAccess{Project: metadata.Project{ID: projectID}}},
+			fakeSDKConfigReader{value: value}, zerolog.Nop())
+		handler.now = func() time.Time { return now }
+		request := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/api/v1/sdk/config", nil)
+		request.Header.Set("X-OpenRUM-Key", "orr_pk_valid")
+		response := httptest.NewRecorder()
+		handler.Get(response, request)
+		var payload map[string]any
+		if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil || response.Code != http.StatusOK {
+			t.Fatalf("status=%d err=%v", response.Code, err)
+		}
+		return payload
+	}
+	base := metadata.ProjectSDKConfig{ProjectID: projectID, Version: 3, EffectiveAt: now, EventSampleRate: 1, APISampleRate: 1, ErrorSampleRate: 1}
+
+	none, ok := get(base)["apiCapture"].(map[string]any)
+	if !ok || len(none) != 0 {
+		t.Fatalf("a project that never opted in must serve an empty apiCapture object, got %#v", get(base)["apiCapture"])
+	}
+
+	base.APICapture = capture.Settings{Rules: []capture.Rule{{
+		ID: "orders", Method: "GET", Pattern: "https://api.example.com/orders/*", ResponseHeaders: []string{"etag"},
+	}}}
+	rules, _ := get(base)["apiCapture"].(map[string]any)["rules"].([]any)
+	if len(rules) != 1 || rules[0].(map[string]any)["pattern"] != "https://api.example.com/orders/*" {
+		t.Fatalf("rules = %#v", rules)
 	}
 }

@@ -8,9 +8,11 @@ test("release workflow uploads a hidden map and verifies an exact source positio
 }) => {
   await mockOpenRUM(page, { projectExists: true });
   await page.route("https://oss.example/**", (route) => route.fulfill({ status: 200 }));
+  // The bare old address still works: it goes to the first project's Source Map page.
   await page.goto("/releases");
+  await expect(page).toHaveURL(/\/settings\/project\/[^/]+\/sourcemaps$/);
 
-  await expect(page.getByRole("heading", { name: "Release 与 Source Map" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Source Map", exact: true })).toBeVisible();
   // The artifact name is the URL path prefix plus the file's path relative to the build
   // output, never just the bare file name.
   await page.getByPlaceholder("例如 static/app/，站点根目录留空").fill("/static/app");
@@ -58,10 +60,10 @@ test("release workflow uploads a hidden map and verifies an exact source positio
     await page.screenshot({ path: process.env.OPENRUM_RELEASES_SCREENSHOT, fullPage: true });
 });
 
-test("an Issue link preselects its release on the Releases page", async ({ page }) => {
+test("an Issue link preselects its release on the Source Map page", async ({ page }) => {
   await mockOpenRUM(page, { projectExists: true });
   await page.goto(
-    `/projects/018f4d9c-83a1-76c9-81c2-3020ab667090/releases?release=${encodeURIComponent("web@2026.09.03")}&dist=browser`,
+    `/settings/project/018f4d9c-83a1-76c9-81c2-3020ab667090/sourcemaps?release=${encodeURIComponent("web@2026.09.03")}&dist=browser`,
   );
   await expect(page.getByRole("button", { name: "长按删除版本 web@2026.09.03" })).toBeVisible();
   await expect(page.getByLabel("版本列表").locator('button[aria-current="true"]')).toContainText(

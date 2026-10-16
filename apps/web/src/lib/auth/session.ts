@@ -53,7 +53,8 @@ export async function apiFetch<T>(
       payload?.error?.requestId ?? response.headers.get("X-Request-ID") ?? "",
       payload?.error?.message ?? "请求失败，请稍后重试。",
     );
-    if (response.status === 401 && options.redirectOnUnauthorized) redirectToLogin(true);
+    if (options.redirectOnUnauthorized && isSessionExpired(response.status, payload?.error?.code))
+      redirectToLogin(true);
     throw error;
   }
   if (response.status === 204) return undefined as T;
@@ -151,6 +152,17 @@ export function safeReturnTo(value: string | null | undefined, fallback = "/") {
   } catch {
     return fallback;
   }
+}
+
+/**
+ * Whether a 401 means the sign-in itself has ended. The API also answers 401 to "type your
+ * password again" (REAUTHENTICATION_REQUIRED, REAUTHENTICATION_FAILED), and to a bad key or
+ * token; those belong to the caller to explain, and must not throw a signed-in person out as
+ * if their session had expired. A 401 with no readable code, such as one from a proxy, still
+ * counts as signed out.
+ */
+export function isSessionExpired(status: number, code?: string) {
+  return status === 401 && (code === undefined || code === "UNAUTHENTICATED");
 }
 
 export function redirectToLogin(expired: boolean) {

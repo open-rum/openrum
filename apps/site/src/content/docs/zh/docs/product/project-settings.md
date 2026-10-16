@@ -12,17 +12,18 @@ Project 设置决定一个被监控的 Web 产品如何上报和保留遥测数�
 - **客户端 DSN**：包含 Origin Allowlist、轮换与吊销
 - **采样**：控制 Event、API 请求和错误的采样
 - **保留时间**：原始数据与聚合数据的保留期
-- **Source Map 上传令牌**：让 CI 为当前项目上传 Source Map Artifact
+- **Source Map**：版本、文件，以及让 CI 为当前项目上传 Source Map Artifact 的上传令牌
 
-Release 及其 Source Map Artifact 不属于项目设置，请在项目主导航打开 **发布**（`/projects/<id>/releases`）。
+Source Map 管理是项目接入配置，不是用来观察数据的页面，所以放在项目设置里，而不是主导航。旧的 `/projects/<id>/releases` 链接会自动跳转过来。
 
 ## 设置入口
 
 Console 的设置地址会明确写出作用域：
 
 - **常规**（`/settings/project/<id>/general`）：名称、开发平台、Origin、保留天数、停用/启用和删除项目。
-- **接入指引**（`/projects/<id>/onboarding`）：复制项目默认 DSN 和平台接入代码，并管理 **Source Map 上传令牌**。Owner 和 Admin 可以创建和吊销令牌，明文只显示一次。参见 [Source Map](/zh/docs/sdk/source-maps/)。
-- **数据管理**：集中采样、速率限制、入站过滤、URL 归一化和隐私脱敏。通过页内标签切换，各项独立保存，作用于当前项目的全部环境。
+- **接入指引**（`/projects/<id>/onboarding`）：复制项目默认 DSN 和平台接入代码。
+- **Source Map**（`/settings/project/<id>/sourcemaps`）：已有 Source Map 的版本、所选版本的文件、匹配测试器，以及 CI 使用的**上传令牌**。还没有任何版本的项目会先看到三步引导：创建令牌、配置构建插件、构建。Owner 和 Admin 可以创建和吊销令牌，明文只显示一次。参见 [Source Map](/zh/docs/sdk/source-maps/)。
+- **数据管理**：集中采样、速率限制、入站过滤、API 头信息与请求体采集、URL 归一化和隐私脱敏。通过页内标签切换，各项独立保存，作用于当前项目的全部环境。
 - **用量统计**（`/settings/project/<id>/usage`）：查看已接收量、估算原始量、处理结果并导出 CSV；采样配置与报表分开。
 
 ### 数据管理分区
@@ -32,6 +33,7 @@ Console 的设置地址会明确写出作用域：
 | 采样配置 | 在 SDK 上报前控制行为、API 和错误事件的保留比例，基于最近 7 天全部事件类型预估用量变化。 | `/settings/project/<id>/sampling` |
 | 速率限制 | 限制 Ingest 每秒请求数，并选择超限策略；与日常 SDK 采样独立。 | `/settings/project/<id>/quota` |
 | 入站过滤 | 排除爬虫、扩展、localhost 和自定义模式。 | `/settings/project/<id>/filters` |
+| API 头信息 | 为指定 API 开启你列出的请求头和响应头的记录，也可选记录脱敏后的请求/响应体。默认关闭，保留 3 天。参见 [API 监控](/zh/docs/product/api-monitoring/#请求头响应头和请求响应体)。 | `/settings/project/<id>/api-capture` |
 | URL 归一化 | 将动态地址归为稳定的路由模板。 | `/settings/project/<id>/url-rules` |
 | 隐私脱敏 | 在内置脱敏规则之上追加敏感字段和匹配模式。 | `/settings/project/<id>/scrubbing` |
 

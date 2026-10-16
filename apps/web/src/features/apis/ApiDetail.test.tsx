@@ -1,9 +1,28 @@
 // @vitest-environment jsdom
 
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import userEvent from "@testing-library/user-event";
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import type { APIFilters } from "@/lib/api/apis";
 import { ApiDetail } from "./ApiDetail";
 
+vi.mock("@/lib/api/apis", async (original) => ({
+  ...(await original<typeof import("@/lib/api/apis")>()),
+  getAPISamples: vi.fn().mockResolvedValue({ samples: [], truncated: false }),
+}));
+
+beforeAll(() => {
+  globalThis.ResizeObserver ??= class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  };
+  // vaul captures the pointer on press; jsdom has no pointer capture.
+  Element.prototype.hasPointerCapture = () => false;
+  Element.prototype.setPointerCapture = () => undefined;
+  Element.prototype.releasePointerCapture = () => undefined;
+});
 afterEach(cleanup);
 
 const detail = {
@@ -33,14 +52,35 @@ const detail = {
     countries: [],
     releases: [],
   },
-  samples: [],
 };
 const projectId = "018f4d9c-83a1-76c9-81c2-3020ab660000";
+const filters: APIFilters = {
+  projectId,
+  from: new Date("2026-09-02T22:00:00.000Z"),
+  to: new Date("2026-09-03T00:00:00.000Z"),
+  methods: [],
+  method: "GET",
+  url: "/api/products/:id",
+  sort: "requests",
+};
+const range = {
+  from: "2026-09-02T22:00:00.000Z",
+  to: "2026-09-03T00:00:00.000Z",
+  interval: "1 HOUR",
+};
 
 describe("ApiDetail", () => {
   it("renders as an accessible drawer and closes from its control", () => {
     const onClose = vi.fn();
-    render(<ApiDetail detail={detail} projectId={projectId} onClose={onClose} />);
+    render(
+      <ApiDetail
+        detail={detail}
+        range={range}
+        filters={filters}
+        projectId={projectId}
+        onClose={onClose}
+      />,
+    );
 
     expect(screen.getByRole("dialog")).toBeTruthy();
     expect(screen.getByRole("heading", { name: "/api/products/:id" })).toBeTruthy();
@@ -50,7 +90,7 @@ describe("ApiDetail", () => {
     expect(onClose).toHaveBeenCalledOnce();
   });
 
-  it("charts requests, P95 and failure rate on separate scales", () => {
+  it("shows request count, request time and status as three charts", () => {
     render(
       <ApiDetail
         detail={{
@@ -61,6 +101,10 @@ describe("ApiDetail", () => {
               requests: 720,
               failures: 12,
               clientErrors: 30,
+              serverErrors: 8,
+              networkErrors: 4,
+              p50: 90,
+              p75: 300,
               p95: 610,
             },
             {
@@ -68,25 +112,43 @@ describe("ApiDetail", () => {
               requests: 840,
               failures: 21,
               clientErrors: 26,
+              serverErrors: 15,
+              networkErrors: 6,
+              p50: 95,
+              p75: 320,
               p95: 680,
             },
           ],
         }}
+        range={range}
+        filters={filters}
         projectId={projectId}
         onClose={vi.fn()}
       />,
     );
 
-    expect(screen.getByRole("img", { name: "该 endpoint 请求量与失败构成趋势" })).toBeTruthy();
+    const drawer = within(screen.getByRole("dialog"));
+    expect(drawer.getByRole("heading", { name: "请求数" })).toBeTruthy();
+    expect(drawer.getByRole("heading", { name: "请求耗时" })).toBeTruthy();
+    expect(drawer.getByRole("heading", { name: "状态码" })).toBeTruthy();
+    expect(drawer.queryByText("当前范围暂无数据")).toBeNull();
   });
 
-  it("explains an empty trend instead of rendering a blank chart", () => {
-    render(<ApiDetail detail={detail} projectId={projectId} onClose={vi.fn()} />);
+  it("explains an empty trend in each chart instead of rendering a blank one", () => {
+    render(
+      <ApiDetail
+        detail={detail}
+        range={range}
+        filters={filters}
+        projectId={projectId}
+        onClose={vi.fn()}
+      />,
+    );
 
-    expect(screen.getByText("当前范围暂无趋势数据。")).toBeTruthy();
+    expect(screen.getAllByText("当前范围暂无数据")).toHaveLength(3);
   });
 
-  it("breaks failures down by exact status code and links samples to their session", () => {
+  it("breaks failures down by exact status code", () => {
     render(
       <ApiDetail
         detail={{
@@ -101,18 +163,9 @@ describe("ApiDetail", () => {
             { fromMs: 3000, toMs: null, requests: 12 },
           ],
           payload: { samples: 900, p50: 2048, p95: 51200 },
-          samples: [
-            {
-              eventId: "018f4d9c-83a1-76c9-81c2-3020ab667098",
-              timestamp: "2026-09-02T23:30:00.000Z",
-              status: 429,
-              durationMs: 1830,
-              route: "/products/:id",
-              pageUrl: "https://shop.example/products/42",
-              sessionId: "018f4d9c-83a1-76c9-81c2-3020ab667099",
-            },
-          ],
         }}
+        range={range}
+        filters={filters}
         projectId={projectId}
         onClose={vi.fn()}
       />,
@@ -123,10 +176,73 @@ describe("ApiDetail", () => {
     expect(statuses.getByText("network")).toBeTruthy();
     expect(within(screen.getByRole("list", { name: "延迟分布" })).getByText("≥ 3s")).toBeTruthy();
     expect(screen.getByText("2.0 KB")).toBeTruthy();
+  });
 
-    const link = screen.getByRole("link", { name: "查看会话" }) as HTMLAnchorElement;
-    expect(link.getAttribute("href")).toContain("/sessions/018f4d9c-83a1-76c9-81c2-3020ab667099?");
-    expect(link.getAttribute("href")).toContain("event=018f4d9c-83a1-76c9-81c2-3020ab667098");
+  it("opens on the trend and moves to the individual requests under 请求样本", async () => {
+    render(
+      <QueryClientProvider
+        client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
+      >
+        <ApiDetail
+          detail={detail}
+          range={range}
+          filters={filters}
+          projectId={projectId}
+          onClose={vi.fn()}
+        />
+      </QueryClientProvider>,
+    );
+    const tabs = within(screen.getByRole("tablist"));
+    expect(tabs.getByRole("tab", { name: "趋势" }).getAttribute("aria-selected")).toBe("true");
+    expect(screen.getByRole("heading", { name: "请求数" })).toBeTruthy();
+    expect(screen.queryByLabelText("按用户 ID 搜索请求")).toBeNull();
+
+    await userEvent.setup().click(tabs.getByRole("tab", { name: /请求样本/ }));
+    expect(await screen.findByLabelText("按用户 ID 搜索请求")).toBeTruthy();
+  });
+
+  function mountWith(requests: number) {
+    return render(
+      <QueryClientProvider
+        client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
+      >
+        <ApiDetail
+          detail={{ ...detail, endpoint: { ...detail.endpoint, requests } }}
+          range={range}
+          filters={filters}
+          projectId={projectId}
+          onClose={vi.fn()}
+        />
+      </QueryClientProvider>,
+    );
+  }
+
+  it("names both tabs, and says how many requests the second one holds", () => {
+    mountWith(120);
+    const tabs = within(screen.getByRole("tablist", { name: "端点详情分区" }));
+    expect(tabs.getAllByRole("tab").map((tab) => tab.textContent)).toEqual([
+      "趋势",
+      "请求样本100+",
+    ]);
+    // Neither label repeats the drawer's own name, which the close button already carries.
+    expect(tabs.queryByRole("tab", { name: "详情" })).toBeNull();
+  });
+
+  it("shows the exact count below the list limit and none for an endpoint without requests", () => {
+    const first = mountWith(37);
+    expect(screen.getByRole("tab", { name: /请求样本/ }).textContent).toBe("请求样本37");
+    first.unmount();
+    mountWith(0);
+    expect(screen.getByRole("tab", { name: /请求样本/ }).textContent).toBe("请求样本");
+  });
+
+  it("keeps the header to one line and puts the privacy note behind an info button", async () => {
+    mountWith(3);
+    const description = screen.getByText(/只展示标准化 URL 和安全上下文/);
+    expect(description.textContent).not.toMatch(/Cookie/);
+    await userEvent.setup().hover(screen.getByRole("button", { name: "查看隐私说明" }));
+    const note = await screen.findAllByText(/不含 query、body 和 Cookie/);
+    expect(note.length).toBeGreaterThan(0);
   });
 
   it("flags a dimension whose P95 runs well above the endpoint baseline", () => {
@@ -142,6 +258,8 @@ describe("ApiDetail", () => {
             ],
           },
         }}
+        range={range}
+        filters={filters}
         projectId={projectId}
         onClose={vi.fn()}
       />,

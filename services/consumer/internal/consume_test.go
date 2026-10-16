@@ -186,13 +186,15 @@ func testConsumer(t *testing.T, payload []byte) (*fakeSource, *fakeEventSink, *f
 	return source, events, deadLetters, consumer
 }
 
-func validQueuePayload(t *testing.T) []byte {
+func validQueuePayload(t *testing.T) []byte { return queuePayloadFrom(t, "valid-all-events.json") }
+
+func queuePayloadFrom(t *testing.T, fixtureName string) []byte {
 	t.Helper()
 	_, filename, _, ok := runtime.Caller(0)
 	if !ok {
 		t.Fatal("resolve fixture")
 	}
-	fixture, err := os.ReadFile(filepath.Join(filepath.Dir(filename), "..", "..", "..", "packages", "protocol", "fixtures", "valid-all-events.json"))
+	fixture, err := os.ReadFile(filepath.Join(filepath.Dir(filename), "..", "..", "..", "packages", "protocol", "fixtures", fixtureName))
 	if err != nil {
 		t.Fatal(err)
 	}

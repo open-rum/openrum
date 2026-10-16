@@ -136,7 +136,7 @@ pnpm install --frozen-lockfile
 pnpm openrum dev
 ```
 
-This runs the API and Console from source, with infrastructure and pipeline services in containers. The Console stays at `http://127.0.0.1:4173`. See [local development](https://openrum.netlify.app/docs/contributing/local-development/) for service commands and troubleshooting.
+This runs the API and Console from source, with infrastructure and pipeline services in containers. The Console stays at `http://127.0.0.1:4173`. See [local development](https://openrum.netlify.app/docs/getting-started/local-development/) for service commands and troubleshooting.
 
 Bug reports, documentation, tests and code are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md), discuss substantial changes in [GitHub Issues](https://github.com/open-rum/openrum/issues), and run `pnpm run check` before opening a pull request. For documentation changes, also run `pnpm site:check`.
 

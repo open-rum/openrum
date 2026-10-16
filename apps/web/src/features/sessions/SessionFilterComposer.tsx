@@ -36,7 +36,21 @@ export function SessionFilterComposer({
         { label: "体验较差", onSelect: () => onChange({ signal: "poor_vital" }) },
         { label: "移动端", onSelect: () => onChange({ deviceType: "mobile" }) },
       ]}
+      searchLabel="会话、用户、页面、错误"
       onSearch={(search) => onChange({ search })}
+      onClear={() =>
+        onChange({
+          search: undefined,
+          signal: "all",
+          route: undefined,
+          release: undefined,
+          browser: undefined,
+          deviceType: undefined,
+          country: undefined,
+          minimumEvents: undefined,
+          minimumDuration: undefined,
+        })
+      }
       onSelect={(key, value) => {
         if (key === "minimumEvents" || key === "minimumDuration") {
           const number = Number(value);
@@ -140,16 +154,40 @@ function sessionFields(
 function filterTokens(filters: SessionFilters): FilterSearchToken[] {
   const tokens: FilterSearchToken[] = [];
   if (filters.search) tokens.push({ key: "search", label: `关键词：${filters.search}` });
-  if (filters.signal !== "all") tokens.push({ key: "signal", label: signalLabel(filters.signal) });
-  if (filters.route) tokens.push({ key: "route", label: `Route：${filters.route}` });
-  if (filters.release) tokens.push({ key: "release", label: `版本：${filters.release}` });
-  if (filters.browser) tokens.push({ key: "browser", label: `浏览器：${filters.browser}` });
-  if (filters.deviceType) tokens.push({ key: "deviceType", label: `设备：${filters.deviceType}` });
-  if (filters.country) tokens.push({ key: "country", label: `国家：${filters.country}` });
+  // The keyword is free text with no field of its own, so it can be removed but not edited.
+  if (filters.signal !== "all")
+    tokens.push({ key: "signal", fieldKey: "signal", label: signalLabel(filters.signal) });
+  if (filters.route)
+    tokens.push({
+      key: "route",
+      fieldKey: "route",
+      value: filters.route,
+      label: `Route：${filters.route}`,
+    });
+  if (filters.release)
+    tokens.push({ key: "release", fieldKey: "release", label: `版本：${filters.release}` });
+  if (filters.browser)
+    tokens.push({ key: "browser", fieldKey: "browser", label: `浏览器：${filters.browser}` });
+  if (filters.deviceType)
+    tokens.push({
+      key: "deviceType",
+      fieldKey: "deviceType",
+      label: `设备：${filters.deviceType}`,
+    });
+  if (filters.country)
+    tokens.push({ key: "country", fieldKey: "country", label: `国家：${filters.country}` });
   if (filters.minimumEvents)
-    tokens.push({ key: "minimumEvents", label: `事件 ≥ ${filters.minimumEvents}` });
+    tokens.push({
+      key: "minimumEvents",
+      fieldKey: "minimumEvents",
+      label: `事件 ≥ ${filters.minimumEvents}`,
+    });
   if (filters.minimumDuration)
-    tokens.push({ key: "minimumDuration", label: `时长 ≥ ${filters.minimumDuration}s` });
+    tokens.push({
+      key: "minimumDuration",
+      fieldKey: "minimumDuration",
+      label: `时长 ≥ ${filters.minimumDuration}s`,
+    });
   return tokens;
 }
 

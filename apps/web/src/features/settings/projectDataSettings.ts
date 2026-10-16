@@ -22,6 +22,13 @@ export const projectDataSettings = [
       "排除不需要的数据，例如爬虫、浏览器扩展和本地调试流量。规则由 Consumer 执行，SDK 会提前过滤其中一部分以节省带宽。",
   },
   {
+    key: "api-capture",
+    path: "/settings/project/$projectId/api-capture",
+    label: "API 头信息",
+    description:
+      "默认不采集任何请求头、响应头和请求/响应体。只对下面列出的 API 记录你勾选的内容，并在几天后自动删除。",
+  },
+  {
     key: "url-rules",
     path: "/settings/project/$projectId/url-rules",
     label: "URL 归一化",

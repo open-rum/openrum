@@ -51,6 +51,22 @@ When implementing from a selected generated mock, treat that image as the source
   Shared search field discovery matches technical keys and common aliases, so
   short input such as `u` can suggest a supported `user.id` field; never suggest
   a field that the current page query API cannot execute.
+- The shared filter search (`components/filters/FilterSearchComposer.tsx`, user request,
+  2026-10-14) is a combobox: the input has `role="combobox"` and the suggestions are a
+  `listbox` of `option`s, so tests and e2e find the input with `getByRole("combobox")` and a
+  suggestion with `getByRole("option")`. ↑/↓ move the highlight, Enter takes it, Tab completes
+  to the best-matching field, Esc closes and then clears. With text typed, the first row says
+  where plain text goes (`searchLabel`, e.g. 在「错误标题」中搜索); a page with no free-text
+  search (Events) must not promise one in its placeholder. A single `name:value` term, by key,
+  synonym or label, becomes that field's condition, and typing `name:` opens the field;
+  anything with more in it stays text. A page whose own query language already reads the
+  form (Logs, which keeps `*` unquoted) passes `fieldTerms={false}`. A condition holding one
+  value carries `fieldKey` so clicking it edits it in place; stacking conditions (API
+  methods, log terms) do not. `onClear` adds 清除全部 from two conditions on; Backspace on an
+  empty input selects the last condition first and removes it on the second press. The 查询
+  button only shows when there is something to submit. The input announces added and removed
+  conditions in a polite live region, so e2e assertions on a condition's text use
+  `getByText(label, { exact: true })`.
 - The Issues page opens with one compact overview strip (a short column chart with an
   事件/会话/用户 switch beside a ranked 错误分布 with a 类型/页面/国家 switch) so the list
   starts on the first screen; do not bring back tall stacked charts. Each row leads with
@@ -420,7 +436,16 @@ When implementing from a selected generated mock, treat that image as the source
 - Treat each project card as an operational health summary. Lead with the last
   24 hours of PV, UV, error events, a real PV trend, and reporting freshness;
   keep sampling, retention, role, and other configuration details secondary.
-- Project settings exposes **常规、接入指引、数据管理、用量统计**. Group sampling,
+- Source Map management (versions, files, match tester and upload tokens) is a
+  project setting at `/settings/project/:projectId/sourcemaps`, not a main-navigation
+  page (user request, 2026-10-14: it is setup, not something you observe, and the
+  old 发布 label promised more than it did). `/projects/:id/releases` and
+  `/releases` only redirect and must keep `?release=&dist=`. A Project with no
+  release opens on the three-step setup guide with the token list inside it; once
+  releases exist the page is a list on the left and the selected release's files
+  on the right, with setup folded into 接入与上传令牌. The `release` and `dist`
+  query values from an Issue's stack guidance still preselect or prefill.
+- Project settings exposes **常规、接入指引、Source Map、数据管理、用量统计**. Group sampling,
   rate limits, inbound filters, URL normalization and privacy scrubbing inside
   **数据管理** using `ProjectDataSettingsShell` and the route-backed sections in
   `projectDataSettings.ts`. Use shadcn Tabs with the **line** variant (underline,

@@ -7,6 +7,24 @@ const site = process.env.PUBLIC_SITE_URL || "http://localhost:4321";
 const repository = process.env.PUBLIC_REPOSITORY_URL || "https://github.com/open-rum/openrum";
 
 export default defineConfig({
+  // Local development was one tutorial split over four pages plus a generated reference. It is
+  // one page now; the old addresses keep working and land on the matching section.
+  redirects: {
+    "/docs/getting-started/local-development/connect-app":
+      "/docs/getting-started/local-development/#connect-the-example-app",
+    "/docs/getting-started/local-development/workflow":
+      "/docs/getting-started/local-development/#day-to-day-development",
+    "/docs/getting-started/local-development/cli":
+      "/docs/getting-started/local-development/#the-openrum-command",
+    "/docs/contributing/local-development": "/docs/getting-started/local-development/",
+    "/zh/docs/getting-started/local-development/connect-app":
+      "/zh/docs/getting-started/local-development/#连接示例应用",
+    "/zh/docs/getting-started/local-development/workflow":
+      "/zh/docs/getting-started/local-development/#日常开发",
+    "/zh/docs/getting-started/local-development/cli":
+      "/zh/docs/getting-started/local-development/#openrum-命令",
+    "/zh/docs/contributing/local-development": "/zh/docs/getting-started/local-development/",
+  },
   site,
   output: "static",
   integrations: [
@@ -104,6 +122,7 @@ export default defineConfig({
                     { slug: "docs/self-hosting/object-storage" },
                   ],
                 },
+                { slug: "docs/self-hosting/email" },
                 {
                   label: "Authentication setup",
                   translations: { zh: "认证配置", "zh-CN": "认证配置" },
@@ -121,16 +140,12 @@ export default defineConfig({
               ],
             },
             {
-              label: "Local development",
-              translations: { zh: "本地开发", "zh-CN": "本地开发" },
+              label: "Development guide",
+              translations: { zh: "开发指南", "zh-CN": "开发指南" },
               collapsed: true,
               items: [
                 { slug: "docs/getting-started/local-development" },
-                { slug: "docs/getting-started/local-development/connect-app" },
-                { slug: "docs/getting-started/local-development/workflow" },
-                { slug: "docs/getting-started/local-development/cli" },
                 { slug: "docs/contributing" },
-                { slug: "docs/contributing/local-development" },
               ],
             },
             {
@@ -261,6 +276,7 @@ export default defineConfig({
             { slug: "docs/reference/glossary" },
             { slug: "docs/reference/configuration" },
             { slug: "docs/reference/sdk-options" },
+            { slug: "docs/reference/cli" },
             { slug: "docs/reference/event-schema" },
             { slug: "docs/reference/ingest-flags" },
             { slug: "docs/reference/ingest-responses" },

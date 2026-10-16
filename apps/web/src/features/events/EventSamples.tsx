@@ -1,17 +1,9 @@
-import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { CopyIcon, MousePointerClickIcon, XIcon } from "lucide-react";
+import { ArrowLeftIcon, CopyIcon, MousePointerClickIcon, XIcon } from "lucide-react";
 import { toast } from "sonner";
 import { AsyncError } from "@/components/ui/AsyncState";
 import { Button } from "@/components/ui/button";
-import {
-  Drawer,
-  DrawerClose,
-  DrawerContent,
-  DrawerDescription,
-  DrawerHeader,
-  DrawerTitle,
-} from "@/components/ui/drawer";
+import { DrawerDescription, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -31,8 +23,14 @@ import { BehaviorTimeline } from "./BehaviorTimeline";
 import { attributePreview, kindLabel, sampleWindowLabel, shortID } from "./catalog";
 import { sessionTimelineRange } from "./timeline";
 
-export function EventSamples({ filters }: { filters: BehaviorFilters }) {
-  const [selectedSample, setSelectedSample] = useState<BehaviorSample>();
+export function EventSamples({
+  filters,
+  onOpenSample,
+}: {
+  filters: BehaviorFilters;
+  /** Opens one sample's detail; the owner decides where it appears. */
+  onOpenSample: (sample: BehaviorSample) => void;
+}) {
   const hasSelectedEvent = Boolean(filters.eventKind || filters.eventName);
   // The previous event's rows must not linger under a new title, so this query keeps no
   // placeholder data: switching events shows a skeleton instead of stale samples.
@@ -71,7 +69,7 @@ export function EventSamples({ filters }: { filters: BehaviorFilters }) {
         />
       ) : null}
       {samples.data?.samples.length ? (
-        <Table>
+        <Table className="event-samples-table">
           <TableHeader>
             <TableRow>
               <TableHead>时间</TableHead>
@@ -82,8 +80,8 @@ export function EventSamples({ filters }: { filters: BehaviorFilters }) {
           </TableHeader>
           <TableBody>
             {samples.data.samples.map((sample) => {
-              const preview = attributePreview(sample.attributes);
-              const open = () => setSelectedSample(sample);
+              const preview = attributePreview(sample.attributes, 3);
+              const open = () => onOpenSample(sample);
               return (
                 <TableRow
                   key={sample.eventId}
@@ -118,7 +116,17 @@ export function EventSamples({ filters }: { filters: BehaviorFilters }) {
                             {key}={value}
                           </code>
                         ))}
-                        {preview.hidden ? <small>+{preview.hidden}</small> : null}
+                        {preview.hidden ? (
+                          <code
+                            className="event-chips__more"
+                            title={Object.entries(sample.attributes)
+                              .slice(preview.shown.length)
+                              .map(([key, value]) => `${key}=${value}`)
+                              .join("\n")}
+                          >
+                            +{preview.hidden}
+                          </code>
+                        ) : null}
                       </span>
                     ) : (
                       <small>无属性</small>
@@ -140,13 +148,6 @@ export function EventSamples({ filters }: { filters: BehaviorFilters }) {
         <EmptyState
           title="该时间窗口内没有原始样本"
           description="原始样本只保留一段时间。可以把时间范围调到更近，或确认该事件仍在上报。"
-        />
-      ) : null}
-      {selectedSample ? (
-        <SampleDetail
-          projectId={filters.projectId}
-          sample={selectedSample}
-          onClose={() => setSelectedSample(undefined)}
         />
       ) : null}
     </section>
@@ -176,13 +177,19 @@ function CopyButton({ value, label }: { value: string; label: string }) {
   );
 }
 
-function SampleDetail({
+/**
+ * One sample's facts and its full session timeline. It renders inside a drawer the caller
+ * owns, so a sample can open from the event drawer without stacking a second drawer on it.
+ */
+export function SampleDetailBody({
   projectId,
   sample,
+  onBack,
   onClose,
 }: {
   projectId: string;
   sample: BehaviorSample;
+  onBack: () => void;
   onClose: () => void;
 }) {
   const range = sessionTimelineRange(sample.timestamp);
@@ -192,97 +199,95 @@ function SampleDetail({
       getSessionTimeline(projectId, sample.sessionId, range.from, range.to, signal),
   });
   return (
-    <Drawer open direction="right" onOpenChange={(open) => !open && onClose()}>
-      <DrawerContent className="event-sample-detail w-[min(520px,calc(100vw-1rem))] sm:max-w-none">
-        <DrawerHeader className="event-sample-detail__header">
-          <div>
-            <span>{kindLabel(sample.kind)}</span>
-            <DrawerTitle>{eventLabel(sample.kind, sample.name)}</DrawerTitle>
-            <DrawerDescription>
-              {new Date(sample.timestamp).toLocaleString("zh-CN")}
-            </DrawerDescription>
-          </div>
-          <DrawerClose asChild>
-            <Button variant="ghost" size="icon" aria-label="关闭样本详情">
-              <XIcon />
-            </Button>
-          </DrawerClose>
-        </DrawerHeader>
-        <dl className="event-sample-facts">
-          <div>
-            <dt>路由</dt>
-            <dd>{sample.route || "—"}</dd>
-          </div>
-          <div>
-            <dt>浏览器</dt>
-            <dd>{sample.browser || "—"}</dd>
-          </div>
-          <div>
-            <dt>设备</dt>
-            <dd>{sample.device || "—"}</dd>
-          </div>
-          <div>
-            <dt>国家</dt>
-            <dd>{sample.country || "—"}</dd>
-          </div>
-          <div>
-            <dt>会话</dt>
-            <dd className="event-session">
-              <code>{sample.sessionId}</code>
-              <CopyButton value={sample.sessionId} label="复制完整会话 ID" />
-            </dd>
-          </div>
-        </dl>
-        {Object.keys(sample.attributes).length ? (
-          <section>
-            <h3>事件属性</h3>
-            <dl className="event-sample-attributes">
-              {Object.entries(sample.attributes).map(([key, value]) => (
-                <div key={key}>
-                  <dt>{key}</dt>
-                  <dd>{value}</dd>
-                </div>
-              ))}
-            </dl>
-          </section>
-        ) : null}
-        <section>
-          <div className="event-sample-session-header">
-            <div>
-              <h3>完整会话时间线</h3>
-              <p>页面、点击、自定义事件、API 与错误按发生顺序排列。</p>
-            </div>
-            {timeline.data ? <span>{timeline.data.events.length} 个事件</span> : null}
-          </div>
-          <Button asChild variant="outline" size="sm">
-            <a
-              href={sessionEventHref(projectId, sample.sessionId, sample.timestamp, sample.eventId)}
-            >
-              打开完整会话详情
-            </a>
+    <>
+      <DrawerHeader className="event-sample-detail__header">
+        <div>
+          <Button variant="ghost" size="sm" className="event-sample-detail__back" onClick={onBack}>
+            <ArrowLeftIcon data-icon="inline-start" />
+            返回事件
           </Button>
-          {timeline.isLoading ? <Skeleton className="h-64" /> : null}
-          {timeline.error ? (
-            <AsyncError
-              error={timeline.error}
-              title="完整会话暂不可用"
-              remediation="已保留事件随附的前序行为；可重新请求完整时间线。"
-              onRetry={() => void timeline.refetch()}
-            />
-          ) : null}
-          {!timeline.isLoading ? (
-            <BehaviorTimeline
-              breadcrumbs={sample.breadcrumbs}
-              sessionTimeline={timeline.data}
-              anchorEventId={sample.eventId}
-              projectId={projectId}
-              from={range.from.toISOString()}
-              to={range.to.toISOString()}
-            />
-          ) : null}
+          <span>{kindLabel(sample.kind)}</span>
+          <DrawerTitle>{eventLabel(sample.kind, sample.name)}</DrawerTitle>
+          <DrawerDescription>
+            {new Date(sample.timestamp).toLocaleString("zh-CN")}
+          </DrawerDescription>
+        </div>
+        <Button variant="ghost" size="icon" aria-label="关闭样本详情" onClick={onClose}>
+          <XIcon />
+        </Button>
+      </DrawerHeader>
+      <dl className="event-sample-facts">
+        <div>
+          <dt>路由</dt>
+          <dd>{sample.route || "—"}</dd>
+        </div>
+        <div>
+          <dt>浏览器</dt>
+          <dd>{sample.browser || "—"}</dd>
+        </div>
+        <div>
+          <dt>设备</dt>
+          <dd>{sample.device || "—"}</dd>
+        </div>
+        <div>
+          <dt>国家</dt>
+          <dd>{sample.country || "—"}</dd>
+        </div>
+        <div>
+          <dt>会话</dt>
+          <dd className="event-session">
+            <code>{sample.sessionId}</code>
+            <CopyButton value={sample.sessionId} label="复制完整会话 ID" />
+          </dd>
+        </div>
+      </dl>
+      {Object.keys(sample.attributes).length ? (
+        <section>
+          <h3>事件属性</h3>
+          <dl className="event-sample-attributes">
+            {Object.entries(sample.attributes).map(([key, value]) => (
+              <div key={key}>
+                <dt>{key}</dt>
+                <dd>{value}</dd>
+              </div>
+            ))}
+          </dl>
         </section>
-      </DrawerContent>
-    </Drawer>
+      ) : null}
+      <section>
+        <div className="event-sample-session-header">
+          <div>
+            <h3>完整会话时间线</h3>
+            <p>页面、点击、自定义事件、API 与错误按发生顺序排列。</p>
+          </div>
+          {timeline.data ? <span>{timeline.data.events.length} 个事件</span> : null}
+        </div>
+        <Button asChild variant="outline" size="sm">
+          <a href={sessionEventHref(projectId, sample.sessionId, sample.timestamp, sample.eventId)}>
+            打开完整会话详情
+          </a>
+        </Button>
+        {timeline.isLoading ? <Skeleton className="h-64" /> : null}
+        {timeline.error ? (
+          <AsyncError
+            error={timeline.error}
+            title="完整会话暂不可用"
+            remediation="已保留事件随附的前序行为；可重新请求完整时间线。"
+            onRetry={() => void timeline.refetch()}
+          />
+        ) : null}
+        {!timeline.isLoading ? (
+          <BehaviorTimeline
+            breadcrumbs={sample.breadcrumbs}
+            sessionTimeline={timeline.data}
+            anchorEventId={sample.eventId}
+            projectId={projectId}
+            from={range.from.toISOString()}
+            to={range.to.toISOString()}
+          />
+        ) : null}
+      </section>
+    </>
   );
 }
 

@@ -26,7 +26,7 @@ Options (environment variable in brackets):
   --help               Show this help`;
 }
 
-/** `openrum sourcemaps upload` and the legacy `openrum-sourcemaps` command. */
+/** `openrum sourcemaps upload`. */
 export async function runSourcemapsUpload(
   args: string[],
   context: Context,

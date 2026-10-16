@@ -273,26 +273,26 @@ for (const guide of ["local-development", "production-deployment"]) {
 test("start sidebar groups collapse and preserve child pages across languages", async ({
   page,
 }) => {
-  await page.goto("/docs/getting-started/local-development/");
+  await page.goto("/docs/self-hosting/overview/");
   const sidebar = page.locator("#starlight__sidebar");
-  const local = sidebar
+  const selfHosting = sidebar
     .locator("details")
-    .filter({ has: page.locator("summary", { hasText: "Local development" }) });
-  await expect(local).toHaveAttribute("open", "");
-  await local.locator("summary").click();
-  await expect(local).not.toHaveAttribute("open");
-  await expect(local.getByRole("link", { name: "Connect and verify", exact: true })).toBeHidden();
-  await local.locator("summary").click();
-  await local.getByRole("link", { name: "Connect and verify", exact: true }).click();
-  await expect(page).toHaveURL(/\/docs\/getting-started\/local-development\/connect-app\/$/);
+    .filter({ has: page.locator("summary", { hasText: /^Self-hosting$/ }) });
+  // The group that holds the current page opens itself.
+  await expect(selfHosting).toHaveAttribute("open", "");
+  await selfHosting.locator("summary").first().click();
+  await expect(selfHosting).not.toHaveAttribute("open");
+  await selfHosting.locator("summary").first().click();
+  const docker = selfHosting
+    .locator("details")
+    .filter({ has: page.locator("summary", { hasText: /^Docker \(single host\)$/ }) });
+  await docker.locator("summary").click();
+  await docker.getByRole("link", { name: "Single-host Docker production", exact: true }).click();
+  await expect(page).toHaveURL(/\/docs\/self-hosting\/docker-production\/$/);
   await page.locator("summary[aria-label='Select language']").click();
   await page.getByRole("menuitemradio", { name: "简体中文" }).click();
-  await expect(page).toHaveURL(/\/zh\/docs\/getting-started\/local-development\/connect-app\/$/);
-  await expect(sidebar.locator('a[aria-current="page"]')).toHaveText("接入与验证");
-  await sidebar
-    .locator("summary")
-    .filter({ hasText: /^自部署$/ })
-    .click();
+  await expect(page).toHaveURL(/\/zh\/docs\/self-hosting\/docker-production\/$/);
+  await expect(sidebar.locator('a[aria-current="page"]')).toHaveText("单机 Docker 生产部署");
   await sidebar
     .locator("summary")
     .filter({ hasText: /^Kubernetes \/ Helm（推荐）$/ })

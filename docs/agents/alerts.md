@@ -25,7 +25,11 @@ CRUD, the notification history with per-channel outcomes, and test sends.
 
 Kinds are registered in `internal/notify/kinds.go`. Today: `webhook` (signed JSON) and
 `feishu` (Feishu/Lark group bot cards). `smtp` has a notifier but is not registered, so it
-cannot be created. To add a kind:
+cannot be created. An email channel should not carry its own server settings: the instance
+mail server is configured once (Console **Email service** or `SMTP_*`) and read through
+`internal/mailservice`, which resolves the deployment server over a Console-managed one and
+sends with `internal/mailer`. Build it on that service rather than on `internal/notify/smtp.go`.
+To add a kind:
 
 1. Implement a `Notifier` in `internal/notify/<kind>.go` and register a `KindSpec` with
    its config normalization, write-only secret fields and builder. Map provider error

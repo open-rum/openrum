@@ -149,3 +149,42 @@ func hasFlag(flags []string, value string) bool {
 	}
 	return false
 }
+
+func TestProjectScrubbingAppliesToAPIHeaderValues(t *testing.T) {
+	compiled := compileProcessing(t, processing.Settings{Scrub: processing.ScrubRules{
+		Patterns: []processing.ScrubPattern{{ID: "order", Expression: `ORD-[0-9]{6}`}},
+	}})
+	events := []event.CanonicalEvent{{
+		EventID: uuid.New(), EventType: event.EventTypeAPI,
+		APIRequestHeaders:  map[string]string{"x-order": "ORD-123456", "accept": "application/json"},
+		APIResponseHeaders: map[string]string{"x-trace": "from ORD-654321"},
+	}}
+
+	applyProcessingRules(events, compiled, nil)
+
+	encoded, _ := json.Marshal(events)
+	if strings.Contains(string(encoded), "123456") || strings.Contains(string(encoded), "654321") {
+		t.Fatalf("a project pattern did not reach header values: %s", encoded)
+	}
+	if events[0].APIRequestHeaders["accept"] != "application/json" {
+		t.Fatal("an unrelated header value was changed")
+	}
+	if !hasFlag(events[0].IngestFlags, "pii_scrubbed") {
+		t.Fatalf("ingest flags are %v, want pii_scrubbed", events[0].IngestFlags)
+	}
+}
+
+func TestProjectScrubbingAppliesToAPIBodies(t *testing.T) {
+	compiled := compileProcessing(t, processing.Settings{Scrub: processing.ScrubRules{
+		Patterns: []processing.ScrubPattern{{ID: "order", Expression: `ORD-[0-9]{6}`}},
+	}})
+	events := []event.CanonicalEvent{{
+		EventID: uuid.New(), EventType: event.EventTypeAPI,
+		APIRequestBody: `{"ref":"ORD-123456"}`, APIResponseBody: `{"note":"see ORD-654321"}`,
+	}}
+	applyProcessingRules(events, compiled, nil)
+	encoded, _ := json.Marshal(events)
+	if strings.Contains(string(encoded), "123456") || strings.Contains(string(encoded), "654321") {
+		t.Fatalf("a project pattern did not reach the bodies: %s", encoded)
+	}
+}

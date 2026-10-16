@@ -27,8 +27,11 @@ import { Aside, LinkCard, Steps } from "@astrojs/starlight/components";
    获取仓库，切换到经过检查的发行标签或提交，不要直接部署随时变化的分支。进入仓库根目录后执行：
 
    ```sh
+   # 复制环境变量模板；之后只编辑这个私有文件
    cp deploy/compose/.env.production.example deploy/compose/.env.production
+   # 只允许当前用户读写，因为里面有密码
    chmod 600 deploy/compose/.env.production
+   # 生成一个随机密钥；这条要执行三次，结果分别填给三个变量
    openssl rand -hex 24
    ```
 
@@ -41,8 +44,10 @@ import { Aside, LinkCard, Steps } from "@astrojs/starlight/components";
 1. ## 构建并检查配置
 
    ```sh
+   # 校验 Compose 配置和环境变量；必填项为空会在这里报错，成功时没有任何输出
    docker compose --env-file deploy/compose/.env.production \
      -f deploy/compose/production.compose.yml config --quiet
+   # 构建应用镜像，API、Ingest、Consumer、Worker、Web 和迁移程序共用它
    docker compose --env-file deploy/compose/.env.production \
      -f deploy/compose/production.compose.yml build migrate
    ```
@@ -52,8 +57,10 @@ import { Aside, LinkCard, Steps } from "@astrojs/starlight/components";
 1. ## 启动并验证
 
    ```sh
+   # 在后台启动整套服务，并等到所有服务都健康才返回
    docker compose --env-file deploy/compose/.env.production \
      -f deploy/compose/production.compose.yml up -d --wait
+   # 通过公网域名检查服务是否就绪；把域名换成你自己的
    curl --fail https://rum.example.com/health/ready
    ```
 

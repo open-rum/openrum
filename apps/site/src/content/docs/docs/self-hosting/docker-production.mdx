@@ -29,8 +29,11 @@ This path runs OpenRUM and its four data services on **one Linux host**. It uses
    Clone the repository and check out a reviewed release tag or commit. Do not deploy a moving branch tip. From the repository root:
 
    ```sh
+   # Copy the environment template; edit only this private file from now on
    cp deploy/compose/.env.production.example deploy/compose/.env.production
+   # Readable by your user only, because it holds passwords
    chmod 600 deploy/compose/.env.production
+   # Generate one random secret; run this three times, one result per variable
    openssl rand -hex 24
    ```
 
@@ -43,8 +46,10 @@ This path runs OpenRUM and its four data services on **one Linux host**. It uses
 1. ## Build and validate before opening the site
 
    ```sh
+   # Validate the Compose file and variables; an empty required value fails here, and success prints nothing
    docker compose --env-file deploy/compose/.env.production \
      -f deploy/compose/production.compose.yml config --quiet
+   # Build the application image that API, Ingest, Consumer, Worker, Web and migrations share
    docker compose --env-file deploy/compose/.env.production \
      -f deploy/compose/production.compose.yml build migrate
    ```
@@ -54,8 +59,10 @@ This path runs OpenRUM and its four data services on **one Linux host**. It uses
 1. ## Start and verify
 
    ```sh
+   # Start the whole stack in the background and wait until every service is healthy
    docker compose --env-file deploy/compose/.env.production \
      -f deploy/compose/production.compose.yml up -d --wait
+   # Check readiness through your public domain; replace the example domain with yours
    curl --fail https://rum.example.com/health/ready
    ```
 

@@ -9,6 +9,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"openrum/internal/mailer"
 )
 
 type Service string
@@ -52,6 +54,9 @@ type Config struct {
 	BootstrapToken              string
 	SystemSettings              []SystemSettingDefinition
 	StoragePressure             StoragePressureConfig
+	// SMTP is the deployment's mail server. When it names a host the Console shows it as
+	// locked and ignores any Console-managed server.
+	SMTP mailer.Settings
 }
 
 // StoragePressureConfig controls the optional ClickHouse capacity guard. The
@@ -181,6 +186,11 @@ func load(service Service, lookup lookupEnv) (Config, error) {
 		return Config{}, err
 	}
 
+	smtpSettings, err := loadSMTP(values)
+	if err != nil {
+		return Config{}, err
+	}
+
 	consumerWorkers := 4
 	if raw := values("OPENRUM_CONSUMER_WORKERS"); raw != "" {
 		consumerWorkers, err = strconv.Atoi(raw)
@@ -228,7 +238,38 @@ func load(service Service, lookup lookupEnv) (Config, error) {
 		BootstrapToken:              values("BOOTSTRAP_TOKEN"),
 		SystemSettings:              systemSettings,
 		StoragePressure:             storagePressure,
+		SMTP:                        smtpSettings,
 	}, nil
+}
+
+// loadSMTP reads the optional deployment mail server. Everything is off unless SMTP_HOST is set,
+// and setting any other SMTP_* variable without it is an error so a typo cannot silently disable mail.
+func loadSMTP(values func(string) string) (mailer.Settings, error) {
+	host := values("SMTP_HOST")
+	if host == "" {
+		for _, key := range []string{"SMTP_PORT", "SMTP_SECURITY", "SMTP_USERNAME", "SMTP_PASSWORD", "SMTP_FROM"} {
+			if values(key) != "" {
+				return mailer.Settings{}, fmt.Errorf("SMTP_HOST is required when %s is set", key)
+			}
+		}
+		return mailer.Settings{}, nil
+	}
+	settings := mailer.Settings{
+		Host: host, Security: mailer.Security(values("SMTP_SECURITY")),
+		Username: values("SMTP_USERNAME"), Password: values("SMTP_PASSWORD"), From: values("SMTP_FROM"),
+	}
+	if raw := values("SMTP_PORT"); raw != "" {
+		port, err := strconv.Atoi(raw)
+		if err != nil {
+			return mailer.Settings{}, fmt.Errorf("SMTP_PORT must be an integer between 1 and 65535")
+		}
+		settings.Port = port
+	}
+	settings = settings.Normalize()
+	if err := settings.Validate(); err != nil {
+		return mailer.Settings{}, fmt.Errorf("SMTP configuration is invalid: %w", err)
+	}
+	return settings, nil
 }
 
 func loadStoragePressure(values func(string) string) (StoragePressureConfig, error) {

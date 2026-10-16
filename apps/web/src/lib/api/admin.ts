@@ -1,6 +1,6 @@
 import { queryOptions } from "@tanstack/react-query";
 import { z } from "zod";
-import { requestJSON } from "./client";
+import { requestJSON, requestNoContent } from "./client";
 import { csrfHeaders } from "@/lib/auth/session";
 
 const isoTime = z.iso.datetime({ offset: true });
@@ -149,6 +149,83 @@ export function putManagedObjectStorage(input: {
       headers: { "Content-Type": "application/json", ...csrfHeaders() },
       body: JSON.stringify(input),
     },
+  );
+}
+
+export const emailSecuritySchema = z.enum(["starttls", "tls", "none"]);
+export type EmailSecurity = z.infer<typeof emailSecuritySchema>;
+
+export const emailStatusSchema = z.object({
+  configured: z.boolean(),
+  // "deployment" is read-only: it comes from SMTP_* environment variables or Helm values.
+  source: z.enum(["none", "deployment", "managed"]),
+  locked: z.boolean(),
+  managedSecretsAvailable: z.boolean(),
+  settings: z
+    .object({
+      host: z.string(),
+      port: z.number().int(),
+      security: emailSecuritySchema,
+      username: z.string(),
+      from: z.string(),
+      passwordSet: z.boolean(),
+    })
+    .nullable(),
+  // A Console-managed server is stored, but the deployment's takes precedence over it.
+  managedOverridden: z.boolean(),
+  updatedAt: isoTime.optional(),
+});
+
+// Delivery stages the API reports, in the order an attempt passes through them.
+export const emailDeliveryResultSchema = z.object({
+  success: z.boolean(),
+  stage: z.enum(["connect", "tls", "auth", "sender", "recipient", "send"]).optional(),
+  message: z.string().optional(),
+  recipient: z.string().optional(),
+});
+
+export type EmailStatus = z.infer<typeof emailStatusSchema>;
+export type EmailDeliveryResult = z.infer<typeof emailDeliveryResultSchema>;
+
+export function emailStatusQueryOptions() {
+  return queryOptions({
+    queryKey: ["admin", "email"],
+    queryFn: ({ signal }) => requestJSON(emailStatusSchema, "/api/v1/admin/email", { signal }),
+  });
+}
+
+export function testEmail() {
+  return requestJSON(emailDeliveryResultSchema, "/api/v1/admin/email/test", {
+    method: "POST",
+    headers: csrfHeaders(),
+  });
+}
+
+export function putManagedEmail(input: {
+  host: string;
+  // 0 lets the API pick the conventional port for the security mode.
+  port: number;
+  security: EmailSecurity;
+  username: string;
+  password: string;
+  from: string;
+}) {
+  return requestJSON(
+    z.object({ configured: z.literal(true), version: z.number().int().positive() }),
+    "/api/v1/admin/email/managed",
+    {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", ...csrfHeaders() },
+      body: JSON.stringify(input),
+    },
+  );
+}
+
+export function deleteManagedEmail() {
+  return requestNoContent(
+    "/api/v1/admin/email/managed",
+    { method: "DELETE", headers: csrfHeaders() },
+    "无法移除邮件服务配置。",
   );
 }
 

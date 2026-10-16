@@ -14,11 +14,15 @@ import {
   putArtifactBytes,
   type Release,
 } from "@/lib/api/releases";
-import { ReleasesPage } from "./ReleasesPage";
+import { SourceMapPage } from "./ReleasesPage";
 
 const toastSuccess = vi.hoisted(() => vi.fn());
 vi.mock("sonner", () => ({ toast: { success: toastSuccess, error: vi.fn() } }));
 vi.mock("@tanstack/react-router", () => ({ useParams: () => ({ projectId: "project-1" }) }));
+// The token list has its own tests and its own requests; here it only has to be on the page.
+vi.mock("@/features/settings/UploadTokensSection", () => ({
+  UploadTokensSection: () => <section aria-label="上传令牌区">tokens</section>,
+}));
 vi.mock("@/lib/api/projects", () => ({
   listOrganizations: async () => ({ organizations: [{ id: "org-1" }] }),
   listProjects: async () => ({ projects: [{ id: "project-1", name: "Web", role: "owner" }] }),
@@ -97,7 +101,7 @@ function artifact(name: string, status: "pending" | "ready" | "failed" = "ready"
 
 beforeEach(() => {
   vi.clearAllMocks();
-  window.history.replaceState({}, "", "/projects/project-1/releases");
+  window.history.replaceState({}, "", "/settings/project/project-1/sourcemaps");
   vi.mocked(getSourceMapStatus).mockResolvedValue({
     storage: "ready",
     maxArtifactBytes: 64 * 1024 * 1024,
@@ -121,7 +125,7 @@ function renderPage() {
   });
   return render(
     <QueryClientProvider client={client}>
-      <ReleasesPage />
+      <SourceMapPage />
     </QueryClientProvider>,
   );
 }
@@ -180,6 +184,71 @@ describe("releases list", () => {
   });
 });
 
+describe("layout", () => {
+  it("puts the selected release's files beside the list", async () => {
+    const view = renderPage();
+    const list = await view.findByLabelText("版本列表");
+    const layout = list.closest(".releases-layout")!;
+    expect(layout).toBeTruthy();
+    // Time and commit are said once, in the detail header, not repeated on every list row.
+    expect(within(list as HTMLElement).queryByText(/部署于/)).toBeNull();
+    const detail = layout.querySelector(".releases-detail") as HTMLElement;
+    expect(within(detail).getByText("web@1.0.0")).toBeTruthy();
+    expect(within(detail).getByText(/部署于/)).toBeTruthy();
+    expect(within(detail).getByText("abc123")).toBeTruthy();
+    expect(within(detail).getByText("匹配测试")).toBeTruthy();
+  });
+
+  it("keeps setup out of the way once versions exist, closed unless a link asks for tokens", async () => {
+    const view = renderPage();
+    await view.findByLabelText("版本列表");
+    const access = view.getByText("接入与上传令牌").closest("details")!;
+    expect(access.open).toBe(false);
+    expect(view.queryByText("第一次使用：三步让 Source Map 生效")).toBeNull();
+    view.unmount();
+
+    window.history.replaceState({}, "", "/settings/project/project-1/sourcemaps#upload-tokens");
+    const again = renderPage();
+    await again.findByLabelText("版本列表");
+    expect((again.getByText("接入与上传令牌").closest("details") as HTMLDetailsElement).open).toBe(
+      true,
+    );
+  });
+});
+
+describe("a project with no release yet", () => {
+  beforeEach(() => {
+    vi.mocked(listReleases).mockResolvedValue({ releases: [], nextCursor: null });
+  });
+
+  it("shows the three setup steps, with the token list and the build snippet in them", async () => {
+    const view = renderPage();
+    expect(await view.findByText("第一次使用：三步让 Source Map 生效")).toBeTruthy();
+    const steps = view.getAllByRole("listitem").filter((item) => item.querySelector("h3"));
+    expect(steps.map((step) => step.querySelector("h3")?.textContent)).toEqual([
+      "创建上传令牌",
+      "配置构建插件",
+      "构建并发布",
+    ]);
+    expect(within(steps[0]).getByLabelText("上传令牌区")).toBeTruthy();
+    expect(within(steps[1]).getByText(/openRUMSourceMaps/)).toBeTruthy();
+    // The empty list and the "details" fold are not shown on top of the guide.
+    expect(view.queryByLabelText("版本列表")).toBeNull();
+    expect(view.queryByText("接入与上传令牌")).toBeNull();
+  });
+
+  it("does not mistake a search with no match for a new project", async () => {
+    vi.mocked(listReleases).mockImplementation(async (_project, options = {}) =>
+      options.q ? { releases: [], nextCursor: null } : { releases: [release()], nextCursor: null },
+    );
+    const view = renderPage();
+    await view.findByLabelText("版本列表");
+    fireEvent.change(view.getByLabelText("搜索版本"), { target: { value: "nope" } });
+    expect(await view.findByText("没有包含“nope”的版本。")).toBeTruthy();
+    expect(view.queryByText("第一次使用：三步让 Source Map 生效")).toBeNull();
+  });
+});
+
 describe("storage status", () => {
   it("explains missing storage and links instance admins to the settings", async () => {
     vi.mocked(getSourceMapStatus).mockResolvedValue({
@@ -202,7 +271,7 @@ describe("storage status", () => {
 });
 
 describe("storage without delete permission", () => {
-  it("keeps uploads available and warns that deletions leave files behind", async () => {
+  it("keeps uploads available and notes, beside the delete controls, that files are kept", async () => {
     vi.mocked(getSourceMapStatus).mockResolvedValue({
       storage: "ready",
       maxArtifactBytes: 64 * 1024 * 1024,
@@ -210,14 +279,19 @@ describe("storage without delete permission", () => {
       deleteAllowed: false,
     });
     const view = renderPage();
-    expect(await view.findByText("对象存储没有删除权限")).toBeTruthy();
+    expect(await view.findByText("删除受限")).toBeTruthy();
+    expect(view.queryByText("对象存储没有删除权限")).toBeNull();
     expect(view.queryByText("尚未配置对象存储")).toBeNull();
   });
 });
 
 describe("release preselection", () => {
   it("selects the release named in the URL", async () => {
-    window.history.replaceState({}, "", "/projects/project-1/releases?release=web%402.0.0&dist=b");
+    window.history.replaceState(
+      {},
+      "",
+      "/settings/project/project-1/sourcemaps?release=web%402.0.0&dist=b",
+    );
     vi.mocked(listReleases).mockImplementation(async (_project, options = {}) =>
       options.q === "web@2.0.0"
         ? {
@@ -236,7 +310,11 @@ describe("release preselection", () => {
   });
 
   it("prefills registration when the URL release does not exist", async () => {
-    window.history.replaceState({}, "", "/projects/project-1/releases?release=web%403.0.0&dist=b");
+    window.history.replaceState(
+      {},
+      "",
+      "/settings/project/project-1/sourcemaps?release=web%403.0.0&dist=b",
+    );
     const view = renderPage();
     await waitFor(() =>
       expect((view.getByPlaceholderText("web@2026.09.03") as HTMLInputElement).value).toBe(

@@ -5,6 +5,7 @@ export type EventType = "page_view" | "error" | "web_vital" | "api" | "custom" |
 export type LogLevel = "trace" | "debug" | "info" | "warn" | "error" | "fatal";
 export type NavigationType = "navigate" | "reload" | "back_forward" | "prerender" | "route_change";
 export type Attributes = Record<string, string>;
+export type HeaderMap = Record<string, string>;
 export type Measurements = Record<string, number>;
 
 export interface EnvelopeV1 {
@@ -72,6 +73,11 @@ export interface APIEvent extends EventBase {
     duration_ms: number;
     transfer_size?: number;
     failure?: "network" | "timeout" | "abort" | "http";
+    request_headers?: HeaderMap;
+    response_headers?: HeaderMap;
+    /** A redacted, size-limited copy, present only for endpoints a project opted in. */
+    request_body?: string;
+    response_body?: string;
   };
 }
 

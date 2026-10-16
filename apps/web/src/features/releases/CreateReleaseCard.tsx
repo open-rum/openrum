@@ -14,18 +14,19 @@ export function CreateReleaseCard({
   initialVersion = "",
   initialDist = "",
   hint,
-  notice,
   pending,
   error,
   onCreate,
+  onCancel,
 }: {
   initialVersion?: string;
   initialDist?: string;
   hint?: string;
-  notice?: string;
   pending: boolean;
   error?: string;
   onCreate: (input: ReleaseInput) => Promise<unknown> | void;
+  /** Closes the form without registering. */
+  onCancel?: () => void;
 }) {
   const [version, setVersion] = useState(initialVersion);
   const [dist, setDist] = useState(initialDist);
@@ -60,6 +61,7 @@ export function CreateReleaseCard({
             <span>Release *</span>
             <Input
               required
+              autoFocus
               name="version"
               maxLength={128}
               placeholder="web@2026.09.03"
@@ -87,16 +89,18 @@ export function CreateReleaseCard({
               onChange={(event) => setCommitSha(event.target.value)}
             />
           </label>
-          <Button type="submit" disabled={pending || !version.trim()}>
-            <PlusIcon />
-            {pending ? "登记中…" : "登记"}
-          </Button>
+          <div className="release-form__actions">
+            {onCancel ? (
+              <Button type="button" variant="ghost" onClick={onCancel}>
+                取消
+              </Button>
+            ) : null}
+            <Button type="submit" disabled={pending || !version.trim()}>
+              <PlusIcon />
+              {pending ? "登记中…" : "登记"}
+            </Button>
+          </div>
         </form>
-        {notice && !error ? (
-          <p className="release-form__notice" role="status">
-            {notice}
-          </p>
-        ) : null}
         {error ? (
           <p className="release-form__error" role="alert">
             {error}

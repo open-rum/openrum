@@ -9,6 +9,7 @@ import {
   redirect,
 } from "@tanstack/react-router";
 import { HTTPError, getSetupStatus, safeReturnTo, sessionQueryOptions } from "@/lib/auth/session";
+import { listOrganizations, listProjects } from "@/lib/api/projects";
 import { LoginRoutePage } from "@/features/auth/LoginPage";
 import { AwaitingAccessPage } from "@/features/auth/AwaitingAccessPage";
 import { SetupPage } from "@/features/auth/SetupPage";
@@ -65,9 +66,9 @@ const IssueDetailPage = lazyRouteComponent(
   () => import("@/features/issues/IssueDetailPage"),
   "IssueDetailPage",
 );
-const ReleasesPage = lazyRouteComponent(
+const SourceMapPage = lazyRouteComponent(
   () => import("@/features/releases/ReleasesPage"),
-  "ReleasesPage",
+  "SourceMapPage",
 );
 const PerformancePage = lazyRouteComponent(
   () => import("@/features/performance/PerformancePage"),
@@ -104,6 +105,10 @@ const ProjectFiltersRoute = lazyRouteComponent(
   () => import("@/features/settings/ProjectFiltersPage"),
   "ProjectFiltersRoute",
 );
+const ProjectAPICaptureRoute = lazyRouteComponent(
+  () => import("@/features/settings/ProjectAPICapturePage"),
+  "ProjectAPICaptureRoute",
+);
 const ProjectURLRulesRoute = lazyRouteComponent(
   () => import("@/features/settings/ProjectURLRulesPage"),
   "ProjectURLRulesRoute",
@@ -123,6 +128,10 @@ const ProjectSamplingRoute = lazyRouteComponent(
 const AdminOverviewPage = lazyRouteComponent(
   () => import("@/features/admin/AdminOverviewPage"),
   "AdminOverviewPage",
+);
+const EmailServicePage = lazyRouteComponent(
+  () => import("@/features/admin/EmailServicePage"),
+  "EmailServicePage",
 );
 const ObjectStoragePage = lazyRouteComponent(
   () => import("@/features/admin/ObjectStoragePage"),
@@ -399,17 +408,49 @@ const issueDetailRoute = createRoute({
   component: IssueDetailPage,
 });
 
+// Source Map management used to be a main-navigation page called 发布. It is project setup, so it
+// now lives in project settings; these addresses stay so bookmarks, docs and the Issue stack
+// guidance keep working. The query string (`?release=&dist=`) must survive the move.
 const releasesRoute = createRoute({
   getParentRoute: () => protectedRoute,
   path: "/releases",
-  component: ReleasesPage,
+  beforeLoad: async ({ context, location }) => {
+    // No project in the address: use the first one, as the page did before.
+    const { organizations } = await context.queryClient.fetchQuery({
+      queryKey: ["organizations"],
+      queryFn: listOrganizations,
+    });
+    const organization = organizations[0];
+    const project = organization
+      ? (
+          await context.queryClient.fetchQuery({
+            queryKey: ["projects", organization.id],
+            queryFn: () => listProjects(organization.id),
+          })
+        ).projects[0]
+      : undefined;
+    if (!project) throw redirect({ to: "/projects" });
+    throw redirect({ href: sourceMapSettingsHref(project.id, location.searchStr) });
+  },
 });
 
 const projectReleasesRoute = createRoute({
   getParentRoute: () => protectedRoute,
   path: "/projects/$projectId/releases",
-  component: ReleasesPage,
+  beforeLoad: ({ params, location }) => {
+    throw redirect({ href: sourceMapSettingsHref(params.projectId, location.searchStr) });
+  },
 });
+
+const settingsProjectSourceMapRoute = createRoute({
+  getParentRoute: () => protectedRoute,
+  path: "/settings/project/$projectId/sourcemaps",
+  component: SourceMapPage,
+});
+
+function sourceMapSettingsHref(projectId: string, searchStr: string) {
+  return `/settings/project/${encodeURIComponent(projectId)}/sourcemaps${searchStr}`;
+}
 
 const performanceRoute = createRoute({
   getParentRoute: () => protectedRoute,
@@ -511,6 +552,18 @@ const settingsProjectFiltersRoute = createRoute({
   component: ProjectFiltersRoute,
 });
 
+const settingsProjectAPICaptureRoute = createRoute({
+  getParentRoute: () => protectedRoute,
+  path: "/settings/project/$projectId/api-capture",
+  // The API monitoring page links here with the endpoint it was looking at, so a rule can
+  // start from that address instead of being typed out.
+  validateSearch: (search: Record<string, unknown>): { method?: string; url?: string } => ({
+    method: typeof search.method === "string" ? search.method : undefined,
+    url: typeof search.url === "string" ? search.url : undefined,
+  }),
+  component: ProjectAPICaptureRoute,
+});
+
 const settingsProjectURLRulesRoute = createRoute({
   getParentRoute: () => protectedRoute,
   path: "/settings/project/$projectId/url-rules",
@@ -560,6 +613,13 @@ const settingsInstanceObjectStorageRoute = createRoute({
   path: "/settings/instance/object-storage",
   beforeLoad: requireInstanceRole,
   component: ObjectStoragePage,
+});
+
+const settingsInstanceEmailRoute = createRoute({
+  getParentRoute: () => protectedRoute,
+  path: "/settings/instance/email",
+  beforeLoad: requireInstanceRole,
+  component: EmailServicePage,
 });
 
 const settingsInstanceAuthenticationRoute = createRoute({
@@ -774,6 +834,7 @@ const routeTree = rootRoute.addChildren([
     issueDetailRoute,
     releasesRoute,
     projectReleasesRoute,
+    settingsProjectSourceMapRoute,
     performanceRoute,
     projectPerformanceRoute,
     apisRoute,
@@ -788,6 +849,7 @@ const routeTree = rootRoute.addChildren([
     settingsProjectGeneralRoute,
     settingsProjectKeysRoute,
     settingsProjectFiltersRoute,
+    settingsProjectAPICaptureRoute,
     settingsProjectURLRulesRoute,
     settingsProjectScrubbingRoute,
     settingsProjectQuotaRoute,
@@ -796,6 +858,7 @@ const routeTree = rootRoute.addChildren([
     settingsInstanceRoute,
     settingsInstanceRetentionRoute,
     settingsInstanceObjectStorageRoute,
+    settingsInstanceEmailRoute,
     settingsInstanceAuthenticationRoute,
     settingsInstanceAuditRoute,
     legacySettingsRoute,

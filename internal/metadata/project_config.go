@@ -10,6 +10,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"openrum/internal/capture"
 	"openrum/internal/config"
 	"openrum/internal/filter"
 )
@@ -29,6 +30,10 @@ type ProjectSDKConfig struct {
 	// applies the full set, so this is a bandwidth optimisation rather than
 	// the authoritative copy.
 	Filters filter.Settings `json:"filters"`
+	// APICapture is the browser's view of the project's header capture rules.
+	// Empty for a project that never opted in, which tells the SDK to read no
+	// header at all.
+	APICapture capture.Settings `json:"apiCapture"`
 }
 
 type ProjectRetentionPolicy struct {
@@ -44,12 +49,12 @@ func NewProjectConfigRepository(database *sql.DB) *ProjectConfigRepository {
 
 func (repository *ProjectConfigRepository) Get(ctx context.Context, projectID uuid.UUID, now time.Time) (ProjectSDKConfig, error) {
 	var config ProjectSDKConfig
-	var filters []byte
+	var filters, captureRules []byte
 	err := repository.database.QueryRowContext(ctx, `SELECT id,sdk_config_version,sdk_config_effective_at,
-		event_sample_rate,api_sample_rate,error_sample_rate,emergency_sample_rate,emergency_expires_at,inbound_filters
+		event_sample_rate,api_sample_rate,error_sample_rate,emergency_sample_rate,emergency_expires_at,inbound_filters,api_capture_rules
 		FROM projects WHERE id=$1 AND status='active'`, projectID).Scan(&config.ProjectID, &config.Version,
 		&config.EffectiveAt, &config.EventSampleRate, &config.APISampleRate, &config.ErrorSampleRate,
-		&config.EmergencySampleRate, &config.EmergencyExpiresAt, &filters)
+		&config.EmergencySampleRate, &config.EmergencyExpiresAt, &filters, &captureRules)
 	if errors.Is(err, sql.ErrNoRows) {
 		return ProjectSDKConfig{}, ErrNotFound
 	}
@@ -61,6 +66,11 @@ func (repository *ProjectConfigRepository) Get(ctx context.Context, projectID uu
 		return ProjectSDKConfig{}, err
 	}
 	config.Filters = stored.ClientEnforced()
+	storedCapture, err := decodeCaptureSettings(captureRules)
+	if err != nil {
+		return ProjectSDKConfig{}, err
+	}
+	config.APICapture = storedCapture.ClientProjection()
 	config.EffectiveAt = config.EffectiveAt.UTC()
 	if config.EmergencyExpiresAt != nil {
 		expires := config.EmergencyExpiresAt.UTC()

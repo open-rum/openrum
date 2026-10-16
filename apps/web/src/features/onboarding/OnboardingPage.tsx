@@ -32,7 +32,7 @@ import {
 import { getProject, listOrganizations } from "@/lib/api/projects";
 import { recordProductEvent } from "@/lib/telemetry/productEvents";
 import { ProjectCreatePage } from "@/features/projects/ProjectCreatePage";
-import { UploadTokensSection } from "@/features/settings/UploadTokensSection";
+import { uploadTokensPath } from "@/features/releases/releaseLinks";
 import { getProjectPlatform } from "@/features/projects/projectPlatforms";
 import { ConnectionStatus } from "./ConnectionStatus";
 import { rejectGuidance } from "./guidance";
@@ -230,7 +230,20 @@ function ProjectOnboarding({
         </CardContent>
       </Card>
 
-      <UploadTokensSection projectId={project.id} />
+      <Card>
+        <CardHeader>
+          <CardTitle>Source Map</CardTitle>
+          <CardDescription>
+            上传令牌、构建插件和已上传的版本都在 Source Map
+            页管理，用来把压缩后的错误堆栈还原到源码。
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button asChild variant="outline">
+            <a href={uploadTokensPath(project.id)}>管理 Source Map 与上传令牌</a>
+          </Button>
+        </CardContent>
+      </Card>
 
       <Separator />
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">

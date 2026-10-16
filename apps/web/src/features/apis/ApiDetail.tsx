@@ -1,7 +1,9 @@
 import { useState } from "react";
-import { XIcon } from "lucide-react";
+import { ChartLineIcon, InfoIcon, ListIcon, XIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   Drawer,
   DrawerClose,
@@ -19,28 +21,38 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
+  apiFailureLevel,
   apiFailureRate,
   formatAPIBytes,
   formatAPIDuration,
   formatAPILatencyBucket,
   minimumAPISamples,
+  sampleCountLabel,
+  type APIFilters,
   type APIsResponse,
 } from "@/lib/api/apis";
-import { ApiTrend } from "./ApiTrend";
-import { sessionEventHref } from "@/lib/api/sessions";
+import { ApiCharts } from "./ApiCharts";
+import { ApiSamples } from "./ApiSamples";
+import type { ApiTrendRange } from "./plotData";
 
 type Detail = NonNullable<APIsResponse["detail"]>;
 
 export function ApiDetail({
   detail,
+  range,
+  filters,
   projectId,
   onClose,
 }: {
   detail: Detail;
+  range: ApiTrendRange;
+  /** The page's filters, which also select the endpoint, so its requests can be listed. */
+  filters: APIFilters;
   projectId: string;
   onClose: () => void;
 }) {
   const failureRate = apiFailureRate(detail.endpoint);
+  const sampleCount = sampleCountLabel(detail.endpoint.requests);
   return (
     <Drawer open direction="right" onOpenChange={(open) => !open && onClose()}>
       {/* Width lives in the stylesheet: the base drawer caps a right-side panel
@@ -51,13 +63,32 @@ export function ApiDetail({
           <div>
             <span>
               <MethodBadge method={detail.endpoint.method} />
-              <Badge variant={detail.endpoint.failures ? "destructive" : "secondary"}>
+              <Badge
+                variant={
+                  { danger: "destructive", warning: "warning", normal: "secondary" }[
+                    apiFailureLevel(failureRate)
+                  ] as "destructive" | "warning" | "secondary"
+                }
+              >
                 {failureRate.toFixed(1)}% 失败
               </Badge>
             </span>
             <DrawerTitle>{detail.endpoint.url}</DrawerTitle>
             <DrawerDescription>
-              只展示标准化 URL 和安全上下文，不包含 query、body、Cookie 或 headers。
+              只展示标准化 URL 和安全上下文
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button type="button" className="api-detail-info" aria-label="查看隐私说明">
+                      <InfoIcon aria-hidden="true" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" sideOffset={8}>
+                    不含 query、body 和 Cookie；请求头与请求/响应体仅在项目为该 API
+                    开启采集后才有，并在 3 天后删除。
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             </DrawerDescription>
           </div>
           <DrawerClose asChild>
@@ -66,113 +97,81 @@ export function ApiDetail({
             </Button>
           </DrawerClose>
         </DrawerHeader>
-        <div className="api-detail-body">
-          <section className="api-detail-metrics">
-            <Metric
-              label="请求"
-              value={Math.round(detail.endpoint.estimated).toLocaleString()}
-              note={`${detail.endpoint.requests.toLocaleString()} 个采样事件`}
-            />
-            <Metric label="P50" value={formatAPIDuration(detail.endpoint.p50)} />
-            <Metric label="P75" value={formatAPIDuration(detail.endpoint.p75)} />
-            <Metric
-              label="P95"
-              value={formatAPIDuration(detail.endpoint.p95)}
-              note={detail.endpoint.sufficient ? undefined : `样本少于 ${minimumAPISamples}`}
-            />
-            <Metric
-              label="响应大小 P50"
-              value={formatAPIBytes(detail.payload.p50)}
-              note={
-                detail.payload.samples
-                  ? `P95 ${formatAPIBytes(detail.payload.p95)}`
-                  : "无 content-length"
-              }
-            />
-          </section>
-          <section className="api-detail-section">
-            <h3>请求与失败趋势</h3>
-            <ApiTrend trend={detail.trend} label="该 endpoint " />
-          </section>
-          {/* Two bar lists of similar height, paired so the wide panel is not
+        <Tabs defaultValue="trend" className="api-detail-tabs">
+          <TabsList variant="line" aria-label="端点详情分区" className="api-detail-tablist">
+            <TabsTrigger value="trend">
+              <ChartLineIcon aria-hidden="true" />
+              趋势
+            </TabsTrigger>
+            <TabsTrigger value="samples">
+              <ListIcon aria-hidden="true" />
+              请求样本
+              {sampleCount ? <span className="api-detail-tab-count">{sampleCount}</span> : null}
+            </TabsTrigger>
+          </TabsList>
+          <TabsContent value="trend" className="api-detail-body">
+            <section className="api-detail-metrics">
+              <Metric
+                label="请求"
+                value={Math.round(detail.endpoint.estimated).toLocaleString()}
+                note={`${detail.endpoint.requests.toLocaleString()} 个采样事件`}
+              />
+              <Metric label="P50" value={formatAPIDuration(detail.endpoint.p50)} />
+              <Metric label="P75" value={formatAPIDuration(detail.endpoint.p75)} />
+              <Metric
+                label="P95"
+                value={formatAPIDuration(detail.endpoint.p95)}
+                note={detail.endpoint.sufficient ? undefined : `样本少于 ${minimumAPISamples}`}
+              />
+              <Metric
+                label="响应大小 P50"
+                value={formatAPIBytes(detail.payload.p50)}
+                note={
+                  detail.payload.samples
+                    ? `P95 ${formatAPIBytes(detail.payload.p95)}`
+                    : "无 content-length"
+                }
+              />
+            </section>
+            <section className="api-detail-section">
+              <h3>请求、耗时与状态码</h3>
+              <ApiCharts trend={detail.trend} range={range} scope="该 endpoint" />
+            </section>
+            {/* Two bar lists of similar height, paired so the wide panel is not
               one long single column. */}
-          <section className="api-detail-section api-detail-section--paired">
-            <h3>响应状态码</h3>
-            <StatusBreakdown statuses={detail.statuses} />
-            <p className="api-detail-note">
-              失败率只计入 5xx 与网络类错误；{detail.endpoint.clientErrors.toLocaleString()} 次 4xx
-              单独列出。
-            </p>
-          </section>
-          <section className="api-detail-section api-detail-section--paired">
-            <h3>延迟分布</h3>
-            <LatencyHistogram buckets={detail.latency} />
-          </section>
-          <section className="api-detail-section">
-            <h3>维度下钻</h3>
-            <DimensionBreakdown dimensions={detail.dimensions} endpoint={detail.endpoint} />
-          </section>
-          <section className="api-detail-section">
-            <h3>关联 Route</h3>
-            <div className="api-route-facets">
-              {detail.routes.map((route) => (
-                <p key={route.route}>
-                  <code>{route.route}</code>
-                  <span>{route.requests.toLocaleString()} 请求</span>
-                  <strong>{route.failures.toLocaleString()} 失败</strong>
-                </p>
-              ))}
-            </div>
-          </section>
-          <section className="api-detail-section">
-            <h3>事件样本</h3>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>状态</TableHead>
-                  <TableHead>耗时</TableHead>
-                  <TableHead>Route</TableHead>
-                  <TableHead>时间</TableHead>
-                  <TableHead>会话</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {detail.samples.map((sample) => (
-                  <TableRow key={sample.eventId}>
-                    <TableCell>
-                      <Badge
-                        variant={sample.failure || sample.status >= 500 ? "destructive" : "outline"}
-                      >
-                        {sample.failure || sample.status || "network"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="font-semibold">
-                      {Math.round(sample.durationMs)} ms
-                    </TableCell>
-                    <TableCell>
-                      <code>{sample.route || sample.pageUrl}</code>
-                    </TableCell>
-                    <TableCell>{new Date(sample.timestamp).toLocaleString("zh-CN")}</TableCell>
-                    <TableCell>
-                      <a
-                        href={sessionEventHref(
-                          projectId,
-                          sample.sessionId,
-                          sample.timestamp,
-                          sample.eventId,
-                        )}
-                        title={sample.sessionId}
-                      >
-                        查看会话
-                      </a>
-                      {sample.traceId ? <small title={sample.traceId}>trace 已关联</small> : null}
-                    </TableCell>
-                  </TableRow>
+            <section className="api-detail-section api-detail-section--paired">
+              <h3>响应状态码</h3>
+              <StatusBreakdown statuses={detail.statuses} />
+              <p className="api-detail-note">
+                失败率只计入 5xx 与网络类错误；{detail.endpoint.clientErrors.toLocaleString()} 次
+                4xx 单独列出。
+              </p>
+            </section>
+            <section className="api-detail-section api-detail-section--paired">
+              <h3>延迟分布</h3>
+              <LatencyHistogram buckets={detail.latency} />
+            </section>
+            <section className="api-detail-section">
+              <h3>维度下钻</h3>
+              <DimensionBreakdown dimensions={detail.dimensions} endpoint={detail.endpoint} />
+            </section>
+            <section className="api-detail-section">
+              <h3>关联 Route</h3>
+              <div className="api-route-facets">
+                {detail.routes.map((route) => (
+                  <p key={route.route}>
+                    <code>{route.route}</code>
+                    <span>{route.requests.toLocaleString()} 请求</span>
+                    <strong>{route.failures.toLocaleString()} 失败</strong>
+                  </p>
                 ))}
-              </TableBody>
-            </Table>
-          </section>
-        </div>
+              </div>
+            </section>
+          </TabsContent>
+          <TabsContent value="samples" className="api-detail-body api-detail-body--samples">
+            <ApiSamples filters={filters} endpoint={detail.endpoint} projectId={projectId} />
+          </TabsContent>
+        </Tabs>
       </DrawerContent>
     </Drawer>
   );
@@ -285,7 +284,7 @@ function DimensionBreakdown({
                 <TableCell>{facet.value}</TableCell>
                 <TableCell>{facet.requests.toLocaleString()}</TableCell>
                 <TableCell>
-                  <span data-failing={facet.failures > 0}>{rate.toFixed(2)}%</span>
+                  <span data-level={apiFailureLevel(rate)}>{rate.toFixed(2)}%</span>
                 </TableCell>
                 <TableCell>
                   <span data-slower={slower}>{formatAPIDuration(facet.p95)}</span>

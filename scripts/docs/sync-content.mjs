@@ -56,12 +56,6 @@ const publicGuides = [
     "Trust boundaries, threats, controls and residual risks for a public Instance.",
     "docs/security/threat-model.md",
   ],
-  [
-    "contributing/local-development",
-    "Local development",
-    "Work on OpenRUM services, SDK, console and public site.",
-    "docs/local-development.md",
-  ],
 ];
 
 function stripLeadingHeading(body) {

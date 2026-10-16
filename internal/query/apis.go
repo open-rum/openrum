@@ -11,6 +11,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+
+	"openrum/internal/capture"
 )
 
 var ErrInvalidAPIFilters = errors.New("invalid API filters")
@@ -32,6 +34,9 @@ type APIFilters struct {
 	Method  string
 	URL     string
 	Search  string
+	// User narrows one endpoint's sample list to requests whose anonymous or business user
+	// ID starts with it. It never affects the aggregates.
+	User    string
 	Sort    string
 	Compare bool
 }
@@ -81,12 +86,18 @@ type APIEndpoint struct {
 // trend can show what a bucket's requests were made of: 4xx is a caller
 // problem and is excluded from the failure rate, while Failures covers 5xx and
 // transport errors.
+// APITrendPoint is one time bucket. Failures counts 5xx and network failures (not 4xx), so
+// a request is exactly one of: a 4xx, a 5xx, a network failure, or neither.
 type APITrendPoint struct {
-	Bucket       time.Time `json:"bucket"`
-	Requests     uint64    `json:"requests"`
-	Failures     uint64    `json:"failures"`
-	ClientErrors uint64    `json:"clientErrors"`
-	P95          *float64  `json:"p95"`
+	Bucket        time.Time `json:"bucket"`
+	Requests      uint64    `json:"requests"`
+	Failures      uint64    `json:"failures"`
+	ClientErrors  uint64    `json:"clientErrors"`
+	ServerErrors  uint64    `json:"serverErrors"`
+	NetworkErrors uint64    `json:"networkErrors"`
+	P50           *float64  `json:"p50"`
+	P75           *float64  `json:"p75"`
+	P95           *float64  `json:"p95"`
 }
 
 type APIRouteFacet struct {
@@ -95,19 +106,51 @@ type APIRouteFacet struct {
 	Failures uint64 `json:"failures"`
 }
 
+// APISample is one request. Every field comes from what the SDK reported or the server derived;
+// nothing here is invented, so a field the SDK does not send is simply absent.
 type APISample struct {
-	EventID    uuid.UUID `json:"eventId"`
-	Timestamp  time.Time `json:"timestamp"`
-	Status     uint16    `json:"status"`
-	Failure    string    `json:"failure,omitempty"`
-	DurationMS float64   `json:"durationMs"`
-	Route      string    `json:"route,omitempty"`
-	PageURL    string    `json:"pageUrl"`
-	Release    string    `json:"release,omitempty"`
-	Browser    string    `json:"browser,omitempty"`
-	SessionID  uuid.UUID `json:"sessionId"`
-	TraceID    string    `json:"traceId,omitempty"`
+	EventID        uuid.UUID `json:"eventId"`
+	Timestamp      time.Time `json:"timestamp"`
+	Method         string    `json:"method"`
+	URL            string    `json:"url"`
+	Status         uint16    `json:"status"`
+	Failure        string    `json:"failure,omitempty"`
+	DurationMS     float64   `json:"durationMs"`
+	TransferSize   uint64    `json:"transferSize"`
+	Route          string    `json:"route,omitempty"`
+	PageURL        string    `json:"pageUrl"`
+	Environment    string    `json:"environment,omitempty"`
+	Release        string    `json:"release,omitempty"`
+	Browser        string    `json:"browser,omitempty"`
+	BrowserVersion string    `json:"browserVersion,omitempty"`
+	OS             string    `json:"os,omitempty"`
+	OSVersion      string    `json:"osVersion,omitempty"`
+	DeviceType     string    `json:"deviceType,omitempty"`
+	Country        string    `json:"country,omitempty"`
+	SessionID      uuid.UUID `json:"sessionId"`
+	// AnonymousUserID is the SDK's per-browser ID; UserID is the signed-in ID the application set.
+	AnonymousUserID string            `json:"anonymousUserId,omitempty"`
+	UserID          string            `json:"userId,omitempty"`
+	TraceID         string            `json:"traceId,omitempty"`
+	Attributes      map[string]string `json:"attributes,omitempty"`
+	// RequestHeaders and ResponseHeaders are the snapshots a project opted in to. They are
+	// empty for a request that was not covered by a rule and for one older than
+	// capture.RetentionDays.
+	RequestHeaders  map[string]string `json:"requestHeaders,omitempty"`
+	ResponseHeaders map[string]string `json:"responseHeaders,omitempty"`
+	// RequestBody and ResponseBody are redacted, size-limited copies under the same rule.
+	RequestBody  string `json:"requestBody,omitempty"`
+	ResponseBody string `json:"responseBody,omitempty"`
 }
+
+// APISamples is a page of one endpoint's requests, newest first.
+type APISamples struct {
+	Samples   []APISample `json:"samples"`
+	Truncated bool        `json:"truncated"`
+}
+
+// apiSampleLimit bounds the list; Truncated says when more matched.
+const apiSampleLimit = 100
 
 // APIStatusFacet reports one exact response status. A zero status with a
 // failure reason is a request that never produced a response.
@@ -159,7 +202,6 @@ type APIDetail struct {
 	Latency    []APILatencyBucket `json:"latency"`
 	Payload    APIPayload         `json:"payload"`
 	Dimensions APIDimensions      `json:"dimensions"`
-	Samples    []APISample        `json:"samples"`
 }
 
 // apiDimensionColumns are only available on the raw events table, because
@@ -186,8 +228,10 @@ type APISummary struct {
 }
 
 type APIResult struct {
-	From      time.Time       `json:"from"`
-	To        time.Time       `json:"to"`
+	From time.Time `json:"from"`
+	To   time.Time `json:"to"`
+	// Interval is the size of one trend bucket, such as "15 MINUTE".
+	Interval  string          `json:"interval"`
 	Summary   APISummary      `json:"summary"`
 	Previous  *APISummary     `json:"previous,omitempty"`
 	Trend     []APITrendPoint `json:"trend"`
@@ -210,6 +254,7 @@ func NormalizeAPIFilters(filters APIFilters) (APIFilters, error) {
 	filters.Environment, filters.Release, filters.Route = strings.TrimSpace(filters.Environment), strings.TrimSpace(filters.Release), strings.TrimSpace(filters.Route)
 	filters.Method, filters.URL, filters.Sort = strings.ToUpper(strings.TrimSpace(filters.Method)), sanitizeAPIURL(filters.URL), strings.TrimSpace(filters.Sort)
 	filters.Search = strings.TrimSpace(filters.Search)
+	filters.User = strings.TrimSpace(filters.User)
 	filters.Methods = normalizeAPIMethods(filters.Methods)
 	if filters.Sort == "" {
 		filters.Sort = "requests"
@@ -217,8 +262,8 @@ func NormalizeAPIFilters(filters APIFilters) (APIFilters, error) {
 	_, knownSort := apiSorts[filters.Sort]
 	pairedEndpoint := (filters.Method == "") == (filters.URL == "")
 	if filters.ProjectID == uuid.Nil || filters.From.IsZero() || !filters.From.Before(filters.To) || filters.To.Sub(filters.From) > 30*24*time.Hour ||
-		len(filters.Environment) > 64 || len(filters.Release) > 128 || len(filters.Route) > 1024 || len(filters.Method) > 16 || len(filters.URL) > 2048 || len(filters.Search) > 256 ||
-		!pairedEndpoint || !knownSort || containsControl(filters.Environment+filters.Release+filters.Route+filters.Method+filters.URL+filters.Search) {
+		len(filters.Environment) > 64 || len(filters.Release) > 128 || len(filters.Route) > 1024 || len(filters.Method) > 16 || len(filters.URL) > 2048 || len(filters.Search) > 256 || len(filters.User) > 128 ||
+		!pairedEndpoint || !knownSort || containsControl(filters.Environment+filters.Release+filters.Route+filters.Method+filters.URL+filters.Search+filters.User) {
 		return APIFilters{}, ErrInvalidAPIFilters
 	}
 	return filters, nil
@@ -256,7 +301,10 @@ func (repository *APIRepository) Get(ctx context.Context, requested APIFilters) 
 	if err != nil {
 		return APIResult{}, err
 	}
-	result := APIResult{From: filters.From, To: filters.To, Endpoints: endpoints}
+	result := APIResult{
+		From: filters.From, To: filters.To, Endpoints: endpoints,
+		Interval: apiSeriesInterval(filters.To.Sub(filters.From)),
+	}
 	if result.Summary, err = repository.summary(ctx, filters); err != nil {
 		return APIResult{}, err
 	}
@@ -383,7 +431,7 @@ func (repository *APIRepository) detail(ctx context.Context, filters APIFilters)
 	detail := APIDetail{
 		Endpoint: APIEndpoint{Method: filters.Method, URL: filters.URL},
 		Trend:    []APITrendPoint{}, Routes: []APIRouteFacet{},
-		Statuses: []APIStatusFacet{}, Latency: []APILatencyBucket{}, Samples: []APISample{},
+		Statuses: []APIStatusFacet{}, Latency: []APILatencyBucket{},
 	}
 	var err error
 	if detail.Endpoint, err = repository.endpointAggregate(ctx, filters); err != nil {
@@ -407,8 +455,7 @@ func (repository *APIRepository) detail(ctx context.Context, filters APIFilters)
 	if detail.Dimensions, err = repository.dimensions(ctx, filters); err != nil {
 		return detail, err
 	}
-	detail.Samples, err = repository.samples(ctx, filters)
-	return detail, err
+	return detail, nil
 }
 
 func (repository *APIRepository) dimensions(ctx context.Context, filters APIFilters) (APIDimensions, error) {
@@ -551,12 +598,20 @@ func (repository *APIRepository) endpointAggregate(ctx context.Context, filters 
 	return endpoint, nil
 }
 
+// apiSeriesInterval buckets the trend by the Console's shared policy of about thirty points.
+// The source rollup is one minute, so a short range is never split finer than that.
+func apiSeriesInterval(window time.Duration) string {
+	return performanceIntervalSQL(ConsoleSeriesInterval(window, time.Minute))
+}
+
 func (repository *APIRepository) trend(ctx context.Context, filters APIFilters, endpoint bool) ([]APITrendPoint, error) {
 	where, arguments := apiAggregateWhere(filters, endpoint)
-	interval := legacySeriesInterval(filters.To.Sub(filters.From))
+	interval := apiSeriesInterval(filters.To.Sub(filters.From))
 	rows, err := repository.database.QueryContext(ctx, `SELECT toStartOfInterval(bucket, INTERVAL `+interval+`) AS point,
 		uniqCombined64Merge(requests),coalesce(uniqCombined64Merge(failures),0),
-		coalesce(uniqCombined64Merge(client_errors),0),quantileTDigestMerge(0.95)(duration_p95)
+		coalesce(uniqCombined64Merge(client_errors),0),coalesce(uniqCombined64Merge(server_errors),0),
+		coalesce(uniqCombined64Merge(network_errors),0),
+		quantileTDigestMerge(0.50)(duration_p50),quantileTDigestMerge(0.75)(duration_p75),quantileTDigestMerge(0.95)(duration_p95)
 		FROM api_metrics_1m WHERE `+where+` GROUP BY point ORDER BY point`, arguments...)
 	if err != nil {
 		return nil, fmt.Errorf("query API trend: %w", err)
@@ -565,12 +620,13 @@ func (repository *APIRepository) trend(ctx context.Context, filters APIFilters, 
 	result := make([]APITrendPoint, 0)
 	for rows.Next() {
 		var current APITrendPoint
-		var p95 sql.NullFloat64
-		if err := rows.Scan(&current.Bucket, &current.Requests, &current.Failures, &current.ClientErrors, &p95); err != nil {
+		var p50, p75, p95 sql.NullFloat64
+		if err := rows.Scan(&current.Bucket, &current.Requests, &current.Failures, &current.ClientErrors,
+			&current.ServerErrors, &current.NetworkErrors, &p50, &p75, &p95); err != nil {
 			return nil, err
 		}
 		current.Bucket = current.Bucket.UTC()
-		current.P95 = nullableFloat(p95)
+		current.P50, current.P75, current.P95 = nullableFloat(p50), nullableFloat(p75), nullableFloat(p95)
 		result = append(result, current)
 	}
 	return result, rows.Err()
@@ -595,25 +651,62 @@ func (repository *APIRepository) routes(ctx context.Context, filters APIFilters)
 	return result, rows.Err()
 }
 
-func (repository *APIRepository) samples(ctx context.Context, filters APIFilters) ([]APISample, error) {
-	where, arguments := apiRawWhere(filters)
-	rows, err := repository.database.QueryContext(ctx, `SELECT event_id,timestamp,api_status,api_failure,duration_ms,route,page_url_normalized,release,browser,session_id,trace_id
-		FROM rum_events FINAL WHERE `+where+` ORDER BY (api_failure!='' OR api_status>=500) DESC,duration_ms DESC,timestamp DESC LIMIT 25`, arguments...)
+// Samples lists one endpoint's requests, newest first, optionally only a user's. It needs an
+// endpoint: the aggregates answer questions about all of them.
+func (repository *APIRepository) Samples(ctx context.Context, requested APIFilters) (APISamples, error) {
+	filters, err := NormalizeAPIFilters(requested)
 	if err != nil {
-		return nil, fmt.Errorf("query API samples: %w", err)
+		return APISamples{}, err
+	}
+	if filters.Method == "" || filters.URL == "" {
+		return APISamples{}, ErrInvalidAPIFilters
+	}
+	where, arguments := apiRawWhere(filters)
+	if filters.User != "" {
+		where += " AND (startsWith(anonymous_user_id,?) OR startsWith(user_id,?))"
+		arguments = append(arguments, filters.User, filters.User)
+	}
+	rows, err := repository.database.QueryContext(ctx, `SELECT event_id,timestamp,api_method,api_url_normalized,api_status,api_failure,duration_ms,transfer_size,
+		route,page_url_normalized,environment,release,browser,browser_version,os,os_version,device_type,toString(country),session_id,
+		anonymous_user_id,user_id,trace_id,attributes,`+headerColumn("api_request_headers")+`,`+headerColumn("api_response_headers")+`,`+bodyColumn("api_request_body")+`,`+bodyColumn("api_response_body")+`
+		FROM rum_events FINAL WHERE `+where+fmt.Sprintf(` ORDER BY timestamp DESC,event_id LIMIT %d`, apiSampleLimit+1), arguments...)
+	if err != nil {
+		return APISamples{}, fmt.Errorf("query API samples: %w", err)
 	}
 	defer func() { _ = rows.Close() }()
-	result := make([]APISample, 0)
+	result := APISamples{Samples: make([]APISample, 0)}
 	for rows.Next() {
 		var current APISample
-		if err := rows.Scan(&current.EventID, &current.Timestamp, &current.Status, &current.Failure, &current.DurationMS, &current.Route, &current.PageURL, &current.Release, &current.Browser, &current.SessionID, &current.TraceID); err != nil {
-			return nil, err
+		if err := rows.Scan(&current.EventID, &current.Timestamp, &current.Method, &current.URL, &current.Status, &current.Failure,
+			&current.DurationMS, &current.TransferSize, &current.Route, &current.PageURL, &current.Environment, &current.Release,
+			&current.Browser, &current.BrowserVersion, &current.OS, &current.OSVersion, &current.DeviceType, &current.Country,
+			&current.SessionID, &current.AnonymousUserID, &current.UserID, &current.TraceID, &current.Attributes,
+			&current.RequestHeaders, &current.ResponseHeaders, &current.RequestBody, &current.ResponseBody); err != nil {
+			return APISamples{}, err
 		}
 		current.Timestamp = current.Timestamp.UTC()
+		current.URL = sanitizeAPIURL(current.URL)
 		current.PageURL = sanitizeAPIURL(current.PageURL)
-		result = append(result, current)
+		current.Country = strings.Trim(current.Country, "\x00 ")
+		if len(result.Samples) == apiSampleLimit {
+			result.Truncated = true
+			break
+		}
+		result.Samples = append(result.Samples, current)
 	}
 	return result, rows.Err()
+}
+
+// headerColumn reads a header snapshot only while it is inside the retention window.
+// ClickHouse clears an expired column value during a background merge, which can be hours
+// after the expiry, so the promise "three days" is kept here rather than left to the merge.
+func headerColumn(column string) string {
+	return fmt.Sprintf("mapFilter((name,value)->timestamp>=now64(3)-toIntervalDay(%d),%s)", capture.RetentionDays, column)
+}
+
+// bodyColumn is headerColumn for a body, which is a plain string.
+func bodyColumn(column string) string {
+	return fmt.Sprintf("if(timestamp>=now64(3)-toIntervalDay(%d),%s,'')", capture.RetentionDays, column)
 }
 
 type apiEndpointScanner interface{ Scan(...any) error }

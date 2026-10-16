@@ -1,0 +1,106 @@
+---
+title: 邮件服务
+description: 在控制台或部署里配置 OpenRUM 实例发送邮件所用的 SMTP 服务器。
+appliesTo: Alpha
+---
+
+import { Aside, Steps } from "@astrojs/starlight/components";
+
+一个实例通过一台 SMTP 服务器发送邮件。配置一次，所有需要发邮件的功能都会使用它。目前控制台用它发送测试邮件；以后通过邮件发送告警或邀请的功能，也会使用同一台服务器。不配置时，其他功能不受影响。
+
+## 选择在哪里配置
+
+可以在控制台或部署里配置服务器。两处都有时，部署的配置优先。
+
+| | 控制台 | 部署 |
+| --- | --- | --- |
+| 位置 | **系统设置 → 邮件服务** | `SMTP_*` 环境变量，或 Helm 的 `config.smtp` |
+| 密码 | 加密保存在 PostgreSQL | 运行时 Secret 或私有 `.env` 文件 |
+| 前提 | 启用[加密凭据](/zh/docs/self-hosting/authentication/)（`OPENRUM_ALLOW_MANAGED_SECRETS` 和 `OPENRUM_MASTER_KEY`） | 无额外要求 |
+| 修改方式 | 在控制台修改，立即对所有副本生效 | 修改部署后重启 |
+| 控制台里显示为 | 可编辑 | 只读 |
+
+部署里设置了 `SMTP_HOST` 时，控制台只读显示该服务器，并拒绝保存另一台。之前在控制台保存过的配置仍会保留，页面会提示它目前没有生效；去掉部署里的 `SMTP_*` 后它会重新生效。
+
+## 开始之前
+
+向邮件服务商准备好：
+
+- 服务器主机名（例如 `smtp.example.com`）和端口。
+- 它要求的加密方式；如果需要登录，还有用户名和密码。很多服务商要求使用专用的 SMTP 密码或应用专用密码，而不是账号的登录密码。
+- 你控制的域名下的发件人地址，例如 `no-reply@example.com`。
+- 该域名的 SPF、DKIM 和 DMARC 记录。没有这些记录，事务邮件服务发出的邮件常会进入垃圾箱。
+- API 服务到该服务器端口的出站网络。很多云厂商会封禁 25 端口。
+
+系统邮件建议使用 Resend、SendGrid、Amazon SES 这类事务邮件服务，通常比个人邮箱更可靠。控制台页面列出了常见服务商的主机和端口。
+
+## 加密方式
+
+| 方式 | 默认端口 | 行为 |
+| --- | --- | --- |
+| `starttls`（默认） | 587 | 先用明文连接，再升级为 TLS。服务器不支持 STARTTLS 时，OpenRUM 会拒绝继续 |
+| `tls` | 465 | 从连接开始就加密（SMTPS） |
+| `none` | 25 | 不加密，只用于可信的内网中继，且不能填写用户名和密码 |
+
+`starttls` 和 `tls` 模式始终校验证书，且不能关闭校验。要求 TLS 1.2 或更高版本。
+
+## 配置步骤
+
+<Steps>
+
+1. ## 配置服务器
+
+   **在控制台。** 以 Instance Owner 登录，打开 **系统设置 → 邮件服务**，填写服务器、发件人、加密方式、用户名和密码，然后选择 **验证连接并保存**。OpenRUM 会连接服务器并登录，不会发送任何邮件，验证通过才保存。保存需要在五分钟内重新验证你的 OpenRUM 密码，并写入审计日志。密码留空时，只有用户名和服务器地址都没变，才会沿用已保存的密码。
+
+   **在部署里。** 变量见[配置参考](/zh/docs/reference/configuration/#邮件smtp)。使用 Helm 时，把非敏感的值写进 values 文件，把密码放进运行时 Secret：
+
+   ```yaml title="values.production.yaml"
+   config:
+     smtp:
+       host: smtp.example.com
+       security: starttls
+       username: mailer@example.com
+       from: "OpenRUM <no-reply@example.com>"
+   ```
+
+   ```sh
+   # 读取密码，不回显，也不会进入 shell 历史。
+   read -rs SMTP_PASSWORD; echo
+   # 加入现有的运行时 Secret。用 base64 编码，避免特殊字符出问题。
+   kubectl -n openrum patch secret openrum-runtime --type merge \
+     -p "{\"data\":{\"SMTP_PASSWORD\":\"$(printf %s "$SMTP_PASSWORD" | base64 | tr -d '\n')\"}}"
+   # 应用 values，再重启，让 Secret 的变更生效。
+   helm upgrade openrum oci://ghcr.io/open-rum/charts/openrum \
+     --version 0.1.1 --namespace openrum \
+     --values values.production.yaml --wait
+   kubectl -n openrum rollout restart deployment -l app.kubernetes.io/instance=openrum
+   ```
+
+   使用 Docker Compose 时，在 `deploy/compose/.env.production` 里设置 `SMTP_*`，然后运行 `docker compose --env-file deploy/compose/.env.production -f deploy/compose/production.compose.yml up -d`。
+
+   **完成标志：** 控制台页面显示服务器及其来源：**部署环境**或**控制台托管**。
+
+1. ## 发送测试邮件
+
+   选择 **发送测试邮件**。邮件会发送到你当前登录账号的邮箱地址，不能指定其他收件人，并且按钮限制为每五秒一封。
+
+   **完成标志：** 页面提示邮件已发出，并且你的收件箱收到了它。没收到时请检查垃圾邮件箱。
+
+</Steps>
+
+## 失败时怎么排查
+
+保存或测试失败时，页面会指出停在哪个阶段，并显示服务器自己的回复。错误信息里不会出现密码。
+
+| 阶段 | 含义 | 检查什么 |
+| --- | --- | --- |
+| `connect` | 连不上服务器 | 主机名、端口、DNS、防火墙和出站规则 |
+| `tls` | 加密连接失败 | 加密方式与端口是否匹配（465 用 `tls`，587 用 `starttls`），以及服务器证书是否可信 |
+| `auth` | 服务器拒绝登录 | 用户名，以及服务商是否要求 SMTP 专用密码或应用专用密码 |
+| `sender` | 发件人地址被拒绝 | 发件人是否是该账号已验证的地址或域名 |
+| `recipient` | 收件人被拒绝 | 地址是否存在，以及服务商是否允许发送给它 |
+| `send` | 邮件被拒绝或中断 | 服务商的发送额度限制，以及服务器的回复 |
+
+<Aside type="note" title="控制台无法保存时">
+  只有启用了加密凭据，控制台才能保存服务器。如果**邮件服务**页面提示尚未启用托管，请按[控制台认证](/zh/docs/self-hosting/authentication/)启用，或者改为在部署里配置服务器。
+</Aside>

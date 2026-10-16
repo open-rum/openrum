@@ -1,11 +1,13 @@
 ---
-import { ArrowRight, Github, Plus } from "lucide-astro";
+import { ArrowRight, Github, Languages, Plus } from "lucide-astro";
 import BrandMark from "../BrandMark.astro";
 import BrandWordmark from "../BrandWordmark.astro";
+import GitHubMark from "../GitHubMark.astro";
 import PublicLayout from "../../layouts/PublicLayout.astro";
 import ProductMock from "./ProductMock.astro";
 import PaletteMenu from "../PaletteMenu.astro";
 import { docsBase, equivalentPath } from "../../lib/site";
+import { MIN_STARS_SHOWN, formatStars, githubStars } from "../../lib/githubStars";
 import "../../styles/landing.css";
 
 const { lang = "en" } = Astro.props;
@@ -19,12 +21,19 @@ const quickstart = `${docs}/self-hosting/overview/`;
 const contributing = `${docs}/contributing/`;
 const benchmark = `${repository}/blob/main/docs/benchmarks/local-capacity-2026-09-18.md`;
 const otherLanguage = equivalentPath(Astro.url.pathname, zh ? "zh" : "en");
+const languages = [
+  { code: "en", label: "English", href: zh ? otherLanguage : Astro.url.pathname, lang: "en" },
+  { code: "zh", label: "简体中文", href: zh ? Astro.url.pathname : otherLanguage, lang: "zh-CN" },
+];
+// Shown only once the count is worth showing; a failed lookup shows none.
+const stars = await githubStars(repository);
+const starLabel = stars !== undefined && stars >= MIN_STARS_SHOWN ? formatStars(stars) : undefined;
 
 const copy = zh
   ? {
       title: "OpenRUM · 开源、可自托管的前端监控平台",
       description: "开源、可自托管的前端监控平台：错误、性能、会话与用户行为。",
-      nav: { docs: "文档", start: "开始部署", language: "English" },
+      nav: { docs: "文档", start: "开始部署", language: "语言", github: "GitHub 仓库" },
       pill: "Alpha",
       shiny: "AI 即将支持",
       heroTitle: "看清每一次真实访问",
@@ -94,7 +103,12 @@ const copy = zh
       title: "OpenRUM · Open-source, self-hostable frontend monitoring",
       description:
         "Open-source, self-hostable frontend monitoring: errors, performance, sessions and user behavior.",
-      nav: { docs: "Docs", start: "Get started", language: "简体中文" },
+      nav: {
+        docs: "Docs",
+        start: "Get started",
+        language: "Language",
+        github: "GitHub repository",
+      },
       pill: "Alpha",
       shiny: "AI-powered, coming soon",
       heroTitle: "See every real visit.",
@@ -190,14 +204,42 @@ const copy = zh
         <a class="lp-brand" href={home} aria-label="OpenRUM"><BrandMark /><BrandWordmark /></a>
         <div class="lp-nav-links">
           <a href={`${docs}/`}>{copy.nav.docs}</a>
-          <a class="lp-nav-github" href={repository}
-            ><Github size={16} aria-hidden="true" /><span>GitHub</span></a
+          <a
+            class="lp-nav-github"
+            href={repository}
+            aria-label={starLabel ? `${copy.nav.github}, ${starLabel} stars` : copy.nav.github}
+            title={copy.nav.github}
           >
-          <a href={otherLanguage} lang={zh ? "en" : "zh-CN"}>{copy.nav.language}</a>
+            <GitHubMark size={22} />
+            {starLabel ? <span class="lp-nav-stars">{starLabel}</span> : null}
+          </a>
+          <div class="lp-lang">
+            <button
+              type="button"
+              class="lp-lang-trigger"
+              aria-label={copy.nav.language}
+              aria-haspopup="menu"
+              title={copy.nav.language}
+            >
+              <Languages size={18} aria-hidden="true" />
+            </button>
+            <div class="lp-lang-menu" role="menu" aria-label={copy.nav.language}>
+              {
+                languages.map((language) => (
+                  <a
+                    role="menuitem"
+                    href={language.href}
+                    lang={language.lang}
+                    hreflang={language.lang}
+                    aria-current={language.code === lang ? "true" : undefined}
+                  >
+                    {language.label}
+                  </a>
+                ))
+              }
+            </div>
+          </div>
           <PaletteMenu lang={lang} />
-          <a class="lp-button lp-button-primary lp-button-small" href={quickstart}
-            >{copy.nav.start}</a
-          >
         </div>
       </nav>
     </header>

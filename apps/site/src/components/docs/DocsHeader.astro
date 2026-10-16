@@ -71,29 +71,23 @@ const tabs = topics(route.sidebar);
   .docs-tabs::-webkit-scrollbar {
     display: none;
   }
+  /* The selected tab takes the theme colour. The ink variant is the theme colour made dark
+     enough to read as text on the page background. */
   .docs-tabs a {
-    position: relative;
     padding: 0.35rem 0;
     color: var(--ds-text-muted);
     text-decoration: none;
     font-size: 0.875rem;
     font-weight: 550;
     white-space: nowrap;
+    transition: color 0.15s;
   }
   .docs-tabs a:hover {
     color: var(--ds-text);
   }
   .docs-tabs a[aria-current] {
-    color: var(--ds-text);
-  }
-  .docs-tabs a[aria-current]::after {
-    content: "";
-    position: absolute;
-    inset-inline: 0;
-    bottom: -0.6rem;
-    height: 2px;
-    border-radius: 2px;
-    background: var(--ds-primary);
+    color: var(--ds-primary-ink);
+    font-weight: 650;
   }
 
   .docs-header-search {

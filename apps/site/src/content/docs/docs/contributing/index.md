@@ -3,7 +3,7 @@ title: Contributing
 description: How to propose, validate, review and ship changes to OpenRUM.
 ---
 
-Contributions can be bug reports, documentation, tests or code. The best starting point is a specific problem and a small, verifiable change. This page covers collaboration and review; installation, service startup and commands live in [Local development](/docs/contributing/local-development/).
+Contributions can be bug reports, documentation, tests or code. The best starting point is a specific problem and a small, verifiable change. This page covers collaboration and review; installation, service startup and commands live in [Local development](/docs/getting-started/local-development/).
 
 ## Before you start
 
@@ -19,13 +19,13 @@ For a bug report, include the affected version or commit, environment, minimal r
 - Keep one pull request to one problem. Avoid unrelated refactors, generated-file churn and changes to release versions unless they are necessary to solve it.
 - Update the complete contract when behavior changes: producer and consumer, schema or types, tests, user-facing copy and documentation. Do not make a Console control appear to work when its API or SDK behavior is missing.
 - Add focused tests for new behavior and regressions. New database migrations must be forward-only, ordered and safe against existing data; never edit an applied migration in place. Explain compatibility and rollback limits in the pull request.
-- Preserve privacy and query bounds. Never collect raw form values, passwords, authorization headers or cookies; normalize routes and API URLs before persistence. Test with synthetic or redacted data, not production telemetry.
+- Preserve privacy and query bounds. Never collect raw form values, passwords, authorization headers or cookies; normalize routes and API URLs before persistence. HTTP headers and bodies are captured only for APIs a Project opted in, headers from names that exclude credentials and bodies redacted by key and size-limited, and both expire after three days. Test with synthetic or redacted data, not production telemetry.
 - For UI changes, check keyboard access, visible focus, narrow screens and both themes. Provide before/after screenshots when the appearance changes.
 - Update English and Simplified Chinese public pages at matching paths in the same pull request. Document shipped behavior, use Astro/Starlight components where appropriate and verify links in both languages.
 
 ## Validate before requesting review
 
-Follow [Local development](/docs/contributing/local-development/) for setup, commands and the full validation suite. In the pull request, list the **exact commands and results** you ran; if a relevant check was not run, say why. Choose evidence that matches the change:
+Follow [Local development](/docs/getting-started/local-development/) for setup, commands and the full validation suite. In the pull request, list the **exact commands and results** you ran; if a relevant check was not run, say why. Choose evidence that matches the change:
 
 | Change                          | Expected evidence                                                                                                                      |
 | ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |

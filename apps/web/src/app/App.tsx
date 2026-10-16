@@ -6,7 +6,6 @@ import {
   Gauge,
   ListBullets,
   Pulse,
-  Rocket,
   SidebarSimple,
   Sliders,
   SquaresFour,
@@ -113,7 +112,6 @@ const primaryNavigation = [
     to: "/projects/$projectId/sessions",
     preserveAnalysisContext: true,
   },
-  { label: "发布", icon: Rocket, to: "/projects/$projectId/releases" },
 ] as const;
 
 export function App() {

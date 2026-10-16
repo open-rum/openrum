@@ -1,4 +1,5 @@
 import type { BehaviorAnalyticsResponse } from "@/lib/api/analytics";
+import { formatCompact } from "@/features/analytics/format";
 import { eventLabel } from "@/features/analytics/labels";
 
 export type CatalogEntry = BehaviorAnalyticsResponse["catalog"][number];
@@ -46,4 +47,10 @@ export function shortID(value: string) {
 export function attributePreview(attributes: Record<string, string>, limit = 2) {
   const entries = Object.entries(attributes);
   return { shown: entries.slice(0, limit), hidden: Math.max(0, entries.length - limit) };
+}
+
+/** How far sampling moves the estimate, said only when it is large enough to matter. */
+export function samplingNote(events: number, estimated: number) {
+  if (events === 0 || Math.abs(estimated - events) / events < 0.01) return undefined;
+  return `按采样率还原约 ${formatCompact(estimated)}`;
 }

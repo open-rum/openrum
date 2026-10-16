@@ -163,6 +163,19 @@ func applyScrubRules(candidate *event.CanonicalEvent, rules *processing.Compiled
 		scrub(&candidate.PageURL)
 		scrub(&candidate.PageURLNormalized)
 		scrub(&candidate.APIURLNormalized)
+		// Header values are free text a server controls. They are only kept for
+		// an endpoint a project opted in to, but a project's own patterns apply
+		// to them like to any other stored text.
+		for _, headers := range []map[string]string{candidate.APIRequestHeaders, candidate.APIResponseHeaders} {
+			for name, value := range headers {
+				if scrubbed, valueChanged := rules.String(value); valueChanged {
+					headers[name] = scrubbed
+					changed = true
+				}
+			}
+		}
+		scrub(&candidate.APIRequestBody)
+		scrub(&candidate.APIResponseBody)
 		if attributes, attributesChanged := rules.Attributes(candidate.Attributes); attributesChanged {
 			candidate.Attributes = attributes
 			changed = true

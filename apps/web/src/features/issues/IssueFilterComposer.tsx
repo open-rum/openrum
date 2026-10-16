@@ -46,7 +46,23 @@ export function IssueFilterComposer({
         { label: "最近发生", onSelect: () => onChange({ sort: "last_seen" }) },
         { label: "影响用户", onSelect: () => onChange({ sort: "users" }) },
       ]}
+      searchLabel="错误标题"
       onSearch={(title) => onChange({ title })}
+      onClear={() =>
+        // Only what this input owns: the status select and the quick toggles are separate controls.
+        onChange({
+          title: undefined,
+          errorType: undefined,
+          fingerprint: undefined,
+          userId: undefined,
+          release: undefined,
+          browser: undefined,
+          deviceType: undefined,
+          country: undefined,
+          route: undefined,
+          sort: "events",
+        })
+      }
       onSelect={(key, value) => {
         const selected = String(value);
         if (key === "title") onChange({ title: selected });
@@ -180,20 +196,60 @@ function issueFields(
 }
 
 function issueTokens(filters: IssueFilters): FilterSearchToken[] {
+  // Every condition here holds one value, so each can be edited in place. Fields that offer a
+  // list of values reopen on the full list; the free-text ones start from what is set.
   const tokens: FilterSearchToken[] = [];
-  if (filters.title) tokens.push({ key: "title", label: `错误标题：${filters.title}` });
-  if (filters.errorType) tokens.push({ key: "errorType", label: `错误类型：${filters.errorType}` });
+  if (filters.title)
+    tokens.push({
+      key: "title",
+      fieldKey: "title",
+      value: filters.title,
+      label: `错误标题：${filters.title}`,
+    });
+  if (filters.errorType)
+    tokens.push({
+      key: "errorType",
+      fieldKey: "errorType",
+      label: `错误类型：${filters.errorType}`,
+    });
   if (filters.fingerprint)
-    tokens.push({ key: "fingerprint", label: `Fingerprint：${filters.fingerprint}` });
-  if (filters.userId) tokens.push({ key: "userId", label: `用户 ID：${filters.userId}` });
-  if (filters.release) tokens.push({ key: "release", label: `版本：${filters.release}` });
-  if (filters.browser) tokens.push({ key: "browser", label: `浏览器：${filters.browser}` });
+    tokens.push({
+      key: "fingerprint",
+      fieldKey: "fingerprint",
+      value: filters.fingerprint,
+      label: `Fingerprint：${filters.fingerprint}`,
+    });
+  if (filters.userId)
+    tokens.push({
+      key: "userId",
+      fieldKey: "userId",
+      value: filters.userId,
+      label: `用户 ID：${filters.userId}`,
+    });
+  if (filters.release)
+    tokens.push({ key: "release", fieldKey: "release", label: `版本：${filters.release}` });
+  if (filters.browser)
+    tokens.push({ key: "browser", fieldKey: "browser", label: `浏览器：${filters.browser}` });
   if (filters.deviceType)
-    tokens.push({ key: "deviceType", label: `设备：${deviceLabel(filters.deviceType)}` });
+    tokens.push({
+      key: "deviceType",
+      fieldKey: "deviceType",
+      label: `设备：${deviceLabel(filters.deviceType)}`,
+    });
   if (filters.country)
-    tokens.push({ key: "country", label: `国家：${countryLabel(filters.country)}` });
-  if (filters.route) tokens.push({ key: "route", label: `Route：${filters.route}` });
+    tokens.push({
+      key: "country",
+      fieldKey: "country",
+      label: `国家：${countryLabel(filters.country)}`,
+    });
+  if (filters.route)
+    tokens.push({
+      key: "route",
+      fieldKey: "route",
+      value: filters.route,
+      label: `Route：${filters.route}`,
+    });
   if (filters.sort !== "events")
-    tokens.push({ key: "sort", label: `排序：${sortLabels[filters.sort]}` });
+    tokens.push({ key: "sort", fieldKey: "sort", label: `排序：${sortLabels[filters.sort]}` });
   return tokens;
 }

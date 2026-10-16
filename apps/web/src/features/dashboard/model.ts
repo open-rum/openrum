@@ -65,18 +65,8 @@ export const dimensionLabels: Record<string, string> = {
   browser: "浏览器",
   source: "来源",
 };
-export const catalogDimensionLabels: Record<string, string> = {
-  route: "页面路由",
-  release: "版本",
-  country: "国家/地区",
-  browser: "浏览器",
-  device: "设备类型",
-  api: "API",
-  apiMethod: "请求方法",
-  errorType: "错误类型",
-  source: "来源",
-  eventName: "事件名称",
-};
+export { catalogDimensionLabels } from "@/features/filters/dimensionLabels";
+import { catalogDimensionLabels } from "@/features/filters/dimensionLabels";
 export const eventKindLabels: Record<string, string> = {
   page_view: "页面浏览",
   navigation: "路由导航",

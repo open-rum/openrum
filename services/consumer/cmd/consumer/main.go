@@ -59,6 +59,9 @@ func registerRoutes(ctx context.Context, _ *httpx.Router, configuration config.C
 	processingRules := consumerservice.NewCachedProcessingSettingsProvider(
 		metadata.NewProjectProcessingRepository(metadataDatabase), 30*time.Second,
 	)
+	apiCapture := consumerservice.NewCachedAPICaptureSettingsProvider(
+		metadata.NewProjectCaptureRepository(metadataDatabase), 30*time.Second,
+	)
 	deadLetters := consumerservice.NewKafkaDeadLetterSink(configuration.KafkaBrokers, configuration.KafkaEventTopic+".dlq")
 	workerCtx, cancelWorkers := context.WithCancel(ctx)
 	// More workers can fill shared ClickHouse batches across Kafka partitions.
@@ -71,7 +74,8 @@ func registerRoutes(ctx context.Context, _ *httpx.Router, configuration config.C
 		consumer := consumerservice.NewConsumer(source, writer, deadLetters,
 			consumerservice.WithMetrics(metrics), consumerservice.WithRetentionPolicies(retentionPolicies),
 			consumerservice.WithInboundFilters(inboundFilters),
-			consumerservice.WithProcessingRules(processingRules))
+			consumerservice.WithProcessingRules(processingRules),
+			consumerservice.WithAPICapture(apiCapture))
 		consumers = append(consumers, consumer)
 		workers.Add(1)
 		go func() {
