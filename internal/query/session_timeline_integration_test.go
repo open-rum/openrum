@@ -21,7 +21,8 @@ func TestSessionTimelineConnectsBehaviorAPIAndErrorEvidence(t *testing.T) {
 		t.Fatal(err)
 	}
 	projectID, sessionID := uuid.New(), uuid.New()
-	from := time.Date(2026, 10, 5, 8, 0, 0, 0, time.UTC)
+	// Raw events expire after 14 days, so the fixture is dated relative to now.
+	from := time.Now().UTC().Truncate(time.Hour).Add(-48 * time.Hour)
 	_, err := database.ExecContext(ctx, `INSERT INTO rum_events
 		(project_id,event_id,event_type,timestamp,received_at,environment,session_id,anonymous_user_id,page_id,
 		page_url_normalized,route,navigation_type,sample_rate,custom_name,attributes,api_method,api_url_normalized,
@@ -64,7 +65,8 @@ func TestSessionTimelinePagesMoreThanTwoHundredEventsWithoutDuplicates(t *testin
 		t.Fatal(err)
 	}
 	projectID, sessionID := uuid.New(), uuid.New()
-	from := time.Date(2026, 10, 6, 8, 0, 0, 0, time.UTC)
+	// Raw events expire after 14 days, so the fixture is dated relative to now.
+	from := time.Now().UTC().Truncate(time.Hour).Add(-24 * time.Hour)
 	for index := range 205 {
 		// Repeated timestamps prove the (timestamp,event_id) cursor does not skip
 		// or duplicate events that share the same clock value.

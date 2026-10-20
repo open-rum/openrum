@@ -21,13 +21,18 @@ func TestBoundedPathsAndWeeklyRetentionReconcileKnownFixtures(t *testing.T) {
 		t.Fatal(err)
 	}
 	pathProject := uuid.New()
-	base := time.Date(2026, 10, 5, 8, 0, 0, 0, time.UTC)
+	// Weekly retention is bucketed from a Monday. The fixture is dated relative to now, three
+	// weeks back, and keeps its raw events for a year: the default 14-day expiry would delete
+	// the oldest week before the query runs.
+	now := time.Now().UTC()
+	base := time.Date(now.Year(), now.Month(), now.Day(), 8, 0, 0, 0, time.UTC).AddDate(0, 0, -int((now.Weekday()+6)%7)-21)
+	keepUntil := now.AddDate(1, 0, 0)
 	insertBehaviorFixture := func(projectID, sessionID uuid.UUID, user string, at time.Time, eventType, route, customName string) {
 		_, err := database.ExecContext(ctx, `INSERT INTO rum_events
-			(project_id,event_id,event_type,timestamp,received_at,environment,session_id,anonymous_user_id,page_id,
+			(project_id,event_id,event_type,timestamp,received_at,raw_expires_at,environment,session_id,anonymous_user_id,page_id,
 			page_url_normalized,route,navigation_type,sample_rate,custom_name,attributes,ingest_flags)
-			VALUES (?,?,?,?,?,'production',?,?,?, ?,?,'navigate',1,?,map(),[])`,
-			projectID, uuid.New(), eventType, at, at, sessionID, user, uuid.New(), route, route, customName)
+			VALUES (?,?,?,?,?,?,'production',?,?,?, ?,?,'navigate',1,?,map(),[])`,
+			projectID, uuid.New(), eventType, at, at, keepUntil, sessionID, user, uuid.New(), route, route, customName)
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -179,7 +179,7 @@ func TestRejectedRecipientFailsRecipientStage(t *testing.T) {
 }
 
 func TestConnectionRefusedFailsConnectStage(t *testing.T) {
-	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	listener, err := (&net.ListenConfig{}).Listen(context.Background(), "tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -233,7 +233,7 @@ func (server *fakeServer) received() delivery {
 
 func startServer(t *testing.T, options serverOptions) *fakeServer {
 	t.Helper()
-	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	listener, err := (&net.ListenConfig{}).Listen(context.Background(), "tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -284,7 +284,7 @@ func (server *fakeServer) serve(connection net.Conn) {
 		case command == "STARTTLS":
 			write("220 ready\n")
 			secure := tls.Server(connection, server.config)
-			if err := secure.Handshake(); err != nil {
+			if err := secure.HandshakeContext(context.Background()); err != nil {
 				return
 			}
 			connection = secure
