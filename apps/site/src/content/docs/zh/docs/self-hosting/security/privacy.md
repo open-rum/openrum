@@ -28,6 +28,18 @@ Browser SDK 默认排除 query、body、header、Cookie 与输入框原始值。
 
 管理 API 不会回传 Secret。环境托管凭证只读；可选托管值使用外部主密钥做信封加密。审计记录包含 Request ID 与不含 body 的摘要。
 
+## 头像与第三方请求
+
+除了一处例外，Console 的所有资源都从你自己的 Instance 加载：这个例外是人们可以在 **Account** 里选择的生成头像。显示这类头像时，查看者的浏览器会请求公共服务 [DiceBear](https://www.dicebear.com/) 的 `https://api.dicebear.com`，因此 DiceBear 能看到查看者的 IP 地址和头像的随机种子。种子不是由姓名或邮箱派生的，请求也不带 Referer，所以不会泄露你的 Instance 地址。所用风格的许可证均为 CC0。
+
+- 除此之外不会发送关于这个人的任何信息；保持默认首字母，或上传图片的人，不会引起对 DiceBear 的请求。
+- DiceBear 的公共 API 对非商业用途免费，并要求商用者自建。OpenRUM 目前还不能指向你自建的实例，所以不允许任何第三方请求、或用于商业场景的 Instance，应让大家使用首字母或上传图片。
+- 上传需要[对象存储](/zh/docs/self-hosting/object-storage/)。图片在浏览器里裁成 256 像素的 PNG，由 API 检查并重新编码后存入私有 Bucket。只有本人和与其同属一个 Organization 的成员可以通过 API 读取。如果 Bucket 禁止删除，被替换的图片会留在 Bucket 里，但 Console 已无法访问。
+
+## 自助注册的账号
+
+Instance Owner 打开[开放注册](/zh/docs/product/members-and-accounts/#开放注册)后，邮箱注册会保存姓名、邮箱和加盐的 Argon2id 密码哈希。确认链接只保存哈希，链接一直没有被打开时，账号和链接会在 7 天后删除。确认邮件只通过你配置的 SMTP 服务器发出，不会经过其他地方。通过外部登录注册、被要求填写邮箱的人自己输入邮箱，OpenRUM 不验证它。注册页从不显示某个邮箱是否已注册。
+
 ## 对外暴露前
 
 - 阅读[威胁模型](/zh/docs/self-hosting/security/threat-model/)

@@ -52,7 +52,7 @@ func TestBootstrapCreatesAuthenticatedSession(t *testing.T) {
 	router.Handle("GET /api/v1/auth/me", httpx.RequireSession(sessions)(http.HandlerFunc(authHandler.Me)))
 
 	request := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/api/v1/setup/bootstrap", strings.NewReader(
-		`{"email":"bootstrap@example.com","displayName":"Bootstrap Owner","password":"a-production-password","organizationName":"Bootstrap Team"}`,
+		`{"email":"bootstrap@example.com","displayName":"Bootstrap Owner","password":"A-production-password","organizationName":"Bootstrap Team"}`,
 	))
 	request.Header.Set("Content-Type", "application/json")
 	request.Header.Set("X-OpenRUM-Bootstrap-Token", "bootstrap-secret")

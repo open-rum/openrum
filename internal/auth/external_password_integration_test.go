@@ -45,7 +45,7 @@ func TestApprovedExternalAccountSetsIndependentPasswordAfterFreshLogin(t *testin
 	if _, err := database.ExecContext(ctx, "UPDATE sessions SET created_at=now()-interval '6 minutes' WHERE id=$1", oldPrincipal.SessionID); err != nil {
 		t.Fatal(err)
 	}
-	if err := sessions.SetInitialPassword(ctx, oldPrincipal, "a-secure-new-password"); !errors.Is(err, ErrReauthenticationRequired) {
+	if err := sessions.SetInitialPassword(ctx, oldPrincipal, "A-secure-new-password"); !errors.Is(err, ErrReauthenticationRequired) {
 		t.Fatalf("stale session enrolled password: %v", err)
 	}
 	fresh, err := sessions.Create(ctx, userID, "127.0.0.1", "test")
@@ -56,7 +56,7 @@ func TestApprovedExternalAccountSetsIndependentPasswordAfterFreshLogin(t *testin
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := sessions.SetInitialPassword(ctx, freshPrincipal, "a-secure-new-password"); err != nil {
+	if err := sessions.SetInitialPassword(ctx, freshPrincipal, "A-secure-new-password"); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := sessions.Authenticate(ctx, old.Token); !errors.Is(err, ErrUnauthenticated) {
@@ -66,7 +66,7 @@ func TestApprovedExternalAccountSetsIndependentPasswordAfterFreshLogin(t *testin
 	if err != nil {
 		t.Fatal(err)
 	}
-	user, err := login.Authenticate(ctx, email, "a-secure-new-password", "127.0.0.1")
+	user, err := login.Authenticate(ctx, email, "A-secure-new-password", "127.0.0.1")
 	if err != nil || user.ID != userID {
 		t.Fatalf("OpenRUM password login user=%+v err=%v", user, err)
 	}

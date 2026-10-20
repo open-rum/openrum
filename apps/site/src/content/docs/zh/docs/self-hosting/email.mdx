@@ -6,7 +6,7 @@ appliesTo: Alpha
 
 import { Aside, Steps } from "@astrojs/starlight/components";
 
-一个实例通过一台 SMTP 服务器发送邮件。配置一次，所有需要发邮件的功能都会使用它。目前控制台用它发送测试邮件；以后通过邮件发送告警或邀请的功能，也会使用同一台服务器。不配置时，其他功能不受影响。
+一个实例通过一台 SMTP 服务器发送邮件。配置一次，所有需要发邮件的功能都会使用它。目前控制台用它发送测试邮件、[邀请邮件](/zh/docs/product/members-and-accounts/)，以及在[开放注册](/zh/docs/product/members-and-accounts/#开放注册)打开时发送确认新账号邮箱的链接；以后通过邮件发送告警的功能，也会使用同一台服务器。不配置时，其他功能不受影响，只是邮箱注册不可用。
 
 ## 选择在哪里配置
 

@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CheckIcon, EyeOffIcon, RotateCcwIcon, UserRoundIcon } from "lucide-react";
 import { toast } from "sonner";
+import { MemberLabel } from "@/components/account/MemberLabel";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -89,7 +90,7 @@ export function IssueBulkBar({
             <SelectItem value="none">未分配</SelectItem>
             {members.data?.members.map((member) => (
               <SelectItem key={member.userId} value={member.userId}>
-                {member.displayName || member.email}
+                <MemberLabel member={member} />
               </SelectItem>
             ))}
           </SelectGroup>

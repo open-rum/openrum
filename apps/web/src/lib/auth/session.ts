@@ -7,6 +7,10 @@ export type SessionUser = {
   instanceRole?: "instance_owner" | "instance_admin";
   accessStatus?: "approved" | "pending";
   hasPassword?: boolean;
+  /** Organizations this account has asked to join and not yet heard back from. */
+  pendingOrganizations?: string[];
+  /** Profile picture reference, see lib/avatar.ts. Absent when none was chosen. */
+  avatar?: string;
 };
 
 export type SetupStatus = { initialized: boolean };

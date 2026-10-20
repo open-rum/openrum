@@ -188,6 +188,17 @@ func (storage *S3Storage) Head(ctx context.Context, key string) (ObjectInfo, err
 	return ObjectInfo{SizeBytes: aws.ToInt64(result.ContentLength), SHA256: strings.ToLower(result.Metadata["sha256"])}, nil
 }
 
+func (storage *S3Storage) Put(ctx context.Context, key, contentType string, body []byte) error {
+	_, err := storage.client.PutObject(ctx, &s3.PutObjectInput{
+		Bucket: aws.String(storage.bucket), Key: aws.String(key), Body: bytes.NewReader(body),
+		ContentLength: aws.Int64(int64(len(body))), ContentType: &contentType,
+	})
+	if err != nil {
+		return fmt.Errorf("put S3 object: %w", err)
+	}
+	return nil
+}
+
 func (storage *S3Storage) Delete(ctx context.Context, key string) error {
 	_, err := storage.client.DeleteObject(ctx, &s3.DeleteObjectInput{Bucket: aws.String(storage.bucket), Key: aws.String(key)})
 	if err != nil {

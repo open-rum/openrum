@@ -14,11 +14,11 @@ import (
 )
 
 func TestPasswordHashAndVerify(t *testing.T) {
-	hash, err := HashPassword("a-secure-password")
+	hash, err := HashPassword("A-secure-password")
 	if err != nil {
 		t.Fatal(err)
 	}
-	valid, err := VerifyPassword("a-secure-password", hash)
+	valid, err := VerifyPassword("A-secure-password", hash)
 	if err != nil || !valid {
 		t.Fatalf("valid=%v err=%v", valid, err)
 	}
@@ -116,7 +116,7 @@ func TestLoginManagerValidInvalidAndRateLimited(t *testing.T) {
 		_, _ = database.ExecContext(context.WithoutCancel(ctx), "TRUNCATE audit_logs, sessions, project_keys, projects, organization_members, organizations, users CASCADE")
 	}()
 
-	passwordHash, err := HashPassword("a-secure-password")
+	passwordHash, err := HashPassword("A-secure-password")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -134,7 +134,7 @@ func TestLoginManagerValidInvalidAndRateLimited(t *testing.T) {
 	if _, err := manager.Authenticate(ctx, "owner@example.com", "wrong-password", "127.0.0.1"); !errors.Is(err, ErrInvalidCredentials) {
 		t.Fatalf("invalid login error = %v", err)
 	}
-	user, err := manager.Authenticate(ctx, " OWNER@example.com ", "a-secure-password", "127.0.0.1")
+	user, err := manager.Authenticate(ctx, " OWNER@example.com ", "A-secure-password", "127.0.0.1")
 	if err != nil || user.ID != userID {
 		t.Fatalf("user=%+v err=%v", user, err)
 	}

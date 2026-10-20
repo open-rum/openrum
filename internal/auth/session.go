@@ -40,6 +40,8 @@ type Principal struct {
 	InstanceRole string
 	AccessStatus string
 	HasPassword  bool
+	// Avatar is the profile picture reference ("" when none), see internal/avatar.
+	Avatar string
 }
 
 type SessionManager struct {
@@ -96,7 +98,7 @@ func (manager *SessionManager) Authenticate(ctx context.Context, token string) (
 	var principal Principal
 	err := manager.database.QueryRowContext(ctx,
 		`SELECT sessions.id, users.id, users.email, users.display_name, COALESCE(instance_members.role, ''),
-		        users.access_status, users.password_hash IS NOT NULL
+		        users.access_status, users.password_hash IS NOT NULL, COALESCE(users.avatar, '')
 		 FROM sessions JOIN users ON users.id = sessions.user_id
 		 LEFT JOIN instance_members ON instance_members.user_id = users.id
 		 WHERE sessions.token_hash=$1 AND sessions.revoked_at IS NULL
@@ -104,7 +106,7 @@ func (manager *SessionManager) Authenticate(ctx context.Context, token string) (
 		   AND users.status='active'`,
 		tokenHash[:],
 	).Scan(&principal.SessionID, &principal.UserID, &principal.Email, &principal.DisplayName, &principal.InstanceRole,
-		&principal.AccessStatus, &principal.HasPassword)
+		&principal.AccessStatus, &principal.HasPassword, &principal.Avatar)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Principal{}, ErrUnauthenticated
 	}

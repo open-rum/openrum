@@ -116,6 +116,8 @@ func writeControlPlaneError(writer http.ResponseWriter, request *http.Request, l
 		httpx.WriteError(writer, request, http.StatusNotFound, "NOT_FOUND", "Resource not found.")
 	case errors.Is(err, metadata.ErrForbidden):
 		httpx.WriteError(writer, request, http.StatusForbidden, "FORBIDDEN", "You do not have permission to perform this action.")
+	case errors.Is(err, metadata.ErrInvitationLimit):
+		httpx.WriteError(writer, request, http.StatusConflict, "INVITATION_LIMIT", "This organization has too many open invitations or pending requests.")
 	case errors.Is(err, metadata.ErrConflict):
 		httpx.WriteError(writer, request, http.StatusConflict, "CONFLICT", "A resource with these values already exists.")
 	case errors.Is(err, metadata.ErrProjectMustBeDisabled):

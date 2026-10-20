@@ -62,3 +62,40 @@ func TestIsAvailabilityErrorSeparatesObjectAnswers(t *testing.T) {
 		}
 	}
 }
+
+type writableStorage struct {
+	memoryStorage
+	putErr error
+	key    string
+	kind   string
+	body   []byte
+}
+
+func (storage *writableStorage) Put(_ context.Context, key, contentType string, body []byte) error {
+	storage.key, storage.kind, storage.body = key, contentType, body
+	return storage.putErr
+}
+
+func TestSwitchableStoragePutDelegatesToABackendThatCanWrite(t *testing.T) {
+	backend := &writableStorage{}
+	router := NewSwitchableStorage(backend, nil)
+	if err := router.Put(context.Background(), "k", "image/png", []byte("x")); err != nil {
+		t.Fatal(err)
+	}
+	if backend.key != "k" || backend.kind != "image/png" || string(backend.body) != "x" {
+		t.Fatalf("backend=%+v", backend)
+	}
+	backend.putErr = errors.New("dial tcp: connection refused")
+	if err := router.Put(context.Background(), "k", "image/png", nil); err == nil || router.State() != StorageUnavailable {
+		t.Fatalf("a failed write must mark storage unavailable: err=%v state=%s", err, router.State())
+	}
+}
+
+func TestSwitchableStoragePutRefusesWithoutAWritableBackend(t *testing.T) {
+	if err := NewSwitchableStorage(nil, nil).Put(context.Background(), "k", "image/png", nil); !errors.Is(err, ErrInvalidStorage) {
+		t.Fatalf("no backend: err=%v", err)
+	}
+	if err := NewSwitchableStorage(&memoryStorage{}, nil).Put(context.Background(), "k", "image/png", nil); !errors.Is(err, ErrInvalidStorage) {
+		t.Fatalf("a backend that cannot write: err=%v", err)
+	}
+}

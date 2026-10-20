@@ -1,9 +1,13 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { Key, Plus, Trash, UsersThree } from "@phosphor-icons/react";
+import { Key, Plus, Trash, UserPlus, UsersThree } from "@phosphor-icons/react";
 import { ConsolePage, ConsolePageHeader } from "@/components/layout/ConsolePage";
 import { Button } from "@/components/ui/button";
+import { UserAvatar } from "@/components/account/UserAvatar";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { InviteDialog } from "@/features/invitations/InviteDialog";
+import { invitationsQueryKey, listInvitations, listJoinRequests } from "@/lib/api/invitations";
 import {
   Select,
   SelectContent,
@@ -22,13 +26,8 @@ import {
   type OrganizationRole,
 } from "@/lib/api/projects";
 import { sessionQueryOptions } from "@/lib/auth/session";
-
-const roleLabels: Record<OrganizationRole, string> = {
-  owner: "Owner",
-  admin: "Admin",
-  member: "Member",
-  viewer: "Viewer",
-};
+import { InvitationsPanel, JoinRequestsPanel } from "./MemberInvitations";
+import { roleLabels } from "./roleLabels";
 
 export function MembersPage() {
   const queryClient = useQueryClient();
@@ -53,6 +52,20 @@ export function MembersPage() {
     enabled: Boolean(activeOrganizationId),
   });
   const canManage = organization ? canManageMembers(organization.role) : false;
+  const [inviting, setInviting] = useState(false);
+  // Only managers may see these, and the API refuses anyone else.
+  const requestsQuery = useQuery({
+    queryKey: ["organization-join-requests", activeOrganizationId],
+    queryFn: ({ signal }) => listJoinRequests(activeOrganizationId, signal),
+    enabled: Boolean(activeOrganizationId) && canManage,
+  });
+  const invitationsQuery = useQuery({
+    queryKey: invitationsQueryKey(activeOrganizationId),
+    queryFn: ({ signal }) => listInvitations(activeOrganizationId, signal),
+    enabled: Boolean(activeOrganizationId) && canManage,
+  });
+  const pendingRequests = requestsQuery.data?.requests ?? [];
+  const openInvitations = invitationsQuery.data?.invitations ?? [];
   const refreshMembers = () =>
     queryClient.invalidateQueries({ queryKey: ["organization-members", activeOrganizationId] });
   const addMutation = useMutation({
@@ -78,30 +91,40 @@ export function MembersPage() {
         title="成员与权限"
         description="角色权限在服务端逐 API 校验；组织始终必须保留至少一名 Owner。"
         actions={
-          <div className="text-sm font-medium text-foreground">
-            <label htmlFor="members-organization">组织</label>
-            <Select
-              value={activeOrganizationId}
-              onValueChange={(value) => {
-                setOrganizationId(value);
-                setInviteRole("member");
-              }}
-              disabled={!organizations.length}
-            >
-              <SelectTrigger id="members-organization" className="mt-2 min-w-64">
-                <SelectValue placeholder="选择组织" />
-              </SelectTrigger>
-              <SelectContent>
-                {organizations.map((item) => (
-                  <SelectItem key={item.id} value={item.id}>
-                    {item.name} · {roleLabels[item.role]}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="flex items-end gap-3">
+            {canManage && organization ? (
+              <Button type="button" className="h-10" onClick={() => setInviting(true)}>
+                <UserPlus weight="bold" /> 邀请成员
+              </Button>
+            ) : null}
+            <div className="text-sm font-medium text-foreground">
+              <label htmlFor="members-organization">组织</label>
+              <Select
+                value={activeOrganizationId}
+                onValueChange={(value) => {
+                  setOrganizationId(value);
+                  setInviteRole("member");
+                }}
+                disabled={!organizations.length}
+              >
+                <SelectTrigger id="members-organization" className="mt-2 min-w-64">
+                  <SelectValue placeholder="选择组织" />
+                </SelectTrigger>
+                <SelectContent>
+                  {organizations.map((item) => (
+                    <SelectItem key={item.id} value={item.id}>
+                      {item.name} · {roleLabels[item.role]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         }
       />
+      {canManage && organization ? (
+        <InviteDialog organization={organization} open={inviting} onOpenChange={setInviting} />
+      ) : null}
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
         <div>
@@ -167,110 +190,180 @@ export function MembersPage() {
             </p>
           ) : null}
 
-          <div className="border border-border bg-card">
-            <table className="w-full border-collapse text-left text-sm">
-              <thead className="hidden bg-muted/60 text-xs font-semibold tracking-wide text-muted-foreground uppercase sm:table-header-group">
-                <tr>
-                  <th className="px-4 py-3">成员</th>
-                  <th className="px-4 py-3">角色</th>
-                  <th className="px-4 py-3">加入时间</th>
-                  <th className="px-4 py-3 text-right">操作</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {membersQuery.isLoading ? (
-                  <tr>
-                    <td colSpan={4} className="px-4 py-10 text-center text-muted-foreground">
-                      正在加载成员…
-                    </td>
-                  </tr>
-                ) : membersQuery.error ? (
-                  <tr>
-                    <td colSpan={4} className="px-4 py-10 text-center text-destructive">
-                      {membersQuery.error.message}
-                    </td>
-                  </tr>
-                ) : membersQuery.data?.members.length ? (
-                  membersQuery.data.members.map((member) => {
-                    const protectedOwner =
-                      organization?.role !== "owner" && member.role === "owner";
-                    const editable = canManage && !protectedOwner;
-                    return (
-                      <tr
-                        key={member.userId}
-                        className="hover:bg-muted/30 max-sm:grid max-sm:grid-cols-[minmax(0,1fr)_auto] max-sm:gap-y-3 max-sm:p-4"
-                      >
-                        <td className="px-4 py-3 max-sm:col-span-2 max-sm:p-0">
-                          <strong className="block font-medium text-foreground">
-                            {member.displayName}
-                            {member.userId === currentUser.userId ? "（你）" : ""}
-                          </strong>
-                          <span className="mt-1 block text-xs text-muted-foreground">
-                            {member.email}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 max-sm:p-0">
-                          <Select
-                            value={member.role}
-                            disabled={!editable || busy}
-                            onValueChange={(value) =>
-                              roleMutation.mutate({
-                                userId: member.userId,
-                                role: value as OrganizationRole,
-                              })
-                            }
-                          >
-                            <SelectTrigger
-                              size="sm"
-                              className="min-w-28"
-                              aria-label={`修改 ${member.displayName} 的角色`}
-                            >
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {(member.role === "owner" && protectedOwner
-                                ? (["owner"] as OrganizationRole[])
-                                : manageableRoles(organization?.role)
-                              ).map((role) => (
-                                <SelectItem key={role} value={role}>
-                                  {roleLabels[role]}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </td>
-                        <td className="px-4 py-3 text-muted-foreground max-sm:hidden">
-                          {formatDate(member.createdAt)}
-                        </td>
-                        <td className="px-4 py-3 text-right max-sm:p-0">
-                          <Button
-                            type="button"
-                            size="icon-sm"
-                            variant="destructive"
-                            aria-label={`移除 ${member.displayName}`}
-                            disabled={!editable || busy}
-                            onClick={() => {
-                              if (window.confirm(`确认从组织中移除 ${member.displayName}？`)) {
-                                removeMutation.mutate(member.userId);
-                              }
-                            }}
-                          >
-                            <Trash />
-                          </Button>
+          <Tabs defaultValue="members">
+            {canManage ? (
+              <TabsList variant="line" aria-label="成员与邀请" className="mb-4">
+                <TabsTrigger value="members">
+                  成员
+                  {membersQuery.data ? (
+                    <span className="ml-1.5 text-xs text-muted-foreground">
+                      {membersQuery.data.members.length}
+                    </span>
+                  ) : null}
+                </TabsTrigger>
+                <TabsTrigger value="requests">
+                  加入申请
+                  {pendingRequests.length ? (
+                    <span className="ml-1.5 rounded-full bg-primary px-1.5 text-xs text-primary-foreground">
+                      {pendingRequests.length}
+                    </span>
+                  ) : null}
+                </TabsTrigger>
+                <TabsTrigger value="invitations">
+                  邀请链接
+                  {openInvitations.length ? (
+                    <span className="ml-1.5 text-xs text-muted-foreground">
+                      {openInvitations.length}
+                    </span>
+                  ) : null}
+                </TabsTrigger>
+              </TabsList>
+            ) : null}
+            <TabsContent value="members">
+              <div className="border border-border bg-card">
+                <table className="w-full border-collapse text-left text-sm">
+                  <thead className="hidden bg-muted/60 text-xs font-semibold tracking-wide text-muted-foreground uppercase sm:table-header-group">
+                    <tr>
+                      <th className="px-4 py-3">成员</th>
+                      <th className="px-4 py-3">角色</th>
+                      <th className="px-4 py-3">加入时间</th>
+                      <th className="px-4 py-3 text-right">操作</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {membersQuery.isLoading ? (
+                      <tr>
+                        <td colSpan={4} className="px-4 py-10 text-center text-muted-foreground">
+                          正在加载成员…
                         </td>
                       </tr>
-                    );
-                  })
-                ) : (
-                  <tr>
-                    <td colSpan={4} className="px-4 py-10 text-center text-muted-foreground">
-                      <UsersThree className="mx-auto mb-2 size-6" /> 暂无成员
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+                    ) : membersQuery.error ? (
+                      <tr>
+                        <td colSpan={4} className="px-4 py-10 text-center text-destructive">
+                          {membersQuery.error.message}
+                        </td>
+                      </tr>
+                    ) : membersQuery.data?.members.length ? (
+                      membersQuery.data.members.map((member) => {
+                        const protectedOwner =
+                          organization?.role !== "owner" && member.role === "owner";
+                        const editable = canManage && !protectedOwner;
+                        return (
+                          <tr
+                            key={member.userId}
+                            className="hover:bg-muted/30 max-sm:grid max-sm:grid-cols-[minmax(0,1fr)_auto] max-sm:gap-y-3 max-sm:p-4"
+                          >
+                            <td className="px-4 py-3 max-sm:col-span-2 max-sm:p-0">
+                              <div className="flex items-center gap-3">
+                                <UserAvatar
+                                  userId={member.userId}
+                                  name={member.displayName}
+                                  avatar={member.avatar}
+                                />
+                                <div className="min-w-0">
+                                  <strong className="block font-medium text-foreground">
+                                    {member.displayName}
+                                    {member.userId === currentUser.userId ? "（你）" : ""}
+                                  </strong>
+                                  <span className="mt-1 block text-xs text-muted-foreground">
+                                    {member.email}
+                                  </span>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 max-sm:p-0">
+                              <Select
+                                value={member.role}
+                                disabled={!editable || busy}
+                                onValueChange={(value) =>
+                                  roleMutation.mutate({
+                                    userId: member.userId,
+                                    role: value as OrganizationRole,
+                                  })
+                                }
+                              >
+                                <SelectTrigger
+                                  size="sm"
+                                  className="min-w-28"
+                                  aria-label={`修改 ${member.displayName} 的角色`}
+                                >
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {(member.role === "owner" && protectedOwner
+                                    ? (["owner"] as OrganizationRole[])
+                                    : manageableRoles(organization?.role)
+                                  ).map((role) => (
+                                    <SelectItem key={role} value={role}>
+                                      {roleLabels[role]}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </td>
+                            <td className="px-4 py-3 text-muted-foreground max-sm:hidden">
+                              {formatDate(member.createdAt)}
+                            </td>
+                            <td className="px-4 py-3 text-right max-sm:p-0">
+                              <Button
+                                type="button"
+                                size="icon-sm"
+                                variant="destructive"
+                                aria-label={`移除 ${member.displayName}`}
+                                disabled={!editable || busy}
+                                onClick={() => {
+                                  if (window.confirm(`确认从组织中移除 ${member.displayName}？`)) {
+                                    removeMutation.mutate(member.userId);
+                                  }
+                                }}
+                              >
+                                <Trash />
+                              </Button>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    ) : (
+                      <tr>
+                        <td colSpan={4} className="px-4 py-10 text-center text-muted-foreground">
+                          <UsersThree className="mx-auto mb-2 size-6" /> 暂无成员
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </TabsContent>
+            {canManage && organization ? (
+              <>
+                <TabsContent value="requests">
+                  {requestsQuery.error ? (
+                    <p className="text-sm text-destructive" role="alert">
+                      {requestsQuery.error.message}
+                    </p>
+                  ) : (
+                    <JoinRequestsPanel
+                      organizationId={organization.id}
+                      requests={pendingRequests}
+                      roles={manageableRoles(organization.role)}
+                    />
+                  )}
+                </TabsContent>
+                <TabsContent value="invitations">
+                  {invitationsQuery.error ? (
+                    <p className="text-sm text-destructive" role="alert">
+                      {invitationsQuery.error.message}
+                    </p>
+                  ) : (
+                    <InvitationsPanel
+                      organizationId={organization.id}
+                      invitations={openInvitations}
+                    />
+                  )}
+                </TabsContent>
+              </>
+            ) : null}
+          </Tabs>
         </div>
 
         <aside className="space-y-4">

@@ -18,6 +18,22 @@ import { PlannedPage } from "./PlannedPage";
 import { RouteLoading } from "./RouteLoading";
 import { queryClient } from "./queryClient";
 
+const RegisterPage = lazyRouteComponent(
+  () => import("@/features/auth/RegisterPage"),
+  "RegisterPage",
+);
+const VerifyEmailPage = lazyRouteComponent(
+  () => import("@/features/auth/VerifyEmailPage"),
+  "VerifyEmailPage",
+);
+const CompleteRegistrationPage = lazyRouteComponent(
+  () => import("@/features/auth/CompleteRegistrationPage"),
+  "CompleteRegistrationPage",
+);
+const InvitePage = lazyRouteComponent(
+  () => import("@/features/invitations/InvitePage"),
+  "InvitePage",
+);
 const OverviewPage = lazyRouteComponent(
   () => import("@/features/overview/OverviewPage"),
   "OverviewPage",
@@ -209,6 +225,49 @@ const loginRoute = createRoute({
     }
   },
   component: LoginRoutePage,
+});
+
+// Registration pages are for people with no session. Someone already signed in has nothing to
+// register, so they go to the Console; a person with no session stays.
+async function leaveWhenSignedIn(context: { queryClient: QueryClient }) {
+  try {
+    const user = await context.queryClient.fetchQuery(sessionQueryOptions());
+    if (user.accessStatus === "pending") throw redirect({ to: "/awaiting-access", search: {} });
+    throw redirect({ to: "/" });
+  } catch (error) {
+    if (error instanceof HTTPError && error.status === 401) return;
+    throw error;
+  }
+}
+
+const registerRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/register",
+  beforeLoad: async ({ context }) => {
+    const status = await getSetupStatus();
+    if (!status.initialized) throw redirect({ to: "/setup" });
+    await leaveWhenSignedIn(context);
+  },
+  component: RegisterPage,
+});
+
+const completeRegistrationRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/register/complete",
+  beforeLoad: ({ context }) => leaveWhenSignedIn(context),
+  component: CompleteRegistrationPage,
+});
+
+const verifyEmailRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/verify-email/$token",
+  component: VerifyEmailPage,
+});
+
+const inviteRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/invite/$token",
+  component: InvitePage,
 });
 
 const awaitingAccessRoute = createRoute({
@@ -805,6 +864,10 @@ const protectedChildren = plannedRoutes.map(({ path, title, description, icon })
 const routeTree = rootRoute.addChildren([
   setupRoute,
   loginRoute,
+  registerRoute,
+  completeRegistrationRoute,
+  verifyEmailRoute,
+  inviteRoute,
   awaitingAccessRoute,
   protectedRoute.addChildren([
     indexRoute,

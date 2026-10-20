@@ -37,18 +37,7 @@ afterEach(() => {
 });
 afterAll(() => server.close());
 
-it("shows only status and sign-out actions while organization access is pending", async () => {
-  server.use(
-    http.get("/api/v1/auth/me", () =>
-      HttpResponse.json({
-        userId: "pending",
-        email: "new@example.test",
-        displayName: "New user",
-        accessStatus: "pending",
-        hasPassword: false,
-      }),
-    ),
-  );
+function renderAwaiting() {
   const root = createRootRoute();
   const route = createRoute({
     getParentRoute: () => root,
@@ -64,7 +53,7 @@ it("shows only status and sign-out actions while organization access is pending"
       initialEntries: ["/awaiting-access?returnTo=%2Fprojects%2Fexample"],
     }),
   });
-  const view = render(
+  return render(
     <QueryClientProvider
       client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
     >
@@ -73,8 +62,41 @@ it("shows only status and sign-out actions while organization access is pending"
       </ThemeProvider>
     </QueryClientProvider>,
   );
+}
+
+it("shows only status and sign-out actions while organization access is pending", async () => {
+  server.use(
+    http.get("/api/v1/auth/me", () =>
+      HttpResponse.json({
+        userId: "pending",
+        email: "new@example.test",
+        displayName: "New user",
+        accessStatus: "pending",
+        hasPassword: false,
+      }),
+    ),
+  );
+  const view = renderAwaiting();
   expect(await view.findByText(/new@example.test/)).toBeTruthy();
   expect(view.getByRole("button", { name: "检查状态" })).toBeTruthy();
   expect(view.getByRole("button", { name: "退出登录" })).toBeTruthy();
   expect(view.queryByRole("link", { name: "创建组织" })).toBeNull();
+});
+
+it("names the organizations the account has asked to join", async () => {
+  server.use(
+    http.get("/api/v1/auth/me", () =>
+      HttpResponse.json({
+        userId: "invited",
+        email: "nina@example.test",
+        displayName: "Nina",
+        accessStatus: "pending",
+        hasPassword: true,
+        pendingOrganizations: ["Acme", "Globex"],
+      }),
+    ),
+  );
+  const view = renderAwaiting();
+  expect(await view.findByText(/已申请加入「Acme」、「Globex」，等待管理员通过/)).toBeTruthy();
+  expect(view.queryByText(/告知组织管理员/)).toBeNull();
 });

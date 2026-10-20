@@ -83,3 +83,26 @@ func TestS3StorageProbeWarnsWhenDeleteIsForbidden(t *testing.T) {
 		t.Fatalf("delete step=%+v", step)
 	}
 }
+
+func TestS3StoragePutWritesTheObjectWithItsContentType(t *testing.T) {
+	t.Setenv("AWS_ACCESS_KEY_ID", "test-access-key")
+	t.Setenv("AWS_SECRET_ACCESS_KEY", "test-secret")
+	var path, contentType string
+	var body []byte
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		path, contentType = request.URL.Path, request.Header.Get("Content-Type")
+		body, _ = io.ReadAll(request.Body)
+		writer.Header().Set("ETag", `"stored"`)
+	}))
+	defer server.Close()
+	storage, err := NewS3Storage(t.Context(), "us-east-1", server.URL, "openrum-test", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := storage.Put(t.Context(), "users/u/avatar/h.png", "image/png", []byte("pixels")); err != nil {
+		t.Fatal(err)
+	}
+	if path != "/openrum-test/users/u/avatar/h.png" || contentType != "image/png" || string(body) != "pixels" {
+		t.Fatalf("path=%q type=%q body=%q", path, contentType, body)
+	}
+}

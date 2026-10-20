@@ -5,7 +5,7 @@ import { cleanup, render, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
 import { LoginPage } from "./LoginPage";
 
@@ -24,6 +24,11 @@ beforeAll(() => {
     },
   });
   server.listen({ onUnhandledRequest: "error" });
+});
+beforeEach(() => {
+  server.use(
+    http.get("/api/v1/auth/registration", () => HttpResponse.json({ open: false, email: false })),
+  );
 });
 afterEach(() => {
   cleanup();
@@ -114,5 +119,51 @@ describe("login methods", () => {
     cleanup();
     const expired = renderLogin("expired");
     expect(expired.getByText("外部登录已过期，请重新开始。")).toBeTruthy();
+  });
+});
+
+describe("registration", () => {
+  it("links to sign-up only when registration is open", async () => {
+    server.use(
+      http.get("/api/v1/auth/methods", () => HttpResponse.json({ local: true, providers: [] })),
+    );
+    const closed = renderLogin();
+    await closed.findByRole("form", { name: "登录 OpenRUM" });
+    expect(closed.queryByRole("link", { name: "注册" })).toBeNull();
+    cleanup();
+
+    server.use(
+      http.get("/api/v1/auth/registration", () => HttpResponse.json({ open: true, email: true })),
+    );
+    const open = renderLogin();
+    expect((await open.findByRole("link", { name: "注册" })).getAttribute("href")).toBe(
+      "/register",
+    );
+  });
+
+  it("tells an unverified account to confirm its address and can resend the link", async () => {
+    let resent: Record<string, unknown> | undefined;
+    server.use(
+      http.get("/api/v1/auth/methods", () => HttpResponse.json({ local: true, providers: [] })),
+      http.post("/api/v1/auth/login", () =>
+        HttpResponse.json(
+          { error: { code: "EMAIL_NOT_VERIFIED", message: "Confirm your email address first." } },
+          { status: 403 },
+        ),
+      ),
+      http.post("/api/v1/auth/register/resend", async ({ request }) => {
+        resent = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json({ status: "verification_sent" }, { status: 202 });
+      }),
+    );
+    const user = userEvent.setup();
+    const view = renderLogin();
+    await user.type(await view.findByLabelText("邮箱"), "nina@example.com");
+    await user.type(view.getByLabelText("密码"), "Str0ng-pass");
+    await user.click(view.getByRole("button", { name: "登录" }));
+    expect((await view.findByRole("alert")).textContent).toContain("邮箱还没有验证");
+    await user.click(view.getByRole("button", { name: "重新发送验证邮件" }));
+    await waitFor(() => expect(resent).toEqual({ email: "nina@example.com" }));
+    expect(await view.findByText("验证邮件已重新发送，请查收。")).toBeTruthy();
   });
 });

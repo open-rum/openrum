@@ -19,6 +19,7 @@ import { sessionQueryOptions } from "@/lib/auth/session";
 import { cn } from "@/lib/utils";
 import { AdminPageLayout } from "./AdminPageLayout";
 import { ReauthenticationDialog } from "./ReauthenticationDialog";
+import { RegistrationPolicyCard } from "./RegistrationPolicyCard";
 
 type Draft = {
   id: string;
@@ -36,7 +37,7 @@ const providerChoices: Array<{
   description: string;
 }> = [
   { kind: "google", label: "Google", description: "Google 账号与 Workspace" },
-  { kind: "github", label: "GitHub", description: "GitHub 账号与已验证邮箱" },
+  { kind: "github", label: "GitHub", description: "GitHub 账号，没有已验证邮箱时登录后补填" },
   { kind: "ldap", label: "LDAP", description: "企业目录，支持 LDAPS 和 StartTLS" },
   { kind: "oidc", label: "通用 OIDC", description: "连接企业 SSO，可添加多个提供者" },
 ];
@@ -142,6 +143,7 @@ export function AuthenticationPage() {
           </AlertDescription>
         </Alert>
       ) : null}
+      <RegistrationPolicyCard canEdit={session.data?.instanceRole === "instance_owner"} />
       <section
         className="rounded-2xl border border-border bg-card p-5"
         aria-labelledby="provider-choices-title"

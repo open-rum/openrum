@@ -7,8 +7,7 @@ description: 运维用于 Source Map Artifact 的可选 OSS 或 S3 兼容存储�
 
 ## 触发条件与影响
 
-关注供应商 API 错误/延迟、Source Map 上传或 Finalize 失败，以及未解析栈帧增长。对象存储
-故障不影响原始监控事件写入，但新 Release 无法符号化，项目删除清理也可能延迟。
+关注供应商 API 错误/延迟、Source Map 上传或 Finalize 失败，以及未解析栈帧增长。对象存储里存放 Source Map 对象和用户上传的头像（`users/<user-id>/avatar/<hash>.png`，只能通过 API 读取）。对象存储故障不影响原始监控事件写入，但新 Release 无法符号化，也无法上传头像（已有头像在恢复前显示首字母），项目删除清理也可能延迟。
 
 ## 安全处置
 

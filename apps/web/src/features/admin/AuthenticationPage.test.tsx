@@ -38,6 +38,14 @@ function renderPage(managedSecretsAvailable: boolean, providers: AdminAuthProvid
     http.get("/api/v1/admin/authentication", () =>
       HttpResponse.json({ managedSecretsAvailable, providers }),
     ),
+    http.get("/api/v1/admin/registration", () =>
+      HttpResponse.json({
+        open: false,
+        emailEnabled: false,
+        mailConfigured: false,
+        updatedAt: null,
+      }),
+    ),
   );
   return render(
     <QueryClientProvider

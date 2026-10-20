@@ -331,11 +331,11 @@ select {
 .project-hover-card__footer {
   padding-top: 4px;
   display: grid;
-  grid-template-columns: 1fr 1fr;
   gap: 2px;
 }
 .project-hover-card__footer > button {
-  justify-content: center;
+  width: 100%;
+  justify-content: flex-start;
 }
 .sidebar-nav-switcher {
   min-height: 0;

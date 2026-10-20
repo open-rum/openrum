@@ -25,12 +25,19 @@ const (
 var (
 	ErrInvalidCredentials = errors.New("invalid credentials")
 	ErrLoginRateLimited   = errors.New("login rate limited")
+	// ErrEmailNotVerified is returned for the right password on an account whose address has
+	// not been confirmed yet. It is only said after the password matched, so it does not tell
+	// a stranger which addresses are registered.
+	ErrEmailNotVerified = errors.New("email address is not verified")
 )
 
 type AuthenticatedUser struct {
 	ID          uuid.UUID
 	Email       string
 	DisplayName string
+	// AccessStatus is "pending" for an account still waiting for an organization to take
+	// it in. It may sign in, but every route except /auth/me and /auth/logout refuses it.
+	AccessStatus string
 }
 
 type FailureLimiter interface {
@@ -47,7 +54,7 @@ type LoginManager struct {
 }
 
 func NewLoginManager(database *sql.DB, limiter FailureLimiter) (*LoginManager, error) {
-	dummyHash, err := HashPassword("openrum-dummy-password")
+	dummyHash, err := HashPassword("Openrum-dummy-password!")
 	if err != nil {
 		return nil, err
 	}
@@ -67,11 +74,11 @@ func (manager *LoginManager) Authenticate(ctx context.Context, email, password, 
 
 	var user AuthenticatedUser
 	var passwordHash sql.NullString
-	var status, accessStatus string
+	var status string
 	err := manager.database.QueryRowContext(ctx,
 		"SELECT id, email, display_name, password_hash, status, access_status FROM users WHERE email=$1",
 		email,
-	).Scan(&user.ID, &user.Email, &user.DisplayName, &passwordHash, &status, &accessStatus)
+	).Scan(&user.ID, &user.Email, &user.DisplayName, &passwordHash, &status, &user.AccessStatus)
 	if errors.Is(err, sql.ErrNoRows) {
 		_, _ = manager.verifyPassword(password, manager.dummyHash)
 		manager.limiter.Failed(ctx, ipAddress, email)
@@ -89,11 +96,14 @@ func (manager *LoginManager) Authenticate(ctx context.Context, email, password, 
 	if err != nil {
 		return AuthenticatedUser{}, err
 	}
-	if !valid || status != "active" || accessStatus != "approved" {
+	if !valid || status != "active" {
 		manager.limiter.Failed(ctx, ipAddress, email)
 		return AuthenticatedUser{}, ErrInvalidCredentials
 	}
 	manager.limiter.Succeeded(ctx, email)
+	if user.AccessStatus == "unverified" {
+		return AuthenticatedUser{}, ErrEmailNotVerified
+	}
 	return user, nil
 }
 

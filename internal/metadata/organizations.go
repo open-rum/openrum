@@ -28,9 +28,11 @@ type OrganizationMemberView struct {
 	UserID      uuid.UUID
 	Email       string
 	DisplayName string
-	Role        OrganizationRole
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
+	// Avatar is the profile picture reference, "" when none (see internal/avatar).
+	Avatar    string
+	Role      OrganizationRole
+	CreatedAt time.Time
+	UpdatedAt time.Time
 }
 
 type OrganizationRepository struct {
@@ -115,7 +117,7 @@ func (repository *OrganizationRepository) ListMembers(ctx context.Context, actor
 		return nil, err
 	}
 	rows, err := repository.database.QueryContext(ctx,
-		`SELECT users.id, users.email, users.display_name, organization_members.role,
+		`SELECT users.id, users.email, users.display_name, COALESCE(users.avatar, ''), organization_members.role,
 		        organization_members.created_at, organization_members.updated_at
 		 FROM organization_members
 		 JOIN users ON users.id=organization_members.user_id
@@ -128,7 +130,7 @@ func (repository *OrganizationRepository) ListMembers(ctx context.Context, actor
 	members := make([]OrganizationMemberView, 0)
 	for rows.Next() {
 		var member OrganizationMemberView
-		if err := rows.Scan(&member.UserID, &member.Email, &member.DisplayName, &member.Role,
+		if err := rows.Scan(&member.UserID, &member.Email, &member.DisplayName, &member.Avatar, &member.Role,
 			&member.CreatedAt, &member.UpdatedAt); err != nil {
 			return nil, err
 		}
@@ -140,7 +142,7 @@ func (repository *OrganizationRepository) ListMembers(ctx context.Context, actor
 func (repository *OrganizationRepository) GetMember(ctx context.Context, actorID, organizationID, userID uuid.UUID) (OrganizationMemberView, error) {
 	var member OrganizationMemberView
 	err := repository.database.QueryRowContext(ctx,
-		`SELECT target.id, target.email, target.display_name, target_membership.role,
+		`SELECT target.id, target.email, target.display_name, COALESCE(target.avatar, ''), target_membership.role,
 		        target_membership.created_at, target_membership.updated_at
 		 FROM organization_members AS actor_membership
 		 JOIN organization_members AS target_membership
@@ -148,7 +150,7 @@ func (repository *OrganizationRepository) GetMember(ctx context.Context, actorID
 		 JOIN users AS target ON target.id=target_membership.user_id
 		 WHERE actor_membership.organization_id=$1 AND actor_membership.user_id=$2
 		   AND target_membership.user_id=$3`, organizationID, actorID, userID,
-	).Scan(&member.UserID, &member.Email, &member.DisplayName, &member.Role, &member.CreatedAt, &member.UpdatedAt)
+	).Scan(&member.UserID, &member.Email, &member.DisplayName, &member.Avatar, &member.Role, &member.CreatedAt, &member.UpdatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return OrganizationMemberView{}, ErrNotFound
 	}

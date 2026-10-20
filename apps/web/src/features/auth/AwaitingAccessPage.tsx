@@ -14,6 +14,8 @@ export function AwaitingAccessPage() {
     onSuccess: () => window.location.replace("/login"),
   });
 
+  const waiting = session.data?.pendingOrganizations ?? [];
+
   useEffect(() => {
     if (session.data?.accessStatus === "approved")
       window.location.replace(safeReturnTo(search.returnTo));
@@ -27,10 +29,17 @@ export function AwaitingAccessPage() {
         </span>
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">等待组织授权</h1>
-          <p className="mt-2 text-sm leading-6 text-muted-foreground">
-            账号已创建。请将邮箱 {session.data?.email ?? ""}{" "}
-            告知组织管理员，由管理员添加成员后即可进入控制台。
-          </p>
+          {waiting.length ? (
+            <p className="mt-2 text-sm leading-6 text-muted-foreground">
+              已申请加入{waiting.map((name) => `「${name}」`).join("、")}
+              ，等待管理员通过。通过后这个页面会自动进入控制台。
+            </p>
+          ) : (
+            <p className="mt-2 text-sm leading-6 text-muted-foreground">
+              账号已创建。请将邮箱 {session.data?.email ?? ""}{" "}
+              告知组织管理员，由管理员添加成员后即可进入控制台。
+            </p>
+          )}
         </div>
         {session.error ? (
           <p className="text-sm text-destructive" role="alert">

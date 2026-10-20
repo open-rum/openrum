@@ -168,10 +168,14 @@ func ExchangeOAuthIdentity(ctx context.Context, p Provider, redirectURL, code, n
 	if err := idToken.Claims(&claims); err != nil {
 		return ProviderIdentity{}, err
 	}
-	if !claims.EmailVerified || claims.Email == "" {
-		return ProviderIdentity{}, errors.New("verified email is required")
+	// An address the provider has not verified is not trusted as a prefill. A new person is
+	// asked for one (which OpenRUM does not verify for external sign-ups); a returning
+	// person is found by subject and never needs it.
+	email := ""
+	if claims.EmailVerified {
+		email = claims.Email
 	}
-	return ProviderIdentity{Subject: idToken.Subject, Email: claims.Email, Name: claims.Name}, nil
+	return ProviderIdentity{Subject: idToken.Subject, Email: email, Name: claims.Name}, nil
 }
 
 func githubIdentity(ctx context.Context, accessToken string) (ProviderIdentity, error) {
@@ -216,16 +220,17 @@ func githubIdentityAt(ctx context.Context, accessToken, baseURL string) (Provide
 	if err := call("/user/emails", &emails); err != nil {
 		return ProviderIdentity{}, err
 	}
+	name := user.Name
+	if name == "" {
+		name = user.Login
+	}
 	for _, entry := range emails {
 		if entry.Primary && entry.Verified {
-			name := user.Name
-			if name == "" {
-				name = user.Login
-			}
 			return ProviderIdentity{Subject: fmt.Sprint(user.ID), Email: entry.Email, Name: name}, nil
 		}
 	}
-	return ProviderIdentity{}, errors.New("verified primary GitHub email is required")
+	// No verified primary address: the new person is asked for one.
+	return ProviderIdentity{Subject: fmt.Sprint(user.ID), Name: name}, nil
 }
 
 func ldapConnection(p Provider) (*ldap.Conn, error) {

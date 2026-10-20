@@ -31,7 +31,7 @@ func TestValidateBootstrapInput(t *testing.T) {
 	input, err := validateBootstrapInput(BootstrapInput{
 		Email:            " OWNER@Example.COM ",
 		DisplayName:      " Owner ",
-		Password:         "twelve-chars!",
+		Password:         "Twelve-chars!",
 		OrganizationName: " Example Team ",
 	})
 	if err != nil {
@@ -83,7 +83,7 @@ func TestConcurrentBootstrapCreatesExactlyOneOwner(t *testing.T) {
 	input := BootstrapInput{
 		Email:            "owner@example.com",
 		DisplayName:      "Owner",
-		Password:         "a-production-password",
+		Password:         "A-production-password",
 		OrganizationName: "Frontend Platform",
 	}
 

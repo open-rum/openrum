@@ -32,6 +32,7 @@ type memberResponse struct {
 	UserID      string                    `json:"userId"`
 	Email       string                    `json:"email"`
 	DisplayName string                    `json:"displayName"`
+	Avatar      string                    `json:"avatar,omitempty"`
 	Role        metadata.OrganizationRole `json:"role"`
 	CreatedAt   string                    `json:"createdAt"`
 	UpdatedAt   string                    `json:"updatedAt"`
@@ -168,7 +169,7 @@ func principalAndOrganization(writer http.ResponseWriter, request *http.Request)
 
 func memberDTO(member metadata.OrganizationMemberView) memberResponse {
 	return memberResponse{
-		UserID: member.UserID.String(), Email: member.Email, DisplayName: member.DisplayName, Role: member.Role,
+		UserID: member.UserID.String(), Email: member.Email, DisplayName: member.DisplayName, Avatar: member.Avatar, Role: member.Role,
 		CreatedAt: member.CreatedAt.UTC().Format(timeFormat), UpdatedAt: member.UpdatedAt.UTC().Format(timeFormat),
 	}
 }

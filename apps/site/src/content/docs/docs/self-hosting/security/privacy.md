@@ -27,6 +27,18 @@ Authentication uses server-side sessions, HttpOnly cookies, same-origin CSRF val
 
 Secret values are never returned by admin APIs. Environment-managed credentials remain read-only; opt-in managed values use authenticated envelope encryption with an external master key. Audit records include Request ID and a body-free summary.
 
+## Profile pictures and third-party requests
+
+The Console loads everything else from your own Instance, with one exception: the generated profile pictures people can pick under **Account**. Showing one makes the viewer's browser request `https://api.dicebear.com`, the public [DiceBear](https://www.dicebear.com/) service, so DiceBear sees the viewer's IP address and the avatar's random seed. The seed is not derived from a name or an email, and the request carries no referrer, so your Instance's address is not sent. The styles used are CC0.
+
+- Nothing else about a person is sent, and a person who keeps the default initials, or uploads a picture, causes no request to DiceBear.
+- DiceBear's public API is free for non-commercial use and asks commercial users to host their own copy. OpenRUM cannot yet point at your own copy, so an Instance that must make no third-party requests, or that is used commercially, should tell people to use initials or uploaded pictures.
+- Uploading needs [object storage](/docs/self-hosting/object-storage/). A picture is cut to a 256-pixel PNG in the browser, checked and written out again by the API, and stored in the private bucket. Only the person and members of an Organization they share can fetch it, through the API. If the bucket refuses deletes, a replaced picture stays in the bucket, unreachable from the Console.
+
+## Accounts that sign themselves up
+
+When an Instance Owner turns on [open registration](/docs/product/members-and-accounts/#open-registration), email sign-up stores the name, the email and a salted Argon2id hash of the password. A confirmation link is stored only as a hash, and the account and link are deleted after 7 days if the link is never opened. The confirmation mail goes through the SMTP server you configure and nowhere else. Someone who signs up through an external provider and is asked for an email types it themselves; OpenRUM does not verify it. Sign-up never shows whether an address is registered.
+
 ## Before going public
 
 - Read the [Threat model](/docs/self-hosting/security/threat-model/).

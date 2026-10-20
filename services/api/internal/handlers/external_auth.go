@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/sha256"
 	"crypto/subtle"
@@ -26,7 +27,14 @@ const oauthFlowTTL = 10 * time.Minute
 
 const oauthStartLimit = 20
 
+// registrationPolicy tells the handler whether a first sign-in through a provider is approved
+// at once (registration is open) or waits for an administrator.
+type registrationPolicy interface {
+	Open(context.Context) (bool, error)
+}
+
 type ExternalAuthHandler struct {
+	registration registrationPolicy
 	store        *auth.ExternalStore
 	sessions     *auth.SessionManager
 	redis        redis.UniversalClient
@@ -52,6 +60,23 @@ type oauthFlow struct {
 func NewExternalAuthHandler(store *auth.ExternalStore, sessions *auth.SessionManager, redisClient redis.UniversalClient,
 	limiter auth.FailureLimiter, members *metadata.InstanceMemberRepository, baseURL *url.URL, secureCookie bool, logger zerolog.Logger) *ExternalAuthHandler {
 	return &ExternalAuthHandler{store: store, sessions: sessions, redis: redisClient, limiter: limiter, members: members, baseURL: baseURL, secureCookie: secureCookie, logger: logger}
+}
+
+// EnableRegistration lets first sign-ins through a provider be approved when registration is open.
+func (handler *ExternalAuthHandler) EnableRegistration(policy registrationPolicy) {
+	handler.registration = policy
+}
+
+func (handler *ExternalAuthHandler) approveNewAccounts(ctx context.Context) bool {
+	if handler.registration == nil {
+		return false
+	}
+	open, err := handler.registration.Open(ctx)
+	if err != nil {
+		handler.logger.Error().Err(err).Msg("read registration policy")
+		return false
+	}
+	return open
 }
 
 func (handler *ExternalAuthHandler) Methods(writer http.ResponseWriter, request *http.Request) {
@@ -339,7 +364,11 @@ func (handler *ExternalAuthHandler) Callback(writer http.ResponseWriter, request
 		http.Redirect(writer, request, "/settings/account?link=success", http.StatusSeeOther)
 		return
 	}
-	user, err := handler.store.ResolveIdentity(request.Context(), provider, identity.Subject, identity.Email, identity.Name)
+	user, err := handler.store.ResolveIdentity(request.Context(), provider, identity.Subject, identity.Email, identity.Name, handler.approveNewAccounts(request.Context()))
+	if errors.Is(err, auth.ErrEmailRequired) {
+		handler.askForEmail(writer, request, flow, provider, identity)
+		return
+	}
 	if err != nil {
 		handler.redirectFlowFailure(writer, request, flow, "external")
 		return
@@ -402,7 +431,7 @@ func (handler *ExternalAuthHandler) ldapAuthenticate(writer http.ResponseWriter,
 		writer.WriteHeader(http.StatusNoContent)
 		return
 	}
-	user, err := handler.store.ResolveIdentity(request.Context(), provider, identity.Subject, identity.Email, identity.Name)
+	user, err := handler.store.ResolveIdentity(request.Context(), provider, identity.Subject, identity.Email, identity.Name, handler.approveNewAccounts(request.Context()))
 	if err != nil {
 		httpx.WriteError(writer, request, http.StatusConflict, "IDENTITY_CONFLICT", "Use an existing sign-in method and link this identity in Account settings.")
 		return

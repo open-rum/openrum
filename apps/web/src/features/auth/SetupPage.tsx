@@ -4,6 +4,7 @@ import { Link } from "@tanstack/react-router";
 import { ArrowRight, CheckCircle } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import { bootstrap, HTTPError, sessionQueryOptions } from "@/lib/auth/session";
+import { passwordPattern, passwordRuleHint, passwordRuleMessage } from "@/lib/auth/password";
 import { AuthField, AuthFrame } from "./AuthFrame";
 
 export function SetupPage() {
@@ -44,6 +45,11 @@ export function SetupPage() {
             setClientError("两次输入的密码不一致。");
             return;
           }
+          const weak = passwordRuleMessage(password);
+          if (weak) {
+            setClientError(weak);
+            return;
+          }
           setup.mutate({
             email: String(form.get("email") ?? ""),
             displayName: String(form.get("displayName") ?? ""),
@@ -81,17 +87,17 @@ export function SetupPage() {
         <AuthField
           name="password"
           label="密码"
-          hint="至少 12 个字符"
+          hint={passwordRuleHint}
           type="password"
           required
-          minLength={12}
+          pattern={passwordPattern}
+          title={passwordRuleHint}
           autoComplete="new-password"
         />
         <AuthField
           label="确认密码"
           type="password"
           required
-          minLength={12}
           value={passwordConfirmation}
           autoComplete="new-password"
           onChange={(event) => setPasswordConfirmation(event.target.value)}

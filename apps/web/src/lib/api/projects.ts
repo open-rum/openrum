@@ -61,6 +61,8 @@ export type OrganizationMember = {
   userId: string;
   email: string;
   displayName: string;
+  /** Profile picture reference, see lib/avatar.ts. Absent when none was chosen. */
+  avatar?: string;
   role: OrganizationRole;
   createdAt: string;
   updatedAt: string;

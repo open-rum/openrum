@@ -348,6 +348,41 @@ When implementing from a selected generated mock, treat that image as the source
   remains the route back to the project list and reveals the project switcher
   on hover or keyboard focus. Project routes show project name and environment
   beside the slightly larger mark; non-project routes show the OpenRUM name.
+- Organization invitations (user request, 2026-10-20). The project panel's footer (one
+  button per row: 所有项目, 创建项目, and 邀请成员 for Owners and Admins only) and the 成员与权限
+  header open `InviteDialog`: a role Select, then default-variant Tabs 复制链接 / 发送邮件
+  (disabled with its reason when the instance has no mail server). The dialog's open state
+  lives in `ProjectSwitcher`, outside the hover card, or it unmounts when the pointer leaves.
+  A link only lets its holder *ask*: `/invite/:token` registers a new account (kept pending)
+  or signs an existing one in, files a join request, and an Owner or Admin approves it under
+  成员与权限 → 加入申请 (line Tabs 成员 / 加入申请 / 邀请链接, with counts). Never let a link
+  grant membership by itself, never offer Owner, and do not promise the person a
+  notification; their waiting page only polls. A link's secret is stored hashed, so a copied
+  link cannot be shown again and 重发 makes a new one. See `docs/security/threat-model.md`.
+- Open registration (user request, 2026-10-20). An Instance Owner turns it on under 系统设置 →
+  认证与访问 → 开放注册 (`RegistrationPolicyCard`, off by default, password re-check). `/register`
+  offers the enabled external providers (never LDAP: a directory signs in, it does not register)
+  and an email form that exists only when `GET /auth/registration` says `email: true`, which needs
+  a mail server; without one say so instead of showing a form that cannot work. Email sign-up ends
+  on "请查收验证邮件", and its answer never says whether an address was already registered. The
+  mailed link opens `/verify-email/:token`, which POSTs once (a GET must not use it up), approves
+  the account and signs it in, with no administrator step and no Organization needed. An external
+  sign-in that returns no usable email lands on `/register/complete` to type one (unverified, only
+  required to be unused). Everyone shares one password rule, `lib/auth/password.ts`: 8+ characters
+  with upper case, lower case and a symbol; use `passwordPattern` / `passwordRuleHint` rather than
+  a `minLength`, and never put a length on the login field. Invitation links are unchanged: they
+  only let someone ask to join an Organization.
+- Profile pictures (user request, 2026-10-21). Account → 用户信息 holds `AvatarPicker`: a
+  batch of 12 generated avatars that mixes four CC0 DiceBear styles (`lib/avatar.ts`, the
+  server accepts the same list), 换一批 for another batch, 恢复为首字母, and 上传图片, which is
+  disabled with its reason until object storage is configured (`/auth/avatar/status`). A click
+  saves at once. The reference is `dicebear:<style>:<seed>` or `upload:<hash>`; seeds are
+  random and never derived from a name or email. Generated avatars are the Console's one
+  third-party request (api.dicebear.com, no referrer), so keep that disclosed in the UI and
+  the privacy page, and never use the user's own id or address as a seed. Uploads are cut to a
+  256 px square in the browser and served by the API, never from the bucket. Show a picture
+  only for Console accounts (account menu, member list, join requests, Issue assignee) through
+  `UserAvatar` / `MemberLabel`; Sessions and Logs "users" are SDK ids and get none.
 - A Project represents one monitored product and owns a bounded list of
   Environments from the fixed set development, test, staging and production. The
   project hover panel lists the environments that have reported data (from the

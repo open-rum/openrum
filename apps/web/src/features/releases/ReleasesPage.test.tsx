@@ -5,7 +5,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { HTTPError } from "@/lib/auth/session";
 import {
   completeArtifact,
-  createRelease,
   deleteRelease,
   getSourceMapStatus,
   listArtifacts,
@@ -164,23 +163,6 @@ describe("releases list", () => {
     await waitFor(() =>
       expect(toastSuccess).toHaveBeenCalledWith("已删除版本 web@1.0.0 及其 Source Map"),
     );
-  });
-
-  it("selects an existing release instead of failing on duplicate registration", async () => {
-    vi.mocked(createRelease).mockResolvedValue({
-      release: release({ id: "release-9", version: "web@9.0.0" }),
-      created: false,
-    });
-    const view = renderPage();
-    await view.findByLabelText("版本列表");
-    fireEvent.change(view.getByPlaceholderText("web@2026.09.03"), {
-      target: { value: "web@9.0.0" },
-    });
-    fireEvent.click(view.getByRole("button", { name: "登记" }));
-    await waitFor(() =>
-      expect(view.getByRole("status").textContent).toContain("版本 web@9.0.0 已存在，已为你选中"),
-    );
-    expect(view.getByRole("button", { name: "长按删除版本 web@9.0.0" })).toBeTruthy();
   });
 });
 

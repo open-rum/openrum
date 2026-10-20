@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -8,6 +9,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 
 	"openrum/internal/auth"
@@ -19,6 +21,18 @@ type AuthHandler struct {
 	sessions     *auth.SessionManager
 	logger       zerolog.Logger
 	secureCookie bool
+	pending      pendingOrganizationSource
+}
+
+// pendingOrganizationSource names the organizations an account has asked to join.
+type pendingOrganizationSource interface {
+	PendingOrganizations(ctx context.Context, userID uuid.UUID) ([]string, error)
+}
+
+// EnablePendingOrganizations lets /auth/me tell a waiting account which organizations it
+// asked to join.
+func (handler *AuthHandler) EnablePendingOrganizations(source pendingOrganizationSource) {
+	handler.pending = source
 }
 
 type loginRequest struct {
@@ -57,6 +71,8 @@ func (handler *AuthHandler) Login(writer http.ResponseWriter, request *http.Requ
 		switch {
 		case errors.Is(err, auth.ErrInvalidCredentials):
 			httpx.WriteError(writer, request, http.StatusUnauthorized, "INVALID_CREDENTIALS", "Email or password is incorrect.")
+		case errors.Is(err, auth.ErrEmailNotVerified):
+			httpx.WriteError(writer, request, http.StatusForbidden, "EMAIL_NOT_VERIFIED", "Confirm your email address first.")
 		case errors.Is(err, auth.ErrLoginRateLimited):
 			writer.Header().Set("Retry-After", "900")
 			httpx.WriteError(writer, request, http.StatusTooManyRequests, "LOGIN_RATE_LIMITED", "Too many login attempts. Try again later.")
@@ -80,7 +96,7 @@ func (handler *AuthHandler) Login(writer http.ResponseWriter, request *http.Requ
 		"userId":       user.ID.String(),
 		"email":        user.Email,
 		"displayName":  user.DisplayName,
-		"accessStatus": "approved",
+		"accessStatus": user.AccessStatus,
 	})
 }
 
@@ -90,14 +106,25 @@ func (handler *AuthHandler) Me(writer http.ResponseWriter, request *http.Request
 		httpx.WriteError(writer, request, http.StatusUnauthorized, "UNAUTHENTICATED", "Authentication is required.")
 		return
 	}
+	var waiting []string
+	if principal.AccessStatus == "pending" && handler.pending != nil {
+		names, err := handler.pending.PendingOrganizations(request.Context(), principal.UserID)
+		if err != nil {
+			handler.internalError(writer, request, err)
+			return
+		}
+		waiting = names
+	}
 	writeJSON(writer, http.StatusOK, struct {
-		UserID       string `json:"userId"`
-		Email        string `json:"email"`
-		DisplayName  string `json:"displayName"`
-		InstanceRole string `json:"instanceRole,omitempty"`
-		AccessStatus string `json:"accessStatus"`
-		HasPassword  bool   `json:"hasPassword"`
-	}{principal.UserID.String(), principal.Email, principal.DisplayName, principal.InstanceRole, principal.AccessStatus, principal.HasPassword})
+		UserID               string   `json:"userId"`
+		Email                string   `json:"email"`
+		DisplayName          string   `json:"displayName"`
+		InstanceRole         string   `json:"instanceRole,omitempty"`
+		AccessStatus         string   `json:"accessStatus"`
+		HasPassword          bool     `json:"hasPassword"`
+		PendingOrganizations []string `json:"pendingOrganizations,omitempty"`
+		Avatar               string   `json:"avatar,omitempty"`
+	}{principal.UserID.String(), principal.Email, principal.DisplayName, principal.InstanceRole, principal.AccessStatus, principal.HasPassword, waiting, principal.Avatar})
 }
 
 func (handler *AuthHandler) SetInitialPassword(writer http.ResponseWriter, request *http.Request) {
@@ -116,7 +143,7 @@ func (handler *AuthHandler) SetInitialPassword(writer http.ResponseWriter, reque
 		var validation *auth.ValidationError
 		switch {
 		case errors.As(err, &validation):
-			httpx.WriteError(writer, request, http.StatusBadRequest, "VALIDATION_ERROR", "Password must contain at least 12 characters.")
+			httpx.WriteError(writer, request, http.StatusBadRequest, "VALIDATION_ERROR", passwordRuleMessage)
 		case errors.Is(err, auth.ErrReauthenticationRequired):
 			httpx.WriteError(writer, request, http.StatusUnauthorized, "REAUTHENTICATION_REQUIRED", "Sign in again before setting a password.")
 		default:
@@ -155,7 +182,7 @@ func (handler *AuthHandler) ChangePassword(writer http.ResponseWriter, request *
 		var validationError *auth.ValidationError
 		switch {
 		case errors.As(err, &validationError):
-			httpx.WriteError(writer, request, http.StatusBadRequest, "VALIDATION_ERROR", "New password must contain at least 12 characters.")
+			httpx.WriteError(writer, request, http.StatusBadRequest, "VALIDATION_ERROR", passwordRuleMessage)
 		case errors.Is(err, auth.ErrInvalidCredentials):
 			httpx.WriteError(writer, request, http.StatusUnauthorized, "INVALID_CREDENTIALS", "Current password is incorrect.")
 		default:

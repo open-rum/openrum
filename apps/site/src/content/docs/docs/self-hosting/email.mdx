@@ -6,7 +6,7 @@ appliesTo: Alpha
 
 import { Aside, Steps } from "@astrojs/starlight/components";
 
-An Instance sends mail through one SMTP server. Configure it once and every feature that sends email uses it. Today the Console uses it for the test message; features that send alerts or invitations by email will use the same server. Without it, everything else works as before.
+An Instance sends mail through one SMTP server. Configure it once and every feature that sends email uses it. Today the Console uses it for the test message, for [invitation emails](/docs/product/members-and-accounts/) and, when [open registration](/docs/product/members-and-accounts/#open-registration) is on, for the link that confirms a new account's email; features that send alerts by email will use the same server. Without it, everything else works as before, except that email sign-up is unavailable.
 
 ## Choose where to configure it
 

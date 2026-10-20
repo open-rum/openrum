@@ -6,6 +6,8 @@ import { ConsolePage, ConsolePageHeader } from "@/components/layout/ConsolePage"
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { changePassword, sessionQueryOptions } from "@/lib/auth/session";
+import { passwordPattern, passwordRuleHint, passwordRuleMessage } from "@/lib/auth/password";
+import { AvatarPicker } from "./AvatarPicker";
 import {
   getAuthMethods,
   getLinkedIdentities,
@@ -84,7 +86,10 @@ export function AccountPage() {
             用户信息
           </h2>
         </div>
-        <dl className="mt-5 grid gap-5 sm:grid-cols-2">
+        <div className="mt-5">
+          <AvatarPicker user={user} />
+        </div>
+        <dl className="mt-6 grid gap-5 border-t border-border pt-6 sm:grid-cols-2">
           <div>
             <dt className="text-sm font-medium text-muted-foreground">用户名</dt>
             <dd className="mt-1 text-sm text-foreground">{user.displayName}</dd>
@@ -248,6 +253,11 @@ export function AccountPage() {
             setValidationError("两次输入的新密码不一致。");
             return;
           }
+          const weak = passwordRuleMessage(newPassword);
+          if (weak) {
+            setValidationError(weak);
+            return;
+          }
           if (hasPassword) password.mutate({ currentPassword, newPassword });
           else initialPassword.mutate(newPassword);
         }}
@@ -260,7 +270,8 @@ export function AccountPage() {
           </h2>
         </div>
         <p className="mt-1 text-sm text-muted-foreground">
-          至少 12 个字符。外部账号须在登录后五分钟内设置，供本地登录及管理员敏感操作使用。
+          至少 8
+          个字符，须同时包含大写字母、小写字母和符号。外部账号须在登录后五分钟内设置，供本地登录及管理员敏感操作使用。
         </p>
 
         <div className="mt-5 grid gap-4">
@@ -281,19 +292,14 @@ export function AccountPage() {
               name="newPassword"
               type="password"
               autoComplete="new-password"
-              minLength={12}
+              pattern={passwordPattern}
+              title={passwordRuleHint}
               required
             />
           </label>
           <label className="grid gap-2 text-sm font-medium">
             确认新密码
-            <Input
-              name="confirmPassword"
-              type="password"
-              autoComplete="new-password"
-              minLength={12}
-              required
-            />
+            <Input name="confirmPassword" type="password" autoComplete="new-password" required />
           </label>
         </div>
 

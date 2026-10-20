@@ -4,7 +4,7 @@
 
 ## Trigger and impact
 
-Detect with provider API error/latency, source-map upload/finalize failures and unresolved stack-frame growth. Optional OSS or S3-compatible storage contains source-map objects; raw monitoring events and product metadata remain in Kafka/ClickHouse/PostgreSQL. Error ingestion continues, but new releases cannot be symbolicated and project deletion cleanup may be delayed.
+Detect with provider API error/latency, source-map upload/finalize failures and unresolved stack-frame growth. Optional OSS or S3-compatible storage contains source-map objects and uploaded profile pictures (`users/<user-id>/avatar/<hash>.png`, served only through the API); raw monitoring events and product metadata remain in Kafka/ClickHouse/PostgreSQL. Error ingestion continues, but new releases cannot be symbolicated, profile pictures cannot be uploaded (existing ones show initials until storage returns), and project deletion cleanup may be delayed.
 
 ## Safe response
 

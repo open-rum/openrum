@@ -21,8 +21,11 @@ var (
 	ErrIdentityConflict    = errors.New("email already belongs to another account")
 	ErrIdentityLinked      = errors.New("identity is already linked")
 	ErrIdentityLastMethod  = errors.New("cannot remove the last login method")
-	ErrProviderChanged     = errors.New("provider identity scope cannot be changed")
-	providerIDPattern      = regexp.MustCompile(`^[a-z][a-z0-9-]{0,39}$`)
+	// ErrEmailRequired means the provider gave no usable address for someone signing up for
+	// the first time. Nothing has been created; the caller asks the person for one.
+	ErrEmailRequired   = errors.New("an email address is required to finish signing up")
+	ErrProviderChanged = errors.New("provider identity scope cannot be changed")
+	providerIDPattern  = regexp.MustCompile(`^[a-z][a-z0-9-]{0,39}$`)
 )
 
 type ProviderSettings struct {
@@ -224,11 +227,19 @@ func (store *ExternalStore) DisableProvider(ctx context.Context, id string) erro
 	return nil
 }
 
-func (store *ExternalStore) ResolveIdentity(ctx context.Context, p Provider, subject, email, name string) (ExternalUser, error) {
+// ResolveIdentity finds the account an external identity belongs to, or makes one. The new
+// account is approved when approveNew is set (registration is open) and waits for an
+// administrator otherwise. A first sign-in with no address returns ErrEmailRequired.
+func (store *ExternalStore) ResolveIdentity(ctx context.Context, p Provider, subject, email, name string, approveNew bool) (ExternalUser, error) {
 	email = strings.ToLower(strings.TrimSpace(email))
-	parsed, err := mail.ParseAddress(email)
-	if err != nil || parsed.Address != email || len(email) > 320 || subject == "" || len(subject) > 512 {
+	if subject == "" || len(subject) > 512 {
 		return ExternalUser{}, ErrProviderUnavailable
+	}
+	if email != "" {
+		parsed, err := mail.ParseAddress(email)
+		if err != nil || parsed.Address != email || len(email) > 320 {
+			return ExternalUser{}, ErrProviderUnavailable
+		}
 	}
 	name = strings.TrimSpace(name)
 	if name == "" {
@@ -249,8 +260,10 @@ func (store *ExternalStore) ResolveIdentity(ctx context.Context, p Provider, sub
 	if _, err := tx.ExecContext(ctx, "SELECT pg_advisory_xact_lock(hashtextextended($1,0))", p.ID+":"+subject); err != nil {
 		return ExternalUser{}, err
 	}
-	if _, err := tx.ExecContext(ctx, "SELECT pg_advisory_xact_lock(hashtextextended($1,0))", email); err != nil {
-		return ExternalUser{}, err
+	if email != "" {
+		if _, err := tx.ExecContext(ctx, "SELECT pg_advisory_xact_lock(hashtextextended($1,0))", email); err != nil {
+			return ExternalUser{}, err
+		}
 	}
 	var user ExternalUser
 	var status string
@@ -266,6 +279,9 @@ func (store *ExternalStore) ResolveIdentity(ctx context.Context, p Provider, sub
 	if !errors.Is(err, sql.ErrNoRows) {
 		return ExternalUser{}, err
 	}
+	if email == "" {
+		return ExternalUser{}, ErrEmailRequired
+	}
 	var existing uuid.UUID
 	err = tx.QueryRowContext(ctx, "SELECT id FROM users WHERE email=$1", email).Scan(&existing)
 	if err == nil {
@@ -278,8 +294,11 @@ func (store *ExternalStore) ResolveIdentity(ctx context.Context, p Provider, sub
 	user.Email = email
 	user.DisplayName = name
 	user.AccessStatus = "pending"
+	if approveNew {
+		user.AccessStatus = "approved"
+	}
 	_, err = tx.ExecContext(ctx, `INSERT INTO users(id,email,display_name,auth_source,access_status)
-		VALUES($1,$2,$3,$4,'pending')`, user.ID, email, name, p.Kind)
+		VALUES($1,$2,$3,$4,$5)`, user.ID, email, name, p.Kind, user.AccessStatus)
 	if err != nil {
 		return ExternalUser{}, err
 	}

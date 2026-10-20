@@ -43,6 +43,13 @@ type Storage interface {
 	Read(context.Context, string, int64) ([]byte, error)
 }
 
+// ObjectWriter stores a small object from the server itself, for things such as profile
+// pictures that the API receives and checks before they reach the bucket. Source maps do
+// not use it: they go straight from the browser through a presigned URL.
+type ObjectWriter interface {
+	Put(ctx context.Context, key, contentType string, body []byte) error
+}
+
 type Prober interface {
 	Probe(context.Context) StorageProbeResult
 }
@@ -267,6 +274,17 @@ func (storage *OSSStorage) Head(ctx context.Context, key string) (ObjectInfo, er
 		return ObjectInfo{}, fmt.Errorf("head OSS object: %w", err)
 	}
 	return ObjectInfo{SizeBytes: result.ContentLength, SHA256: strings.ToLower(result.Metadata["sha256"])}, nil
+}
+
+func (storage *OSSStorage) Put(ctx context.Context, key, contentType string, body []byte) error {
+	_, err := storage.probeClient.PutObject(ctx, &oss.PutObjectRequest{
+		Bucket: oss.Ptr(storage.bucket), Key: oss.Ptr(key), Body: bytes.NewReader(body),
+		ContentLength: oss.Ptr(int64(len(body))), ContentType: &contentType,
+	})
+	if err != nil {
+		return fmt.Errorf("put OSS object: %w", err)
+	}
+	return nil
 }
 
 func (storage *OSSStorage) Delete(ctx context.Context, key string) error {

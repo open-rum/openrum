@@ -28,6 +28,7 @@ func TestVerifyObjectChecksSizeAndDigest(t *testing.T) {
 }
 
 type fakeOSSObjectClient struct {
+	lastPut   *oss.PutObjectRequest
 	putErr    error
 	getErr    error
 	deleteErr error
@@ -36,6 +37,7 @@ type fakeOSSObjectClient struct {
 }
 
 func (client *fakeOSSObjectClient) PutObject(_ context.Context, request *oss.PutObjectRequest, _ ...func(*oss.Options)) (*oss.PutObjectResult, error) {
+	client.lastPut = request
 	client.body, _ = io.ReadAll(request.Body)
 	return &oss.PutObjectResult{}, client.putErr
 }
@@ -157,6 +159,23 @@ func TestOSSStorageRejectsInvalidConfigAndLongTTL(t *testing.T) {
 	}
 	storage := &OSSStorage{}
 	if _, err := storage.PresignUpload(t.Context(), "key", 1, make([]byte, 32), MaxPresignTTL+time.Second); !errors.Is(err, ErrObjectMismatch) {
+		t.Fatalf("err=%v", err)
+	}
+}
+
+func TestOSSStoragePutWritesTheObjectWithItsContentType(t *testing.T) {
+	client := &fakeOSSObjectClient{}
+	storage := &OSSStorage{probeClient: client, bucket: "openrum-test"}
+	if err := storage.Put(t.Context(), "users/u/avatar/h.png", "image/png", []byte("pixels")); err != nil {
+		t.Fatal(err)
+	}
+	request := client.lastPut
+	if request == nil || *request.Bucket != "openrum-test" || *request.Key != "users/u/avatar/h.png" ||
+		*request.ContentType != "image/png" || *request.ContentLength != 6 || string(client.body) != "pixels" {
+		t.Fatalf("request=%+v body=%q", request, client.body)
+	}
+	client.putErr = errors.New("denied")
+	if err := storage.Put(t.Context(), "k", "image/png", []byte("x")); err == nil || !strings.Contains(err.Error(), "put OSS object") {
 		t.Fatalf("err=%v", err)
 	}
 }

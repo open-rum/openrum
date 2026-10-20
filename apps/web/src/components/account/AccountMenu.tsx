@@ -1,7 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { ChevronsUpDown, LogOut, Monitor, Moon, Settings, Sun, UserRound } from "lucide-react";
 import { densities, palettes } from "@openrum/design-tokens/catalog";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { UserAvatar } from "@/components/account/UserAvatar";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -15,7 +15,10 @@ import {
 import { useTheme, type Theme } from "@/components/theme/ThemeProvider";
 
 type AccountMenuProps = {
+  userId: string;
   displayName: string;
+  /** Profile picture reference, see lib/avatar.ts. */
+  avatar?: string;
   email: string;
   signingOut: boolean;
   onSignOut: () => void;
@@ -23,18 +26,10 @@ type AccountMenuProps = {
   showInstanceSettings?: boolean;
 };
 
-function initials(displayName: string) {
-  return displayName
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0])
-    .join("")
-    .toUpperCase();
-}
-
 export function AccountMenu({
+  userId,
   displayName,
+  avatar,
   email,
   signingOut,
   onSignOut,
@@ -46,9 +41,13 @@ export function AccountMenu({
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" className="account-menu__trigger" aria-label="打开账户菜单">
-          <Avatar className="account-menu__avatar" size="sm">
-            <AvatarFallback>{initials(displayName)}</AvatarFallback>
-          </Avatar>
+          <UserAvatar
+            className="account-menu__avatar"
+            size="sm"
+            userId={userId}
+            name={displayName}
+            avatar={avatar}
+          />
           <span className="account-menu__identity">
             <strong>{displayName}</strong>
           </span>

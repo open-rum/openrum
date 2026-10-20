@@ -21,6 +21,7 @@ import {
   XIcon,
 } from "lucide-react";
 import { toast } from "sonner";
+import { MemberLabel } from "@/components/account/MemberLabel";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   ConsolePage,
@@ -381,7 +382,7 @@ function IssueInvestigation({
                 className="issue-assignee"
                 title={members.error ? "成员列表加载失败，暂不可分配" : "负责人"}
               >
-                <UserRoundIcon data-icon="inline-start" />
+                {assignee ? null : <UserRoundIcon data-icon="inline-start" />}
                 <SelectValue placeholder="未分配" />
               </SelectTrigger>
               <SelectContent>
@@ -392,7 +393,7 @@ function IssueInvestigation({
                   ) : null}
                   {members.data?.members.map((member) => (
                     <SelectItem key={member.userId} value={member.userId}>
-                      {member.displayName || member.email}
+                      <MemberLabel member={member} />
                     </SelectItem>
                   ))}
                 </SelectGroup>
@@ -516,13 +517,11 @@ function IssueInvestigation({
               <small>当前时间与筛选范围内去重</small>
             </SidebarItem>
             <SidebarItem label="负责人">
-              <span>
-                {assignee
-                  ? assignee.displayName || assignee.email
-                  : issue.assigneeUserId
-                    ? "已分配"
-                    : "未分配"}
-              </span>
+              {assignee ? (
+                <MemberLabel member={assignee} />
+              ) : (
+                <span>{issue.assigneeUserId ? "已分配" : "未分配"}</span>
+              )}
             </SidebarItem>
             <SidebarItem label="问题指纹">
               <code className="issue-sidebar__fingerprint" title={issue.fingerprint}>

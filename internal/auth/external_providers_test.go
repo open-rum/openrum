@@ -15,7 +15,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"strings"
 	"testing"
 	"time"
 
@@ -115,8 +114,11 @@ func TestOIDCExchangeVerifiesSignedTokenNonceAndEmail(t *testing.T) {
 		t.Fatal("invalid nonce was accepted")
 	}
 	verified = false
-	if _, err := ExchangeOAuthIdentity(context.Background(), provider, "https://openrum.example.test/callback", "code", "expected-nonce", "a-test-verifier"); err == nil {
-		t.Fatal("unverified email was accepted")
+	// An address the provider has not verified is never trusted: the identity comes back
+	// without one and the new person is asked to type their own.
+	unverified, err := ExchangeOAuthIdentity(context.Background(), provider, "https://openrum.example.test/callback", "code", "expected-nonce", "a-test-verifier")
+	if err != nil || unverified.Subject != "stable-user-42" || unverified.Email != "" {
+		t.Fatalf("unverified identity=%+v err=%v", unverified, err)
 	}
 }
 
@@ -156,8 +158,9 @@ func TestGitHubIdentityUsesStableIDAndVerifiedPrimaryEmail(t *testing.T) {
 		t.Fatalf("identity=%+v err=%v", identity, err)
 	}
 	verified = false
-	if _, err := githubIdentityAt(context.Background(), "fake-access-token", server.URL); err == nil || !strings.Contains(err.Error(), "verified primary") {
-		t.Fatalf("unverified primary email was accepted: %v", err)
+	unverified, err := githubIdentityAt(context.Background(), "fake-access-token", server.URL)
+	if err != nil || unverified.Subject != "12345" || unverified.Email != "" {
+		t.Fatalf("unverified primary email was trusted: %+v err=%v", unverified, err)
 	}
 }
 

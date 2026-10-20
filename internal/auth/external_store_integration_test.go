@@ -81,13 +81,13 @@ func TestExternalIdentityLifecycle(t *testing.T) {
 	if err := database.QueryRowContext(ctx, "SELECT email FROM users WHERE id=$1", localID).Scan(&localEmail); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := store.ResolveIdentity(ctx, configured, "external-subject", localEmail, "External user"); !errors.Is(err, ErrIdentityConflict) {
+	if _, err := store.ResolveIdentity(ctx, configured, "external-subject", localEmail, "External user", false); !errors.Is(err, ErrIdentityConflict) {
 		t.Fatalf("same-email first sign-in should not merge: %v", err)
 	}
 	if err := store.LinkIdentity(ctx, localID, configured, "external-subject"); err != nil {
 		t.Fatal(err)
 	}
-	linked, err := store.ResolveIdentity(ctx, configured, "external-subject", "other@example.test", "External user")
+	linked, err := store.ResolveIdentity(ctx, configured, "external-subject", "other@example.test", "External user", false)
 	if err != nil || linked.ID != localID || linked.AccessStatus != "approved" {
 		t.Fatalf("explicitly linked identity=%+v err=%v", linked, err)
 	}
@@ -96,14 +96,37 @@ func TestExternalIdentityLifecycle(t *testing.T) {
 	}
 
 	newEmail := "pending-" + uuid.NewString() + "@example.test"
-	pending, err := store.ResolveIdentity(ctx, configured, "new-subject", newEmail, "Pending user")
+	pending, err := store.ResolveIdentity(ctx, configured, "new-subject", newEmail, "Pending user", false)
 	if err != nil || pending.AccessStatus != "pending" {
 		t.Fatalf("first external sign-in=%+v err=%v", pending, err)
 	}
 	t.Cleanup(func() { _, _ = database.ExecContext(context.Background(), "DELETE FROM users WHERE id=$1", pending.ID) })
-	again, err := store.ResolveIdentity(ctx, configured, "new-subject", "changed@example.test", "Changed")
+	again, err := store.ResolveIdentity(ctx, configured, "new-subject", "changed@example.test", "Changed", false)
 	if err != nil || again.ID != pending.ID || again.Email != newEmail {
 		t.Fatalf("stable subject did not retain account: %+v, %v", again, err)
+	}
+	// No address from the provider: nothing is created until the person supplies one.
+	if _, err := store.ResolveIdentity(ctx, configured, "no-email-subject", "", "No Email", true); !errors.Is(err, ErrEmailRequired) {
+		t.Fatalf("first sign-in without an address: %v", err)
+	}
+	var created int
+	if err := database.QueryRowContext(ctx, "SELECT count(*) FROM auth_identities WHERE subject='no-email-subject'").Scan(&created); err != nil || created != 0 {
+		t.Fatalf("an identity was created without an address: %d %v", created, err)
+	}
+	typedEmail := "typed-" + uuid.NewString() + "@example.test"
+	opened, err := store.ResolveIdentity(ctx, configured, "no-email-subject", typedEmail, "No Email", true)
+	if err != nil || opened.AccessStatus != "approved" || opened.Email != typedEmail {
+		t.Fatalf("sign-up with a typed address while registration is open=%+v err=%v", opened, err)
+	}
+	t.Cleanup(func() { _, _ = database.ExecContext(context.Background(), "DELETE FROM users WHERE id=$1", opened.ID) })
+	// A returning person needs no address at all.
+	back, err := store.ResolveIdentity(ctx, configured, "no-email-subject", "", "", false)
+	if err != nil || back.ID != opened.ID {
+		t.Fatalf("returning sign-in without an address=%+v err=%v", back, err)
+	}
+	// The typed address must not belong to anyone else.
+	if _, err := store.ResolveIdentity(ctx, configured, "another-subject", typedEmail, "Someone", true); !errors.Is(err, ErrIdentityConflict) {
+		t.Fatalf("a taken address was accepted: %v", err)
 	}
 	pendingIdentities, err := store.ListIdentities(ctx, pending.ID)
 	if err != nil || len(pendingIdentities) != 1 {
@@ -134,7 +157,7 @@ func TestExternalIdentityLifecycle(t *testing.T) {
 	if testProvider, err := store.GetProviderForTest(ctx, providerID); err != nil || testProvider.Enabled || testProvider.Secret != secret {
 		t.Fatalf("disabled provider cannot be tested: %+v, %v", testProvider, err)
 	}
-	if _, err := store.ResolveIdentity(ctx, configured, "new-subject", newEmail, "Pending user"); !errors.Is(err, ErrProviderUnavailable) {
+	if _, err := store.ResolveIdentity(ctx, configured, "new-subject", newEmail, "Pending user", false); !errors.Is(err, ErrProviderUnavailable) {
 		t.Fatalf("stale provider completed sign-in after disable: %v", err)
 	}
 	identities, err := store.ListIdentities(ctx, localID)

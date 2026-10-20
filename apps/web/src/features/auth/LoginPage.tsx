@@ -1,15 +1,19 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSearch } from "@tanstack/react-router";
-import { Building2Icon, CircleAlertIcon, ClockAlertIcon, ShieldCheckIcon } from "lucide-react";
-import { SiGithub } from "@icons-pack/react-simple-icons";
-import { GoogleIcon } from "@/components/icons/GoogleIcon";
+import { CircleAlertIcon, ClockAlertIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { FieldGroup } from "@/components/ui/field";
 import { HTTPError, login, safeReturnTo, sessionQueryOptions } from "@/lib/auth/session";
 import { getAuthMethods, loginLDAP, startOAuthLogin, type AuthMethod } from "@/lib/auth/providers";
+import {
+  getRegistrationStatus,
+  registrationStatusQueryKey,
+  resendVerification,
+} from "@/lib/auth/registration";
 import { AuthField, AuthFrame } from "./AuthFrame";
+import { ProviderIcon } from "./ProviderIcon";
 
 type LoginPageProps = {
   returnTo?: string;
@@ -63,6 +67,15 @@ export function LoginPage({ returnTo, expired, externalError }: LoginPageProps) 
   });
   const invalidCredentials =
     authenticate.error instanceof HTTPError && authenticate.error.status === 401;
+  const notVerified =
+    authenticate.error instanceof HTTPError && authenticate.error.code === "EMAIL_NOT_VERIFIED";
+  // Without a registration answer the link is simply left out; sign-in never waits for it.
+  const registration = useQuery({
+    queryKey: registrationStatusQueryKey,
+    queryFn: ({ signal }) => getRegistrationStatus(signal),
+    retry: false,
+  });
+  const resend = useMutation({ mutationFn: (email: string) => resendVerification(email) });
 
   return (
     <AuthFrame>
@@ -206,7 +219,6 @@ export function LoginPage({ returnTo, expired, externalError }: LoginPageProps) 
             type="password"
             placeholder="输入密码"
             required
-            minLength={12}
             autoComplete="current-password"
             aria-invalid={invalidCredentials || undefined}
             aria-describedby={authenticate.error ? "login-error" : undefined}
@@ -214,7 +226,26 @@ export function LoginPage({ returnTo, expired, externalError }: LoginPageProps) 
 
           {authenticate.error ? (
             <Alert variant="destructive" id="login-error">
-              <AlertDescription>{loginErrorMessage(authenticate.error)}</AlertDescription>
+              <AlertDescription>
+                {loginErrorMessage(authenticate.error)}
+                {notVerified ? (
+                  <>
+                    {" "}
+                    {resend.isSuccess ? (
+                      <span role="status">验证邮件已重新发送，请查收。</span>
+                    ) : (
+                      <button
+                        type="button"
+                        className="underline underline-offset-2"
+                        disabled={resend.isPending}
+                        onClick={() => resend.mutate(authenticate.variables?.email ?? "")}
+                      >
+                        重新发送验证邮件
+                      </button>
+                    )}
+                  </>
+                ) : null}
+              </AlertDescription>
             </Alert>
           ) : null}
 
@@ -228,20 +259,23 @@ export function LoginPage({ returnTo, expired, externalError }: LoginPageProps) 
           </Button>
         </FieldGroup>
       </form>
+      {registration.data?.open ? (
+        <p className="mt-6 text-center text-sm text-muted-foreground">
+          还没有账号？{" "}
+          <a className="text-foreground underline underline-offset-2" href="/register">
+            注册
+          </a>
+        </p>
+      ) : null}
     </AuthFrame>
   );
-}
-
-function ProviderIcon({ kind }: { kind: AuthMethod["kind"] }) {
-  if (kind === "google") return <GoogleIcon className="rounded-[2px] bg-white" />;
-  if (kind === "github") return <SiGithub className="size-4" aria-hidden="true" />;
-  if (kind === "ldap") return <Building2Icon className="size-4" aria-hidden="true" />;
-  return <ShieldCheckIcon className="size-4" aria-hidden="true" />;
 }
 
 function loginErrorMessage(error: Error, directory = false) {
   if (error instanceof HTTPError && error.status === 401)
     return directory ? "目录用户名或密码不正确。" : "邮箱或密码不正确。";
   if (error instanceof HTTPError && error.status === 429) return "尝试次数过多，请 15 分钟后再试。";
+  if (error instanceof HTTPError && error.code === "EMAIL_NOT_VERIFIED")
+    return "邮箱还没有验证。请打开注册时收到的邮件里的链接。";
   return error.message;
 }

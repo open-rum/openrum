@@ -147,6 +147,20 @@ func (storage *SwitchableStorage) Read(ctx context.Context, key string, maximum 
 	return contents, err
 }
 
+// Put writes through to the live client when it can write objects itself. A backend that
+// cannot reports ErrInvalidStorage, as a missing client does.
+func (storage *SwitchableStorage) Put(ctx context.Context, key, contentType string, body []byte) error {
+	storage.mutex.RLock()
+	defer storage.mutex.RUnlock()
+	writer, ok := storage.storage.(ObjectWriter)
+	if !ok {
+		return ErrInvalidStorage
+	}
+	err := writer.Put(ctx, key, contentType, body)
+	storage.observe(err)
+	return err
+}
+
 func (storage *SwitchableStorage) Probe(ctx context.Context) StorageProbeResult {
 	storage.mutex.RLock()
 	defer storage.mutex.RUnlock()

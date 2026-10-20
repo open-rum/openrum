@@ -28,6 +28,9 @@ it("links an LDAP identity explicitly and enrolls a separate OpenRUM password", 
         providers: [{ id: "ldap", kind: "ldap", label: "公司目录" }],
       }),
     ),
+    http.get("/api/v1/auth/avatar/status", () =>
+      HttpResponse.json({ uploadAvailable: false, maxUploadBytes: 524288, styles: [] }),
+    ),
     http.get("/api/v1/auth/identities", () =>
       HttpResponse.json({
         identities: linked
@@ -79,9 +82,9 @@ it("links an LDAP identity explicitly and enrolls a separate OpenRUM password", 
     expect(linkBody).toEqual({ username: "member", password: "directory-password" }),
   );
   expect(await view.findByText("目录身份已连接。")).toBeTruthy();
-  await user.type(view.getByLabelText("新密码"), "a-new-openrum-password");
-  await user.type(view.getByLabelText("确认新密码"), "a-new-openrum-password");
+  await user.type(view.getByLabelText("新密码"), "A-new-openrum-password");
+  await user.type(view.getByLabelText("确认新密码"), "A-new-openrum-password");
   await user.click(view.getByRole("button", { name: "设置密码" }));
-  await waitFor(() => expect(passwordBody).toEqual({ password: "a-new-openrum-password" }));
+  await waitFor(() => expect(passwordBody).toEqual({ password: "A-new-openrum-password" }));
   expect(await view.findByText(/OpenRUM 密码已设置/)).toBeTruthy();
 });

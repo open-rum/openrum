@@ -114,6 +114,8 @@ func registerRoutes(ctx context.Context, router *httpx.Router, configuration con
 	eventProducer := ingest.NewKafkaProducer(configuration.KafkaBrokers, configuration.KafkaEventTopic)
 	organizationHandler := handlers.NewOrganizationHandler(organizationRepository, logger)
 	memberHandler := handlers.NewMemberHandler(organizationRepository, logger)
+	invitationRepository := metadata.NewInvitationRepository(database)
+	authHandler.EnablePendingOrganizations(invitationRepository)
 	instanceMemberRepository := metadata.NewInstanceMemberRepository(database)
 	instanceAuditRepository := metadata.NewInstanceAuditRepository(database)
 	adminMutationAudit := handlers.AdminMutationAudit(instanceAuditRepository, logger)
@@ -194,17 +196,24 @@ func registerRoutes(ctx context.Context, router *httpx.Router, configuration con
 	// Every consumer holds the switcher, so the refresher can replace the client
 	// when the managed configuration changes on any replica.
 	storageSwitcher := sourcemap.NewSwitchableStorage(nil, nil)
+	avatarHandler := handlers.NewAvatarHandler(metadata.NewAvatarRepository(database), storageSwitcher, logger)
 	adminStorageHandler := handlers.NewAdminStorageHandler(instanceMemberRepository, sessionManager, storageSwitcher, configuration, logger)
 	adminStorageHandler.EnableArtifactUsage(issueStateRepository)
 	// One service decides which mail server applies, so alerts and invitations added later
 	// send through the same configuration the Console shows.
 	mailService := mailservice.New(configuration.SMTP, emailManaged, nil)
 	adminEmailHandler := handlers.NewAdminEmailHandler(instanceMemberRepository, sessionManager, mailService, logger)
+	invitationHandler := handlers.NewInvitationHandler(invitationRepository, organizationRepository, sessionManager, mailService,
+		redisClient, configuration.PublicBaseURL, secureCookie, logger)
 	if instanceSecretRepository != nil {
 		adminEmailHandler.EnableManagedSecrets(instanceSecretRepository)
 	}
+	registrationRepository := metadata.NewRegistrationRepository(database)
+	registrationHandler := handlers.NewRegistrationHandler(registrationRepository, sessionManager, mailService,
+		instanceMemberRepository, redisClient, configuration.PublicBaseURL, secureCookie, logger)
 	externalAuthHandler := handlers.NewExternalAuthHandler(auth.NewExternalStore(database, authKeyring), sessionManager,
 		redisClient, failureLimiter, instanceMemberRepository, configuration.PublicBaseURL, secureCookie, logger)
+	externalAuthHandler.EnableRegistration(registrationRepository)
 	if instanceSecretRepository != nil {
 		adminStorageHandler.EnableManagedSecrets(instanceSecretRepository, storageSwitcher)
 	}
@@ -233,6 +242,14 @@ func registerRoutes(ctx context.Context, router *httpx.Router, configuration con
 	router.HandleFunc("POST /api/v1/setup/bootstrap", setupHandler.Bootstrap)
 	router.HandleFunc("POST /api/v1/auth/login", authHandler.Login)
 	router.HandleFunc("GET /api/v1/auth/methods", externalAuthHandler.Methods)
+	router.HandleFunc("GET /api/v1/auth/registration", registrationHandler.Status)
+	router.HandleFunc("POST /api/v1/auth/register", registrationHandler.Register)
+	router.HandleFunc("POST /api/v1/auth/register/resend", registrationHandler.Resend)
+	router.HandleFunc("POST /api/v1/auth/register/verify", registrationHandler.Verify)
+	router.HandleFunc("GET /api/v1/auth/register/external", externalAuthHandler.Profile)
+	router.HandleFunc("POST /api/v1/auth/register/external", externalAuthHandler.CompleteProfile)
+	router.HandleFunc("GET /api/v1/invitations/{token}", invitationHandler.Preview)
+	router.HandleFunc("POST /api/v1/invitations/{token}/register", invitationHandler.Register)
 	router.HandleFunc("POST /api/v1/auth/providers/{providerId}/start", externalAuthHandler.StartLogin)
 	router.HandleFunc("GET /api/v1/auth/providers/{providerId}/callback", externalAuthHandler.Callback)
 	router.HandleFunc("POST /api/v1/auth/providers/{providerId}/ldap/login", externalAuthHandler.LDAPLogin)
@@ -252,17 +269,29 @@ func registerRoutes(ctx context.Context, router *httpx.Router, configuration con
 	router.Handle("DELETE /api/v1/auth/identities/{identityId}", requireSession(requireCSRF(http.HandlerFunc(externalAuthHandler.Unlink))))
 	router.Handle("POST /api/v1/auth/providers/{providerId}/link", requireSession(requireCSRF(http.HandlerFunc(externalAuthHandler.StartLink))))
 	router.Handle("POST /api/v1/auth/providers/{providerId}/ldap/link", requireSession(requireCSRF(http.HandlerFunc(externalAuthHandler.LDAPLink))))
+	router.Handle("GET /api/v1/auth/avatar/status", requireSession(http.HandlerFunc(avatarHandler.Status)))
+	router.Handle("PUT /api/v1/auth/avatar", requireSession(requireCSRF(http.HandlerFunc(avatarHandler.Set))))
+	router.Handle("GET /api/v1/users/{userId}/avatar", requireSession(http.HandlerFunc(avatarHandler.Get)))
 	router.Handle("GET /api/v1/organizations", requireSession(http.HandlerFunc(organizationHandler.List)))
 	router.Handle("POST /api/v1/organizations", requireSession(requireCSRF(http.HandlerFunc(organizationHandler.Create))))
 	router.Handle("GET /api/v1/organizations/{orgId}/members", requireSession(http.HandlerFunc(memberHandler.List)))
 	router.Handle("POST /api/v1/organizations/{orgId}/members", requireSession(requireCSRF(http.HandlerFunc(memberHandler.Add))))
 	router.Handle("PATCH /api/v1/organizations/{orgId}/members/{userId}", requireSession(requireCSRF(http.HandlerFunc(memberHandler.Update))))
 	router.Handle("DELETE /api/v1/organizations/{orgId}/members/{userId}", requireSession(requireCSRF(http.HandlerFunc(memberHandler.Remove))))
+	router.Handle("GET /api/v1/organizations/{orgId}/invitations", requireSession(http.HandlerFunc(invitationHandler.List)))
+	router.Handle("POST /api/v1/organizations/{orgId}/invitations", requireSession(requireCSRF(http.HandlerFunc(invitationHandler.Create))))
+	router.Handle("DELETE /api/v1/organizations/{orgId}/invitations/{invitationId}", requireSession(requireCSRF(http.HandlerFunc(invitationHandler.Revoke))))
+	router.Handle("GET /api/v1/organizations/{orgId}/join-requests", requireSession(http.HandlerFunc(invitationHandler.ListRequests)))
+	router.Handle("POST /api/v1/organizations/{orgId}/join-requests/{requestId}/approve", requireSession(requireCSRF(http.HandlerFunc(invitationHandler.Approve))))
+	router.Handle("POST /api/v1/organizations/{orgId}/join-requests/{requestId}/reject", requireSession(requireCSRF(http.HandlerFunc(invitationHandler.Reject))))
+	router.Handle("POST /api/v1/invitations/{token}/join", requireSession(requireCSRF(http.HandlerFunc(invitationHandler.Join))))
 	router.Handle("GET /api/v1/admin/members", requireSession(http.HandlerFunc(adminMemberHandler.List)))
 	router.Handle("POST /api/v1/admin/members", requireSession(adminMutationAudit(requireCSRF(http.HandlerFunc(adminMemberHandler.Add)))))
 	router.Handle("PATCH /api/v1/admin/members/{userId}", requireSession(adminMutationAudit(requireCSRF(http.HandlerFunc(adminMemberHandler.Update)))))
 	router.Handle("DELETE /api/v1/admin/members/{userId}", requireSession(adminMutationAudit(requireCSRF(http.HandlerFunc(adminMemberHandler.Remove)))))
 	router.Handle("GET /api/v1/admin/configuration", requireSession(http.HandlerFunc(adminConfigurationHandler.Get)))
+	router.Handle("GET /api/v1/admin/registration", requireSession(http.HandlerFunc(registrationHandler.AdminGet)))
+	router.Handle("PUT /api/v1/admin/registration", requireSession(adminMutationAudit(requireCSRF(http.HandlerFunc(registrationHandler.AdminPut)))))
 	router.Handle("GET /api/v1/admin/authentication", requireSession(http.HandlerFunc(externalAuthHandler.AdminGet)))
 	router.Handle("PUT /api/v1/admin/authentication/providers/{providerId}", requireSession(adminMutationAudit(requireCSRF(http.HandlerFunc(externalAuthHandler.AdminPut)))))
 	router.Handle("DELETE /api/v1/admin/authentication/providers/{providerId}", requireSession(adminMutationAudit(requireCSRF(http.HandlerFunc(externalAuthHandler.AdminDisable)))))

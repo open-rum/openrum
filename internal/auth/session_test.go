@@ -56,7 +56,7 @@ func TestSessionLifecycleRotationExpiryRevokeAndPasswordChange(t *testing.T) {
 		_, _ = database.ExecContext(context.WithoutCancel(ctx), "TRUNCATE audit_logs, sessions, project_keys, projects, organization_members, organizations, users CASCADE")
 	}()
 
-	passwordHash, err := HashPassword("current-password")
+	passwordHash, err := HashPassword("Current-password")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -67,7 +67,7 @@ func TestSessionLifecycleRotationExpiryRevokeAndPasswordChange(t *testing.T) {
 		t.Fatal(err)
 	}
 	manager := NewSessionManager(database)
-	if err := manager.Reauthenticate(ctx, userID, "current-password"); err != nil {
+	if err := manager.Reauthenticate(ctx, userID, "Current-password"); err != nil {
 		t.Fatalf("reauthenticate valid password: %v", err)
 	}
 	if err := manager.Reauthenticate(ctx, userID, "wrong-password"); !errors.Is(err, ErrInvalidCredentials) {
@@ -103,7 +103,7 @@ func TestSessionLifecycleRotationExpiryRevokeAndPasswordChange(t *testing.T) {
 	}
 	elevatedAt := time.Now().UTC().Truncate(time.Millisecond)
 	manager.now = func() time.Time { return elevatedAt }
-	if err := manager.Elevate(ctx, rotatedPrincipal, "current-password"); err != nil {
+	if err := manager.Elevate(ctx, rotatedPrincipal, "Current-password"); err != nil {
 		t.Fatalf("elevate session: %v", err)
 	}
 	if err := manager.RequireRecentElevation(ctx, rotatedPrincipal, 5*time.Minute); err != nil {
@@ -119,7 +119,7 @@ func TestSessionLifecycleRotationExpiryRevokeAndPasswordChange(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := manager.ChangePassword(ctx, rotatedPrincipal, "current-password", "replacement-password"); err != nil {
+	if err := manager.ChangePassword(ctx, rotatedPrincipal, "Current-password", "Replacement-password"); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := manager.Authenticate(ctx, other.Token); !errors.Is(err, ErrUnauthenticated) {
@@ -129,7 +129,7 @@ func TestSessionLifecycleRotationExpiryRevokeAndPasswordChange(t *testing.T) {
 	if err := database.QueryRowContext(ctx, "SELECT password_hash FROM users WHERE id=$1", userID).Scan(&newHash); err != nil {
 		t.Fatal(err)
 	}
-	valid, err := VerifyPassword("replacement-password", newHash)
+	valid, err := VerifyPassword("Replacement-password", newHash)
 	if err != nil || !valid {
 		t.Fatalf("new password valid=%v err=%v", valid, err)
 	}

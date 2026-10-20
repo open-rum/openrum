@@ -370,7 +370,9 @@ export function App() {
               </nav>
               <div className="account-panel">
                 <AccountMenu
+                  userId={user.userId}
                   displayName={user.displayName}
+                  avatar={user.avatar}
                   email={user.email}
                   signingOut={signOut.isPending}
                   onSignOut={() => signOut.mutate()}
