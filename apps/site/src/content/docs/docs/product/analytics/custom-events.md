@@ -63,8 +63,9 @@ it. Only these attributes survive:
 - `role` — one of `button`, `link`, `menuitem`, `tab`
 - `input_type` — one of `button`, `checkbox`, `radio`, `reset`, `submit`, `file`, and only when `element` is `input`
 - `name` — a scrubbed label, ≤ 64 characters
+- `selector` — a short CSS path to the element: the element and at most two ancestors, written as `tag#id.class` steps joined by ` > `, for example `div.experiment-grid > article.experiment-card > button.run-button`. At most three classes per step. An id or class that contains a digit is left out, because those are usually generated or carry data.
 
-No text content, no values, no selectors — which is what lets click tracking be on by default
+No text content and no values — which is what lets click tracking be on by default
 without collecting what people typed.
 
 Next: [Instrumentation recipes](/docs/product/analytics/instrumentation/) applies all of this

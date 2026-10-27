@@ -95,13 +95,39 @@ function SelectLabel({ className, ...props }: React.ComponentProps<typeof Select
   );
 }
 
+/**
+ * Radix selects a mouse pick on pointerup and closes the menu at once, so the click that
+ * follows lands on whatever lay under the menu: a table row opens, a link navigates. This
+ * swallows that one click. A new press means a new, intended click, so it stops waiting then,
+ * and in any case almost at once.
+ */
+function swallowNextClick() {
+  const stop = () => {
+    window.removeEventListener("click", swallow, true);
+    window.removeEventListener("pointerdown", stop, true);
+  };
+  const swallow = (event: MouseEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+    stop();
+  };
+  window.addEventListener("click", swallow, true);
+  window.addEventListener("pointerdown", stop, true);
+  window.setTimeout(stop, 120);
+}
+
 function SelectItem({
   className,
   children,
+  onPointerUp,
   ...props
 }: React.ComponentProps<typeof SelectPrimitive.Item>) {
   return (
     <SelectPrimitive.Item
+      onPointerUp={(event) => {
+        onPointerUp?.(event);
+        if (event.pointerType === "mouse" && !props.disabled) swallowNextClick();
+      }}
       data-slot="select-item"
       className={cn(
         "relative flex w-full cursor-default items-center gap-2.5 rounded-xl py-2 pr-8 pl-3 text-sm outline-hidden select-none focus:bg-accent focus:text-accent-foreground not-data-[variant=destructive]:focus:**:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 *:[span]:last:flex *:[span]:last:items-center *:[span]:last:gap-2",

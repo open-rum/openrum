@@ -1,93 +1,73 @@
+import { useCallback } from "react";
 import {
-  ArrowDownWideNarrowIcon,
   BugIcon,
+  CircleDotIcon,
   CircleUserRoundIcon,
   FingerprintIcon,
   Globe2Icon,
   MonitorSmartphoneIcon,
   PackageIcon,
   RouteIcon,
+  TagIcon,
   TextSearchIcon,
 } from "lucide-react";
 import {
-  FilterSearchComposer,
-  type FilterSearchField,
-  type FilterSearchToken,
-} from "@/components/filters/FilterSearchComposer";
+  SearchQueryInput,
+  type SearchQueryError,
+  type SearchQueryField,
+} from "@/components/filters/SearchQueryInput";
 import { countryLabel, deviceLabel } from "@/features/filters/dimensionLabels";
 import type { IssueFilters, IssueOverviewResponse, IssuesResponse } from "@/lib/api/issues";
+import { useSearchSuggest } from "@/lib/search/useSearchSuggest";
 
-type IssueFilterPatch = Partial<Omit<IssueFilters, "projectId">>;
+const STATE_FIELDS = new Set(["is", "assigned"]);
 
-const sortLabels: Record<IssueFilters["sort"], string> = {
-  events: "事件数排序",
-  users: "影响用户排序",
-  last_seen: "最近发生排序",
-};
-
+/**
+ * The Issues search: every condition, from title to user and the Issue's own status and
+ * assignee, is one query in `q`.
+ */
 export function IssueFilterComposer({
+  projectId,
   filters,
   facets,
   errorTypes,
+  error,
   onChange,
 }: {
+  projectId: string;
   filters: IssueFilters;
   facets?: IssuesResponse["facets"];
   errorTypes?: IssueOverviewResponse["errorTypes"];
-  onChange: (patch: IssueFilterPatch) => void;
+  /** Why the server refused the search, if it did. */
+  error?: SearchQueryError;
+  onChange: (patch: { q?: string }) => void;
 }) {
+  const serverSuggest = useSearchSuggest({
+    projectId,
+    dataset: "issues",
+    from: filters.from,
+    to: filters.to,
+    environment: filters.environment,
+  });
+  // is: and assigned: read Issue state, which the server's value index does not hold.
+  const suggest = useCallback<typeof serverSuggest>(
+    async (field, contains, signal) =>
+      STATE_FIELDS.has(field.key) ? [] : serverSuggest(field, contains, signal),
+    [serverSuggest],
+  );
   return (
-    <FilterSearchComposer
-      ariaLabel="搜索错误或添加筛选条件"
-      placeholder="搜索错误标题或添加筛选条件…"
+    <SearchQueryInput
+      ariaLabel="搜索错误问题"
+      placeholder="搜索错误标题，或输入条件，例如 is:unresolved assigned:me browser:Safari"
+      value={filters.q ?? ""}
+      // An emptied search is kept as q= so the default is:unresolved does not come back.
+      onSubmit={(q) => onChange({ q: q ?? "" })}
       fields={issueFields(facets, errorTypes)}
-      tokens={issueTokens(filters)}
-      shortcuts={[
-        { label: "最近发生", onSelect: () => onChange({ sort: "last_seen" }) },
-        { label: "影响用户", onSelect: () => onChange({ sort: "users" }) },
-      ]}
-      searchLabel="错误标题"
-      onSearch={(title) => onChange({ title })}
-      onClear={() =>
-        // Only what this input owns: the status select and the quick toggles are separate controls.
-        onChange({
-          title: undefined,
-          errorType: undefined,
-          fingerprint: undefined,
-          userId: undefined,
-          release: undefined,
-          browser: undefined,
-          deviceType: undefined,
-          country: undefined,
-          route: undefined,
-          sort: "events",
-        })
-      }
-      onSelect={(key, value) => {
-        const selected = String(value);
-        if (key === "title") onChange({ title: selected });
-        if (key === "errorType") onChange({ errorType: selected });
-        if (key === "fingerprint") onChange({ fingerprint: selected });
-        if (key === "userId") onChange({ userId: selected });
-        if (key === "release") onChange({ release: selected });
-        if (key === "browser") onChange({ browser: selected });
-        if (key === "deviceType") onChange({ deviceType: selected });
-        if (key === "country") onChange({ country: selected });
-        if (key === "route") onChange({ route: selected });
-        if (key === "sort") onChange({ sort: selected as IssueFilters["sort"] });
-      }}
-      onRemove={(key) => {
-        if (key === "title") onChange({ title: undefined });
-        if (key === "errorType") onChange({ errorType: undefined });
-        if (key === "fingerprint") onChange({ fingerprint: undefined });
-        if (key === "userId") onChange({ userId: undefined });
-        if (key === "release") onChange({ release: undefined });
-        if (key === "browser") onChange({ browser: undefined });
-        if (key === "deviceType") onChange({ deviceType: undefined });
-        if (key === "country") onChange({ country: undefined });
-        if (key === "route") onChange({ route: undefined });
-        if (key === "sort") onChange({ sort: "events" });
-      }}
+      attributes
+      suggest={suggest}
+      recentKey="issues"
+      freeTextLabel="错误标题"
+      error={error}
     />
   );
 }
@@ -95,7 +75,7 @@ export function IssueFilterComposer({
 function issueFields(
   facets?: IssuesResponse["facets"],
   errorTypes?: IssueOverviewResponse["errorTypes"],
-): FilterSearchField[] {
+): SearchQueryField[] {
   const facetOptions = (
     source: Array<{ value: string; events: number; users: number }> | undefined,
     label: (value: string) => string = (value) => value,
@@ -110,18 +90,50 @@ function issueFields(
       }));
   return [
     {
-      key: "title",
-      label: "错误标题",
-      hint: "模糊匹配归并后的错误消息",
-      aliases: ["title", "message", "error.message", "错误消息"],
-      icon: TextSearchIcon,
-      options: [],
+      key: "is",
+      type: "enum",
+      label: "问题状态",
+      hint: "待处理（含已回归）、已解决、新问题、未分配等",
+      aliases: ["status", "状态"],
+      icon: CircleDotIcon,
+      equalsOnly: true,
+      options: [
+        { value: "unresolved", label: "待处理（含已回归）" },
+        { value: "regressed", label: "已回归" },
+        { value: "resolved", label: "已解决" },
+        { value: "ignored", label: "已忽略" },
+        { value: "new", label: "新问题（首次发生在所选时间内）" },
+        { value: "unassigned", label: "未分配" },
+        { value: "assigned", label: "已分配" },
+      ],
     },
     {
-      key: "errorType",
+      key: "assigned",
+      type: "enum",
+      label: "负责人",
+      hint: "assigned:me 为分配给我",
+      aliases: ["assignee", "负责人", "分配"],
+      icon: CircleUserRoundIcon,
+      equalsOnly: true,
+      options: [
+        { value: "me", label: "分配给我" },
+        { value: "none", label: "未分配" },
+      ],
+    },
+    {
+      key: "title",
+      type: "text",
+      label: "错误标题",
+      hint: "归并后的错误消息",
+      aliases: ["message", "error.message", "错误消息"],
+      icon: TextSearchIcon,
+    },
+    {
+      key: "error.type",
+      type: "text",
       label: "错误类型",
       hint: "TypeError、RangeError 等异常类型",
-      aliases: ["type", "error.type", "error.name", "exception"],
+      aliases: ["errorType", "type", "exception"],
       icon: BugIcon,
       options: (errorTypes ?? []).map((option) => ({
         value: option.value,
@@ -132,22 +144,31 @@ function issueFields(
     },
     {
       key: "fingerprint",
+      type: "text",
       label: "Fingerprint",
       hint: "精确定位一个错误问题",
-      aliases: ["issue", "fingerprint", "指纹"],
+      aliases: ["issue", "指纹"],
       icon: FingerprintIcon,
-      options: [],
     },
     {
-      key: "userId",
+      key: "user.id",
+      type: "text",
       label: "用户 ID",
-      hint: "按 SDK 设置的 user.id 查找，受原始事件保留期限制",
-      aliases: ["user", "user.id", "userid", "用户"],
+      hint: "SDK 设置的 user.id，需读取原始事件",
+      aliases: ["userId", "user", "用户"],
       icon: CircleUserRoundIcon,
-      options: [],
+    },
+    {
+      key: "anonymous_user_id",
+      type: "text",
+      label: "匿名访客 ID",
+      hint: "SDK 生成的匿名访客标识，需读取原始事件",
+      aliases: ["visitor", "访客"],
+      icon: CircleUserRoundIcon,
     },
     {
       key: "release",
+      type: "text",
       label: "版本",
       hint: "按 Release 定位错误回归",
       icon: PackageIcon,
@@ -155,101 +176,43 @@ function issueFields(
     },
     {
       key: "browser",
+      type: "enum",
       label: "浏览器",
       hint: "Chrome、Safari、Firefox 等",
       icon: MonitorSmartphoneIcon,
       options: facetOptions(facets?.browsers),
     },
     {
-      key: "deviceType",
+      key: "device",
+      type: "enum",
       label: "设备类型",
-      hint: "桌面端、移动端、平板",
+      hint: "desktop、mobile、tablet",
+      aliases: ["deviceType"],
       icon: MonitorSmartphoneIcon,
       options: facetOptions(facets?.deviceTypes, deviceLabel),
     },
     {
       key: "country",
+      type: "enum",
       label: "国家 / 地区",
-      hint: "按错误发生地筛选",
+      hint: "两位国家代码，例如 CN、US",
       icon: Globe2Icon,
       options: facetOptions(facets?.countries, countryLabel),
     },
     {
       key: "route",
+      type: "text",
       label: "页面 Route",
-      hint: "精确匹配 SDK 上报的页面路由",
+      hint: "SDK 上报的页面路由",
       icon: RouteIcon,
-      options: [],
     },
     {
-      key: "sort",
-      label: "排序",
-      hint: "按错误量、影响用户或最近发生时间排序",
-      icon: ArrowDownWideNarrowIcon,
-      allowCustom: false,
-      options: (Object.keys(sortLabels) as IssueFilters["sort"][]).map((value) => ({
-        value,
-        label: sortLabels[value],
-      })),
+      key: "attributes.",
+      type: "text",
+      label: "自定义属性",
+      hint: "写成 attributes.名称:值，需读取原始事件",
+      aliases: ["property", "属性"],
+      icon: TagIcon,
     },
   ];
-}
-
-function issueTokens(filters: IssueFilters): FilterSearchToken[] {
-  // Every condition here holds one value, so each can be edited in place. Fields that offer a
-  // list of values reopen on the full list; the free-text ones start from what is set.
-  const tokens: FilterSearchToken[] = [];
-  if (filters.title)
-    tokens.push({
-      key: "title",
-      fieldKey: "title",
-      value: filters.title,
-      label: `错误标题：${filters.title}`,
-    });
-  if (filters.errorType)
-    tokens.push({
-      key: "errorType",
-      fieldKey: "errorType",
-      label: `错误类型：${filters.errorType}`,
-    });
-  if (filters.fingerprint)
-    tokens.push({
-      key: "fingerprint",
-      fieldKey: "fingerprint",
-      value: filters.fingerprint,
-      label: `Fingerprint：${filters.fingerprint}`,
-    });
-  if (filters.userId)
-    tokens.push({
-      key: "userId",
-      fieldKey: "userId",
-      value: filters.userId,
-      label: `用户 ID：${filters.userId}`,
-    });
-  if (filters.release)
-    tokens.push({ key: "release", fieldKey: "release", label: `版本：${filters.release}` });
-  if (filters.browser)
-    tokens.push({ key: "browser", fieldKey: "browser", label: `浏览器：${filters.browser}` });
-  if (filters.deviceType)
-    tokens.push({
-      key: "deviceType",
-      fieldKey: "deviceType",
-      label: `设备：${deviceLabel(filters.deviceType)}`,
-    });
-  if (filters.country)
-    tokens.push({
-      key: "country",
-      fieldKey: "country",
-      label: `国家：${countryLabel(filters.country)}`,
-    });
-  if (filters.route)
-    tokens.push({
-      key: "route",
-      fieldKey: "route",
-      value: filters.route,
-      label: `Route：${filters.route}`,
-    });
-  if (filters.sort !== "events")
-    tokens.push({ key: "sort", fieldKey: "sort", label: `排序：${sortLabels[filters.sort]}` });
-  return tokens;
 }

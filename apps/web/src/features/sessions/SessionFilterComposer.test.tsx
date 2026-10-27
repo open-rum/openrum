@@ -29,23 +29,26 @@ afterEach(cleanup);
 function Harness() {
   const [filters, setFilters] = useState(initialFilters);
   return (
-    <SessionFilterComposer
-      filters={filters}
-      facets={facets}
-      onChange={(patch) => setFilters((current) => ({ ...current, ...patch }))}
-    />
+    <>
+      <SessionFilterComposer
+        filters={filters}
+        facets={facets}
+        onChange={(patch) => setFilters((current) => ({ ...current, ...patch }))}
+      />
+      <output aria-label="q">{filters.q ?? ""}</output>
+    </>
   );
 }
 
 describe("session filter composer", () => {
   it("focuses and opens with / outside editable controls", async () => {
     render(<Harness />);
-    const search = screen.getByRole("combobox", { name: "搜索会话或添加筛选条件" });
+    const search = screen.getByRole("combobox", { name: "搜索会话" });
 
     fireEvent.keyDown(window, { key: "/" });
 
     await waitFor(() => expect(document.activeElement).toBe(search));
-    expect(screen.getByText("添加筛选条件")).toBeTruthy();
+    expect(screen.getByText("添加条件")).toBeTruthy();
   });
 
   it("does not steal focus when / is typed in another input", () => {
@@ -61,19 +64,28 @@ describe("session filter composer", () => {
     fireEvent.keyDown(otherInput, { key: "/" });
 
     expect(document.activeElement).toBe(otherInput);
-    expect(screen.queryByText("添加筛选条件")).toBeNull();
+    expect(screen.queryByText("添加条件")).toBeNull();
   });
 
-  it("adds a structured filter token and lets the user remove it", async () => {
+  it("writes a chosen field and value into the query text", async () => {
     const user = userEvent.setup();
     render(<Harness />);
+    const box = screen.getByRole("combobox", { name: "搜索会话" }) as HTMLInputElement;
 
-    await user.click(screen.getByRole("combobox", { name: "搜索会话或添加筛选条件" }));
+    await user.click(box);
     await user.click(screen.getByRole("option", { name: /国家 \/ 地区/ }));
+    expect(box.value).toBe("country:");
     await user.click(screen.getByRole("option", { name: /JP/ }));
 
-    expect(screen.getByText("国家：JP")).toBeTruthy();
-    await user.click(screen.getByRole("button", { name: "移除筛选：国家：JP" }));
-    expect(screen.queryByText("国家：JP")).toBeNull();
+    expect(box.value).toBe("country:JP");
+    expect(screen.getByRole("status", { name: "q" }).textContent).toBe("country:JP");
+  });
+
+  it("offers the old quick signals as conditions", async () => {
+    const user = userEvent.setup();
+    render(<Harness />);
+    await user.click(screen.getByRole("combobox", { name: "搜索会话" }));
+    await user.click(screen.getByRole("button", { name: "有错误" }));
+    expect(screen.getByRole("status", { name: "q" }).textContent).toBe("errors:>0");
   });
 });

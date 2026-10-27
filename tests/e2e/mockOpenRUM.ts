@@ -288,6 +288,8 @@ export async function mockOpenRUM(
       return json(route, behaviorAnalytics());
     if (path === `/api/v1/projects/${secondProjectId}/analytics/events`)
       return json(route, behaviorAnalytics());
+    if (path === `/api/v1/projects/${projectId}/search/values`)
+      return json(route, searchValues(url.searchParams));
     if (path === `/api/v1/projects/${projectId}/analytics/sessions`) return json(route, sessions());
     if (path.startsWith(`/api/v1/projects/${projectId}/analytics/sessions/`))
       return json(route, sessionTimeline(url.searchParams));
@@ -848,6 +850,24 @@ function sessionTimeline(parameters: URLSearchParams) {
       },
     ],
   };
+}
+
+// Common values the search box suggests, narrowed by what has been typed like the server does.
+function searchValues(params: URLSearchParams) {
+  const known: Record<string, string[]> = {
+    "user.id": ["customer-123", "customer-456"],
+    anonymous_user_id: ["visitor-abc", "visitor-def"],
+    route: ["/checkout", "/cart", "/products/:id"],
+    release: ["web@2026.09.3", "web@2026.09.2"],
+    browser: ["Chrome", "Safari", "Firefox"],
+    country: ["CN", "US"],
+    level: ["info", "warn", "error"],
+  };
+  const contains = (params.get("contains") ?? "").toLowerCase();
+  const values = (known[params.get("field") ?? ""] ?? [])
+    .filter((value) => value.toLowerCase().includes(contains))
+    .map((value, index) => ({ value, count: 40 - index * 7 }));
+  return { values };
 }
 
 function sessions() {

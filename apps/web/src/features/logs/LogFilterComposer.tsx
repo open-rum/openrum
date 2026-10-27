@@ -6,71 +6,63 @@ import {
   Globe2Icon,
   HashIcon,
   LaptopIcon,
+  MonitorSmartphoneIcon,
   PackageIcon,
   RouteIcon,
   ScrollTextIcon,
-  TagsIcon,
+  TagIcon,
 } from "lucide-react";
 import {
-  FilterSearchComposer,
-  type FilterSearchField,
-  type FilterSearchToken,
-} from "@/components/filters/FilterSearchComposer";
-import { logLevels, logSearchTerm, type LogEntry, type LogFilters } from "@/lib/api/logs";
-import { splitTerms } from "./logFilterQuery";
+  SearchQueryInput,
+  type SearchQueryError,
+  type SearchQueryField,
+} from "@/components/filters/SearchQueryInput";
+import { logLevels, type LogEntry, type LogFilters } from "@/lib/api/logs";
+import { useSearchSuggest } from "@/lib/search/useSearchSuggest";
 
+/** The Logs search: the whole query is `q`, in the shared search language. */
 export function LogFilterComposer({
   filters,
   items,
+  error,
   onChange,
 }: {
   filters: LogFilters;
   items?: LogEntry[];
+  /** Why the server refused the search, if it did. */
+  error?: SearchQueryError;
   onChange: (patch: Partial<LogFilters>) => void;
 }) {
-  const terms = splitTerms(filters.q ?? "");
-  const appendQuery = (term: string) =>
-    onChange({ q: [...terms, term].filter(Boolean).join(" ") || undefined });
+  const suggest = useSearchSuggest({
+    projectId: filters.projectId,
+    dataset: "logs",
+    from: new Date(filters.from),
+    to: new Date(filters.to),
+    environment: filters.environment,
+  });
   return (
-    <FilterSearchComposer
-      ariaLabel="搜索日志或添加筛选条件"
-      placeholder="搜索消息、用户或添加筛选条件…"
+    <SearchQueryInput
+      ariaLabel="搜索日志"
+      placeholder='搜索日志正文，或输入条件，例如 level:error AND user.id:"customer-123"'
+      value={filters.q ?? ""}
+      onSubmit={(q) => onChange({ q })}
       fields={logFields(items)}
-      tokens={logTokens(filters, terms)}
+      attributes
+      suggest={suggest}
+      recentKey="logs"
+      freeTextLabel="日志正文"
+      error={error}
       shortcuts={[
-        { label: "错误日志", onSelect: () => onChange({ level: "error" }) },
-        { label: "警告日志", onSelect: () => onChange({ level: "warn" }) },
-        { label: "有 Trace", onSelect: () => appendQuery("trace_id:*") },
+        { label: "错误日志", term: "level:[error,fatal]" },
+        { label: "警告日志", term: "level:warn" },
+        { label: "有 Trace", term: "has:trace_id" },
+        { label: "不含调试日志", term: "!level:[debug,trace]" },
       ]}
-      searchLabel="日志正文与属性"
-      // The query already understands field:value with quoting and `*`; reading it again here
-      // would quote a wildcard such as trace_id:* and change what it matches.
-      fieldTerms={false}
-      syntaxHint={'可直接输入查询词，例如 user.id:"customer-123" 或 trace_id:*'}
-      onSearch={appendQuery}
-      onClear={() => onChange({ q: undefined, level: undefined })}
-      onSelect={(key, value) => {
-        if (key === "level") {
-          onChange({ level: String(value) });
-          return;
-        }
-        if (key === "raw" || key === "message") appendQuery(String(value));
-        else appendQuery(logSearchTerm(key, String(value)));
-      }}
-      onRemove={(key) => {
-        if (key === "level") {
-          onChange({ level: undefined });
-          return;
-        }
-        if (!key.startsWith("q:")) return;
-        const index = Number(key.slice(2));
-        onChange({ q: terms.filter((_, termIndex) => termIndex !== index).join(" ") || undefined });
-      }}
     />
   );
 }
 
-function logFields(items?: LogEntry[]): FilterSearchField[] {
+function logFields(items?: LogEntry[]): SearchQueryField[] {
   const options = (key: keyof LogEntry) =>
     [...new Set(items?.map((item) => String(item[key] ?? "")).filter(Boolean))].map((value) => ({
       value,
@@ -79,28 +71,75 @@ function logFields(items?: LogEntry[]): FilterSearchField[] {
   return [
     {
       key: "level",
+      type: "enum",
       label: "日志级别",
-      hint: "TRACE、DEBUG、INFO、WARN、ERROR、FATAL",
+      hint: "trace、debug、info、warn、error、fatal",
+      aliases: ["severity"],
       icon: BugIcon,
-      allowCustom: false,
       options: logLevels.map((level) => ({ value: level, label: level.toUpperCase() })),
     },
     {
+      key: "message",
+      type: "text",
+      label: "日志正文",
+      hint: "在正文中查找，区分大小写",
+      icon: FileCode2Icon,
+    },
+    {
       key: "logger",
+      type: "text",
       label: "Logger",
-      hint: "按日志记录器或模块筛选",
+      hint: "日志记录器或模块",
       icon: ScrollTextIcon,
       options: options("logger"),
     },
     {
+      key: "user.id",
+      type: "text",
+      label: "用户 ID",
+      hint: "SDK 显式设置的用户标识",
+      aliases: ["userId", "user_id", "user", "用户"],
+      icon: CircleUserRoundIcon,
+      options: options("userId"),
+    },
+    {
+      key: "anonymous_user_id",
+      type: "text",
+      label: "匿名访客 ID",
+      hint: "SDK 生成的匿名访客标识",
+      aliases: ["anonymousUserId", "visitor"],
+      icon: CircleUserRoundIcon,
+      options: options("anonymousUserId"),
+    },
+    {
+      key: "trace_id",
+      type: "text",
+      label: "Trace ID",
+      hint: "同一条分布式调用链",
+      aliases: ["traceId"],
+      icon: FingerprintIcon,
+      options: options("traceId"),
+    },
+    {
+      key: "session_id",
+      type: "uuid",
+      label: "Session ID",
+      hint: "一次会话产生的日志",
+      aliases: ["sessionId"],
+      icon: HashIcon,
+      options: options("sessionId"),
+    },
+    {
       key: "route",
+      type: "text",
       label: "页面 Route",
-      hint: "筛选特定页面产生的日志",
+      hint: "产生日志的页面",
       icon: RouteIcon,
       options: options("route"),
     },
     {
       key: "release",
+      type: "text",
       label: "版本",
       hint: "按 Release 定位回归",
       icon: PackageIcon,
@@ -108,101 +147,36 @@ function logFields(items?: LogEntry[]): FilterSearchField[] {
     },
     {
       key: "browser",
+      type: "enum",
       label: "浏览器",
       hint: "Chrome、Safari、Firefox 等",
       icon: LaptopIcon,
       options: options("browser"),
     },
     {
+      key: "device",
+      type: "enum",
+      label: "设备类型",
+      hint: "desktop、mobile、tablet",
+      aliases: ["deviceType"],
+      icon: MonitorSmartphoneIcon,
+      options: options("deviceType"),
+    },
+    {
       key: "country",
+      type: "enum",
       label: "国家 / 地区",
-      hint: "按访问来源国家筛选",
+      hint: "两位国家代码，例如 CN、US",
       icon: Globe2Icon,
       options: options("country"),
     },
     {
-      key: "trace_id",
-      label: "Trace ID",
-      hint: "定位同一条分布式调用链",
-      icon: FingerprintIcon,
-      options: options("traceId"),
-    },
-    {
-      key: "session_id",
-      label: "Session ID",
-      hint: "查看一次会话产生的日志",
-      icon: HashIcon,
-      options: options("sessionId"),
-    },
-    {
-      key: "user.id",
-      label: "用户 ID",
-      hint: "按 SDK 显式设置的用户标识筛选",
-      aliases: ["user", "user.id", "userid", "用户"],
-      icon: CircleUserRoundIcon,
-      options: options("userId"),
-    },
-    {
-      key: "anonymous_user_id",
-      label: "匿名访客 ID",
-      hint: "按匿名访客标识筛选",
-      icon: CircleUserRoundIcon,
-      options: options("anonymousUserId"),
-    },
-    {
-      key: "raw",
-      label: "属性表达式",
-      hint: '输入自定义属性，例如 checkout.step:"payment"',
-      icon: TagsIcon,
-      options: [],
-    },
-    {
-      key: "message",
-      label: "日志正文",
-      hint: "输入要在消息正文中查找的关键词",
-      icon: FileCode2Icon,
-      options: [],
+      key: "attributes.",
+      type: "text",
+      label: "自定义属性",
+      hint: "写成 attributes.名称:值",
+      aliases: ["property", "属性"],
+      icon: TagIcon,
     },
   ];
-}
-
-function logTokens(filters: LogFilters, terms: string[]): FilterSearchToken[] {
-  const tokens: FilterSearchToken[] = terms.map((term, index) => ({
-    key: `q:${index}`,
-    label: formatTerm(term),
-  }));
-  if (filters.level)
-    tokens.unshift({
-      key: "level",
-      fieldKey: "level",
-      label: `级别：${filters.level.toUpperCase()}`,
-    });
-  return tokens;
-}
-
-function formatTerm(term: string) {
-  const separator = term.indexOf(":");
-  if (separator < 1) return `正文：${term}`;
-  const key = term.slice(0, separator);
-  const rawValue = term.slice(separator + 1);
-  let value = rawValue;
-  try {
-    value = JSON.parse(rawValue);
-  } catch {
-    // Wildcards and existing unquoted terms remain readable as entered.
-  }
-  const label = {
-    severity: "级别",
-    logger: "Logger",
-    route: "Route",
-    release: "版本",
-    browser: "浏览器",
-    country: "国家",
-    trace_id: "Trace ID",
-    session_id: "Session ID",
-    "user.id": "用户 ID",
-    anonymous_user_id: "访客 ID",
-    message: "正文",
-  }[key];
-  return `${label ?? key}：${value}`;
 }

@@ -1,9 +1,16 @@
-import { ArrowDownWideNarrowIcon, CodeXmlIcon, PackageIcon, RouteIcon } from "lucide-react";
+import { CodeXmlIcon, LinkIcon, PackageIcon, RouteIcon } from "lucide-react";
 import {
-  FilterSearchComposer,
-  type FilterSearchField,
-  type FilterSearchToken,
-} from "@/components/filters/FilterSearchComposer";
+  SearchQueryInput,
+  type SearchQueryError,
+  type SearchQueryField,
+} from "@/components/filters/SearchQueryInput";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   apiMethods,
   apiSortLabels,
@@ -11,60 +18,68 @@ import {
   type APIFilters,
   type APIsResponse,
 } from "@/lib/api/apis";
+import { useSearchSuggest } from "@/lib/search/useSearchSuggest";
 
 type Facets = APIsResponse["facets"];
 
+/** The API list's search and sort. The search holds every condition as text in `q`. */
 export function ApiFilterBar({
   filters,
   facets,
+  error,
   onChange,
 }: {
   filters: APIFilters;
   facets?: Facets;
+  /** Why the server refused the search, if it did. */
+  error?: SearchQueryError;
   onChange: (patch: Partial<APIFilters>) => void;
 }) {
+  const suggest = useSearchSuggest({
+    projectId: filters.projectId,
+    dataset: "apis",
+    from: filters.from,
+    to: filters.to,
+    environment: filters.environment,
+  });
   return (
-    <FilterSearchComposer
-      ariaLabel="搜索 API 或添加筛选条件"
-      placeholder="搜索 endpoint 或添加筛选条件…"
-      fields={apiFields(facets)}
-      tokens={apiTokens(filters)}
-      shortcuts={[
-        { label: "GET", onSelect: () => addMethod("GET", filters, onChange) },
-        { label: "POST", onSelect: () => addMethod("POST", filters, onChange) },
-        { label: "失败率排序", onSelect: () => onChange({ sort: "failureRate" }) },
-      ]}
-      searchLabel="Endpoint"
-      onSearch={(search) => onChange({ search })}
-      onClear={() =>
-        onChange({
-          search: undefined,
-          methods: [],
-          release: undefined,
-          route: undefined,
-          sort: "requests",
-        })
-      }
-      onSelect={(key, value) => {
-        const selected = String(value);
-        if (key === "method") addMethod(selected, filters, onChange);
-        if (key === "release") onChange({ release: selected });
-        if (key === "route") onChange({ route: selected });
-        if (key === "sort") onChange({ sort: selected as APIFilters["sort"] });
-      }}
-      onRemove={(key) => {
-        if (key === "search") onChange({ search: undefined });
-        if (key === "release") onChange({ release: undefined });
-        if (key === "route") onChange({ route: undefined });
-        if (key === "sort") onChange({ sort: "requests" });
-        if (key.startsWith("method:"))
-          onChange({ methods: filters.methods.filter((method) => method !== key.slice(7)) });
-      }}
-    />
+    <>
+      <SearchQueryInput
+        ariaLabel="搜索 API"
+        placeholder="搜索 endpoint，或输入条件，例如 method:[POST,PUT] AND endpoint:*pay*"
+        value={filters.q ?? ""}
+        onSubmit={(q) => onChange({ q })}
+        fields={apiFields(facets)}
+        suggest={suggest}
+        recentKey="apis"
+        freeTextLabel="Endpoint"
+        error={error}
+        shortcuts={[
+          { label: "GET", term: "method:GET" },
+          { label: "POST", term: "method:POST" },
+          { label: "写操作", term: "method:[POST,PUT,PATCH,DELETE]" },
+        ]}
+      />
+      <Select
+        value={filters.sort}
+        onValueChange={(sort) => onChange({ sort: sort as APIFilters["sort"] })}
+      >
+        <SelectTrigger aria-label="API 排序" className="api-sort-trigger">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {apiSorts.map((sort) => (
+            <SelectItem key={sort} value={sort}>
+              {apiSortLabels[sort]}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </>
   );
 }
 
-function apiFields(facets?: Facets): FilterSearchField[] {
+function apiFields(facets?: Facets): SearchQueryField[] {
   const facetOptions = (source?: { value: string; requests: number }[]) =>
     (source ?? [])
       .filter((option) => option.value)
@@ -77,11 +92,19 @@ function apiFields(facets?: Facets): FilterSearchField[] {
   const observedMethods = new Set(facets?.methods.map((facet) => facet.value));
   return [
     {
+      key: "endpoint",
+      type: "text",
+      label: "Endpoint",
+      hint: "标准化后的接口地址，*pay* 表示包含",
+      aliases: ["url", "接口"],
+      icon: LinkIcon,
+    },
+    {
       key: "method",
+      type: "enum",
       label: "HTTP 方法",
       hint: "GET、POST、PUT、PATCH、DELETE 等",
       icon: CodeXmlIcon,
-      allowCustom: false,
       options: apiMethods
         .filter((method) => !facets || observedMethods.has(method))
         .map((method) => ({
@@ -93,6 +116,7 @@ function apiFields(facets?: Facets): FilterSearchField[] {
     },
     {
       key: "release",
+      type: "text",
       label: "版本",
       hint: "按 Release 定位接口回归",
       icon: PackageIcon,
@@ -100,47 +124,11 @@ function apiFields(facets?: Facets): FilterSearchField[] {
     },
     {
       key: "route",
+      type: "text",
       label: "页面 Route",
-      hint: "查看特定页面发起的请求",
+      hint: "发起请求的页面",
       icon: RouteIcon,
       options: facetOptions(facets?.routes),
     },
-    {
-      key: "sort",
-      label: "排序",
-      hint: "按请求量、失败、延迟或影响排序",
-      icon: ArrowDownWideNarrowIcon,
-      allowCustom: false,
-      options: apiSorts.map((sort) => ({ value: sort, label: apiSortLabels[sort] })),
-    },
   ];
-}
-
-function apiTokens(filters: APIFilters): FilterSearchToken[] {
-  const tokens: FilterSearchToken[] = [];
-  // Methods stack, and the endpoint text has no field of its own: those can be removed but not
-  // edited in place.
-  if (filters.search) tokens.push({ key: "search", label: `Endpoint：${filters.search}` });
-  for (const method of filters.methods)
-    tokens.push({ key: `method:${method}`, label: `方法：${method}` });
-  if (filters.release)
-    tokens.push({ key: "release", fieldKey: "release", label: `版本：${filters.release}` });
-  if (filters.route)
-    tokens.push({
-      key: "route",
-      fieldKey: "route",
-      value: filters.route,
-      label: `Route：${filters.route}`,
-    });
-  if (filters.sort !== "requests")
-    tokens.push({ key: "sort", fieldKey: "sort", label: `排序：${apiSortLabels[filters.sort]}` });
-  return tokens;
-}
-
-function addMethod(
-  method: string,
-  filters: APIFilters,
-  onChange: (patch: Partial<APIFilters>) => void,
-) {
-  if (!filters.methods.includes(method)) onChange({ methods: [...filters.methods, method] });
 }

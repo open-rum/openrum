@@ -11,17 +11,17 @@ import (
 
 func TestLogSearchIsBoundedAndParameterized(t *testing.T) {
 	attributeClause, attributeArgs, attributeErr := logSearch(`attributes.level:custom`)
-	if attributeErr != nil || attributeClause != "attributes[?]=?" || !reflect.DeepEqual(attributeArgs, []any{"level", "custom"}) {
+	if attributeErr != nil || attributeClause != "(attributes[?] = ?)" || !reflect.DeepEqual(attributeArgs, []any{"level", "custom"}) {
 		t.Fatalf("attribute namespace: %s %v %v", attributeClause, attributeArgs, attributeErr)
 	}
 	clause, args, err := logSearch(`severity:error message:"payment failed" order.id:"a' OR 1=1 --"`)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if clause != "log_level=? AND position(log_message,?)>0 AND attributes[?]=?" || !reflect.DeepEqual(args, []any{"error", "payment failed", "order.id", "a' OR 1=1 --"}) {
+	if clause != "(log_level = ?) AND (position(log_message, ?) > 0) AND (attributes[?] = ?)" || !reflect.DeepEqual(args, []any{"error", "payment failed", "order.id", "a' OR 1=1 --"}) {
 		t.Fatalf("%s %v", clause, args)
 	}
-	for _, query := range []string{`severity:oops`, `"unclosed`, `a OR b`, `value:>10`, `order.id:`, `bad[]:x`, strings.Repeat("word ", 13)} {
+	for _, query := range []string{`severity:oops`, `"unclosed`, `a OR b`, `value:>10`, `order.id:`, `session_id:not-a-uuid`, strings.Repeat("word ", 13)} {
 		if _, _, err := logSearch(query); err == nil {
 			t.Errorf("accepted %q", query)
 		}
@@ -62,13 +62,29 @@ func TestLogUserSearchUsesIdentityColumnsNotAttributes(t *testing.T) {
 	} {
 		t.Run(tc.key, func(t *testing.T) {
 			clause, args, err := logSearch(tc.key + `:"customer ' OR 1=1 --" severity:warn`)
-			if err != nil || clause != tc.column+"=? AND log_level=?" || !reflect.DeepEqual(args, []any{"customer ' OR 1=1 --", "warn"}) {
+			if err != nil || clause != "("+tc.column+" = ?) AND (log_level = ?)" || !reflect.DeepEqual(args, []any{"customer ' OR 1=1 --", "warn"}) {
 				t.Fatalf("identity query: %s %v %v", clause, args, err)
 			}
 		})
 	}
 	clause, args, err := logSearch(`attributes.user.id:attribute-user user.id:actual-user`)
-	if err != nil || clause != "attributes[?]=? AND user_id=?" || !reflect.DeepEqual(args, []any{"user.id", "attribute-user", "actual-user"}) {
+	if err != nil || clause != "(attributes[?] = ?) AND (user_id = ?)" || !reflect.DeepEqual(args, []any{"user.id", "attribute-user", "actual-user"}) {
 		t.Fatalf("identity namespace: %s %v %v", clause, args, err)
+	}
+}
+
+func TestLogSearchTakesTheSharedOperators(t *testing.T) {
+	clause, args, err := logSearch(`!level:[debug,trace] has:trace_id logger:checkout* !timeout`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "NOT (log_level IN (?,?)) AND (trace_id != '') AND (startsWith(log_logger, ?)) AND NOT (position(log_message, ?) > 0)"
+	if clause != want || !reflect.DeepEqual(args, []any{"debug", "trace", "checkout", "timeout"}) {
+		t.Fatalf("%s %v", clause, args)
+	}
+	// The old "has a trace" shortcut wrote trace_id:*, which used to look for a literal *.
+	clause, _, err = logSearch(`trace_id:*`)
+	if err != nil || clause != "(trace_id != '')" {
+		t.Fatalf("trace_id:* = %s %v", clause, err)
 	}
 }

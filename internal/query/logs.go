@@ -7,9 +7,9 @@ import (
 	"fmt"
 	"strings"
 	"time"
-	"unicode"
 
 	"openrum/internal/event"
+	"openrum/internal/search"
 
 	"github.com/google/uuid"
 )
@@ -95,107 +95,46 @@ func NormalizeLogFilters(f LogFilters) (LogFilters, error) {
 	return f, nil
 }
 
-// Search is a deliberately small AND-only grammar: words, quoted phrases, field:value.
-// Identifiers are allowlisted; user text and attribute keys are always bound parameters.
+// logSchema is what the Logs search accepts. Any name it does not know is an attribute, as it
+// always has been, and a bare word or message:x looks inside the message, case-sensitively.
+var logSchema = search.Schema{
+	Fields: []search.Field{
+		{Key: "level", Aliases: []string{"severity"}, Exprs: []string{"log_level"}, Type: search.Enum, Normalize: func(value string) (string, bool) {
+			value = strings.ToLower(value)
+			return value, event.ValidLogLevel(value)
+		}},
+		{Key: "logger", Exprs: []string{"log_logger"}, Type: search.Text},
+		{Key: "environment", Exprs: []string{"environment"}, Type: search.Enum},
+		{Key: "release", Exprs: []string{"release"}, Type: search.Text},
+		{Key: "route", Exprs: []string{"route"}, Type: search.Text},
+		{Key: "browser", Exprs: []string{"browser"}, Type: search.Enum},
+		{Key: "device", Aliases: []string{"deviceType"}, Exprs: []string{"device_type"}, Type: search.Enum},
+		{Key: "country", Exprs: []string{"country"}, Type: search.Enum, Normalize: upperCountry},
+		{Key: "trace_id", Aliases: []string{"traceId"}, Exprs: []string{"trace_id"}, Type: search.Text},
+		{Key: "session_id", Aliases: []string{"sessionId"}, Exprs: []string{"session_id"}, Type: search.UUID},
+		{Key: "user.id", Aliases: []string{"user_id", "userId"}, Exprs: []string{"user_id"}, Type: search.Text},
+		{Key: "anonymous_user_id", Aliases: []string{"anonymousUserId"}, Exprs: []string{"anonymous_user_id"}, Type: search.Text},
+		{Key: "message", Exprs: []string{"log_message"}, Type: search.Text, CaseSensitive: true, EqualsMeansContains: true},
+	},
+	AttributeExpr:              "attributes",
+	UnknownFieldsAreAttributes: true,
+	AttributeKey:               behaviorPropertyPattern.MatchString,
+	FreeText:                   "message",
+}
+
+func upperCountry(value string) (string, bool) {
+	value = strings.ToUpper(value)
+	return value, len(value) == 2
+}
+
+// logSearch turns the q parameter into conditions joined with AND.
 func logSearch(input string) (string, []any, error) {
-	var tokens []string
-	var current strings.Builder
-	var quoted, escaped bool
-	for _, r := range input {
-		if escaped {
-			switch r {
-			case 'n':
-				current.WriteRune('\n')
-			case 'r':
-				current.WriteRune('\r')
-			case 't':
-				current.WriteRune('\t')
-			default:
-				current.WriteRune(r)
-			}
-			escaped = false
-			continue
-		}
-		if r == '\\' {
-			escaped = true
-			continue
-		}
-		if r == '"' {
-			quoted = !quoted
-			continue
-		}
-		if unicode.IsSpace(r) && !quoted {
-			if current.Len() > 0 {
-				tokens = append(tokens, current.String())
-				current.Reset()
-			}
-		} else {
-			current.WriteRune(r)
-		}
+	compiled, _, err := logSchema.ParseAndCompile(input, search.Raw)
+	if err != nil {
+		return "", nil, errors.Join(ErrInvalidLogFilters, err)
 	}
-	if quoted || escaped {
-		return "", nil, ErrInvalidLogFilters
-	}
-	if current.Len() > 0 {
-		tokens = append(tokens, current.String())
-	}
-	if len(tokens) > 12 {
-		return "", nil, ErrInvalidLogFilters
-	}
-	columns := map[string]string{
-		"severity": "log_level", "level": "log_level", "logger": "log_logger",
-		"environment": "environment", "release": "release", "route": "route",
-		"browser": "browser", "device": "device_type", "country": "country",
-		"trace_id": "trace_id", "session_id": "session_id",
-		"user.id": "user_id", "user_id": "user_id", "userId": "user_id",
-		"anonymous_user_id": "anonymous_user_id", "anonymousUserId": "anonymous_user_id",
-	}
-	var clauses []string
-	var args []any
-	for _, token := range tokens {
-		if token == "OR" || token == "AND" || token == "NOT" {
-			return "", nil, ErrInvalidLogFilters
-		}
-		key, value, field := strings.Cut(token, ":")
-		if !field {
-			clauses = append(clauses, "position(log_message,?)>0")
-			args = append(args, token)
-			continue
-		}
-		attributeKey := strings.TrimPrefix(key, "attributes.")
-		if value == "" || !behaviorPropertyPattern.MatchString(attributeKey) || strings.HasPrefix(value, ">") || strings.HasPrefix(value, "<") {
-			return "", nil, ErrInvalidLogFilters
-		}
-		if strings.HasPrefix(key, "attributes.") {
-			clauses = append(clauses, "attributes[?]=?")
-			args = append(args, attributeKey, value)
-			continue
-		}
-		if key == "message" {
-			clauses = append(clauses, "position(log_message,?)>0")
-			args = append(args, value)
-			continue
-		}
-		if column, ok := columns[key]; ok {
-			if column == "log_level" {
-				value = strings.ToLower(value)
-				if !event.ValidLogLevel(value) {
-					return "", nil, ErrInvalidLogFilters
-				}
-			}
-			if column == "session_id" {
-				if _, err := uuid.Parse(value); err != nil {
-					return "", nil, ErrInvalidLogFilters
-				}
-			}
-			clauses = append(clauses, column+"=?")
-			args = append(args, value)
-		} else {
-			clauses = append(clauses, "attributes[?]=?")
-			args = append(args, key, value)
-		}
-	}
-	return strings.Join(clauses, " AND "), args, nil
+	where, args := compiled.WhereSQL()
+	return strings.TrimPrefix(where, " AND "), args, nil
 }
 
 func logWhere(f LogFilters) (string, []any) {

@@ -34,6 +34,9 @@ func (handler *AnalyticsHandler) Samples(writer http.ResponseWriter, request *ht
 		return
 	}
 	filters, err := parseBehaviorFilters(request, projectID)
+	if err != nil && writeSearchError(writer, request, err) {
+		return
+	}
 	if err != nil {
 		httpx.WriteError(writer, request, http.StatusBadRequest, "VALIDATION_ERROR", "Samples require one event and a UTC range no longer than 24 hours.")
 		return
@@ -81,13 +84,16 @@ func (handler *AnalyticsHandler) Get(writer http.ResponseWriter, request *http.R
 		return
 	}
 	filters, err := parseBehaviorFilters(request, projectID)
+	if err != nil && writeSearchError(writer, request, err) {
+		return
+	}
 	if err != nil {
 		httpx.WriteError(writer, request, http.StatusBadRequest, "VALIDATION_ERROR", "A valid UTC range and one supported behavior dimension are required.")
 		return
 	}
 	if err := query.CheckBehaviorBudget(filters); err != nil {
 		if errors.Is(err, query.ErrBehaviorQueryTooExpensive) {
-			httpx.WriteError(writer, request, http.StatusUnprocessableEntity, "QUERY_TOO_EXPENSIVE", "Shorten the time range, use a built-in dimension, or add an event/environment filter.")
+			httpx.WriteError(writer, request, http.StatusUnprocessableEntity, "QUERY_TOO_EXPENSIVE", "Shorten the time range, use a built-in dimension, add an event/environment filter, or split by the property you search.")
 			return
 		}
 		httpx.WriteError(writer, request, http.StatusBadRequest, "VALIDATION_ERROR", "Behavior filters are invalid.")
@@ -132,6 +138,6 @@ func parseBehaviorFilters(request *http.Request, projectID uuid.UUID) (query.Beh
 	return query.NormalizeBehaviorFilters(query.BehaviorFilters{
 		ProjectID: projectID, From: from, To: to, Environment: values.Get("environment"),
 		EventKind: values.Get("eventKind"), EventName: values.Get("eventName"), Dimension: values.Get("dimension"),
-		Measurement: values.Get("measurement"), MaxPoints: maxPoints,
+		Measurement: values.Get("measurement"), MaxPoints: maxPoints, Query: values.Get("q"),
 	})
 }

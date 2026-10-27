@@ -50,6 +50,9 @@ func (handler *SessionHandler) List(writer http.ResponseWriter, request *http.Re
 		return
 	}
 	filters, err := parseSessionFilters(request, projectID)
+	if err != nil && writeSearchError(writer, request, err) {
+		return
+	}
 	if err != nil {
 		httpx.WriteError(writer, request, http.StatusBadRequest, "VALIDATION_ERROR", "A valid UTC range and bounded session filters are required.")
 		return
@@ -170,7 +173,7 @@ func parseSessionFilters(request *http.Request, projectID uuid.UUID) (query.Sess
 	return query.NormalizeSessionFilters(query.SessionFilters{
 		ProjectID: projectID, From: from, To: to, Environment: values.Get("environment"), Release: values.Get("release"),
 		Browser: values.Get("browser"), DeviceType: values.Get("deviceType"), Country: values.Get("country"),
-		Route: values.Get("route"), Search: values.Get("search"), Signal: values.Get("signal"), Sort: values.Get("sort"),
+		Route: values.Get("route"), Search: values.Get("search"), Query: values.Get("q"), Signal: values.Get("signal"), Sort: values.Get("sort"),
 		MinimumEvents: minimumEvents, MinimumDuration: minimumDuration, Limit: limit, Page: page,
 	})
 }

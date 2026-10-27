@@ -55,7 +55,9 @@ export function EventExplorer({
       />
       <EventList
         catalog={data.catalog}
-        total={data.totals.events}
+        // The catalog ignores the selected event and the search, so its shares are of its own
+        // sum; the page's totals may describe a narrowed slice.
+        total={data.catalog.reduce((sum, entry) => sum + entry.metric.events, 0)}
         selectedKind={filters.eventKind}
         selectedName={filters.eventName}
         onOpen={(kind, name) => setOpen({ kind, name })}
@@ -68,7 +70,6 @@ export function EventExplorer({
           kind={open.kind}
           name={open.name}
           onClose={() => setOpen(undefined)}
-          onFilter={(kind, name) => onSelectEvent(kind, name)}
         />
       ) : null}
     </div>

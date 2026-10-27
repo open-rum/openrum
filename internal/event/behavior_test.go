@@ -38,3 +38,29 @@ func TestNormalizeBehaviorAttributesPreservesProductCustomEvents(t *testing.T) {
 		t.Fatalf("changed=%v attributes=%#v error=%v", changed, attributes, err)
 	}
 }
+
+func TestNormalizeBehaviorAttributesKeepsOnlyAShortSafeSelector(t *testing.T) {
+	for _, test := range []struct {
+		selector string
+		kept     bool
+	}{
+		{"div.experiment-grid > article.experiment-card.accent-violet > button.run-button", true},
+		{"main#content > button", true},
+		{"a > b > c > button", false},               // four steps
+		{"button.user-42", false},                   // a digit can carry data
+		{"button[data-id=x]", false},                // only tag, id and class
+		{"button.a.b.c.d", false},                   // more than three classes
+		{"button > script:contains(secret)", false}, // not a plain step
+		{"BUTTON.run", false},                       // the SDK lowercases tags
+	} {
+		attributes, _, err := event.NormalizeBehaviorAttributes(event.BehaviorEventClick, map[string]string{
+			"element": "button", "selector": test.selector,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, ok := attributes["selector"]; ok != test.kept {
+			t.Fatalf("selector %q kept=%v, want %v", test.selector, ok, test.kept)
+		}
+	}
+}

@@ -9,21 +9,57 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+
+	"openrum/internal/search"
 )
 
 var ErrInvalidSessionFilters = errors.New("invalid session filters")
 
+// sessionSchema is what the Sessions search accepts. Row-level fields match when any event of
+// the session does, so a negated one means no event does; the rest compare the session itself.
+var sessionSchema = search.Schema{
+	Fields: []search.Field{
+		{Key: "route", Aliases: []string{"page"}, Exprs: []string{"route", "page_url_normalized"}, Type: search.Text, Scope: search.AnyEvent},
+		{Key: "release", Exprs: []string{"release"}, Type: search.Text, Scope: search.AnyEvent},
+		{Key: "browser", Exprs: []string{"browser"}, Type: search.Enum, Scope: search.AnyEvent},
+		{Key: "os", Exprs: []string{"os"}, Type: search.Enum, Scope: search.AnyEvent},
+		{Key: "device", Aliases: []string{"deviceType"}, Exprs: []string{"device_type"}, Type: search.Enum, Scope: search.AnyEvent},
+		{Key: "country", Exprs: []string{"country"}, Type: search.Enum, Scope: search.AnyEvent, Normalize: upperCountry},
+		{Key: "user.id", Aliases: []string{"userId", "user_id"}, Exprs: []string{"user_id"}, Type: search.Text, Scope: search.AnyEvent},
+		{Key: "anonymous_user_id", Aliases: []string{"visitor", "anonymousUserId"}, Exprs: []string{"anonymous_user_id"}, Type: search.Text, Scope: search.AnyEvent},
+		{Key: "session_id", Aliases: []string{"sessionId"}, Exprs: []string{"session_id"}, Type: search.UUID, Scope: search.AnyEvent},
+		{Key: "event", Exprs: []string{"custom_name"}, Type: search.Text, Scope: search.AnyEvent},
+		{Key: "error", Exprs: []string{"error_message"}, Type: search.Text, Scope: search.AnyEvent},
+		{Key: "events", Exprs: []string{"event_count"}, Type: search.Number, Scope: search.Having},
+		{Key: "errors", Exprs: []string{"error_count"}, Type: search.Number, Scope: search.Having},
+		{Key: "page_views", Aliases: []string{"pageViews"}, Exprs: []string{"page_view_count"}, Type: search.Number, Scope: search.Having},
+		{Key: "api_failures", Aliases: []string{"apiFailures"}, Exprs: []string{"api_failure_count"}, Type: search.Number, Scope: search.Having},
+		{Key: "duration", Exprs: []string{"duration_seconds"}, Type: search.Duration, DurationUnit: time.Second, Scope: search.Having},
+		{Key: "slowest_api", Aliases: []string{"slowestApi"}, Exprs: []string{"maxIf(duration_ms,event_type='api')"}, Type: search.Duration, DurationUnit: time.Millisecond, Scope: search.Having},
+		{Key: "poor_vitals", Aliases: []string{"poorVitals"}, Exprs: []string{"countIf(event_type='web_vital' AND metric_rating='poor')"}, Type: search.Number, Scope: search.Having},
+		{Key: "text", Exprs: []string{"toString(session_id)", "anonymous_user_id", "user_id", "route", "page_url_normalized", "custom_name", "error_message"},
+			Type: search.Text, Scope: search.AnyEvent},
+	},
+	AttributeExpr:  "attributes",
+	AttributeScope: search.AnyEvent,
+	AttributeKey:   behaviorPropertyPattern.MatchString,
+	FreeText:       "text",
+}
+
 type SessionFilters struct {
-	ProjectID       uuid.UUID
-	From            time.Time
-	To              time.Time
-	Environment     string
-	Release         string
-	Browser         string
-	DeviceType      string
-	Country         string
-	Route           string
-	Search          string
+	ProjectID   uuid.UUID
+	From        time.Time
+	To          time.Time
+	Environment string
+	Release     string
+	Browser     string
+	DeviceType  string
+	Country     string
+	Route       string
+	Search      string
+	// Query is the shared search (internal/search). Every condition is about the session:
+	// route:/checkout keeps sessions that visited it, duration:>2m compares its length.
+	Query           string
 	Signal          string
 	Sort            string
 	MinimumEvents   int
@@ -116,8 +152,12 @@ func NormalizeSessionFilters(filters SessionFilters) (SessionFilters, error) {
 		!validSessionSort(filters.Sort) || !boundedQueryDimension(filters.Environment, 64) ||
 		!boundedQueryDimension(filters.Release, 128) || !boundedQueryDimension(filters.Browser, 128) ||
 		!boundedQueryDimension(filters.DeviceType, 64) || !boundedQueryDimension(filters.Country, 2) ||
-		!boundedQueryDimension(filters.Route, 512) || !boundedQueryDimension(filters.Search, 128) {
+		!boundedQueryDimension(filters.Route, 512) || !boundedQueryDimension(filters.Search, 128) ||
+		!boundedQueryDimension(filters.Query, search.MaxLength) {
 		return SessionFilters{}, ErrInvalidSessionFilters
+	}
+	if _, _, err := sessionSchema.ParseAndCompile(filters.Query, search.Raw); err != nil {
+		return SessionFilters{}, errors.Join(ErrInvalidSessionFilters, err)
 	}
 	return filters, nil
 }
@@ -131,6 +171,7 @@ func validSessionSort(value string) bool {
 }
 
 func (repository *SessionRepository) List(ctx context.Context, requested SessionFilters) (SessionPage, error) {
+	ctx = boundedQueryContext(ctx)
 	filters, err := NormalizeSessionFilters(requested)
 	if err != nil {
 		return SessionPage{}, err
@@ -227,6 +268,11 @@ func sessionHaving(filters SessionFilters) (string, []any) {
 	if filters.MinimumDuration > 0 {
 		clauses = append(clauses, "duration_seconds>=?")
 		arguments = append(arguments, filters.MinimumDuration)
+	}
+	compiled, _, _ := sessionSchema.ParseAndCompile(filters.Query, search.Raw)
+	for _, clause := range append(compiled.Where, compiled.Having...) {
+		clauses = append(clauses, clause.SQL)
+		arguments = append(arguments, clause.Args...)
 	}
 	if len(clauses) == 0 {
 		return "", arguments

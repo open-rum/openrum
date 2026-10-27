@@ -59,6 +59,8 @@ export type SessionFilters = {
   country?: string;
   route?: string;
   search?: string;
+  /** The shared search (lib/search/terms.ts): route:/checkout, duration:>2m, user.id:… */
+  q?: string;
   signal: SessionSignal;
   sort: SessionSort;
   minimumEvents?: number;
@@ -164,6 +166,7 @@ export function getSessions(filters: SessionFilters, signal?: AbortSignal) {
     country: filters.country,
     route: filters.route,
     search: filters.search,
+    q: filters.q,
     minimumEvents: filters.minimumEvents,
     minimumDuration: filters.minimumDuration,
   })) {

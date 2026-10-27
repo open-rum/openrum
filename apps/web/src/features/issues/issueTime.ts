@@ -28,3 +28,10 @@ export function formatAbsoluteTime(value: string) {
 export function isNewInRange(firstSeenAt: string, from: Date) {
   return new Date(firstSeenAt).getTime() >= from.getTime();
 }
+
+/** Keeps a relative range ("最近 7 天") relative on the page a link opens. */
+export function withTimePreset(parameters: URLSearchParams) {
+  const preset = new URLSearchParams(window.location.search).get("timePreset");
+  if (preset) parameters.set("timePreset", preset);
+  return parameters;
+}

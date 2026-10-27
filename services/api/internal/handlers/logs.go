@@ -54,8 +54,11 @@ func (handler *LogHandler) List(writer http.ResponseWriter, request *http.Reques
 	filters, err := query.NormalizeLogFilters(query.LogFilters{ProjectID: projectID, From: from, To: to, Limit: limit,
 		Environment: values.Get("environment"), Release: values.Get("release"), Route: values.Get("route"), Browser: values.Get("browser"),
 		DeviceType: values.Get("deviceType"), Country: values.Get("country"), Level: values.Get("level"), Query: values.Get("q"), Cursor: values.Get("cursor")})
+	if err != nil && writeSearchError(writer, request, err) {
+		return
+	}
 	if fromErr != nil || toErr != nil || limitErr != nil || err != nil {
-		httpx.WriteError(writer, request, http.StatusBadRequest, "VALIDATION_ERROR", "Use a range up to 30 days and words or field:value search terms. OR, comparisons, and unclosed quotes are not supported.")
+		httpx.WriteError(writer, request, http.StatusBadRequest, "VALIDATION_ERROR", "Use a range up to 30 days and a valid search.")
 		return
 	}
 	ctx, cancel := context.WithTimeout(request.Context(), 10*time.Second)

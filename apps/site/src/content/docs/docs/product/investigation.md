@@ -15,7 +15,7 @@ OpenRUM keeps behavior analytics and error monitoring in one investigation path 
 
 ## Triage the Issue list
 
-The Issue list is built for triage. The **New issues**, **Unassigned** and **Assigned to me** chips narrow it in one click, and the status filter includes **Regressed**: Issues you resolved that have failed again since. Select rows with the checkboxes to resolve, ignore, reopen or assign many Issues at once; members with the Viewer role can read the list but not change it.
+The Issue list is built for triage. It opens on the Issues that still need handling (`is:unresolved` in the search box), which include **Regressed** ones: Issues you resolved that have failed again since. Status and assignee are search conditions like any other: `is:regressed`, `is:resolved`, `is:ignored`, `is:new` (first seen in the selected range), `is:unassigned` and `assigned:me`. Remove `is:unresolved` to see every Issue. Change one Issue's owner from its **Owner** column, or select rows with the checkboxes to resolve, ignore, reopen or assign many Issues at once; members with the Viewer role can read the list but not change it.
 
 ## Evidence you should expect
 

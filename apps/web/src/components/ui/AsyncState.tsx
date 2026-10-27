@@ -10,11 +10,14 @@ export function AsyncError({
   title,
   remediation,
   onRetry,
+  action,
 }: {
   error: unknown;
   title: string;
   remediation: string;
   onRetry?: () => void;
+  /** A way out that fits this failure better than retrying, shown before 重新加载. */
+  action?: ReactNode;
 }) {
   const requestId = error instanceof HTTPError ? error.requestId : "";
   return (
@@ -24,10 +27,15 @@ export function AsyncError({
       <AlertDescription>
         <span>{remediation}</span>
         {requestId ? <small className="mt-1 block font-mono">Request ID: {requestId}</small> : null}
-        {onRetry ? (
-          <Button type="button" size="sm" variant="outline" className="mt-3" onClick={onRetry}>
-            <RefreshCwIcon /> 重新加载
-          </Button>
+        {action || onRetry ? (
+          <span className="mt-3 flex flex-wrap gap-2">
+            {action}
+            {onRetry ? (
+              <Button type="button" size="sm" variant="outline" onClick={onRetry}>
+                <RefreshCwIcon /> 重新加载
+              </Button>
+            ) : null}
+          </span>
         ) : null}
       </AlertDescription>
     </Alert>

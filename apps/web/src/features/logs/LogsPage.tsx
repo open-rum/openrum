@@ -24,11 +24,23 @@ import {
 import { useAnalysisContext } from "@/features/filters/AnalysisContextBar";
 import { getLogs, logSearchTerm, type LogEntry, type LogFilters } from "@/lib/api/logs";
 import { LogDetails, LogLevelBadge } from "./LogDetails";
+import { searchErrorFrom } from "@/lib/api/search";
+import { equalsTerm, foldIntoQuery } from "@/lib/search/legacy";
+import { appendTerms } from "@/lib/search/query";
 import { LogFilterComposer } from "./LogFilterComposer";
 import { LogTrend } from "./LogTrend";
 import "./logs.css";
 
-const legacyDimensionKeys = ["country", "deviceType", "route", "browser", "release"] as const;
+// Old links carried these as their own parameters; they are read as conditions of the query.
+const legacyKeys = ["level", "country", "deviceType", "route", "browser", "release"] as const;
+const legacyFields: Record<(typeof legacyKeys)[number], string> = {
+  level: "level",
+  country: "country",
+  deviceType: "device",
+  route: "route",
+  browser: "browser",
+  release: "release",
+};
 
 export function LogsPage() {
   const { projectId } = useParams({ strict: false }) as { projectId: string };
@@ -40,24 +52,31 @@ export function LogsPage() {
   );
   const fallbackTo = useMemo(() => new Date(), []);
   const params = new URLSearchParams(search);
-  const hasLegacyDimensions = legacyDimensionKeys.some((key) => params.has(key));
+  const hasLegacy = legacyKeys.some((key) => params.has(key));
+  const q = foldIntoQuery(
+    params.get("q"),
+    legacyKeys.map((key) => {
+      const value = params.get(key)?.trim();
+      return value ? equalsTerm(legacyFields[key], value) : undefined;
+    }),
+  );
   useEffect(() => {
-    // Removed sidebar filters must not survive as invisible constraints in old links.
+    // An old link's one-field parameters become visible text in the query, never hidden filters.
     const url = new URL(window.location.href);
-    if (!legacyDimensionKeys.some((key) => url.searchParams.has(key))) return;
-    for (const key of legacyDimensionKeys) url.searchParams.delete(key);
+    if (!legacyKeys.some((key) => url.searchParams.has(key))) return;
+    for (const key of legacyKeys) url.searchParams.delete(key);
     url.searchParams.delete("cursor");
+    if (q) url.searchParams.set("q", q);
     window.history.replaceState(window.history.state, "", url);
     window.dispatchEvent(new Event("openrum:urlchange"));
-  }, [search]);
+  }, [search, q]);
   const filters: LogFilters = {
     projectId,
     from: (context?.from ?? new Date(fallbackTo.getTime() - 86400000)).toISOString(),
     to: (context?.to ?? fallbackTo).toISOString(),
     environment: context?.environment,
-    q: params.get("q") || undefined,
-    level: params.get("level") || undefined,
-    cursor: hasLegacyDimensions ? undefined : params.get("cursor") || undefined,
+    q,
+    cursor: hasLegacy ? undefined : params.get("cursor") || undefined,
   };
   const update = (patch: Partial<LogFilters>) => {
     const next = new URLSearchParams(window.location.search);
@@ -100,7 +119,7 @@ function LogWorkspace({
   });
   const data = query.data;
   const addFilter = (key: string, value: string) => {
-    update({ q: [filters.q, logSearchTerm(key, value)].filter(Boolean).join(" ") });
+    update({ q: appendTerms(filters.q ?? "", [logSearchTerm(key, value)]) });
     setSelected(null);
   };
   const exportPage = () => {
@@ -133,18 +152,26 @@ function LogWorkspace({
         }
       />
       <ConsoleFilterBar
-        primary={<LogFilterComposer filters={filters} items={data?.items} onChange={update} />}
+        primary={
+          <LogFilterComposer
+            filters={filters}
+            items={data?.items}
+            error={searchErrorFrom(query.error)}
+            onChange={update}
+          />
+        }
       />
       <ConsolePageContent className="grid gap-4">
         <details className="logs-search-help">
           <summary>搜索语法</summary>
           <p>
             关键词匹配正文（区分大小写），多个条件同时满足。支持
-            severity、logger、environment、release、route、country、device、browser、trace_id、session_id
-            和自定义属性；用户 ID 用 user.id（也支持 user_id、userId），匿名访客用
-            anonymous_user_id。 含空格的值用双引号包裹。暂不支持 OR、通配符和数值比较。
+            level、logger、release、route、country、device、browser、trace_id、session_id、
+            user.id、anonymous_user_id 和自定义属性（attributes.名称）。在条件前加 ! 表示“不是”，
+            字段:[值1,值2] 表示其中之一，字段:*值* 表示包含，字段:值* 表示开头是，has:字段
+            表示有值。含空格的值用双引号包裹。不支持 OR 和括号。
           </p>
-          <code>user.id:"customer-123" severity:error</code>
+          <code>user.id:"customer-123" !level:[debug,trace] has:trace_id</code>
         </details>
         {query.isLoading || !ready ? (
           <div className="grid gap-4" aria-label="正在加载日志">

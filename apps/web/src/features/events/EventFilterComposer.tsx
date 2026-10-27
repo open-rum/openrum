@@ -1,171 +1,169 @@
-import { ActivityIcon, BracesIcon, ChartNoAxesColumnIcon } from "lucide-react";
+import { Globe2Icon, MonitorSmartphoneIcon, PackageIcon, RouteIcon, TagIcon } from "lucide-react";
 import {
-  FilterSearchComposer,
-  type FilterSearchField,
-  type FilterSearchToken,
-} from "@/components/filters/FilterSearchComposer";
-import type {
-  BehaviorAnalyticsResponse,
-  BehaviorDimension,
-  BehaviorFilters,
-  BehaviorKind,
-} from "@/lib/api/analytics";
+  SearchQueryInput,
+  type SearchQueryError,
+  type SearchQueryField,
+} from "@/components/filters/SearchQueryInput";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import type { BehaviorAnalyticsResponse, BehaviorFilters, BehaviorKind } from "@/lib/api/analytics";
 import { eventLabel } from "@/features/analytics/labels";
+import { useSearchSuggest } from "@/lib/search/useSearchSuggest";
 
+const allEvents = "__all__";
+
+/**
+ * Which event the Events page looks at, and a search that narrows the events by the
+ * dimensions every page shares (page, country, device, browser, release) and by their
+ * properties, such as attributes.plan:pro. How the distribution is split is chosen on its own
+ * card, and measurements live in the event drawer: neither filters anything, so neither sits
+ * beside the search.
+ */
 export function EventFilterComposer({
   filters,
   data,
+  error,
   onChange,
 }: {
   filters: BehaviorFilters;
   data?: BehaviorAnalyticsResponse;
+  /** Why the server refused the search, if it did. */
+  error?: SearchQueryError;
   onChange: (patch: Partial<BehaviorFilters>) => void;
 }) {
+  const suggest = useSearchSuggest({
+    projectId: filters.projectId,
+    dataset: "events",
+    from: filters.from,
+    to: filters.to,
+    environment: filters.environment,
+    // Property values of the event being explored come first.
+    event: filters.eventKind === "custom" ? filters.eventName : undefined,
+  });
+  const selectedEvent = filters.eventKind
+    ? `${filters.eventKind}:${filters.eventName ?? "*"}`
+    : allEvents;
   return (
-    <FilterSearchComposer
-      ariaLabel="添加事件筛选条件"
-      placeholder="添加筛选条件…"
-      fields={eventFields(data)}
-      tokens={eventTokens(filters)}
-      shortcuts={[
-        {
-          label: "页面访问",
-          onSelect: () => onChange({ eventKind: "page_view", eventName: undefined }),
-        },
-        { label: "点击", onSelect: () => onChange({ eventKind: "click", eventName: undefined }) },
-        {
-          label: "自定义事件",
-          onSelect: () => onChange({ eventKind: "custom", eventName: undefined }),
-        },
-      ]}
-      onSelect={(key, value) => {
-        const selected = String(value);
-        if (key === "event") {
-          const separator = selected.indexOf(":");
-          const eventKind = selected.slice(0, separator) as BehaviorKind;
-          const eventName = selected.slice(separator + 1);
-          onChange({ eventKind, eventName: eventName === "*" ? undefined : eventName });
-          return;
-        }
-        if (key === "dimension") {
-          onChange({ dimension: selected as BehaviorDimension });
-          return;
-        }
-        if (key === "measurement") onChange({ measurement: selected });
-      }}
-      onClear={() =>
-        onChange({
-          eventKind: undefined,
-          eventName: undefined,
-          dimension: "country",
-          measurement: undefined,
-        })
-      }
-      onRemove={(key) => {
-        if (key === "event") onChange({ eventKind: undefined, eventName: undefined });
-        if (key === "dimension") onChange({ dimension: "country" });
-        if (key === "measurement") onChange({ measurement: undefined });
-      }}
-    />
+    <>
+      <Select
+        value={selectedEvent}
+        onValueChange={(value) => {
+          if (value === allEvents) {
+            onChange({ eventKind: undefined, eventName: undefined });
+            return;
+          }
+          const separator = value.indexOf(":");
+          const eventName = value.slice(separator + 1);
+          onChange({
+            eventKind: value.slice(0, separator) as BehaviorKind,
+            eventName: eventName === "*" ? undefined : eventName,
+          });
+        }}
+      >
+        <SelectTrigger aria-label="事件" className="event-filter-trigger">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value={allEvents}>全部事件</SelectItem>
+          <SelectItem value="page_view:*">全部页面访问</SelectItem>
+          <SelectItem value="navigation:*">全部页面导航</SelectItem>
+          <SelectItem value="click:*">全部点击</SelectItem>
+          <SelectItem value="custom:*">全部自定义事件</SelectItem>
+          {data?.catalog.length ? (
+            <SelectGroup>
+              <SelectLabel>事件</SelectLabel>
+              {data.catalog.map((event) => (
+                <SelectItem
+                  key={`${event.kind}:${event.name}`}
+                  value={`${event.kind}:${event.name}`}
+                >
+                  {eventLabel(event.kind, event.name)}
+                </SelectItem>
+              ))}
+            </SelectGroup>
+          ) : null}
+        </SelectContent>
+      </Select>
+      <SearchQueryInput
+        ariaLabel="搜索事件"
+        placeholder="按页面、国家、设备或属性筛选，例如 route:/checkout AND attributes.plan:pro"
+        value={filters.q ?? ""}
+        onSubmit={(q) => onChange({ q })}
+        fields={eventFields(data)}
+        attributes
+        suggest={suggest}
+        recentKey="events"
+        error={error}
+      />
+    </>
   );
 }
 
-function eventFields(data?: BehaviorAnalyticsResponse): FilterSearchField[] {
+/**
+ * The shared dimensions first, then one field per property the events carry, so "属性 plan
+ * 是 pro" is one choice away. Values come from the server's suggestions.
+ */
+function eventFields(data?: BehaviorAnalyticsResponse): SearchQueryField[] {
   return [
     {
-      key: "event",
-      label: "事件",
-      hint: "按事件类型或具体事件名称筛选",
-      icon: ActivityIcon,
-      allowCustom: false,
-      options: [
-        { value: "page_view:*", label: "全部页面访问" },
-        { value: "navigation:*", label: "全部页面导航" },
-        { value: "click:*", label: "全部点击" },
-        { value: "custom:*", label: "全部自定义事件" },
-        ...(data?.catalog.map((event) => ({
-          value: `${event.kind}:${event.name}`,
-          label: eventLabel(event.kind, event.name),
-          count: event.metric.events,
-          countLabel: "个事件",
-        })) ?? []),
-      ],
+      key: "route",
+      type: "text",
+      label: "页面",
+      hint: "事件发生时的 Route 或页面 URL",
+      aliases: ["page", "页面"],
+      icon: RouteIcon,
     },
     {
-      key: "dimension",
-      label: "分群维度",
-      hint: "按国家、设备、浏览器、来源或自定义属性拆分",
-      icon: BracesIcon,
-      allowCustom: false,
-      options: [
-        { value: "country", label: "国家" },
-        { value: "device", label: "设备" },
-        { value: "browser", label: "浏览器" },
-        { value: "source", label: "来源" },
-        ...(data?.properties.map((property) => ({
-          value: `property:${property.name}`,
-          label: `属性 · ${property.name}`,
-          count: property.events,
-          countLabel: "个事件",
-        })) ?? []),
-      ],
+      key: "country",
+      type: "enum",
+      label: "国家 / 地区",
+      hint: "两位国家代码，例如 CN、US",
+      icon: Globe2Icon,
     },
     {
-      key: "measurement",
-      label: "测量值",
-      hint: "选择自定义数值指标进行分析",
-      icon: ChartNoAxesColumnIcon,
-      allowCustom: false,
-      options:
-        data?.measurements.map((measurement) => ({
-          value: measurement.name,
-          label: measurement.name,
-          count: measurement.samples,
-          countLabel: "个样本",
-        })) ?? [],
+      key: "device",
+      type: "enum",
+      label: "设备类型",
+      hint: "desktop、mobile、tablet",
+      aliases: ["deviceType"],
+      icon: MonitorSmartphoneIcon,
+    },
+    {
+      key: "browser",
+      type: "enum",
+      label: "浏览器",
+      hint: "Chrome、Safari、Firefox 等",
+      icon: MonitorSmartphoneIcon,
+    },
+    {
+      key: "release",
+      type: "text",
+      label: "版本",
+      hint: "SDK 上报的 Release",
+      icon: PackageIcon,
+    },
+    ...(data?.properties.map((property) => ({
+      key: `attributes.${property.name}`,
+      type: "text" as const,
+      label: `属性 ${property.name}`,
+      hint: `${property.events.toLocaleString()} 个事件上报了它，${property.cardinality} 种取值`,
+      aliases: [property.name],
+      icon: TagIcon,
+    })) ?? []),
+    {
+      key: "attributes.",
+      type: "text",
+      label: "其他属性",
+      hint: "写成 attributes.名称:值",
+      aliases: ["property", "属性"],
+      icon: TagIcon,
     },
   ];
-}
-
-function eventTokens(filters: BehaviorFilters): FilterSearchToken[] {
-  const tokens: FilterSearchToken[] = [];
-  if (filters.eventKind) {
-    tokens.push({
-      key: "event",
-      fieldKey: "event",
-      label: filters.eventName
-        ? `事件：${eventLabel(filters.eventKind, filters.eventName)}`
-        : `事件：${eventKindLabel(filters.eventKind)}`,
-    });
-  }
-  if (filters.dimension !== "country")
-    tokens.push({
-      key: "dimension",
-      fieldKey: "dimension",
-      label: `分群：${dimensionLabel(filters.dimension)}`,
-    });
-  if (filters.measurement)
-    tokens.push({
-      key: "measurement",
-      fieldKey: "measurement",
-      label: `测量值：${filters.measurement}`,
-    });
-  return tokens;
-}
-
-function eventKindLabel(kind: BehaviorKind) {
-  return {
-    page_view: "全部页面访问",
-    navigation: "全部页面导航",
-    click: "全部点击",
-    custom: "全部自定义事件",
-  }[kind];
-}
-
-function dimensionLabel(dimension: BehaviorDimension) {
-  if (dimension.startsWith("property:")) return `属性 · ${dimension.slice(9)}`;
-  if (dimension === "device") return "设备";
-  if (dimension === "browser") return "浏览器";
-  if (dimension === "source") return "来源";
-  return "国家";
 }

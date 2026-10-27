@@ -1,6 +1,13 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { BugIcon, ChevronLeftIcon, ChevronRightIcon, RefreshCwIcon } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+import {
+  ArrowDownUpIcon,
+  BugIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  RefreshCwIcon,
+} from "lucide-react";
 import { AsyncError } from "@/components/ui/AsyncState";
 import {
   ConsoleFilterBar,
@@ -12,7 +19,6 @@ import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
-  SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue,
@@ -26,15 +32,16 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Toggle } from "@/components/ui/toggle";
-import { getIssueOverview, getIssues, type IssueFilters } from "@/lib/api/issues";
+import { getIssueOverview, getIssues, updateIssue } from "@/lib/api/issues";
 import { TIME_SERIES_MAX_POINTS } from "@/lib/charts/timeSeries";
-import { listOrganizations, listProjects, type Project } from "@/lib/api/projects";
+import { listMembers, listOrganizations, listProjects, type Project } from "@/lib/api/projects";
 import { projectIdFromPathname } from "@/lib/projects/currentProject";
+import { searchErrorFrom } from "@/lib/api/search";
 import { IssueFilterComposer } from "./IssueFilterComposer";
 import { IssueBulkBar } from "./IssueBulkBar";
 import { IssueTable } from "./IssueTable";
 import { IssueOverview } from "./IssueOverview";
+import { issueSorts } from "./issueSort";
 import { useIssueFilters } from "./useIssueFilters";
 import "./issues.css";
 
@@ -83,7 +90,7 @@ export function IssuesPage() {
 }
 
 function ProjectIssues({ project }: { project: Project }) {
-  const { filters, update } = useIssueFilters(project.id);
+  const { filters, update } = useIssueFilters(project.id, { foldIntoQuery: true });
   const scope = JSON.stringify({ ...filters, cursor: undefined, search: undefined });
   const [pagination, setPagination] = useState<{
     scope: string;
@@ -106,6 +113,7 @@ function ProjectIssues({ project }: { project: Project }) {
       filters.deviceType,
       filters.country,
       filters.route,
+      filters.q,
       filters.status,
       filters.assignee,
       filters.newOnly,
@@ -131,11 +139,33 @@ function ProjectIssues({ project }: { project: Project }) {
       filters.deviceType,
       filters.country,
       filters.route,
+      filters.q,
     ],
     queryFn: ({ signal }) => getIssueOverview(filters, signal),
   });
   const issues = query.data?.issues ?? [];
   const canChange = project.role !== "viewer";
+  // The owner column shows names and pictures; without the list it still shows who owns what.
+  const members = useQuery({
+    queryKey: ["members", project.organizationId],
+    queryFn: () => listMembers(project.organizationId),
+    retry: false,
+  });
+  const queryClient = useQueryClient();
+  const assign = useMutation({
+    mutationFn: ({
+      fingerprint,
+      assigneeUserId,
+    }: {
+      fingerprint: string;
+      assigneeUserId: string;
+    }) => updateIssue(filters, fingerprint, { assigneeUserId }),
+    onSuccess: (_state, { assigneeUserId }) => {
+      toast.success(assigneeUserId ? "已分配负责人" : "已取消分配");
+      void queryClient.invalidateQueries({ queryKey: ["issues", project.id] });
+    },
+    onError: () => toast.error("分配失败，请稍后重试"),
+  });
   // A selection belongs to the page it was made on; any filter, sort or page change drops it.
   const selectionKey = `${scope}|${filters.cursor ?? ""}`;
   const [selection, setSelection] = useState<{ key: string; ids: ReadonlySet<string> }>({
@@ -144,38 +174,6 @@ function ProjectIssues({ project }: { project: Project }) {
   });
   const selectedIds = selection.key === selectionKey ? selection.ids : new Set<string>();
   const selectedIssues = issues.filter((issue) => selectedIds.has(issue.fingerprint));
-  const hasFilters = Boolean(
-    filters.status ||
-    filters.assignee ||
-    filters.newOnly ||
-    filters.title ||
-    filters.errorType ||
-    filters.fingerprint ||
-    filters.userId ||
-    filters.release ||
-    filters.browser ||
-    filters.deviceType ||
-    filters.country ||
-    filters.route ||
-    filters.sort !== "events",
-  );
-  const clearFilters = () =>
-    update({
-      status: undefined,
-      assignee: undefined,
-      newOnly: undefined,
-      title: undefined,
-      errorType: undefined,
-      fingerprint: undefined,
-      userId: undefined,
-      release: undefined,
-      browser: undefined,
-      deviceType: undefined,
-      country: undefined,
-      route: undefined,
-      sort: "events",
-      cursor: undefined,
-    });
   return (
     <ConsolePage width="fluid">
       <ConsolePageHeader
@@ -197,70 +195,38 @@ function ProjectIssues({ project }: { project: Project }) {
       <ConsoleFilterBar
         primary={
           <>
-            <Select
-              value={filters.status ?? "all"}
-              onValueChange={(value) =>
-                update({
-                  status: value === "all" ? undefined : (value as IssueFilters["status"]),
-                  cursor: undefined,
-                })
-              }
-            >
-              <SelectTrigger aria-label="问题状态" className="min-w-36">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  <SelectItem value="all">全部状态</SelectItem>
-                  <SelectItem value="unresolved">待处理</SelectItem>
-                  <SelectItem value="regressed">已回归</SelectItem>
-                  <SelectItem value="resolved">已解决</SelectItem>
-                  <SelectItem value="ignored">已忽略</SelectItem>
-                </SelectGroup>
-              </SelectContent>
-            </Select>
-            <div className="issue-quick-filters" role="group" aria-label="快捷筛选">
-              <Toggle
-                variant="outline"
-                size="sm"
-                pressed={Boolean(filters.newOnly)}
-                onPressedChange={(on) => update({ newOnly: on || undefined, cursor: undefined })}
-                title="首次发生在所选时间范围内的问题"
-              >
-                新问题
-              </Toggle>
-              <Toggle
-                variant="outline"
-                size="sm"
-                pressed={filters.assignee === "none"}
-                onPressedChange={(on) =>
-                  update({ assignee: on ? "none" : undefined, cursor: undefined })
-                }
-              >
-                未分配
-              </Toggle>
-              <Toggle
-                variant="outline"
-                size="sm"
-                pressed={filters.assignee === "me"}
-                onPressedChange={(on) =>
-                  update({ assignee: on ? "me" : undefined, cursor: undefined })
-                }
-              >
-                分配给我
-              </Toggle>
-            </div>
             <IssueFilterComposer
+              projectId={project.id}
               filters={filters}
               facets={query.data?.facets}
               errorTypes={overviewQuery.data?.errorTypes}
+              error={searchErrorFrom(query.error) ?? searchErrorFrom(overviewQuery.error)}
               onChange={(patch) => update({ ...patch, cursor: undefined })}
             />
-            {hasFilters ? (
-              <Button type="button" variant="ghost" onClick={clearFilters}>
-                清除筛选
-              </Button>
-            ) : null}
+            <Select
+              value={filters.sort}
+              onValueChange={(sort) =>
+                update({ sort: sort as typeof filters.sort, cursor: undefined })
+              }
+            >
+              <SelectTrigger aria-label="问题排序" className="issue-sort-trigger">
+                <ArrowDownUpIcon data-icon="inline-start" />
+                {/* The trigger names the order; the hints belong to the menu. */}
+                <SelectValue>
+                  {issueSorts.find((item) => item.value === filters.sort)?.label}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent align="end">
+                {issueSorts.map((item) => (
+                  <SelectItem key={item.value} value={item.value} className="issue-sort-item">
+                    <span>
+                      <strong>{item.label}</strong>
+                      <small>{item.hint}</small>
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </>
         }
       />
@@ -309,6 +275,13 @@ function ProjectIssues({ project }: { project: Project }) {
               <IssueTable
                 issues={issues}
                 filters={filters}
+                assignment={{
+                  members: members.data?.members,
+                  onAssign: canChange
+                    ? (issue, assigneeUserId) =>
+                        assign.mutate({ fingerprint: issue.fingerprint, assigneeUserId })
+                    : undefined,
+                }}
                 onSortChange={(sort) => update({ sort, cursor: undefined })}
                 selection={
                   canChange
@@ -323,16 +296,13 @@ function ProjectIssues({ project }: { project: Project }) {
               <Empty>
                 <EmptyHeader>
                   <EmptyTitle>
-                    {filters.title ? "没有匹配该错误标题的问题" : "本页没有匹配状态的问题"}
+                    {filters.q ? "没有匹配当前查询的问题" : "本页没有匹配状态的问题"}
                   </EmptyTitle>
                   <EmptyDescription>可以继续翻页，或调整筛选条件。</EmptyDescription>
                 </EmptyHeader>
-                {filters.title ? (
+                {filters.q ? (
                   <EmptyContent>
-                    <Button
-                      variant="outline"
-                      onClick={() => update({ title: undefined }, "replace")}
-                    >
+                    <Button variant="outline" onClick={() => update({ q: "" }, "replace")}>
                       清除搜索
                     </Button>
                   </EmptyContent>

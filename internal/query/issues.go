@@ -13,9 +13,41 @@ import (
 	"github.com/google/uuid"
 
 	"openrum/internal/metadata"
+	"openrum/internal/search"
 )
 
 var ErrInvalidIssueFilters = errors.New("invalid issue filters")
+
+// issueSchema is what the Issues search accepts. A bare word searches the title.
+var issueSchema = search.Schema{
+	Fields: []search.Field{
+		{Key: "title", Aliases: []string{"message"}, Exprs: []string{"error_message"}, Aggregate: "issue_title", AggregateHaving: true, Type: search.Text},
+		{Key: "error.type", Aliases: []string{"errorType", "type"}, Exprs: []string{"error_type"}, Aggregate: "error_type_value", AggregateHaving: true, Type: search.Text},
+		{Key: "fingerprint", Exprs: []string{"fingerprint"}, Aggregate: "fingerprint", Type: search.Text},
+		{Key: "release", Exprs: []string{"release"}, Aggregate: "release", Type: search.Text},
+		{Key: "route", Exprs: []string{"route"}, Aggregate: "route", Type: search.Text},
+		{Key: "browser", Exprs: []string{"browser"}, Aggregate: "browser", Type: search.Enum},
+		{Key: "device", Aliases: []string{"deviceType"}, Exprs: []string{"device_type"}, Aggregate: "device_type", Type: search.Enum},
+		{Key: "country", Exprs: []string{"country"}, Aggregate: "country", Type: search.Enum, Normalize: upperCountry},
+		{Key: "user.id", Aliases: []string{"userId", "user_id"}, Exprs: []string{"user_id"}, Type: search.Text},
+		{Key: "anonymous_user_id", Aliases: []string{"anonymousUserId"}, Exprs: []string{"anonymous_user_id"}, Type: search.Text},
+	},
+	AttributeExpr: "attributes",
+	AttributeKey:  behaviorPropertyPattern.MatchString,
+	FreeText:      "title",
+}
+
+// issueSearch compiles the shared search for one table. Normalize has already refused
+// anything that does not compile.
+func issueSearch(filters IssueFilters, mode search.Mode) search.Compiled {
+	compiled, _, _ := issueSchema.ParseAndCompile(filters.Query, mode)
+	return compiled
+}
+
+// issueUsesRawEvents reports whether the list must read raw error events.
+func issueUsesRawEvents(filters IssueFilters) bool {
+	return filters.UserID != "" || issueSearch(filters, search.Aggregate).RawOnly
+}
 
 type IssueStateLookup interface {
 	ListIssueStates(context.Context, uuid.UUID, []string) (map[string]metadata.IssueState, error)
@@ -35,8 +67,13 @@ type IssueFilters struct {
 	DeviceType  string
 	Country     string
 	Fingerprint string
-	Status      metadata.IssueStatus
-	// Assignee narrows to Issues nobody owns (AssigneeNone) or one member's (a user UUID).
+	// Query is the shared search (internal/search). Conditions the rollup keeps run on it;
+	// the rest, such as user.id or attributes, move the list to raw error events.
+	Query  string
+	Status metadata.IssueStatus
+	// Status unresolved includes regressed (see matchesStatus).
+	// Assignee narrows to Issues nobody owns (AssigneeNone), anybody owns (AssigneeAny) or
+	// one member's (a user UUID).
 	Assignee string
 	// NewOnly keeps Issues first seen inside the range (see fillFirstSeen for the horizon).
 	NewOnly bool
@@ -67,6 +104,8 @@ type IssueSummary struct {
 	Trend []uint64 `json:"trend,omitempty"`
 	// Culprit is where the latest event in the range failed, read from its raw stack.
 	Culprit *IssueCulprit `json:"culprit,omitempty"`
+	// trendDelta is the trend sort's key: events in the range's second half minus its first.
+	trendDelta int64
 }
 
 // IssueCulprit names the innermost application frame of a stack.
@@ -138,25 +177,31 @@ func NewIssuesRepository(database *sql.DB, states IssueStateLookup) *IssuesRepos
 }
 
 func (repository *IssuesRepository) List(ctx context.Context, requested IssueFilters) (IssuePage, error) {
+	ctx = boundedQueryContext(ctx)
 	filters, cursor, err := normalizeIssueFilters(requested)
 	if err != nil {
 		return IssuePage{}, err
 	}
 	where, arguments := issueWhere(filters)
-	query := `SELECT fingerprint, max(fingerprint_version), argMaxMerge(error_type) AS error_type_value, argMaxMerge(error_message) AS issue_title,
+	// The trend sort compares the range's second half with its first: the Issues growing most.
+	middle := filters.From.Add(filters.To.Sub(filters.From) / 2)
+	query := `SELECT fingerprint, max(fingerprint_version) AS fingerprint_version_value, argMaxMerge(error_type) AS error_type_value, argMaxMerge(error_message) AS issue_title,
   uniqCombined64Merge(events) AS event_count, uniqCombined64Merge(users) AS user_count, uniqCombined64Merge(sessions) AS session_count,
-  minMerge(first_seen) AS first_seen_at, maxMerge(last_seen) AS last_seen_at
+  minMerge(first_seen) AS first_seen_at, maxMerge(last_seen) AS last_seen_at,
+  toInt64(uniqCombined64MergeIf(events, bucket >= ?)) - toInt64(uniqCombined64MergeIf(events, bucket < ?)) AS trend_delta
 FROM issue_metrics_5m WHERE ` + where + `
 GROUP BY fingerprint`
-	usesRawEvents := filters.UserID != ""
+	usesRawEvents := issueUsesRawEvents(filters)
 	if usesRawEvents {
 		where, arguments = issueEventWhere(filters)
-		query = `SELECT fingerprint, max(fingerprint_version), argMax(error_type, timestamp) AS error_type_value, argMax(error_message, timestamp) AS issue_title,
+		query = `SELECT fingerprint, max(fingerprint_version) AS fingerprint_version_value, argMax(error_type, timestamp) AS error_type_value, argMax(error_message, timestamp) AS issue_title,
   uniqCombined64(event_id) AS event_count, uniqCombined64If(anonymous_user_id, anonymous_user_id != '') AS user_count,
-  uniqCombined64(session_id) AS session_count, min(timestamp) AS first_seen_at, max(timestamp) AS last_seen_at
+  uniqCombined64(session_id) AS session_count, min(timestamp) AS first_seen_at, max(timestamp) AS last_seen_at,
+  toInt64(uniqCombined64If(event_id, timestamp >= ?)) - toInt64(uniqCombined64If(event_id, timestamp < ?)) AS trend_delta
 FROM rum_events WHERE ` + where + `
 GROUP BY fingerprint`
 	}
+	arguments = append([]any{middle, middle}, arguments...)
 	having := make([]string, 0, 3)
 	if filters.ErrorType != "" && !usesRawEvents {
 		having = append(having, "error_type_value = ?")
@@ -166,10 +211,19 @@ GROUP BY fingerprint`
 		having = append(having, "positionCaseInsensitiveUTF8(issue_title, ?) > 0")
 		arguments = append(arguments, filters.Title)
 	}
-	if cursor != nil {
+	if !usesRawEvents {
+		for _, clause := range issueSearch(filters, search.Aggregate).Having {
+			having = append(having, clause.SQL)
+			arguments = append(arguments, clause.Args...)
+		}
+	}
+	if cursor != nil && filters.Sort != "first_seen" {
 		primary, value := "event_count", any(cursor.Events)
-		if filters.Sort == "users" {
+		switch filters.Sort {
+		case "users":
 			primary, value = "user_count", cursor.Users
+		case "trend":
+			primary, value = "trend_delta", cursor.Trend
 		}
 		if filters.Sort == "last_seen" {
 			having = append(having, `(last_seen_at < ? OR (last_seen_at = ? AND fingerprint > ?))`)
@@ -190,6 +244,11 @@ GROUP BY fingerprint`
 		order = "user_count DESC, last_seen_at DESC, fingerprint ASC"
 	case "last_seen":
 		order = "last_seen_at DESC, fingerprint ASC"
+	case "trend":
+		order = "trend_delta DESC, last_seen_at DESC, fingerprint ASC"
+	case "first_seen":
+		query, arguments = issueAgeQuery(filters, query, arguments, cursor)
+		order = "first_seen_value DESC, c.fingerprint ASC"
 	}
 	query += ` ORDER BY ` + order + ` LIMIT ?`
 	arguments = append(arguments, candidateLimit)
@@ -233,7 +292,7 @@ GROUP BY fingerprint`
 		if issue.Status == metadata.IssueStatusResolved && issue.ResolvedAt != nil && issue.LastSeenAt.After(*issue.ResolvedAt) {
 			issue.Status = metadata.IssueStatusRegressed
 		}
-		if filters.Status != "" && issue.Status != filters.Status {
+		if !matchesStatus(filters.Status, issue.Status) {
 			continue
 		}
 		if !matchesAssignee(filters.Assignee, issue.AssigneeUserID) {
@@ -393,6 +452,7 @@ FROM rum_events WHERE %s AND fingerprint IN (%s) GROUP BY fingerprint`, eventWhe
 }
 
 func (repository *IssuesRepository) Trend(ctx context.Context, requested IssueFilters, fingerprint string) ([]IssueTrendPoint, error) {
+	ctx = boundedQueryContext(ctx)
 	filters, _, err := normalizeIssueFilters(requested)
 	if err != nil || fingerprint == "" || len(fingerprint) > 128 {
 		return nil, ErrInvalidIssueFilters
@@ -427,6 +487,7 @@ GROUP BY 1 ORDER BY 1`, minutes, where), arguments...)
 // instances. Those dimensions are intentionally not approximated from the
 // issue rollup because the rollup does not retain user_id or page_id.
 func (repository *IssuesRepository) Overview(ctx context.Context, requested IssueFilters) (IssueOverview, error) {
+	ctx = boundedQueryContext(ctx)
 	requested.Cursor = ""
 	filters, _, err := normalizeIssueFilters(requested)
 	if err != nil {
@@ -555,6 +616,8 @@ type issueCursor struct {
 	Events      uint64    `json:"e"`
 	Users       uint64    `json:"u"`
 	LastSeenAt  time.Time `json:"l"`
+	FirstSeenAt time.Time `json:"a,omitzero"`
+	Trend       int64     `json:"t,omitempty"`
 	Fingerprint string    `json:"f"`
 	Sort        string    `json:"s"`
 }
@@ -570,14 +633,17 @@ func normalizeIssueFilters(filters IssueFilters) (IssueFilters, *issueCursor, er
 		filters.Sort = "events"
 	}
 	if filters.Limit < 1 || filters.Limit > 100 || !validIssueStatus(filters.Status) || !validAssigneeFilter(filters.Assignee) ||
-		(filters.Sort != "events" && filters.Sort != "users" && filters.Sort != "last_seen") ||
+		!validIssueSort(filters.Sort) ||
 		!boundedQueryDimension(filters.Environment, 64) || !boundedQueryDimension(filters.Release, 128) ||
 		!boundedQueryDimension(filters.Route, 512) || !boundedQueryDimension(filters.Browser, 128) ||
 		!boundedQueryDimension(filters.DeviceType, 64) || !boundedQueryDimension(filters.Country, 2) ||
 		!boundedQueryDimension(filters.Title, 200) || !boundedQueryDimension(filters.ErrorType, 128) ||
 		!boundedQueryDimension(filters.UserID, 128) ||
-		!boundedQueryDimension(filters.Fingerprint, 128) {
+		!boundedQueryDimension(filters.Fingerprint, 128) || !boundedQueryDimension(filters.Query, search.MaxLength) {
 		return IssueFilters{}, nil, ErrInvalidIssueFilters
+	}
+	if _, _, err := issueSchema.ParseAndCompile(filters.Query, search.Raw); err != nil {
+		return IssueFilters{}, nil, errors.Join(ErrInvalidIssueFilters, err)
 	}
 	filters.From, filters.To = filters.From.UTC(), filters.To.UTC()
 	var cursor *issueCursor
@@ -601,11 +667,45 @@ func validIssueStatus(status metadata.IssueStatus) bool {
 		status == metadata.IssueStatusIgnored || status == metadata.IssueStatusRegressed
 }
 
+func validIssueSort(sort string) bool {
+	switch sort {
+	case "events", "users", "last_seen", "first_seen", "trend":
+		return true
+	}
+	return false
+}
+
+// issueAgeQuery wraps the candidate query for the first-seen sort. The range only knows when
+// an Issue first failed inside it, so each candidate's earliest sighting is read again up to
+// newIssueLookback earlier, the same horizon fillFirstSeen gives the page, and the list is
+// ordered and paged by that. Only the shared Environment narrows it, as in fillFirstSeen.
+func issueAgeQuery(filters IssueFilters, inner string, arguments []any, cursor *issueCursor) (string, []any) {
+	environment := ""
+	ageArguments := []any{filters.ProjectID, filters.From.Add(-newIssueLookback), filters.To}
+	if filters.Environment != "" {
+		environment = " AND environment = ?"
+		ageArguments = append(ageArguments, filters.Environment)
+	}
+	query := `SELECT c.fingerprint, c.fingerprint_version_value, c.error_type_value, c.issue_title, c.event_count,
+  c.user_count, c.session_count, if(a.age_fingerprint = '', c.first_seen_at, least(c.first_seen_at, a.earliest)) AS first_seen_value,
+  c.last_seen_at, c.trend_delta
+FROM (` + inner + `) AS c
+LEFT JOIN (SELECT fingerprint AS age_fingerprint, minMerge(first_seen) AS earliest FROM issue_metrics_5m
+  WHERE project_id = ? AND bucket >= ? AND bucket < ?` + environment + ` GROUP BY fingerprint) AS a
+  ON c.fingerprint = a.age_fingerprint`
+	arguments = append(arguments, ageArguments...)
+	if cursor != nil {
+		query += ` WHERE (first_seen_value < ? OR (first_seen_value = ? AND c.fingerprint > ?))`
+		arguments = append(arguments, cursor.FirstSeenAt, cursor.FirstSeenAt, cursor.Fingerprint)
+	}
+	return query, arguments
+}
+
 // AssigneeNone is the Assignee filter value for Issues nobody owns.
 const AssigneeNone = "none"
 
 func validAssigneeFilter(value string) bool {
-	if value == "" || value == AssigneeNone {
+	if value == "" || value == AssigneeNone || value == AssigneeAny {
 		return true
 	}
 	_, err := uuid.Parse(value)
@@ -618,6 +718,8 @@ func matchesAssignee(filter string, assignee *uuid.UUID) bool {
 		return true
 	case AssigneeNone:
 		return assignee == nil
+	case AssigneeAny:
+		return assignee != nil
 	default:
 		return assignee != nil && assignee.String() == filter
 	}
@@ -635,6 +737,11 @@ func issueWhere(filters IssueFilters) (string, []any) {
 			clauses = append(clauses, filter.column+" = ?")
 			arguments = append(arguments, filter.value)
 		}
+	}
+	// Only the conditions the rollup keeps; HAVING conditions belong to the list query.
+	for _, clause := range issueSearch(filters, search.Aggregate).Where {
+		clauses = append(clauses, clause.SQL)
+		arguments = append(arguments, clause.Args...)
 	}
 	return strings.Join(clauses, " AND "), arguments
 }
@@ -658,6 +765,10 @@ func issueEventWhere(filters IssueFilters) (string, []any) {
 		clauses = append(clauses, "positionCaseInsensitiveUTF8(error_message, ?) > 0")
 		arguments = append(arguments, filters.Title)
 	}
+	for _, clause := range issueSearch(filters, search.Raw).Where {
+		clauses = append(clauses, clause.SQL)
+		arguments = append(arguments, clause.Args...)
+	}
 	return strings.Join(clauses, " AND "), arguments
 }
 
@@ -667,7 +778,7 @@ func scanIssueCandidates(rows *sql.Rows) ([]IssueSummary, error) {
 	for rows.Next() {
 		var issue IssueSummary
 		if err := rows.Scan(&issue.Fingerprint, &issue.FingerprintVersion, &issue.ErrorType, &issue.Title,
-			&issue.Events, &issue.Users, &issue.Sessions, &issue.FirstSeenAt, &issue.LastSeenAt); err != nil {
+			&issue.Events, &issue.Users, &issue.Sessions, &issue.FirstSeenAt, &issue.LastSeenAt, &issue.trendDelta); err != nil {
 			return nil, fmt.Errorf("scan issue: %w", err)
 		}
 		issue.FirstSeenAt, issue.LastSeenAt = issue.FirstSeenAt.UTC(), issue.LastSeenAt.UTC()
@@ -677,6 +788,9 @@ func scanIssueCandidates(rows *sql.Rows) ([]IssueSummary, error) {
 }
 
 func encodeIssueCursor(issue IssueSummary, sort string) string {
-	encoded, _ := json.Marshal(issueCursor{Events: issue.Events, Users: issue.Users, LastSeenAt: issue.LastSeenAt, Fingerprint: issue.Fingerprint, Sort: sort})
+	encoded, _ := json.Marshal(issueCursor{
+		Events: issue.Events, Users: issue.Users, LastSeenAt: issue.LastSeenAt, FirstSeenAt: issue.FirstSeenAt,
+		Trend: issue.trendDelta, Fingerprint: issue.Fingerprint, Sort: sort,
+	})
 	return base64.RawURLEncoding.EncodeToString(encoded)
 }
