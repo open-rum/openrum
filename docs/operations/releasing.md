@@ -20,7 +20,13 @@ Make one release-preparation PR that updates `deploy/helm/openrum/Chart.yaml` (`
 
 ### Where each version number lives
 
-The version is repeated in several places, and the release checks only catch some of them. Change them together in the preparation PR, then search for the old number to find stragglers (for example `git grep -nI "0.1.0" -- . ':!pnpm-lock.yaml'`; ignore application release names such as `storefront@0.1.0` in examples).
+The version is repeated in several places, and the release checks only catch some of them. Change them together in the preparation PR, then search for the old number to find stragglers:
+
+```sh
+git grep -nIP '(?<![\d.])0\.1\.1(?!\d)' -- . ':!pnpm-lock.yaml' ':!go.mod' ':!go.sum' ':!docs/benchmarks'
+```
+
+The look-behind and look-ahead keep `0.1.10` and Go module versions such as `v0.1.14` out of the list. What should stay: the example tags in this document, in `.github/workflows/*.yml` input descriptions and in `scripts/release/` (they illustrate the tag format), test fixtures that name an arbitrary version, and application release names such as `storefront@0.1.0` in examples. Besides the files in the table, the search finds the root `README.md` and `README.zh-CN.md`, `packages/browser-sdk/README.md`, and the Console and end-to-end tests that assert the CDN path (`apps/web/src/features/onboarding/onboarding.test.tsx`, `tests/e2e/onboarding.spec.ts`).
 
 | Release                               | Change                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -33,13 +39,32 @@ The npm package is independent of the product, but the script an Instance serves
 
 Keep the docs for unreleased features in review until the corresponding artifact is published. The current public docs site shows one current version; the versioned static archive preserves the exact docs built from each tag, but the site does not yet serve archived versions at separate URLs.
 
+Netlify deploys `main`, so merging the preparation PR immediately tells readers to install a Chart and an npm version that do not exist yet. Keep that window short: run the dry runs on the PR branch's head before merging, then push the tags as soon as `main` is green.
+
+### Compatibility between the SDK and an Instance
+
+The npm package and the Instance are upgraded by different people at different times, so both directions must keep working:
+
+- An Instance must accept what the previous SDK sends. New fields in the envelope or in an automatic event's attributes are optional, and the server drops what it does not recognise rather than rejecting the Event.
+- A new SDK sent to an older Instance must degrade quietly: a feature that needs the new server (a new attribute, a new config endpoint) does nothing there, and nothing errors.
+
+When a release relies on either rule, say so in the release notes.
+
+### Release notes
+
+The workflow creates the GitHub Release with notes generated from PR titles. After it finishes, edit the Release and add a short section above them for operators:
+
+- **Upgrade steps**: new migrations and whether they are additive (they must be, see [upgrades](upgrades.md)), new or changed Helm values, anything to do before or after `helm upgrade`.
+- **Behaviour changes**: anything an existing user would notice without changing anything, such as a filter that now matches more, a default that moved, or a field that is now collected.
+- **SDK**: the `@openrum/browser` version released alongside, and which of its features need this Instance version.
+
 Run normal CI on the PR, then use **Publish release → Run workflow** with a version such as `v0.1.1` to run the full release validation without publishing. The dry run checks the version contract, renders and packages the Chart, builds the documentation from the candidate commit, and retains both artifacts for inspection. It does not push images, Chart packages, tags, GitHub Releases, or production deployments.
 
 ## Publish
 
 A release is published by pushing a Git tag, from a clone, not from the GitHub web interface. Before tagging:
 
-1. The preparation PR is merged and the `main` commit you are releasing has a green CI run (`gh run list --repo open-rum/openrum --branch main --limit 3`).
+1. The preparation PR is merged and the `main` commit you are releasing has a green CI run (`gh run list --repo open-rum/openrum --branch main --limit 3`). CI on the PR runs the integration tests; run them locally with `bash scripts/test-integration.sh` against the development stack when the change touches queries or migrations.
 2. The dry run of the workflow you are about to trigger passed on that commit.
 3. Your clone is on that commit: `git checkout main && git pull`. Both release workflows refuse a tag that is not on `main`.
 
@@ -71,7 +96,7 @@ The mutable Docker registry cache entry only stores intermediate build layers ac
 
 ## Publish the browser SDK
 
-`@openrum/browser` is the only npm package. It is versioned independently of the product, so an SDK fix does not need a Chart or image release.
+`@openrum/browser` is versioned independently of the product, so an SDK fix does not need a Chart or image release. (`@openrum/sourcemap` and `@openrum/cli` are the other npm packages; see [below](#publish-the-cli-and-source-map-packages).)
 
 One-time setup:
 

@@ -15,11 +15,11 @@ ClickHouse 迁移。常规 Release 的迁移必须 Expand First：只增加列/�
 ## N-1 到 N
 
 1. 确认 PostgreSQL/ClickHouse 备份、Kafka Lag、Ingest 接收和查询新鲜度健康。
-2. 运行 `helm lint deploy/helm/openrum` 并渲染准确的生产 Values。
-3. 执行：
+2. 阅读目标版本发布说明里的升级步骤和行为变化，再用已发布的 Chart 渲染准确的生产 Values：`helm template openrum oci://ghcr.io/open-rum/charts/openrum --version X.Y.Z -f values.production.yaml`。
+3. 执行（始终固定 `--version`；本地检出的 `deploy/helm/openrum` 只用于开发）：
 
 ```sh
-helm upgrade openrum deploy/helm/openrum --namespace openrum --atomic --wait --timeout 15m -f values.production.yaml
+helm upgrade openrum oci://ghcr.io/open-rum/charts/openrum --version X.Y.Z --namespace openrum --atomic --wait --timeout 15m -f values.production.yaml
 ```
 
 4. 确认迁移 Job 完成、所有 Deployment 可用、Kafka Lag 恢复基线且 `helm test openrum --namespace openrum` 成功。

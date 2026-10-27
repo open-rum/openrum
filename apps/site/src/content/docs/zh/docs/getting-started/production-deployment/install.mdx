@@ -15,10 +15,10 @@ import { Steps, Aside, LinkCard } from "@astrojs/starlight/components";
    选定要安装的版本，并确认你的机器能访问它的 Chart：
 
    ```sh
-   helm show chart oci://ghcr.io/open-rum/charts/openrum --version 0.1.1
+   helm show chart oci://ghcr.io/open-rum/charts/openrum --version 0.1.2
    ```
 
-   Chart 默认使用与之配套的 `ghcr.io/open-rum/openrum:0.1.1`，同时提供 AMD64 和 ARM64 节点的镜像。同一镜像内包含五个服务、迁移工具、控制台和 Browser SDK，所以不需要自己构建或推送。请始终固定 `--version`，并在之后每条命令里使用同一个版本。
+   Chart 默认使用与之配套的 `ghcr.io/open-rum/openrum:0.1.2`，同时提供 AMD64 和 ARM64 节点的镜像。同一镜像内包含五个服务、迁移工具、控制台和 Browser SDK，所以不需要自己构建或推送。请始终固定 `--version`，并在之后每条命令里使用同一个版本。
 
    <Aside type="note" title="使用自己的镜像">
      只有内网镜像仓库、隔离网络的集群或修改过的源码才需要自己构建镜像。在仓库根目录执行，请为每次发布使用唯一标签，并记录对应 Git commit：
@@ -34,7 +34,7 @@ import { Steps, Aside, LinkCard } from "@astrojs/starlight/components";
      `imagePullSecrets`；如果你还修改了 Chart，就在该源码目录下使用 `deploy/helm/openrum` 安装。
    </Aside>
 
-   **完成标志：** `helm show chart` 输出 `version: 0.1.1` 和 `appVersion: "0.1.1"`。
+   **完成标志：** `helm show chart` 输出 `version: 0.1.2` 和 `appVersion: "0.1.2"`。
 
 1. ## 创建运行时 Secret 和 HTTPS 证书
 
@@ -121,7 +121,7 @@ import { Steps, Aside, LinkCard } from "@astrojs/starlight/components";
 
    ```sh
    helm template openrum oci://ghcr.io/open-rum/charts/openrum \
-     --version 0.1.1 --namespace openrum \
+     --version 0.1.2 --namespace openrum \
      --values values.production.yaml > /dev/null
    ```
 
@@ -129,7 +129,7 @@ import { Steps, Aside, LinkCard } from "@astrojs/starlight/components";
 
    ```sh
    helm upgrade --install openrum oci://ghcr.io/open-rum/charts/openrum \
-     --version 0.1.1 --namespace openrum \
+     --version 0.1.2 --namespace openrum \
      --values values.production.yaml \
      --wait --timeout 15m
    helm test openrum --namespace openrum

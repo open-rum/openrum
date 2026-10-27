@@ -71,7 +71,7 @@ import { Aside, Steps } from "@astrojs/starlight/components";
      -p "{\"data\":{\"SMTP_PASSWORD\":\"$(printf %s "$SMTP_PASSWORD" | base64 | tr -d '\n')\"}}"
    # 应用 values，再重启，让 Secret 的变更生效。
    helm upgrade openrum oci://ghcr.io/open-rum/charts/openrum \
-     --version 0.1.1 --namespace openrum \
+     --version 0.1.2 --namespace openrum \
      --values values.production.yaml --wait
    kubectl -n openrum rollout restart deployment -l app.kubernetes.io/instance=openrum
    ```

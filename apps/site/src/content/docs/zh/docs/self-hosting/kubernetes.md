@@ -19,9 +19,9 @@ Chart 以 `oci://ghcr.io/open-rum/charts/openrum` 发布，源码在 `deploy/hel
 
 ## Chart 与镜像
 
-Chart 公开在 `oci://ghcr.io/open-rum/charts/openrum`，默认镜像是与之配套的 `ghcr.io/open-rum/openrum` 标签（Chart `0.1.1` 对应 `0.1.1`），同时提供 `linux/amd64` 和 `linux/arm64`。默认安装不需要源码，也不需要镜像仓库凭据。请始终固定 `--version`。
+Chart 公开在 `oci://ghcr.io/open-rum/charts/openrum`，默认镜像是与之配套的 `ghcr.io/open-rum/openrum` 标签（Chart `0.1.2` 对应 `0.1.2`），同时提供 `linux/amd64` 和 `linux/arm64`。默认安装不需要源码，也不需要镜像仓库凭据。请始终固定 `--version`。
 
-如果使用内网镜像仓库，在 values 文件中补上 `image.repository: registry.example.com/openrum` 和 `image.tag: "0.1.1"`，版本应与 Chart 匹配。如果仓库是私有的，先在同一命名空间创建镜像拉取 Secret，再添加 `imagePullSecrets: [{ name: your-registry-secret }]`。Chart 会将其传给业务 Deployment、安装前的迁移 Job 和 Helm 测试 Pod。如果集群也无法拉取默认的 `busybox:1.37` 测试镜像，还需覆盖 `smokeTest.image`。
+如果使用内网镜像仓库，在 values 文件中补上 `image.repository: registry.example.com/openrum` 和 `image.tag: "0.1.2"`，版本应与 Chart 匹配。如果仓库是私有的，先在同一命名空间创建镜像拉取 Secret，再添加 `imagePullSecrets: [{ name: your-registry-secret }]`。Chart 会将其传给业务 Deployment、安装前的迁移 Job 和 Helm 测试 Pod。如果集群也无法拉取默认的 `busybox:1.37` 测试镜像，还需覆盖 `smokeTest.image`。
 
 要运行修改过的源码，请在仓库根目录自行构建镜像并推送，然后在 values 文件里覆盖 `image.repository` 和 `image.tag`，不要修改 Chart 源文件。见[安装服务](/zh/docs/getting-started/production-deployment/install/)。
 

@@ -19,9 +19,9 @@ The [deployment preparation](/docs/getting-started/production-deployment/) page 
 
 ## Chart and image
 
-The chart is public at `oci://ghcr.io/open-rum/charts/openrum`, and its default image is the matching `ghcr.io/open-rum/openrum` tag (`0.1.1` for chart `0.1.1`), built for `linux/amd64` and `linux/arm64`. A default install needs no source checkout and no registry credentials. Always pin `--version`.
+The chart is public at `oci://ghcr.io/open-rum/charts/openrum`, and its default image is the matching `ghcr.io/open-rum/openrum` tag (`0.1.2` for chart `0.1.2`), built for `linux/amd64` and `linux/arm64`. A default install needs no source checkout and no registry credentials. Always pin `--version`.
 
-To use an internal mirror, add `image.repository: registry.example.com/openrum` and `image.tag: "0.1.1"` to your values file, using the exact image version paired with the chart. For a private registry, create an image-pull Secret in the same namespace and add `imagePullSecrets: [{ name: your-registry-secret }]`. The chart passes it to the application Deployments, the pre-install migration Job, and the Helm test Pod. If the cluster cannot pull the default `busybox:1.37` test image, also override `smokeTest.image`.
+To use an internal mirror, add `image.repository: registry.example.com/openrum` and `image.tag: "0.1.2"` to your values file, using the exact image version paired with the chart. For a private registry, create an image-pull Secret in the same namespace and add `imagePullSecrets: [{ name: your-registry-secret }]`. The chart passes it to the application Deployments, the pre-install migration Job, and the Helm test Pod. If the cluster cannot pull the default `busybox:1.37` test image, also override `smokeTest.image`.
 
 To run modified source, build your own image from the repository root, push it and override `image.repository` and `image.tag` in your values file; do not edit the chart. See [Install services](/docs/getting-started/production-deployment/install/).
 

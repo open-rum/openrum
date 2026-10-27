@@ -1,7 +1,7 @@
 ---
 title: SDK 选项
 description: "@openrum/browser 全部初始化选项的生成参考。"
-appliesTo: "@openrum/browser 0.1.1"
+appliesTo: "@openrum/browser 0.1.2"
 ---
 
 <!-- GENERATED: scripts/docs/generate-reference.mjs -->
