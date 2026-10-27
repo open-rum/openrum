@@ -65,7 +65,7 @@ Run normal CI on the PR, then use **Publish release → Run workflow** with a ve
 A release is published by pushing a Git tag, from a clone, not from the GitHub web interface. Before tagging:
 
 1. The preparation PR is merged and the `main` commit you are releasing has a green CI run (`gh run list --repo open-rum/openrum --branch main --limit 3`). CI on the PR runs the integration tests; run them locally with `bash scripts/test-integration.sh` against the development stack when the change touches queries or migrations.
-2. The dry run of the workflow you are about to trigger passed on that commit.
+2. The dry run of the workflow you are about to trigger passed on that commit. If anything landed or a day passed since the dry run, look at the latest CI on `main` again: the Go vulnerability scan fails as soon as a new advisory is published against the pinned Go version or a dependency, even with no code change. The fix is usually the patch release of Go in `go.mod`, `go.work` and the `Dockerfile` build stage.
 3. Your clone is on that commit: `git checkout main && git pull`. Both release workflows refuse a tag that is not on `main`.
 
 Do not create the tag through **Releases → Draft a new release**. That also creates a GitHub Release, and the workflow deliberately fails when a release for the tag already exists.
@@ -114,6 +114,8 @@ To release:
 git tag -a browser-v0.1.1 -m "@openrum/browser 0.1.1"
 git push origin browser-v0.1.1
 ```
+
+If **Publish to npm** fails with `ERR_PNPM_AUTH_TOKEN_EXCHANGE ... (status code 404)` followed by `E404 Not Found - PUT https://registry.npmjs.org/@openrum%2fbrowser`, npm did not accept the workflow's identity: the package has no Trusted Publisher, or one of its fields (organization, repository, workflow filename, environment) differs from this workflow. npm answers 404 rather than 403 here. Fix the connection on npmjs.com (delete and recreate it to change a field), then rerun only the failed job; the tag stays as it is: `gh run rerun <run-id> --failed --repo open-rum/openrum`.
 
 The workflow refuses an existing npm version, publishes with provenance (only while the repository is public; npm cannot sign provenance for a private repository), and reads the version back from the registry (waiting up to 10 minutes, because a new version can take a few minutes to appear). A plain version publishes under `latest`; a prerelease such as `browser-v0.1.1-alpha.1` publishes under `next`, so `npm install @openrum/browser` never picks it up. npm does not allow republishing a version, so fix a bad release with a new patch version. When both are released together, push the SDK tag first: the documentation tells readers to `npm install @openrum/browser`, so the package should exist before the product release announces it. Verify with `npm view @openrum/browser@0.1.1 version`.
 
