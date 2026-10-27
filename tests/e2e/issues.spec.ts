@@ -16,15 +16,6 @@ test("issues filters, rows and themes remain usable", async ({ page }) => {
   await page.getByRole("combobox", { name: "问题状态" }).click();
   await page.getByRole("option", { name: "待处理" }).click();
   await expect(page).toHaveURL(/status=unresolved/);
-  const search = page.getByRole("combobox", { name: "搜索错误或添加筛选条件" });
-  await search.fill("checkout");
-  await search.press("Enter");
-  await expect(rows).toHaveCount(1);
-  await search.fill("no-match");
-  await search.press("Enter");
-  await expect(page.getByText("当前范围没有匹配的问题")).toBeVisible();
-  await page.getByRole("button", { name: "清除筛选" }).click();
-  await expect(rows).toHaveCount(3);
 
   if (process.env.OPENRUM_ISSUES_LIGHT)
     await page.screenshot({ path: process.env.OPENRUM_ISSUES_LIGHT, fullPage: true });

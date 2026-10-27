@@ -2,6 +2,7 @@ package event
 
 import (
 	"errors"
+	"regexp"
 	"strings"
 
 	"openrum/internal/privacy"
@@ -23,6 +24,13 @@ var (
 	}
 )
 
+// behaviorSelector is the SDK's short CSS path to a click: up to three `tag#id.class` steps
+// joined by " > ". Ids and classes carry no digits, which the SDK already drops because those are
+// usually generated or hold data; anything else is left out rather than stored.
+var behaviorSelector = regexp.MustCompile(`^[a-z][a-z0-9-]*(#[A-Za-z_-]{1,40})?(\.[A-Za-z_-]{1,40}){0,3}( > [a-z][a-z0-9-]*(#[A-Za-z_-]{1,40})?(\.[A-Za-z_-]{1,40}){0,3}){0,2}$`)
+
+const maxBehaviorSelector = 200
+
 // NormalizeBehaviorAttributes applies the stricter schema used by automatic SDK behavior events.
 // Product-defined custom events keep the general custom-event attribute contract.
 func NormalizeBehaviorAttributes(name string, attributes map[string]string) (map[string]string, bool, error) {
@@ -42,6 +50,9 @@ func NormalizeBehaviorAttributes(name string, attributes map[string]string) (map
 	}
 	if explicitName, _ := privacy.ScrubString(attributes["name"], 64); explicitName != "" {
 		result["name"] = explicitName
+	}
+	if selector := attributes["selector"]; len(selector) <= maxBehaviorSelector && behaviorSelector.MatchString(selector) {
+		result["selector"] = selector
 	}
 	return result, !equalStringMap(result, attributes), nil
 }

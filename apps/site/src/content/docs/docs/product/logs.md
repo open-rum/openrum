@@ -40,7 +40,7 @@ Never intentionally log secrets or personal data. Messages and primitive attribu
 - `anonymous_user_id:"visitor-id"`: same anonymous visitor, including logs without a user ID.
 - `attributes.user.id:custom`: a custom attribute named `user.id`, not the SDK identity.
 
-Conditions use AND semantics, with up to 12 terms / 1,024 characters. OR, wildcard expansion and numeric comparisons are not supported. Double-quote values containing spaces.
+Conditions use AND semantics, with up to 12 terms / 1,024 characters. `!` negates a condition, `field:[a,b]` matches any of several values, a `*` at the start or end of a value matches part of it, and `has:trace_id` keeps logs that carry a trace. `AND` between conditions is optional and OR is not supported. Double-quote values containing spaces. The full language is in [Search syntax](/docs/product/search/).
 
 Click a message to inspect properties, filter by an attribute or open the related Session. Export downloads only the current page as JSONL. The volume chart reports captured counts, not sampling estimates. Time ranges are capped at 30 days; narrow expensive queries to retry.
 

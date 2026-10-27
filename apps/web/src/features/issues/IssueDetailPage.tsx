@@ -66,7 +66,6 @@ import {
   type IssueFilters,
 } from "@/lib/api/issues";
 import { listMembers, listOrganizations, listProjects, type Project } from "@/lib/api/projects";
-import { sessionEventHref } from "@/lib/api/sessions";
 import { culpritFrame } from "./displayFrames";
 import { EventBreadcrumbs, EventRelatedApis, FactGrid } from "./EventContext";
 import { eventFacts } from "./eventFacts";
@@ -76,6 +75,7 @@ import {
   OsBrandIcon,
 } from "@/features/sessions/SessionClientMeta";
 import { countryLabel, deviceLabel } from "@/features/filters/dimensionLabels";
+import { withTimePreset } from "./issueTime";
 import { IssueStatusLabel } from "./IssueStatusLabel";
 import { StackTrace } from "./StackTrace";
 import { TagPreview } from "./TagSummary";
@@ -304,7 +304,7 @@ function IssueInvestigation({
         back={
           <a
             className="issue-back-link"
-            href={`/projects/${encodeURIComponent(project.id)}/issues?${serializeIssueFilters(filters)}`}
+            href={`/projects/${encodeURIComponent(project.id)}/issues?${withTimePreset(serializeIssueFilters(filters))}`}
           >
             <ArrowLeftIcon />
             返回问题列表
@@ -707,20 +707,6 @@ function EventSections({ event }: { event: EventDetail }) {
         id="event-breadcrumbs"
         title="行为时间线"
         description="错误前 15 分钟到后 5 分钟，同一会话中的页面、操作、请求与错误。"
-        action={
-          <Button asChild variant="ghost" size="sm">
-            <a
-              href={sessionEventHref(
-                event.projectId,
-                event.sessionId,
-                event.timestamp,
-                event.eventId,
-              )}
-            >
-              打开完整会话
-            </a>
-          </Button>
-        }
       >
         <EventBreadcrumbs event={event} />
       </EventSection>

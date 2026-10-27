@@ -32,6 +32,7 @@ import {
 import { listOrganizations, listProjects, type Project } from "@/lib/api/projects";
 import { projectIdFromPathname } from "@/lib/projects/currentProject";
 import { ApiDetail, MethodBadge } from "./ApiDetail";
+import { searchErrorFrom } from "@/lib/api/search";
 import { ApiFilterBar } from "./ApiFilters";
 import { ApiOverview } from "./ApiOverview";
 
@@ -81,6 +82,7 @@ function ProjectAPIs({ project }: { project: Project }) {
       filters.method,
       filters.url,
       filters.search,
+      filters.q,
       filters.sort,
     ],
     queryFn: ({ signal }) => getAPIs(filters, signal),
@@ -117,6 +119,7 @@ function ProjectAPIs({ project }: { project: Project }) {
           <ApiFilterBar
             filters={filters}
             facets={query.data?.facets}
+            error={searchErrorFrom(query.error)}
             onChange={(patch) => update({ ...patch, method: undefined, url: undefined })}
           />
         }

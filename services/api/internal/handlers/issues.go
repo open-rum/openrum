@@ -70,11 +70,15 @@ func (handler *IssueHandler) List(writer http.ResponseWriter, request *http.Requ
 	}
 	filters, err := parseIssueFilters(request, projectID, principal.UserID)
 	if err != nil {
-		writeIssueValidationError(writer, request)
+		if !writeSearchError(writer, request, err) {
+			writeIssueValidationError(writer, request)
+		}
 		return
 	}
 	filters.RowDetails = true
-	result, err := handler.queries.List(request.Context(), filters)
+	ctx, cancel := context.WithTimeout(request.Context(), 10*time.Second)
+	defer cancel()
+	result, err := handler.queries.List(ctx, filters)
 	if err != nil {
 		handler.writeQueryError(writer, request, err)
 		return
@@ -340,10 +344,25 @@ func parseIssueFilters(request *http.Request, projectID, userID uuid.UUID) (quer
 		ProjectID: projectID, From: from, To: to, Environment: values.Get("environment"), Release: values.Get("release"),
 		Route: values.Get("route"), Browser: values.Get("browser"), DeviceType: values.Get("deviceType"), Country: values.Get("country"),
 		Title: values.Get("title"), ErrorType: values.Get("errorType"), Fingerprint: values.Get("fingerprint"), UserID: values.Get("userId"),
+		Query:  values.Get("q"),
 		Status: metadata.IssueStatus(values.Get("status")), Limit: limit, Cursor: values.Get("cursor"),
 		Sort: values.Get("sort"), Assignee: values.Get("assignee"), NewOnly: values.Get("new") == "1",
 	}
-	if filters.Assignee == "me" {
+	// is:, assigned: in the search read Postgres state, so they become the same filters as
+	// the older status=, assignee= and new= parameters; a search condition wins.
+	rest, state, err := query.SplitIssueStateSearch(filters.Query)
+	if err != nil {
+		return query.IssueFilters{}, err
+	}
+	filters.Query = rest
+	if state.Status != "" {
+		filters.Status = state.Status
+	}
+	if state.Assignee != "" {
+		filters.Assignee = state.Assignee
+	}
+	filters.NewOnly = filters.NewOnly || state.NewOnly
+	if filters.Assignee == query.AssigneeMe {
 		filters.Assignee = userID.String()
 	}
 	_, err = query.NormalizeIssueFilters(filters)

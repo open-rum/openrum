@@ -29,7 +29,7 @@ const item = (eventId: string, kind: string, title: string) => ({
 });
 
 describe("EventBreadcrumbs", () => {
-  it("leaves web vitals out of the behavior that led to the error", async () => {
+  it("opens on the error and leaves web vitals out of what led to it", async () => {
     vi.mocked(getSessionTimeline).mockResolvedValue({
       events: [
         item("44444444-4444-4444-8444-444444444441", "page_view", "/checkout"),
@@ -45,7 +45,14 @@ describe("EventBreadcrumbs", () => {
       </QueryClientProvider>,
     );
     const list = await waitFor(() => view.getByRole("list", { name: "会话行为时间线" }));
-    expect(list.querySelectorAll("li")).toHaveLength(2);
+    // The error itself comes first, rebuilt from the event when the timeline does not reach it,
+    // then what happened before it, latest first.
+    const rows = [...list.querySelectorAll("li")];
+    expect(rows.map((row) => row.getAttribute("data-kind"))).toEqual([
+      "error",
+      "click",
+      "page_view",
+    ]);
     expect(list.querySelector('[data-kind="web_vital"]')).toBeNull();
   });
 });

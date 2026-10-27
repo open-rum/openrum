@@ -16,8 +16,10 @@ import { useBehaviorFilters } from "@/features/analytics/useBehaviorFilters";
 import { getBehaviorAnalytics } from "@/lib/api/analytics";
 import { listOrganizations, listProjects, type Project } from "@/lib/api/projects";
 import { TIME_SERIES_MAX_POINTS } from "@/lib/charts/timeSeries";
+import { searchErrorFrom } from "@/lib/api/search";
 import { EventExplorer } from "./EventExplorer";
 import { EventFilterComposer } from "./EventFilterComposer";
+import { rollupSplit, tooExpensive } from "./searchCost";
 
 export function EventsPage() {
   const { projectId } = useParams({ strict: false }) as { projectId?: string };
@@ -46,8 +48,13 @@ export function EventsPage() {
 function ProjectEvents({ project }: { project: Project }) {
   const { filters, update } = useBehaviorFilters(project.id);
   // The shared point budget is part of the request, and so of the cache key, but not of the
-  // page's URL: it is the Console's policy, not something a person chose.
-  const request = useMemo(() => ({ ...filters, maxPoints: TIME_SERIES_MAX_POINTS }), [filters]);
+  // page's URL: it is the Console's policy, not something a person chose. Measurements are
+  // read in the event drawer; the page shows no breakdown of them, so an old link's
+  // measurement= is not sent.
+  const request = useMemo(
+    () => ({ ...filters, measurement: undefined, maxPoints: TIME_SERIES_MAX_POINTS }),
+    [filters],
+  );
   const query = useQuery({
     queryKey: ["event-explorer", request],
     queryFn: ({ signal }) => getBehaviorAnalytics(request, signal),
@@ -73,16 +80,41 @@ function ProjectEvents({ project }: { project: Project }) {
         }
       />
       <ConsoleFilterBar
-        primary={<EventFilterComposer filters={filters} data={query.data} onChange={update} />}
+        primary={
+          <EventFilterComposer
+            filters={filters}
+            data={query.data}
+            error={searchErrorFrom(query.error)}
+            onChange={update}
+          />
+        }
       />
       <ConsolePageContent className="grid gap-6">
         {query.isLoading ? <EventsSkeleton compact /> : null}
         {query.error ? (
           <AsyncError
             error={query.error}
-            title="事件探索加载失败"
-            remediation="筛选已保留；请缩短范围、改用内置维度或清除高基数属性。"
+            title={tooExpensive(query.error, filters.q) ? "这个搜索的范围太大" : "事件探索加载失败"}
+            remediation={
+              tooExpensive(query.error, filters.q)
+                ? "这个搜索要逐条读取原始事件，选中一个事件时最多查 7 天，不选时最多 1 天。可以选一个事件或缩短时间范围；只有一个国家、设备、浏览器或属性条件时，把分布卡片改为按同一维度拆分，就能用汇总数据查完整范围。"
+                : "筛选已保留；请缩短范围、改用内置维度或清除高基数属性。"
+            }
             onRetry={() => void query.refetch()}
+            action={(() => {
+              const split = tooExpensive(query.error, filters.q)
+                ? rollupSplit(filters.q)
+                : undefined;
+              return split && split.dimension !== filters.dimension ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={() => update({ dimension: split.dimension })}
+                >
+                  改为{split.label}
+                </Button>
+              ) : undefined;
+            })()}
           />
         ) : null}
         {query.data ? (

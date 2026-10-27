@@ -55,7 +55,7 @@ export function SlidingIndicator({
       aria-hidden="true"
       data-slot="sliding-indicator"
       className={cn(
-        "pointer-events-none absolute inset-y-[3px] left-0 z-0 rounded-full bg-background shadow-sm dark:bg-input",
+        "pointer-events-none absolute inset-y-[3px] left-0 z-0 rounded-full bg-primary shadow-sm",
         ready && "transition-[transform,width] duration-200 ease-out motion-reduce:transition-none",
         !box && "hidden",
         className,

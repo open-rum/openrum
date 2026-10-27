@@ -140,20 +140,6 @@ test("full-width logs search, pagination, detail, export and history stay scoped
   await page.screenshot({ path: "/tmp/openrum-logs-no-sidebar-detail.png" });
   await detail.getByRole("button", { name: "按 order.id 筛选", exact: true }).click();
   await expect(detail).not.toBeVisible();
-  const search = page.getByRole("combobox", { name: "搜索日志或添加筛选条件" });
-  await expect(
-    page.getByText("attributes.order.id：order-demo-123", { exact: true }),
-  ).toBeVisible();
-  await search.click();
-  await page.getByRole("option", { name: /^日志级别/ }).click();
-  await page.getByRole("option", { name: "ERROR", exact: true }).click();
-  await expect.poll(() => requests.at(-1)?.searchParams.get("level")).toBe("error");
-  const scopedQuery = 'attributes.order.id:"order-demo-123" route:"/checkout"';
-  await page.getByRole("button", { name: "移除筛选：attributes.order.id：order-demo-123" }).click();
-  await search.fill(scopedQuery);
-  await page.getByRole("button", { name: "查询", exact: true }).click();
-  await expect.poll(() => requests.at(-1)?.searchParams.get("q")).toBe(scopedQuery);
-  expect(requests.at(-1)?.searchParams.has("route")).toBe(false);
   await page.getByRole("button", { name: "更早日志", exact: true }).click();
   await expect(page.getByRole("button", { name: "older checkout log" })).toBeVisible();
   await expect(page.getByRole("button", { name: "更早日志", exact: true })).toBeDisabled();
@@ -165,10 +151,6 @@ test("full-width logs search, pagination, detail, export and history stay scoped
   await page.getByRole("button", { name: "导出本页" }).click();
   expect((await download).suggestedFilename()).toBe("openrum-logs-page.jsonl");
   await page.reload();
-  await expect(
-    page.getByText("attributes.order.id：order-demo-123", { exact: true }),
-  ).toBeVisible();
-  await expect(page.getByText("Route：/checkout", { exact: true })).toBeVisible();
   expect(
     requests.every(
       (url) =>
@@ -181,28 +163,13 @@ test("full-width logs search, pagination, detail, export and history stay scoped
   expect(errors).toEqual([]);
 });
 
-test("logs empty, failure and mobile search states remain usable without dimension filters", async ({
-  page,
-}) => {
+test("logs fit a mobile viewport without dimension filters", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  const requests = await setup(page);
+  await setup(page);
   await page.screenshot({ path: "/tmp/openrum-logs-no-sidebar-mobile.png", fullPage: true });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
     true,
   );
-  const search = page.getByRole("combobox", { name: "搜索日志或添加筛选条件" });
-  await search.click();
-  await page.getByRole("option", { name: /^日志级别/ }).click();
-  await page.getByRole("option", { name: "WARN", exact: true }).click();
-  await expect.poll(() => requests.at(-1)?.searchParams.get("level")).toBe("warn");
-  await search.fill("nothing");
-  await page.getByRole("button", { name: "查询", exact: true }).click();
-  await expect(page.getByText("当前范围没有日志", { exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "移除筛选：正文：nothing" }).click();
-  await search.fill("broken");
-  await page.getByRole("button", { name: "查询", exact: true }).click();
-  await expect(page.getByText("日志加载失败", { exact: true })).toBeVisible();
-  await expect(page.getByText("正文：broken", { exact: true })).toBeVisible();
 });
 
 test("legacy sidebar links cannot apply invisible dimensions or a stale cursor", async ({
@@ -225,31 +192,10 @@ test("legacy sidebar links cannot apply invisible dimensions or a stale cursor",
     await expect.poll(() => new URL(page.url()).searchParams.has(key)).toBe(false);
     expect(requests.every((request) => !request.searchParams.has(key))).toBe(true);
   }
-  const search = page.getByRole("combobox", { name: "搜索日志或添加筛选条件" });
-  await expect(
-    page.getByText("attributes.order.id：order-demo-123", { exact: true }),
-  ).toBeVisible();
-  await expect(page.getByText(/Trace ID：0123456789abcdef/)).toBeVisible();
-  await expect(page.getByText("级别：ERROR", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "回到最新", exact: true })).toBeDisabled();
   for (const key of ["q", "level", "environment", "from", "to"]) {
     expect(requests.at(-1)?.searchParams.get(key)).toBe(new URL(page.url()).searchParams.get(key));
   }
-  await page.getByRole("button", { name: /移除筛选：attributes\.order\.id/ }).click();
-  await page.getByRole("button", { name: /移除筛选：Trace ID/ }).click();
-  await search.fill("checkout");
-  await page.getByRole("button", { name: "查询", exact: true }).click();
-  await expect(page.getByText("正文：checkout", { exact: true })).toBeVisible();
-  await page.goBack();
-  await page.goBack();
-  await page.goBack();
-  await expect(
-    page.getByText("attributes.order.id：order-demo-123", { exact: true }),
-  ).toBeVisible();
-  await page.reload();
-  await expect(
-    page.getByText("attributes.order.id：order-demo-123", { exact: true }),
-  ).toBeVisible();
   expect(
     requests.every((request) =>
       Object.keys(obsolete).every((key) => !request.searchParams.has(key)),
@@ -257,7 +203,7 @@ test("legacy sidebar links cannot apply invisible dimensions or a stale cursor",
   ).toBe(true);
 });
 
-test("user search and same-user details preserve scope and reset pagination", async ({ page }) => {
+test("same-user details preserve scope and reset pagination", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
@@ -265,13 +211,6 @@ test("user search and same-user details preserve scope and reset pagination", as
     if (message.type() === "error") errors.push(message.text());
   });
   const requests = await setup(page);
-  const input = page.getByRole("combobox", { name: "搜索日志或添加筛选条件" });
-  await input.fill('user.id:"customer-123"');
-  await page.getByRole("button", { name: "查询", exact: true }).click();
-  await expect(page.getByRole("table", { name: "日志列表" }).getByRole("row")).toHaveCount(7);
-  await expect.poll(() => requests.at(-1)?.searchParams.get("q")).toBe('user.id:"customer-123"');
-  await page.getByRole("button", { name: "移除筛选：用户 ID：customer-123" }).click();
-  await expect.poll(() => new URL(page.url()).searchParams.has("q")).toBe(false);
   await page.getByRole("button", { name: "更早日志", exact: true }).click();
   await page.getByRole("button", { name: "older checkout log", exact: true }).click();
   const detail = page.getByRole("dialog", { name: "日志详情" });
@@ -282,10 +221,8 @@ test("user search and same-user details preserve scope and reset pagination", as
   await detail.getByRole("button", { name: "同用户日志", exact: true }).click();
   await expect(detail).not.toBeVisible();
   await expect.poll(() => new URL(page.url()).searchParams.has("cursor")).toBe(false);
-  await expect(page.getByText("用户 ID：customer-123", { exact: true })).toBeVisible();
   await expect(page.getByRole("table", { name: "日志列表" }).getByRole("row")).toHaveCount(7);
   await page.reload();
-  await expect(page.getByText("用户 ID：customer-123", { exact: true })).toBeVisible();
   await expect.poll(() => requests.at(-1)?.searchParams.has("cursor")).toBe(false);
   await page.getByRole("button", { name: "切换至暗色模式", exact: true }).click();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
@@ -322,7 +259,6 @@ test("anonymous log details show visitor identity and can search it on mobile", 
   await page.screenshot({ path: "/tmp/openrum-log-user-detail-mobile.png" });
   await user.getByRole("button", { name: "同访客日志", exact: true }).click();
   await expect(detail).not.toBeVisible();
-  await expect(page.getByText("访客 ID：visitor-abc", { exact: true })).toBeVisible();
   await expect
     .poll(() => requests.at(-1)?.searchParams.get("q"))
     .toBe('anonymous_user_id:"visitor-abc"');

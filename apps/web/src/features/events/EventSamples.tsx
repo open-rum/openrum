@@ -1,154 +1,114 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeftIcon, CopyIcon, MousePointerClickIcon, XIcon } from "lucide-react";
+import { CopyIcon } from "lucide-react";
 import { toast } from "sonner";
 import { AsyncError } from "@/components/ui/AsyncState";
 import { Button } from "@/components/ui/button";
-import { DrawerDescription, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { formatRelative } from "@/features/analytics/format";
-import { eventLabel } from "@/features/analytics/labels";
-import { getBehaviorSamples, type BehaviorFilters, type BehaviorSample } from "@/lib/api/analytics";
+import type { BehaviorSample } from "@/lib/api/analytics";
 import { getSessionTimeline } from "@/lib/api/issues";
 import { sessionEventHref } from "@/lib/api/sessions";
 import { BehaviorTimeline } from "./BehaviorTimeline";
-import { attributePreview, kindLabel, sampleWindowLabel, shortID } from "./catalog";
+import { attributePreview, sampleWindowLabel, shortID } from "./catalog";
 import { sessionTimelineRange } from "./timeline";
 
+/**
+ * The event's recent raw samples: a list to scan on the left and everything known about the
+ * picked one on the right, as on the API detail. The drawer owns the query, so its tab can
+ * show how many there are.
+ */
 export function EventSamples({
-  filters,
-  onOpenSample,
+  projectId,
+  range,
+  page,
+  isLoading,
+  error,
+  onRetry,
 }: {
-  filters: BehaviorFilters;
-  /** Opens one sample's detail; the owner decides where it appears. */
-  onOpenSample: (sample: BehaviorSample) => void;
+  projectId: string;
+  range: { from: Date; to: Date };
+  page?: { samples: BehaviorSample[]; limit: number; window?: { from: string; to: string } };
+  isLoading: boolean;
+  error: unknown;
+  onRetry: () => void;
 }) {
-  const hasSelectedEvent = Boolean(filters.eventKind || filters.eventName);
-  // The previous event's rows must not linger under a new title, so this query keeps no
-  // placeholder data: switching events shows a skeleton instead of stale samples.
-  const samples = useQuery({
-    queryKey: ["behavior-samples", filters],
-    queryFn: ({ signal }) => getBehaviorSamples(filters, signal),
-    enabled: hasSelectedEvent,
-  });
-  const limit = samples.data?.limit ?? 50;
+  const [selectedId, setSelectedId] = useState<string>();
+  const samples = page?.samples ?? [];
+  // The newest sample is open until one is picked, and again when the picked one is gone.
+  const selected = samples.find((sample) => sample.eventId === selectedId) ?? samples[0];
+
+  if (isLoading) return <Skeleton className="h-64" />;
+  if (error)
+    return (
+      <AsyncError
+        error={error}
+        title="样本加载失败"
+        remediation="请稍后重试，或缩短时间范围。"
+        onRetry={onRetry}
+      />
+    );
+  if (!samples.length)
+    return (
+      <EmptyState
+        title={page?.window ? "这段时间没有可查看的原始样本" : "所选范围内没有这个事件"}
+        description={
+          page?.window
+            ? "原始事件只保留一段时间，也可能被上方的属性筛选排除。"
+            : "换一个时间范围，或确认该事件仍在上报。"
+        }
+      />
+    );
   return (
-    <section className="behavior-panel" aria-labelledby="event-samples-title">
-      <div className="behavior-panel__header">
-        <div>
+    <section className="event-samples" aria-labelledby="event-samples-title">
+      <div className="event-samples__list">
+        <div className="event-samples__intro">
           <h2 id="event-samples-title">原始样本</h2>
           <p>
-            {hasSelectedEvent
-              ? `${sampleWindowLabel(filters.from, filters.to)}最近至多 ${limit} 条脱敏样本，点击一行查看完整会话。`
-              : "选择事件后，展示它最近的脱敏样本。"}
+            {sampleWindowLabel(range, page?.window)}最近 {samples.length.toLocaleString()}{" "}
+            条，已脱敏。
           </p>
         </div>
-      </div>
-      {!hasSelectedEvent ? (
-        <EmptyState
-          icon={MousePointerClickIcon}
-          title="选择一个事件"
-          description="从左侧事件目录选择后，可检查脱敏属性与前序行为时间线。"
-        />
-      ) : null}
-      {samples.isLoading ? <Skeleton className="h-56" /> : null}
-      {samples.error ? (
-        <AsyncError
-          error={samples.error}
-          title="样本加载失败"
-          remediation="样本查询最多支持 24 小时；请稍后重试。"
-          onRetry={() => void samples.refetch()}
-        />
-      ) : null}
-      {samples.data?.samples.length ? (
-        <Table className="event-samples-table">
-          <TableHeader>
-            <TableRow>
-              <TableHead>时间</TableHead>
-              <TableHead>页面 / 路由</TableHead>
-              <TableHead>属性</TableHead>
-              <TableHead>会话</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {samples.data.samples.map((sample) => {
-              const preview = attributePreview(sample.attributes, 3);
-              const open = () => onOpenSample(sample);
-              return (
-                <TableRow
-                  key={sample.eventId}
-                  tabIndex={0}
-                  className="cursor-pointer"
-                  onClick={open}
-                  onKeyDown={(key) => {
-                    if (key.target !== key.currentTarget) return;
-                    if (key.key === "Enter" || key.key === " ") {
-                      key.preventDefault();
-                      open();
-                    }
-                  }}
+        <ul className="event-samples__items" aria-label="样本列表">
+          {samples.map((sample) => {
+            const preview = attributePreview(sample.attributes, 2);
+            return (
+              <li key={sample.eventId}>
+                <button
+                  type="button"
+                  aria-pressed={sample.eventId === selected?.eventId}
+                  onClick={() => setSelectedId(sample.eventId)}
                 >
-                  <TableCell>
+                  <span className="event-samples__time">
                     <strong title={new Date(sample.timestamp).toLocaleString("zh-CN")}>
                       {formatSampleAge(sample.timestamp)}
                     </strong>
-                    <small>{new Date(sample.timestamp).toLocaleTimeString("zh-CN")}</small>
-                  </TableCell>
-                  <TableCell>
-                    <strong>{sample.route || sample.pageUrl || "未知页面"}</strong>
-                    <small>
-                      {[sample.browser, sample.device, sample.country].filter(Boolean).join(" · ")}
-                    </small>
-                  </TableCell>
-                  <TableCell>
-                    {preview.shown.length ? (
-                      <span className="event-chips">
-                        {preview.shown.map(([key, value]) => (
-                          <code key={key} title={`${key}=${value}`}>
-                            {key}={value}
-                          </code>
-                        ))}
-                        {preview.hidden ? (
-                          <code
-                            className="event-chips__more"
-                            title={Object.entries(sample.attributes)
-                              .slice(preview.shown.length)
-                              .map(([key, value]) => `${key}=${value}`)
-                              .join("\n")}
-                          >
-                            +{preview.hidden}
-                          </code>
-                        ) : null}
-                      </span>
-                    ) : (
-                      <small>无属性</small>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <span className="event-session">
-                      <code>{shortID(sample.sessionId)}</code>
-                      <CopyButton value={sample.sessionId} label="复制会话 ID" />
+                    <small>{new Date(sample.timestamp).toLocaleString("zh-CN")}</small>
+                  </span>
+                  <span className="event-samples__page">
+                    {sample.route || sample.pageUrl || "未知页面"}
+                  </span>
+                  {preview.shown.length ? (
+                    <span className="event-chips">
+                      {preview.shown.map(([key, value]) => (
+                        <code key={key} title={`${key}=${value}`}>
+                          {key}={value}
+                        </code>
+                      ))}
+                      {preview.hidden ? (
+                        <code className="event-chips__more">+{preview.hidden}</code>
+                      ) : null}
                     </span>
-                  </TableCell>
-                </TableRow>
-              );
-            })}
-          </TableBody>
-        </Table>
-      ) : null}
-      {samples.data && !samples.data.samples.length ? (
-        <EmptyState
-          title="该时间窗口内没有原始样本"
-          description="原始样本只保留一段时间。可以把时间范围调到更近，或确认该事件仍在上报。"
-        />
+                  ) : null}
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+      {selected ? (
+        <SampleDetail key={selected.eventId} projectId={projectId} sample={selected} />
       ) : null}
     </section>
   );
@@ -177,21 +137,8 @@ function CopyButton({ value, label }: { value: string; label: string }) {
   );
 }
 
-/**
- * One sample's facts and its full session timeline. It renders inside a drawer the caller
- * owns, so a sample can open from the event drawer without stacking a second drawer on it.
- */
-export function SampleDetailBody({
-  projectId,
-  sample,
-  onBack,
-  onClose,
-}: {
-  projectId: string;
-  sample: BehaviorSample;
-  onBack: () => void;
-  onClose: () => void;
-}) {
+/** One sample's facts, every property it carried and its full session timeline. */
+function SampleDetail({ projectId, sample }: { projectId: string; sample: BehaviorSample }) {
   const range = sessionTimelineRange(sample.timestamp);
   const timeline = useQuery({
     queryKey: ["session-timeline", projectId, sample.sessionId, range.from, range.to],
@@ -199,24 +146,12 @@ export function SampleDetailBody({
       getSessionTimeline(projectId, sample.sessionId, range.from, range.to, signal),
   });
   return (
-    <>
-      <DrawerHeader className="event-sample-detail__header">
-        <div>
-          <Button variant="ghost" size="sm" className="event-sample-detail__back" onClick={onBack}>
-            <ArrowLeftIcon data-icon="inline-start" />
-            返回事件
-          </Button>
-          <span>{kindLabel(sample.kind)}</span>
-          <DrawerTitle>{eventLabel(sample.kind, sample.name)}</DrawerTitle>
-          <DrawerDescription>
-            {new Date(sample.timestamp).toLocaleString("zh-CN")}
-          </DrawerDescription>
-        </div>
-        <Button variant="ghost" size="icon" aria-label="关闭样本详情" onClick={onClose}>
-          <XIcon />
-        </Button>
-      </DrawerHeader>
+    <article className="event-samples__detail" aria-label="样本详情">
       <dl className="event-sample-facts">
+        <div>
+          <dt>时间</dt>
+          <dd>{new Date(sample.timestamp).toLocaleString("zh-CN")}</dd>
+        </div>
         <div>
           <dt>路由</dt>
           <dd>{sample.route || "—"}</dd>
@@ -232,6 +167,10 @@ export function SampleDetailBody({
         <div>
           <dt>国家</dt>
           <dd>{sample.country || "—"}</dd>
+        </div>
+        <div>
+          <dt>访客</dt>
+          <dd>{sample.visitorId ? shortID(sample.visitorId) : "—"}</dd>
         </div>
         <div>
           <dt>会话</dt>
@@ -287,7 +226,7 @@ export function SampleDetailBody({
           />
         ) : null}
       </section>
-    </>
+    </article>
   );
 }
 

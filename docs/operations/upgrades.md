@@ -11,8 +11,8 @@ Application images must provide `/bin/sh`; the chart's five-second `preStop` dra
 ## N-1 to N procedure
 
 1. Confirm PostgreSQL/ClickHouse backups, Kafka lag, ingest acceptance and query freshness are healthy.
-2. Run `helm lint deploy/helm/openrum` and render the exact production values.
-3. Upgrade with `helm upgrade openrum deploy/helm/openrum --namespace openrum --atomic --wait --timeout 15m -f values.production.yaml`.
+2. Read the target version's release notes for upgrade steps and behaviour changes, then render the exact production values against the published Chart: `helm template openrum oci://ghcr.io/open-rum/charts/openrum --version X.Y.Z -f values.production.yaml`.
+3. Upgrade with `helm upgrade openrum oci://ghcr.io/open-rum/charts/openrum --version X.Y.Z --namespace openrum --atomic --wait --timeout 15m -f values.production.yaml`. Always pin `--version`; a local checkout of `deploy/helm/openrum` is for development only.
 4. Confirm the migration Job completed, every Deployment is available, Kafka lag returns to baseline, and `helm test openrum --namespace openrum` succeeds.
 5. Keep SDK ingest checks running throughout the rollout; abort if acceptance drops or P99 crosses the agreed budget.
 

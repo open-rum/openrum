@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { equalsTerm, foldIntoQuery, textTerm } from "@/lib/search/legacy";
 import { requestJSON } from "./client";
 
 const isoTime = z.iso.datetime({ offset: true });
@@ -169,6 +170,8 @@ export type APIFilters = {
   method?: string;
   url?: string;
   search?: string;
+  /** The shared search for the ranked list: endpoint:*pay*, !route:/admin, release:[a,b]. */
+  q?: string;
   sort: APISort;
 };
 
@@ -204,17 +207,27 @@ export function defaultAPIFilters(
       : new Date(to.getTime() - 86400000);
   const sortValue = search.get("sort");
   const requested = new Set(search.getAll("methods").map((value) => value.toUpperCase()));
+  const methods = apiMethods.filter((method) => requested.has(method));
+  const release = clean(search.get("release"));
+  const route = clean(search.get("route"));
+  const text = clean(search.get("search"));
+  // The one-field parameters of old links become conditions of the search query.
+  const q = foldIntoQuery(clean(search.get("q"))?.slice(0, 1024), [
+    text ? textTerm(text) : undefined,
+    methods.length === 1 ? equalsTerm("method", methods[0]!) : undefined,
+    methods.length > 1 ? `method:[${methods.join(",")}]` : undefined,
+    release ? equalsTerm("release", release) : undefined,
+    route ? equalsTerm("route", route) : undefined,
+  ]);
   return {
     projectId,
     from,
     to,
     environment: clean(search.get("environment")),
-    release: clean(search.get("release")),
-    route: clean(search.get("route")),
-    methods: apiMethods.filter((method) => requested.has(method)),
+    methods: [],
     method: clean(search.get("method")),
     url: clean(search.get("url")),
-    search: clean(search.get("search")),
+    q,
     sort: apiSorts.find((value) => value === sortValue) ?? "requests",
   };
 }
@@ -231,6 +244,7 @@ export function serializeAPIFilters(filters: APIFilters) {
     ["method", filters.method],
     ["url", filters.url],
     ["search", filters.search],
+    ["q", filters.q],
   ] as const)
     if (value) parameters.set(key, value);
   for (const method of filters.methods) parameters.append("methods", method);

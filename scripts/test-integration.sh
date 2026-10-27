@@ -12,7 +12,7 @@ kafka_topic="openrum-integration-v1"
 "${compose[@]}" up -d --wait postgres clickhouse kafka redis
 
 if ! "${compose[@]}" exec -T postgres psql -U openrum -d postgres -tAc \
-  "SELECT 1 FROM pg_database WHERE datname='openrum_test'" | tr -d '[:space:]' | rg -q '^1$'; then
+  "SELECT 1 FROM pg_database WHERE datname='openrum_test'" | tr -d '[:space:]' | grep -q '^1$'; then
   "${compose[@]}" exec -T postgres createdb -U openrum -O openrum openrum_test
 fi
 

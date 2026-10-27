@@ -57,7 +57,8 @@ SDK 和 Ingest 两侧都会执行。SDK 在本地直接丢弃；Ingest 会裁剪
 - `role` —— `button`、`link`、`menuitem`、`tab` 之一
 - `input_type` —— `button`、`checkbox`、`radio`、`reset`、`submit`、`file` 之一，且只在 `element` 是 `input` 时保留
 - `name` —— 脱敏后的标签，≤ 64 字符
+- `selector` —— 元素的简短 CSS 路径：元素本身加最多两层父元素，每层写成 `标签#id.class`，用 ` > ` 连接，例如 `div.experiment-grid > article.experiment-card > button.run-button`。每层最多保留 3 个 class。含数字的 id 或 class 会被去掉，因为这类名字通常是自动生成的，或者带有数据。
 
-没有文本内容，没有输入值，没有选择器。这就是点击采集可以默认开启、而不会采到用户输入了什么的原因。
+没有文本内容，也没有输入值。这就是点击采集可以默认开启、而不会采到用户输入了什么的原因。
 
 接下来：[埋点场景](/zh/docs/product/analytics/instrumentation/)把这些规则套到团队真正会问的分析上。

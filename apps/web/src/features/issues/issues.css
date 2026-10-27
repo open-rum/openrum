@@ -1109,6 +1109,49 @@ li[data-library] .stack-frame__text {
 .issues-list-table .issue-col-trend {
   padding-block: 0;
 }
+/* Sort menu: each order with a line on what it puts first. */
+.issue-sort-item span:has(> strong) {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+.issue-sort-item strong {
+  font-weight: 500;
+}
+.issue-sort-item small {
+  font-size: var(--text-caption, 12px);
+  color: var(--ds-text-muted);
+}
+
+/* The owner: a picture, or a dashed outline nobody fills yet. */
+.issues-list-table .issue-col-assignee {
+  width: 88px;
+  text-align: right;
+}
+.issue-assignee,
+.issue-assignee-trigger {
+  display: inline-flex;
+  align-items: center;
+}
+.issue-assignee-trigger {
+  gap: 4px;
+  padding-inline: 4px 8px;
+}
+.issue-assignee-empty {
+  display: inline-flex;
+  width: 24px;
+  height: 24px;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed currentColor;
+  border-radius: 999px;
+  color: var(--ds-text-muted);
+}
+.issue-assignee-empty svg {
+  width: 14px;
+  height: 14px;
+}
 
 /* Overview strip: a short column chart beside a ranked breakdown. */
 .issue-overview {
@@ -1203,13 +1246,6 @@ li[data-library] .stack-frame__text {
     border-top: 1px solid var(--ds-border-soft);
     border-left: 0;
   }
-}
-
-/* Quick filters sit beside the status select and read as one group. */
-.issue-quick-filters {
-  display: flex;
-  align-items: center;
-  gap: 6px;
 }
 
 /* The selection bar takes the heading's place so the table does not jump. */

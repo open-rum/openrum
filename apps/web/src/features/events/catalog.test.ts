@@ -33,12 +33,20 @@ describe("event catalog sorting", () => {
 });
 
 describe("sample window", () => {
-  const to = new Date("2026-09-03T12:00:00Z");
-  it("says so when the trend range is wider than the sample cap", () => {
-    expect(sampleWindowLabel(new Date("2026-08-27T12:00:00Z"), to)).toContain("最后 24 小时");
+  const range = { from: new Date("2026-08-27T12:00:00Z"), to: new Date("2026-09-03T12:00:00Z") };
+  it("names the day before the event last occurred when the server read a part", () => {
+    const label = sampleWindowLabel(range, {
+      from: "2026-08-30T08:41:00Z",
+      to: "2026-08-31T08:41:00Z",
+    });
+    expect(label).toContain("最后一次出现");
+    expect(label).toContain("前 24 小时内");
   });
-  it("describes the whole range when it fits", () => {
-    expect(sampleWindowLabel(new Date("2026-09-03T06:00:00Z"), to)).toBe("所选时间范围内");
+  it("describes the whole range when the samples cover it", () => {
+    expect(
+      sampleWindowLabel(range, { from: range.from.toISOString(), to: range.to.toISOString() }),
+    ).toBe("所选时间范围内");
+    expect(sampleWindowLabel(range)).toBe("所选时间范围内");
   });
 });
 

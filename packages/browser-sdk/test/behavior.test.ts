@@ -5,6 +5,7 @@ import { OpenRUMClient } from "../src/client.ts";
 import {
   behaviorIntegration,
   describeTarget,
+  selectorPath,
   type BehaviorElement,
   type BehaviorRuntime,
 } from "../src/integrations/behavior.ts";
@@ -70,10 +71,12 @@ void test("captures only a bounded, explicit description of an interactive targe
   assert.equal(event?.type, "custom");
   if (event?.type !== "custom") assert.fail("expected custom event");
   assert.equal(event.name, "ui.click");
+  // Classes with digits, such as these, are left out of the selector as possible data.
   assert.deepEqual(event.attributes, {
     element: "button",
     role: "button",
     name: "checkout.submit",
+    selector: "button",
   });
   assert.doesNotMatch(JSON.stringify(event), /person@|customer-42|4242|token|secret input/);
 });
@@ -103,4 +106,24 @@ void test("does not collect text input values and enforces a per-minute event bu
 
 void test("ignores non-interactive targets without an explicit safe name", () => {
   assert.equal(describeTarget(element({ value: "private" }, "DIV")), undefined);
+});
+
+void test("names a click by a short CSS path of developer-written names", () => {
+  const node = (tagName: string, attributes: Record<string, string>, parent?: BehaviorElement) => ({
+    tagName,
+    parentElement: parent ?? null,
+    getAttribute: (name: string) => attributes[name] ?? null,
+  });
+  const body = node("BODY", { class: "app" });
+  const page = node("MAIN", { class: "page" }, body);
+  const grid = node("DIV", { class: "experiment-grid" }, page);
+  const card = node("ARTICLE", { class: "experiment-card accent-violet css-1x9f2" }, grid);
+  const button = node("BUTTON", { id: "user-42", class: "run-button" }, card);
+  // Three steps at most, and generated or data-like names (with digits) are dropped.
+  assert.equal(
+    selectorPath(button),
+    "div.experiment-grid > article.experiment-card.accent-violet > button.run-button",
+  );
+  // The walk stops at body, so a shallow element keeps only real steps.
+  assert.equal(selectorPath(page), "main.page");
 });

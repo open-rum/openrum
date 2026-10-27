@@ -15,10 +15,10 @@ Complete [Deployment preparation](/docs/getting-started/production-deployment/) 
    Pick the release to install and check that its chart is reachable from your machine:
 
    ```sh
-   helm show chart oci://ghcr.io/open-rum/charts/openrum --version 0.1.1
+   helm show chart oci://ghcr.io/open-rum/charts/openrum --version 0.1.2
    ```
 
-   The chart's default image is the matching `ghcr.io/open-rum/openrum:0.1.1`, built for AMD64 and ARM64 nodes. One image contains all five services, the migration tool, the Console and the Browser SDK, so there is nothing to build or push. Always pin `--version`, and use the same version in every later command.
+   The chart's default image is the matching `ghcr.io/open-rum/openrum:0.1.2`, built for AMD64 and ARM64 nodes. One image contains all five services, the migration tool, the Console and the Browser SDK, so there is nothing to build or push. Always pin `--version`, and use the same version in every later command.
 
    <Aside type="note" title="Using your own image">
      Build your own image only for an internal mirror, an air-gapped cluster or modified source. From
@@ -36,7 +36,7 @@ Complete [Deployment preparation](/docs/getting-started/production-deployment/) 
      `deploy/helm/openrum` in that checkout if you also changed the chart.
    </Aside>
 
-   **Success:** `helm show chart` prints `version: 0.1.1` and `appVersion: "0.1.1"`.
+   **Success:** `helm show chart` prints `version: 0.1.2` and `appVersion: "0.1.2"`.
 
 1. ## Create the runtime Secret and the HTTPS certificate
 
@@ -123,7 +123,7 @@ Complete [Deployment preparation](/docs/getting-started/production-deployment/) 
 
    ```sh
    helm template openrum oci://ghcr.io/open-rum/charts/openrum \
-     --version 0.1.1 --namespace openrum \
+     --version 0.1.2 --namespace openrum \
      --values values.production.yaml > /dev/null
    ```
 
@@ -131,7 +131,7 @@ Complete [Deployment preparation](/docs/getting-started/production-deployment/) 
 
    ```sh
    helm upgrade --install openrum oci://ghcr.io/open-rum/charts/openrum \
-     --version 0.1.1 --namespace openrum \
+     --version 0.1.2 --namespace openrum \
      --values values.production.yaml \
      --wait --timeout 15m
    helm test openrum --namespace openrum

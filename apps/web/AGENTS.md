@@ -32,8 +32,22 @@ When implementing from a selected generated mock, treat that image as the source
   Session ends after 30 minutes idle or 24 hours continuous activity; it is not
   a user's lifecycle. Do not expose a replay control until real privacy-filtered
   replay data and a player exist.
-- Sessions, Events, API, Logs, and Issues use the shared focus-expanding filter search:
-  `/` focuses it, selected conditions remain visible as removable tokens, and
+- The shared search language (user request, 2026-10-23) is `internal/search` on the server and
+  `lib/search/terms.ts` / `lib/search/query.ts` in the Console: `!` negates, `field:[a,b]` is
+  one of, a `*` at the start or end of a value is contains/starts/ends, `has:field` is present,
+  `> >= < <=` compare number and duration fields, and `AND` between conditions is optional
+  punctuation. Never add OR or parentheses. Each page declares its fields in its Schema (Go)
+  and its `*FilterComposer` (Console); keep the two lists the same and only offer what the
+  page's query answers (the API list has no status or duration). Values are suggested by
+  `GET /projects/:id/search/values`; recent searches live in localStorage only. The Events page
+  narrows by the shared route, country, device, browser and release plus `attributes.<name>`
+  (user request, 2026-10-25: those dimensions belong on every page). One property, country,
+  device or browser condition split by itself reads the rollup; anything else, route included,
+  reads raw events within `CheckBehaviorBudget`. There is no SQL mode; it needs a read-only
+  ClickHouse account, row policies and resource limits first. See
+  `apps/site/.../product/search.md`.
+- Sessions, Events, API, Logs, and Issues use the shared text search box
+  (`SearchQueryInput`): `/` focuses it, the query is shown as text, and
   each page supplies only the fields its API supports. Do not duplicate these
   filters in a side rail or render a second search box. Logs keeps its full-width
   chart and list; express optional country/device/route/browser/release constraints
@@ -45,28 +59,41 @@ When implementing from a selected generated mock, treat that image as the source
   IDs in log details, with same-user and same-visitor actions. Never infer a
   current user from a Session or fabricate profile fields not captured by the SDK.
   Issues keeps its high-frequency status as a Select immediately left of the
-  shared search. Its search starts with Issue-specific title, error type, and Fingerprint fields,
-  followed by user.id, release, browser, device, country, Route, and sorting. Issue-title
+  shared search and its sort as a Select after it. Its fields start with Issue-specific title,
+  error type and Fingerprint, followed by user.id, release, browser, device, country and Route. Issue-title
   search is server-side across the selected range, never scoped to the loaded page.
   Shared search field discovery matches technical keys and common aliases, so
   short input such as `u` can suggest a supported `user.id` field; never suggest
   a field that the current page query API cannot execute.
-- The shared filter search (`components/filters/FilterSearchComposer.tsx`, user request,
-  2026-10-14) is a combobox: the input has `role="combobox"` and the suggestions are a
-  `listbox` of `option`s, so tests and e2e find the input with `getByRole("combobox")` and a
-  suggestion with `getByRole("option")`. ↑/↓ move the highlight, Enter takes it, Tab completes
-  to the best-matching field, Esc closes and then clears. With text typed, the first row says
-  where plain text goes (`searchLabel`, e.g. 在「错误标题」中搜索); a page with no free-text
-  search (Events) must not promise one in its placeholder. A single `name:value` term, by key,
-  synonym or label, becomes that field's condition, and typing `name:` opens the field;
-  anything with more in it stays text. A page whose own query language already reads the
-  form (Logs, which keeps `*` unquoted) passes `fieldTerms={false}`. A condition holding one
-  value carries `fieldKey` so clicking it edits it in place; stacking conditions (API
-  methods, log terms) do not. `onClear` adds 清除全部 from two conditions on; Backspace on an
-  empty input selects the last condition first and removes it on the second press. The 查询
-  button only shows when there is something to submit. The input announces added and removed
-  conditions in a polite live region, so e2e assertions on a condition's text use
-  `getByText(label, { exact: true })`.
+- The shared search box (`components/filters/SearchQueryInput.tsx`, user request, 2026-10-23)
+  shows the whole query as editable monospace text, never as tokens, so it can be copied,
+  pasted and changed in place: `user.id:"c-1" AND !browser:Chrome`. A coloured copy sits
+  under a transparent input (field, operator, value, keyword colours; a refused condition is
+  underlined from the server's `error.search.position`). Suggestions follow the caret: field
+  names while a name is typed, then operator buttons (是、不是、属于其中之一、包含、有值…, by field
+  type) and values after the colon. Choosing writes text and puts ` AND ` before a new
+  condition; a value or has-condition runs the search, a list stays open until Enter. The
+  input is a `combobox` with a `listbox` of `option`s. The page's URL holds only `q` (plus
+  its own settings such as sort or status); old one-field parameters (release=, browser=,
+  signal=, minimumEvents=, level=, methods=, …) are read once as conditions via
+  `lib/search/legacy.ts` and not written again. Sort, the Events event and the Issues status
+  are separate Selects, not search fields. There is no 查询 button (user request, 2026-10-25):
+  Enter (`enterKeyHint="search"` on phones), a chosen value or a has-condition runs the search,
+  and an edit that has not run shows 按 Enter 搜索 in place of the `/` hint. The Events split is
+  chosen on its distribution card and measurements in the event drawer; neither sits beside the
+  search because neither filters. The Issue detail page keeps its
+  one-field 只看 tags; only the list folds them into `q`.
+- The Events detail drawer (user request, 2026-10-25) mirrors the API detail: a wide right
+  drawer with line Tabs 概览 / 样本. 概览 holds 次数/用户/会话/人均次数, the trend, then 属性 (each
+  property's top values from the rollup, `properties[].topValues`, sent only when one event is
+  selected, drawn with the distribution's row anatomy) and the distribution and measurements.
+  Clicking a value narrows the whole drawer through its own `attributes.<name>:<value>` terms
+  shown as removable chips. The drawer only looks: it has no 只看这个事件 button (removed at the
+  user's request) and never changes the page, whose event selector filters the page. 样本 is a
+  list beside the picked sample's
+  facts, properties and session timeline, read only once the tab opens. The server reads one
+  day of raw events at most: a longer range reads the day before the event last occurred
+  (`window` in the response), so a quiet last day never empties the list.
 - The Issues page opens with one compact overview strip (a short column chart with an
   事件/会话/用户 switch beside a ranked 错误分布 with a 类型/页面/国家 switch) so the list
   starts on the first screen; do not bring back tall stacked charts. Each row leads with

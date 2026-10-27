@@ -95,14 +95,17 @@ describe("issues list", () => {
     expect(view.container.querySelectorAll("[data-selected]")).toHaveLength(1);
   });
 
-  it("shows the culprit line and a trend sparkline, without a first-seen column", () => {
+  it("shows the culprit line, a trend sparkline, first seen and the owner", () => {
     const filters = defaultIssueFilters(projectId, new Date("2026-09-03T12:00:00Z"));
     const view = render(<IssueTable issues={[issueFixture("unresolved", 0)]} filters={filters} />);
     const row = view.container.querySelector("[data-issue-row]");
     expect(row?.textContent).toContain("TypeError · submit · assets/app.js");
     expect(row?.querySelector("svg")).toBeTruthy();
-    expect(view.queryByText("首次发生")).toBeNull();
     expect(view.getByText("趋势")).toBeTruthy();
+    expect(view.getByText("首次发生")).toBeTruthy();
+    // Without a way to assign, the owner is shown but cannot be changed.
+    expect(view.getByLabelText("未分配")).toBeTruthy();
+    expect(view.queryByRole("combobox", { name: /更换负责人/ })).toBeNull();
   });
 
   it("marks only Issues first seen inside the range as new", () => {

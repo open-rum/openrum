@@ -13,6 +13,7 @@ import (
 	"github.com/google/uuid"
 
 	"openrum/internal/capture"
+	"openrum/internal/search"
 )
 
 var ErrInvalidAPIFilters = errors.New("invalid API filters")
@@ -36,7 +37,10 @@ type APIFilters struct {
 	Search  string
 	// User narrows one endpoint's sample list to requests whose anonymous or business user
 	// ID starts with it. It never affects the aggregates.
-	User    string
+	User string
+	// Query is the shared search (internal/search). The ranked list accepts what the rollup
+	// keeps; one endpoint's samples also take status, duration and the client fields.
+	Query   string
 	Sort    string
 	Compare bool
 }
@@ -266,7 +270,55 @@ func NormalizeAPIFilters(filters APIFilters) (APIFilters, error) {
 		!pairedEndpoint || !knownSort || containsControl(filters.Environment+filters.Release+filters.Route+filters.Method+filters.URL+filters.Search+filters.User) {
 		return APIFilters{}, ErrInvalidAPIFilters
 	}
+	if len(filters.Query) > search.MaxLength {
+		return APIFilters{}, ErrInvalidAPIFilters
+	}
+	schema := apiListSchema
+	if filters.Method != "" {
+		schema = apiSampleSchema
+	}
+	if _, _, err := schema.ParseAndCompile(filters.Query, search.Raw); err != nil {
+		return APIFilters{}, errors.Join(ErrInvalidAPIFilters, err)
+	}
 	return filters, nil
+}
+
+func upperMethod(value string) (string, bool) {
+	value = strings.ToUpper(value)
+	for _, method := range apiMethods {
+		if method == value {
+			return value, true
+		}
+	}
+	return "", false
+}
+
+var apiListFields = []search.Field{
+	{Key: "method", Exprs: []string{"api_method"}, Aggregate: "api_method", Type: search.Enum, Normalize: upperMethod},
+	{Key: "endpoint", Aliases: []string{"url"}, Exprs: []string{"api_url_normalized"}, Aggregate: "api_url_normalized", Type: search.Text},
+	{Key: "route", Exprs: []string{"route"}, Aggregate: "route", Type: search.Text},
+	{Key: "release", Exprs: []string{"release"}, Aggregate: "release", Type: search.Text},
+}
+
+// apiListSchema is what the ranked endpoint list accepts: only what api_metrics_1m keeps.
+var apiListSchema = search.Schema{Fields: apiListFields, FreeText: "endpoint"}
+
+// apiSampleSchema is what one endpoint's request samples accept.
+var apiSampleSchema = search.Schema{
+	Fields: append(append([]search.Field(nil), apiListFields...),
+		search.Field{Key: "status", Exprs: []string{"api_status"}, Type: search.Number},
+		search.Field{Key: "duration", Exprs: []string{"duration_ms"}, Type: search.Duration, DurationUnit: time.Millisecond},
+		search.Field{Key: "failure", Exprs: []string{"api_failure"}, Type: search.Text},
+		search.Field{Key: "browser", Exprs: []string{"browser"}, Type: search.Enum},
+		search.Field{Key: "device", Aliases: []string{"deviceType"}, Exprs: []string{"device_type"}, Type: search.Enum},
+		search.Field{Key: "country", Exprs: []string{"country"}, Type: search.Enum, Normalize: upperCountry},
+		search.Field{Key: "user.id", Aliases: []string{"userId", "user_id"}, Exprs: []string{"user_id"}, Type: search.Text},
+		search.Field{Key: "anonymous_user_id", Aliases: []string{"anonymousUserId"}, Exprs: []string{"anonymous_user_id"}, Type: search.Text},
+		search.Field{Key: "trace_id", Aliases: []string{"traceId"}, Exprs: []string{"trace_id"}, Type: search.Text},
+	),
+	AttributeExpr: "attributes",
+	AttributeKey:  behaviorPropertyPattern.MatchString,
+	FreeText:      "endpoint",
 }
 
 // apiMethods bounds the method filter to the verbs the browser SDK records, so
@@ -293,6 +345,7 @@ func normalizeAPIMethods(requested []string) []string {
 }
 
 func (repository *APIRepository) Get(ctx context.Context, requested APIFilters) (APIResult, error) {
+	ctx = boundedQueryContext(ctx)
 	filters, err := NormalizeAPIFilters(requested)
 	if err != nil {
 		return APIResult{}, err
@@ -654,6 +707,7 @@ func (repository *APIRepository) routes(ctx context.Context, filters APIFilters)
 // Samples lists one endpoint's requests, newest first, optionally only a user's. It needs an
 // endpoint: the aggregates answer questions about all of them.
 func (repository *APIRepository) Samples(ctx context.Context, requested APIFilters) (APISamples, error) {
+	ctx = boundedQueryContext(ctx)
 	filters, err := NormalizeAPIFilters(requested)
 	if err != nil {
 		return APISamples{}, err
@@ -666,6 +720,10 @@ func (repository *APIRepository) Samples(ctx context.Context, requested APIFilte
 		where += " AND (startsWith(anonymous_user_id,?) OR startsWith(user_id,?))"
 		arguments = append(arguments, filters.User, filters.User)
 	}
+	compiled, _, _ := apiSampleSchema.ParseAndCompile(filters.Query, search.Raw)
+	extra, extraArguments := compiled.WhereSQL()
+	where += extra
+	arguments = append(arguments, extraArguments...)
 	rows, err := repository.database.QueryContext(ctx, `SELECT event_id,timestamp,api_method,api_url_normalized,api_status,api_failure,duration_ms,transfer_size,
 		route,page_url_normalized,environment,release,browser,browser_version,os,os_version,device_type,toString(country),session_id,
 		anonymous_user_id,user_id,trace_id,attributes,`+headerColumn("api_request_headers")+`,`+headerColumn("api_response_headers")+`,`+bodyColumn("api_request_body")+`,`+bodyColumn("api_response_body")+`
@@ -746,6 +804,10 @@ func apiAggregateWhere(filters APIFilters, endpoint bool) (string, []any) {
 				arguments = append(arguments, method)
 			}
 		}
+		compiled, _, _ := apiListSchema.ParseAndCompile(filters.Query, search.Aggregate)
+		extra, extraArguments := compiled.WhereSQL()
+		where += extra
+		arguments = append(arguments, extraArguments...)
 	}
 	return where, arguments
 }

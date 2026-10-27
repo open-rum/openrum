@@ -1,7 +1,7 @@
 ---
 title: SDK options
 description: Generated reference for every @openrum/browser initialization option.
-appliesTo: "@openrum/browser 0.1.1"
+appliesTo: "@openrum/browser 0.1.2"
 ---
 
 <!-- GENERATED: scripts/docs/generate-reference.mjs -->

@@ -194,12 +194,17 @@ export type IssueFilters = {
   deviceType?: string;
   country?: string;
   route?: string;
+  /**
+   * The shared search (lib/search/terms.ts), for conditions beyond the fields above. An empty
+   * string is a search someone cleared, which the list keeps apart from no search at all.
+   */
+  q?: string;
   status?: IssueStatus;
   /** "none" for unowned Issues, "me" for the signed-in member's, or a member's user ID. */
   assignee?: string;
   /** Only Issues first seen inside the range. */
   newOnly?: boolean;
-  sort: "events" | "users" | "last_seen";
+  sort: "events" | "users" | "last_seen" | "first_seen" | "trend";
   cursor?: string;
 };
 
@@ -331,7 +336,13 @@ export function parseIssueFilters(
   const status = issueStatusSchema.safeParse(clean(search.get("status")));
   const assignee = clean(search.get("assignee"));
   const sortValue = search.get("sort");
-  const sort = sortValue === "users" || sortValue === "last_seen" ? sortValue : "events";
+  const sort =
+    sortValue === "users" ||
+    sortValue === "last_seen" ||
+    sortValue === "first_seen" ||
+    sortValue === "trend"
+      ? sortValue
+      : "events";
   const cursor = clean(search.get("cursor"));
   return {
     projectId,
@@ -347,6 +358,7 @@ export function parseIssueFilters(
     deviceType: clean(search.get("deviceType")),
     country: clean(search.get("country")),
     route: clean(search.get("route")),
+    q: search.has("q") ? (clean(search.get("q"))?.slice(0, 1024) ?? "") : undefined,
     status: status.success ? status.data : undefined,
     assignee: /^(none|me|[0-9a-f-]{36})$/i.test(assignee ?? "") ? assignee : undefined,
     newOnly: search.get("new") === "1" || undefined,
@@ -379,6 +391,7 @@ export function serializeIssueFilters(filters: IssueFilters) {
   ] as const) {
     if (value) parameters.set(key, value);
   }
+  if (filters.q !== undefined) parameters.set("q", filters.q);
   return parameters;
 }
 

@@ -220,6 +220,7 @@ export default defineConfig({
               items: [
                 { slug: "docs/product/dashboards" },
                 { slug: "docs/product/investigation" },
+                { slug: "docs/product/search" },
                 { slug: "docs/product/logs" },
                 { slug: "docs/product/performance" },
                 { slug: "docs/product/api-monitoring" },

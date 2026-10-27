@@ -43,6 +43,9 @@ func (handler *APIHandler) Get(writer http.ResponseWriter, request *http.Request
 		return
 	}
 	filters, err := parseAPIFilters(request, projectID)
+	if err != nil && writeSearchError(writer, request, err) {
+		return
+	}
 	if err != nil {
 		httpx.WriteError(writer, request, http.StatusBadRequest, "VALIDATION_ERROR", "A valid UTC range up to 30 days and bounded API filters are required.")
 		return
@@ -80,7 +83,7 @@ func parseAPIFilters(request *http.Request, projectID uuid.UUID) (query.APIFilte
 		ProjectID: projectID, From: from, To: to, Environment: values.Get("environment"),
 		Release: values.Get("release"), Route: values.Get("route"), Methods: values["methods"],
 		Method: values.Get("method"), URL: values.Get("url"), Search: values.Get("search"),
-		User: values.Get("user"), Sort: values.Get("sort"), Compare: values.Get("compare") == "previous",
+		User: values.Get("user"), Query: values.Get("q"), Sort: values.Get("sort"), Compare: values.Get("compare") == "previous",
 	})
 }
 
@@ -101,6 +104,9 @@ func (handler *APIHandler) Samples(writer http.ResponseWriter, request *http.Req
 		return
 	}
 	filters, err := parseAPIFilters(request, projectID)
+	if err != nil && writeSearchError(writer, request, err) {
+		return
+	}
 	if err != nil {
 		httpx.WriteError(writer, request, http.StatusBadRequest, "VALIDATION_ERROR", "A valid UTC range up to 30 days and bounded API filters are required.")
 		return

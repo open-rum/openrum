@@ -449,6 +449,9 @@ func pageClicks(page Page, at time.Time, random *rand.Rand) []event.EventV1 {
 		if click.Role != "" {
 			attributes["role"] = click.Role
 		}
+		// The short CSS path the SDK reports, shaped like a real storefront's markup.
+		attributes["selector"] = fmt.Sprintf("main.page > section.%s-section > %s.%s",
+			click.Name, strings.ToLower(click.Element), click.Name)
 		events = append(events, event.EventV1{
 			EventID: uuid.NewString(), Type: event.EventTypeCustom,
 			Timestamp: timestamp(at.Add(time.Duration(1_000+random.Intn(9_000)) * time.Millisecond)),

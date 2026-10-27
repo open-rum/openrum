@@ -25,6 +25,10 @@ export const behaviorAnalyticsSchema = z.object({
       name: z.string(),
       events: z.number().int().nonnegative(),
       cardinality: z.number().int().nonnegative(),
+      /** The most frequent values, sent only when one event is selected. */
+      topValues: z
+        .array(z.object({ value: z.string(), events: z.number().int().nonnegative() }))
+        .optional(),
     }),
   ),
   measurements: z.array(
@@ -79,6 +83,8 @@ export const behaviorSamplesSchema = z.object({
     }),
   ),
   limit: z.number().int().positive(),
+  /** Where the samples were read: the range, or the day before the event last occurred. */
+  window: z.object({ from: isoTimeSchema, to: isoTimeSchema }).optional(),
 });
 
 export type BehaviorAnalyticsResponse = z.infer<typeof behaviorAnalyticsSchema>;
@@ -179,6 +185,8 @@ export type BehaviorFilters = {
   dimension: BehaviorDimension;
   /** Names a Custom Event measurement to break down by `dimension`. */
   measurement?: string;
+  /** Narrows the events by their properties with the shared search: attributes.plan:pro. */
+  q?: string;
 };
 
 export function defaultBehaviorFilters(
@@ -193,10 +201,21 @@ export function defaultBehaviorFilters(
   const eventName = clean(search.get("eventName"), 80);
   const environment = clean(search.get("environment"), 64);
   const measurement = clean(search.get("measurement"), 64);
+  const q = clean(search.get("q"), 1024);
   if (from >= to || to.getTime() - from.getTime() > 30 * 24 * 60 * 60 * 1000) {
     return { projectId, from: new Date(to.getTime() - 24 * 60 * 60 * 1000), to, dimension };
   }
-  return { projectId, from, to, dimension, eventKind: kind, eventName, environment, measurement };
+  return {
+    projectId,
+    from,
+    to,
+    dimension,
+    eventKind: kind,
+    eventName,
+    environment,
+    measurement,
+    q,
+  };
 }
 
 export function serializeBehaviorFilters(filters: BehaviorFilters) {
@@ -213,6 +232,7 @@ export function serializeBehaviorFilters(filters: BehaviorFilters) {
   // be split on it; the server rejects the pair only for the `all` pseudo-dimension,
   // which this type cannot express.
   if (filters.measurement) parameters.set("measurement", filters.measurement);
+  if (filters.q) parameters.set("q", filters.q);
   return parameters;
 }
 
@@ -224,13 +244,11 @@ export function getBehaviorAnalytics(filters: BehaviorFilters, signal?: AbortSig
   );
 }
 
+/** The server picks which day of a longer range to read and reports it as `window`. */
 export function getBehaviorSamples(filters: BehaviorFilters, signal?: AbortSignal) {
-  const sampleFilters = { ...filters };
-  const earliest = sampleFilters.to.getTime() - 24 * 60 * 60 * 1000;
-  if (sampleFilters.from.getTime() < earliest) sampleFilters.from = new Date(earliest);
   return requestJSON(
     behaviorSamplesSchema,
-    `/api/v1/projects/${encodeURIComponent(filters.projectId)}/analytics/events/samples?${serializeBehaviorFilters(sampleFilters)}`,
+    `/api/v1/projects/${encodeURIComponent(filters.projectId)}/analytics/events/samples?${serializeBehaviorFilters(filters)}`,
     { signal },
   );
 }

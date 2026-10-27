@@ -1,6 +1,15 @@
-import { ArrowDownIcon } from "lucide-react";
+import { ArrowDownIcon, UserRoundIcon } from "lucide-react";
+import { MemberLabel } from "@/components/account/MemberLabel";
+import { UserAvatar } from "@/components/account/UserAvatar";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -11,11 +20,22 @@ import {
 } from "@/components/ui/table";
 import { Sparkline } from "@/lib/charts/Sparkline";
 import { serializeIssueFilters, type IssueFilters, type IssuesResponse } from "@/lib/api/issues";
+import type { OrganizationMember } from "@/lib/api/projects";
 import { IssueStatusLabel } from "./IssueStatusLabel";
+import { issueSorts } from "./issueSort";
+import { withTimePreset } from "./issueTime";
 import { issueStatusLabel } from "./issueStatus";
 import { formatAbsoluteTime, formatRelativeTime, isNewInRange } from "./issueTime";
 
 type IssueSort = IssueFilters["sort"];
+
+type Issue = IssuesResponse["issues"][number];
+
+/** Who can own an Issue, and how to change it; leave `onAssign` out for read-only people. */
+export type IssueAssignment = {
+  members?: OrganizationMember[];
+  onAssign?: (issue: Issue, assigneeUserId: string) => void;
+};
 
 export type IssueSelection = {
   selected: ReadonlySet<string>;
@@ -27,12 +47,14 @@ export function IssueTable({
   filters,
   onSortChange,
   selection,
+  assignment,
 }: {
   issues: IssuesResponse["issues"];
   filters: IssueFilters;
   onSortChange?: (sort: IssueSort) => void;
   /** Leave out for people who cannot change Issues; the checkbox column then disappears. */
   selection?: IssueSelection;
+  assignment?: IssueAssignment;
 }) {
   const selectedCount = selection
     ? issues.filter((issue) => selection.selected.has(issue.fingerprint)).length
@@ -66,7 +88,7 @@ export function IssueTable({
           className="issue-sort-button"
           data-active={filters.sort === sort || undefined}
           onClick={() => onSortChange(sort)}
-          title={`按${label}从高到低排序`}
+          title={`按${label}排序：${issueSorts.find((item) => item.value === sort)?.hint ?? ""}`}
         >
           {label}
           <ArrowDownIcon aria-hidden="true" />
@@ -102,15 +124,17 @@ export function IssueTable({
             </TableHead>
           ) : null}
           <TableHead>问题</TableHead>
-          <TableHead className="issue-col-trend">趋势</TableHead>
+          {sortableHead("trend", "趋势", "issue-col-trend")}
           {sortableHead("events", "事件", "issue-col-number")}
           {sortableHead("users", "用户", "issue-col-number")}
           {sortableHead("last_seen", "最近发生", "issue-col-time")}
+          {sortableHead("first_seen", "首次发生", "issue-col-time")}
+          <TableHead className="issue-col-assignee">负责人</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
         {issues.map((issue, index) => {
-          const parameters = serializeIssueFilters(filters);
+          const parameters = withTimePreset(serializeIssueFilters(filters));
           const href = `/projects/${encodeURIComponent(filters.projectId)}/issues/${encodeURIComponent(issue.fingerprint)}?${parameters.toString()}`;
           const isNew = isNewInRange(issue.firstSeenAt, filters.from);
           const location = [issue.culprit?.function, issue.culprit?.file]
@@ -193,10 +217,74 @@ export function IssueTable({
                   {formatRelativeTime(issue.lastSeenAt)}
                 </time>
               </TableCell>
+              <TableCell className="issue-col-time">
+                <time dateTime={issue.firstSeenAt} title={formatAbsoluteTime(issue.firstSeenAt)}>
+                  {formatRelativeTime(issue.firstSeenAt)}
+                </time>
+              </TableCell>
+              {/* The picker's menu is portalled, but React still bubbles its events through here. */}
+              <TableCell
+                className="issue-col-assignee"
+                onClick={(event) => event.stopPropagation()}
+              >
+                <AssigneeCell issue={issue} assignment={assignment} />
+              </TableCell>
             </TableRow>
           );
         })}
       </TableBody>
     </Table>
+  );
+}
+
+/**
+ * The owner's picture, or an empty outline when nobody owns the Issue. People who can change
+ * Issues pick another owner right here; the row click ignores the picker.
+ */
+function AssigneeCell({ issue, assignment }: { issue: Issue; assignment?: IssueAssignment }) {
+  const owner = issue.assigneeUserId
+    ? assignment?.members?.find((member) => member.userId === issue.assigneeUserId)
+    : undefined;
+  const ownerName = owner ? owner.displayName || owner.email : issue.assigneeUserId ? "成员" : "";
+  const face = issue.assigneeUserId ? (
+    <UserAvatar userId={issue.assigneeUserId} name={ownerName} avatar={owner?.avatar} size="sm" />
+  ) : (
+    <span className="issue-assignee-empty">
+      <UserRoundIcon aria-hidden="true" />
+    </span>
+  );
+  const label = issue.assigneeUserId ? `负责人：${ownerName}` : "未分配";
+  if (!assignment?.onAssign) {
+    return (
+      <span className="issue-assignee" title={label} aria-label={label}>
+        {face}
+      </span>
+    );
+  }
+  const onAssign = assignment.onAssign;
+  return (
+    <Select
+      value={issue.assigneeUserId ?? "none"}
+      onValueChange={(value) => onAssign(issue, value === "none" ? "" : value)}
+    >
+      <SelectTrigger
+        size="sm"
+        className="issue-assignee-trigger"
+        aria-label={`${label}，更换负责人`}
+        title={label}
+      >
+        {face}
+      </SelectTrigger>
+      <SelectContent align="end">
+        <SelectGroup>
+          <SelectItem value="none">未分配</SelectItem>
+          {assignment.members?.map((member) => (
+            <SelectItem key={member.userId} value={member.userId}>
+              <MemberLabel member={member} />
+            </SelectItem>
+          ))}
+        </SelectGroup>
+      </SelectContent>
+    </Select>
   );
 }

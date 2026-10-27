@@ -3,7 +3,12 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import type { BehaviorAnalyticsResponse, BehaviorFilters } from "@/lib/api/analytics";
+import {
+  getBehaviorAnalytics,
+  getBehaviorSamples,
+  type BehaviorAnalyticsResponse,
+  type BehaviorFilters,
+} from "@/lib/api/analytics";
 import { EventExplorer } from "./EventExplorer";
 
 const detailResponse = vi.hoisted(() => ({ current: undefined as unknown }));
@@ -11,6 +16,11 @@ vi.mock("@/lib/api/analytics", async (original) => ({
   ...(await original<typeof import("@/lib/api/analytics")>()),
   getBehaviorSamples: vi.fn().mockResolvedValue({ samples: [], limit: 50 }),
   getBehaviorAnalytics: vi.fn(async () => detailResponse.current),
+}));
+
+vi.mock("@/lib/api/issues", async (original) => ({
+  ...(await original<typeof import("@/lib/api/issues")>()),
+  getSessionTimeline: vi.fn().mockRejectedValue(new Error("not in this test")),
 }));
 
 beforeAll(() => {
@@ -34,6 +44,7 @@ beforeAll(() => {
 afterEach(() => {
   cleanup();
   window.localStorage.clear();
+  vi.clearAllMocks();
 });
 
 const metric = (events: number, users = events) => ({
@@ -154,28 +165,134 @@ describe("event explorer", () => {
     expect(props.onChangeDimension).toHaveBeenCalledWith("property:tier");
   });
 
-  it("opens a row with Enter and Space and applies the filter only on request", async () => {
+  it("opens a row with Enter without changing the page's filters", async () => {
     const props = mount(response());
     const row = list().getByText("order_completed").closest("tr")!;
     fireEvent.keyDown(row, { key: "Enter" });
     const dialog = await screen.findByRole("dialog");
-    await waitFor(() =>
-      expect(within(dialog).getByRole("button", { name: "只看这个事件" })).toBeTruthy(),
-    );
+    expect(await within(dialog).findByLabelText("该事件的核心指标")).toBeTruthy();
+    // The drawer only looks; the page's event selector is what filters the page.
+    expect(within(dialog).queryByRole("button", { name: "只看这个事件" })).toBeNull();
     expect(props.onSelectEvent).not.toHaveBeenCalled();
-    fireEvent.click(within(dialog).getByRole("button", { name: "只看这个事件" }));
-    expect(props.onSelectEvent).toHaveBeenCalledWith("custom", "order_completed");
   });
 
-  it("shows the event's own figures, distribution and properties in the drawer", async () => {
+  it("splits the drawer into an overview and samples, like the API detail", async () => {
     mount(response());
     fireEvent.click(list().getByText("order_completed").closest("tr")!);
     const dialog = await screen.findByRole("dialog");
     expect(await within(dialog).findByLabelText("该事件的核心指标")).toBeTruthy();
+    expect(within(dialog).getByText("人均次数")).toBeTruthy();
     expect(within(dialog).getByRole("heading", { name: "趋势" })).toBeTruthy();
+    expect(within(dialog).getByRole("heading", { name: "属性" })).toBeTruthy();
     expect(within(dialog).getByRole("heading", { name: "国家分布" })).toBeTruthy();
-    expect(within(dialog).getByRole("heading", { name: "可分组属性" })).toBeTruthy();
-    expect(within(dialog).getByRole("heading", { name: "原始样本" })).toBeTruthy();
+    // Samples read raw events, so they wait until their tab is opened.
+    expect(getBehaviorSamples).not.toHaveBeenCalled();
+    expect(within(dialog).getByRole("tab", { name: /概览/ }).getAttribute("aria-selected")).toBe(
+      "true",
+    );
+  });
+
+  it("lists each property's common values and narrows the whole drawer to one", async () => {
+    const user = userEvent.setup();
+    const props = mount(response(), { filters: { ...filters, q: "attributes.region:cn" } });
+    detailResponse.current = response({
+      totals: metric(55, 30),
+      properties: [
+        {
+          name: "tier",
+          events: 55,
+          cardinality: 3,
+          topValues: [
+            { value: "gold", events: 30 },
+            { value: "silver", events: 20 },
+          ],
+        },
+      ],
+    });
+    fireEvent.click(list().getByText("order_completed").closest("tr")!);
+    const dialog = await screen.findByRole("dialog");
+    const gold = await within(dialog).findByRole("button", { name: "只看 tier = gold" });
+    expect(gold.textContent).toContain("54.5%");
+    await user.click(gold);
+    expect(within(dialog).getByLabelText("详情筛选").textContent).toContain("tier = gold");
+    await waitFor(() =>
+      expect(vi.mocked(getBehaviorAnalytics).mock.lastCall?.[0].q).toBe(
+        "attributes.region:cn AND attributes.tier:gold",
+      ),
+    );
+    await user.click(within(dialog).getByRole("tab", { name: /样本/ }));
+    await waitFor(() =>
+      expect(vi.mocked(getBehaviorSamples).mock.lastCall?.[0]).toMatchObject({
+        eventName: "order_completed",
+        q: "attributes.region:cn AND attributes.tier:gold",
+      }),
+    );
+    // The page's own search is left as it was.
+    expect(props.onSelectEvent).not.toHaveBeenCalled();
+  });
+
+  it("removes a chosen value from the drawer", async () => {
+    const user = userEvent.setup();
+    mount(response());
+    detailResponse.current = response({
+      properties: [
+        { name: "tier", events: 55, cardinality: 1, topValues: [{ value: "gold", events: 55 }] },
+      ],
+    });
+    fireEvent.click(list().getByText("order_completed").closest("tr")!);
+    const dialog = await screen.findByRole("dialog");
+    await user.click(await within(dialog).findByRole("button", { name: "只看 tier = gold" }));
+    await user.click(within(dialog).getByRole("button", { name: "移除 tier = gold" }));
+    expect(within(dialog).queryByLabelText("详情筛选")).toBeNull();
+  });
+
+  it("lists samples beside the picked one and says which day they come from", async () => {
+    const user = userEvent.setup();
+    vi.mocked(getBehaviorSamples).mockResolvedValueOnce({
+      limit: 50,
+      window: { from: "2026-09-02T03:00:00Z", to: "2026-09-03T03:00:00Z" },
+      samples: [
+        {
+          eventId: "00000000-0000-4000-8000-000000000001",
+          timestamp: "2026-09-03T02:59:00Z",
+          kind: "custom",
+          name: "order_completed",
+          route: "/checkout",
+          sessionId: "00000000-0000-4000-8000-0000000000aa",
+          attributes: { tier: "gold" },
+          breadcrumbs: [],
+        },
+        {
+          eventId: "00000000-0000-4000-8000-000000000002",
+          timestamp: "2026-09-03T02:58:00Z",
+          kind: "custom",
+          name: "order_completed",
+          route: "/cart",
+          sessionId: "00000000-0000-4000-8000-0000000000bb",
+          attributes: {},
+          breadcrumbs: [],
+        },
+      ],
+    });
+    mount(response(), {
+      filters: { ...filters, from: new Date("2026-08-27T00:00:00Z") },
+    });
+    fireEvent.click(list().getByText("order_completed").closest("tr")!);
+    const dialog = await screen.findByRole("dialog");
+    await user.click(within(dialog).getByRole("tab", { name: /样本/ }));
+    expect(await within(dialog).findByText(/最后一次出现/)).toBeTruthy();
+    expect(within(dialog).getByRole("tab", { name: /样本/ }).textContent).toContain("2");
+    const items = within(within(dialog).getByRole("list", { name: "样本列表" })).getAllByRole(
+      "button",
+    );
+    expect(items[0]!.getAttribute("aria-pressed")).toBe("true");
+    const detail = within(dialog).getByRole("article", { name: "样本详情" });
+    expect(within(detail).getByText("gold")).toBeTruthy();
+    await user.click(items[1]!);
+    expect(items[1]!.getAttribute("aria-pressed")).toBe("true");
+    expect(
+      within(within(dialog).getByRole("article", { name: "样本详情" })).getAllByText("/cart"),
+    ).toBeTruthy();
   });
 
   it("shows measurements in the drawer only when the event has them", async () => {
@@ -183,7 +300,7 @@ describe("event explorer", () => {
     fireEvent.click(list().getByText("order_completed").closest("tr")!);
     const dialog = await screen.findByRole("dialog");
     await within(dialog).findByRole("heading", { name: "趋势" });
-    expect(within(dialog).queryByRole("heading", { name: "数值指标" })).toBeNull();
+    expect(within(dialog).queryByRole("heading", { name: "测量值" })).toBeNull();
   });
 
   it("names what is being viewed beside the figures, and clears it", () => {
@@ -200,6 +317,14 @@ describe("event explorer", () => {
     fireEvent.click(within(bar).getByRole("button", { name: "清除选择" }));
     expect(selected.onSelectEvent).toHaveBeenCalledWith();
     expect(props.onSelectEvent).not.toHaveBeenCalled();
+  });
+
+  it("keeps list shares within the list when the page's totals are narrowed", () => {
+    // A search or a selected event narrows the totals, but the list still counts every event.
+    mount(response({ totals: metric(45, 40) }), { filters: { ...filters, q: "country:US" } });
+    const row = list().getByText("order_completed").closest("tr")!;
+    expect(row.textContent).toContain("5.8%");
+    expect(row.textContent).not.toContain("122");
   });
 
   it("marks the filtered event's row as selected", () => {

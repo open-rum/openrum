@@ -27,17 +27,27 @@ export function sortCatalog(catalog: CatalogEntry[], sort: CatalogSortKey) {
   });
 }
 
-const dayMilliseconds = 24 * 60 * 60 * 1000;
-
 /**
- * Raw samples are capped at 24 hours to bound the scan, even when the trend covers a
- * longer range. Say which window the table actually shows instead of implying the whole
- * range.
+ * Raw samples are read from one day at most. A longer range reads the day before the event
+ * last occurred, which the server reports as the window; say which stretch the list shows
+ * instead of implying the whole range.
  */
-export function sampleWindowLabel(from: Date, to: Date) {
-  return to.getTime() - from.getTime() > dayMilliseconds
-    ? "所选范围的最后 24 小时"
-    : "所选时间范围内";
+export function sampleWindowLabel(
+  range: { from: Date; to: Date },
+  window?: { from: string; to: string },
+) {
+  if (!window) return "所选时间范围内";
+  const from = new Date(window.from);
+  const to = new Date(window.to);
+  if (from.getTime() <= range.from.getTime() && to.getTime() >= range.to.getTime())
+    return "所选时间范围内";
+  const last = new Date(to.getTime() - 60 * 1000).toLocaleString("zh-CN", {
+    month: "numeric",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  return `最后一次出现（${last}）前 24 小时内`;
 }
 
 export function shortID(value: string) {

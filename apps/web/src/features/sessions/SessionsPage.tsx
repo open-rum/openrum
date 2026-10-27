@@ -55,6 +55,8 @@ import {
 import { listOrganizations, listProjects, type Project } from "@/lib/api/projects";
 import { SessionPreviewDrawer } from "./SessionPreviewDrawer";
 import { SessionClientMeta } from "./SessionClientMeta";
+import { searchErrorFrom } from "@/lib/api/search";
+import { equalsTerm, foldIntoQuery, textTerm } from "@/lib/search/legacy";
 import { SessionFilterComposer } from "./SessionFilterComposer";
 
 export function SessionsPage() {
@@ -98,16 +100,9 @@ function ProjectSessions({ project }: { project: Project }) {
     from: contextFrom,
     to: contextTo,
     environment: analysisContext?.environment,
-    release: initial.release,
-    browser: initial.browser,
-    deviceType: initial.deviceType,
-    country: initial.country,
-    route: initial.route,
-    search: initial.search,
-    signal: initial.signal,
+    q: initial.q,
+    signal: "all",
     sort: initial.sort,
-    minimumEvents: initial.minimumEvents,
-    minimumDuration: initial.minimumDuration,
     page: initial.page,
   }));
   const [previewID, setPreviewID] = useState(initial.preview);
@@ -188,6 +183,7 @@ function ProjectSessions({ project }: { project: Project }) {
               filters={effectiveFilters}
               facets={query.data?.facets}
               sessions={query.data?.sessions}
+              error={searchErrorFrom(query.error)}
               onChange={update}
             />
             <Select
@@ -469,6 +465,11 @@ function numberValue(value: string) {
   return value && Number.isFinite(parsed) && parsed >= 0 ? parsed : undefined;
 }
 
+/**
+ * Reads the list's URL. The old one-field parameters (release=, signal=, minimumEvents=, …)
+ * become conditions of the search query, which the box shows as text; only `q`, sort and page
+ * are written back.
+ */
 function readSessionListSearch() {
   const parameters = new URLSearchParams(window.location.search);
   const signal = parameters.get("signal");
@@ -476,54 +477,57 @@ function readSessionListSearch() {
   const page = Number(parameters.get("page"));
   const minimumEvents = numberValue(parameters.get("minimumEvents") ?? "");
   const minimumDuration = numberValue(parameters.get("minimumDuration") ?? "");
+  const value = (key: string) => parameters.get(key)?.trim() || undefined;
+  const signalTerm = {
+    error: "errors:>0",
+    api_failure: "api_failures:>0",
+    slow_api: "slowest_api:>=1s",
+    poor_vital: "poor_vitals:>0",
+  }[signal ?? ""];
+  const q = foldIntoQuery(parameters.get("q")?.trim().slice(0, 1024), [
+    value("search") ? textTerm(value("search")!) : undefined,
+    signalTerm,
+    value("route") ? equalsTerm("route", value("route")!) : undefined,
+    value("release") ? equalsTerm("release", value("release")!) : undefined,
+    value("browser") ? equalsTerm("browser", value("browser")!) : undefined,
+    value("deviceType") ? equalsTerm("device", value("deviceType")!) : undefined,
+    value("country") ? equalsTerm("country", value("country")!) : undefined,
+    minimumEvents ? `events:>=${minimumEvents}` : undefined,
+    minimumDuration ? `duration:>=${minimumDuration}s` : undefined,
+  ]);
   return {
-    release: parameters.get("release") || undefined,
-    browser: parameters.get("browser") || undefined,
-    deviceType: parameters.get("deviceType") || undefined,
-    country: parameters.get("country") || undefined,
-    route: parameters.get("route") || undefined,
-    search: parameters.get("search")?.trim() || undefined,
-    signal: (["error", "api_failure", "slow_api", "poor_vital"].includes(signal ?? "")
-      ? signal
-      : "all") as SessionFilters["signal"],
+    q,
     sort: (["duration", "events", "errors"].includes(sort ?? "")
       ? sort
       : "latest") as SessionFilters["sort"],
     page: Number.isInteger(page) && page > 0 ? page : 1,
-    minimumEvents,
-    minimumDuration,
     preview: parameters.get("preview") || undefined,
   };
 }
 
 function hasSessionFilters(filters: SessionFilters) {
-  return Boolean(
-    filters.release ||
-    filters.browser ||
-    filters.deviceType ||
-    filters.country ||
-    filters.route ||
-    filters.search ||
-    filters.signal !== "all" ||
-    filters.minimumEvents ||
-    filters.minimumDuration,
-  );
+  return Boolean(filters.q);
 }
+
+const legacySessionKeys = [
+  "release",
+  "browser",
+  "deviceType",
+  "country",
+  "route",
+  "search",
+  "signal",
+  "minimumEvents",
+  "minimumDuration",
+];
 
 function syncSessionListSearch(filters: SessionFilters) {
   const url = new URL(window.location.href);
+  for (const key of legacySessionKeys) url.searchParams.delete(key);
   const values: Record<string, string | number | undefined> = {
-    release: filters.release,
-    browser: filters.browser,
-    deviceType: filters.deviceType,
-    country: filters.country,
-    route: filters.route,
-    search: filters.search,
-    signal: filters.signal === "all" ? undefined : filters.signal,
+    q: filters.q,
     sort: filters.sort === "latest" ? undefined : filters.sort,
     page: filters.page === 1 ? undefined : filters.page,
-    minimumEvents: filters.minimumEvents,
-    minimumDuration: filters.minimumDuration,
   };
   for (const [key, value] of Object.entries(values)) {
     if (value === undefined || value === "" || value === 0) url.searchParams.delete(key);

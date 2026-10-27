@@ -71,7 +71,7 @@ Certificates are always verified in `starttls` and `tls` mode, and verification 
      -p "{\"data\":{\"SMTP_PASSWORD\":\"$(printf %s "$SMTP_PASSWORD" | base64 | tr -d '\n')\"}}"
    # Apply the values, then restart so the Secret change is picked up.
    helm upgrade openrum oci://ghcr.io/open-rum/charts/openrum \
-     --version 0.1.1 --namespace openrum \
+     --version 0.1.2 --namespace openrum \
      --values values.production.yaml --wait
    kubectl -n openrum rollout restart deployment -l app.kubernetes.io/instance=openrum
    ```
