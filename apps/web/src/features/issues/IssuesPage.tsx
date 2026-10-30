@@ -1,13 +1,8 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
-import {
-  ArrowDownUpIcon,
-  BugIcon,
-  ChevronLeftIcon,
-  ChevronRightIcon,
-  RefreshCwIcon,
-} from "lucide-react";
+import { ArrowDownUpIcon, BugIcon, ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
 import { AsyncError } from "@/components/ui/AsyncState";
 import {
   ConsoleFilterBar,
@@ -152,6 +147,7 @@ function ProjectIssues({ project }: { project: Project }) {
     retry: false,
   });
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const assign = useMutation({
     mutationFn: ({
       fingerprint,
@@ -179,18 +175,6 @@ function ProjectIssues({ project }: { project: Project }) {
       <ConsolePageHeader
         title="错误问题"
         description="先判断影响，再定位原因。相同异常聚合为一个问题，点击查看堆栈与事件现场。"
-        actions={
-          <Button
-            type="button"
-            variant="outline"
-            aria-label="刷新问题"
-            onClick={() => void query.refetch()}
-            disabled={query.isFetching}
-          >
-            <RefreshCwIcon data-icon="inline-start" />
-            {query.isFetching ? "刷新中…" : "刷新"}
-          </Button>
-        }
       />
       <ConsoleFilterBar
         primary={
@@ -275,6 +259,7 @@ function ProjectIssues({ project }: { project: Project }) {
               <IssueTable
                 issues={issues}
                 filters={filters}
+                onOpen={(href) => void navigate({ href })}
                 assignment={{
                   members: members.data?.members,
                   onAssign: canChange

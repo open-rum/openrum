@@ -70,9 +70,21 @@ When implementing from a selected generated mock, treat that image as the source
   pasted and changed in place: `user.id:"c-1" AND !browser:Chrome`. A coloured copy sits
   under a transparent input (field, operator, value, keyword colours; a refused condition is
   underlined from the server's `error.search.position`). Suggestions follow the caret: field
-  names while a name is typed, then operator buttons (是、不是、属于其中之一、包含、有值…, by field
-  type) and values after the colon. Choosing writes text and puts ` AND ` before a new
-  condition; a value or has-condition runs the search, a list stays open until Enter. The
+  names while a name is typed, then, after the colon, one header line with the field and an operator
+  Select (is, is not, is one of, contains, has value…, by field type; operators are shown in
+  English like the query syntax, user request 2026-10-28; not a
+  wall of pill buttons) above the values. Under is one of / is not one of the values are
+  checkboxes: chosen ones stay listed and ticked, choosing a ticked one unticks it, and Enter
+  runs the search (user request, 2026-10-28). Choosing writes text and puts ` AND ` before a new
+  condition; a finished condition (a value or has-condition) is followed by a space with the
+  caret after it, and focusing by keyboard or `/` adds that space after the existing query
+  and puts the caret at the end (user request, 2026-10-28; a click keeps its own caret, and
+  the URL's `q` stays trimmed); a value or has-condition runs the search, a list stays open until Enter. Field
+  suggestions follow Sentry's compact list (user request, 2026-10-28): one 36px row per field
+  with the query name in monospace, the Chinese label beside it and the type (文本/枚举/ID/
+  数字/时长) on the right. With nothing typed the panel is wide with a description column for
+  the highlighted or hovered field; typing a name narrows it to the matches and the description
+  floats to its right. No category tabs until a page has many custom attributes. The
   input is a `combobox` with a `listbox` of `option`s. The page's URL holds only `q` (plus
   its own settings such as sort or status); old one-field parameters (release=, browser=,
   signal=, minimumEvents=, level=, methods=, …) are read once as conditions via
@@ -116,9 +128,13 @@ When implementing from a selected generated mock, treat that image as the source
   标记解决/忽略 (or 重新打开), assignee and a 更多 menu (copy link, copy Fingerprint).
   The main column shows removable 只看 tag tokens, then one compact trends strip:
   event/user totals that switch the series, a short column chart on the shared
-  time buckets, and a tag preview (top browser values with shares that filter on
-  click, plus 全部标签 opening every tag in a Sheet). Below it, one 本问题的事件 card:
-  a header with newer/older, 最新 and the 全部事件 Sheet; an event row with the
+  time buckets, and a tag preview (user request, 2026-10-28): the first three tags
+  with data (浏览器、版本、设备…), each a key, top value and share over a stacked bar of
+  its top values that opens every value on click, then a quiet button opening all tags
+  in a Sheet. Do not go back to one tag's value list beside a large 全部标签 tile. Below it, one 本问题的事件 card:
+  a header with newer/older arrows, then 最新, 最早 and 全部事件 as quiet link text
+  (user request, 2026-10-28; the end already shown is muted and disabled, never a filled
+  pill), paging by the server's `nextCursor`/`newerCursor`; an event row with the
   12-character event ID (click to copy), relative time and 跳转到 links; a client
   row of icon chips (visitor, browser, system, device, country, release, page);
   then sections separated by dividers, each folding from a right-hand chevron:
@@ -495,9 +511,11 @@ When implementing from a selected generated mock, treat that image as the source
   The right-side `AnalysisFilterSidebar` dimension filter was retired and removed
   (user decision, 2026-10-02); do not reintroduce it. Performance narrows only by
   the shared time/environment and the route drill-down from the route table.
-- Treat each project card as an operational health summary. Lead with the last
-  24 hours of PV, UV, error events, a real PV trend, and reporting freshness;
-  keep sampling, retention, role, and other configuration details secondary.
+- The Project list is one table (user request, 2026-10-28: the heatmap card view and its
+  view switch were removed, along with the count/scope line above the table). Each row is
+  an operational health summary: the last 24 hours of PV, UV, error events, a real PV
+  trend, and reporting freshness; keep sampling, retention, role, and other configuration
+  details secondary. Do not bring back a second layout.
 - Source Map management (versions, files, match tester and upload tokens) is a
   project setting at `/settings/project/:projectId/sourcemaps`, not a main-navigation
   page (user request, 2026-10-14: it is setup, not something you observe, and the

@@ -1,30 +1,11 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import {
-  CircleAlertIcon,
-  Clock3Icon,
-  EyeIcon,
-  FolderKanbanIcon,
-  LayoutGridIcon,
-  ListIcon,
-  PlusIcon,
-  SettingsIcon,
-  SunIcon,
-} from "lucide-react";
+import { Clock3Icon, FolderKanbanIcon, PlusIcon, SettingsIcon } from "lucide-react";
 import { AsyncError } from "@/components/ui/AsyncState";
 import { ConsolePage, ConsolePageHeader } from "@/components/layout/ConsolePage";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardAction,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import {
   Select,
@@ -35,7 +16,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
   Table,
   TableBody,
@@ -55,8 +35,6 @@ import {
 } from "@/lib/api/projects";
 import { rememberProject } from "@/lib/projects/currentProject";
 import { cn } from "@/lib/utils";
-import { ActivityHeatmap } from "./ActivityHeatmap";
-import { buildHeatmap } from "./heatmapLayout";
 import { ProjectPlatformIcon, getProjectPlatform } from "./projectPlatforms";
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -65,36 +43,7 @@ const compactNumber = new Intl.NumberFormat("zh-CN", {
   maximumFractionDigits: 1,
 });
 
-const views = [
-  {
-    value: "table",
-    label: "表格",
-    icon: ListIcon,
-    scope: "最近 24 小时",
-    description: "对齐指标，横向比较各项目",
-  },
-  {
-    value: "cards",
-    label: "卡片",
-    icon: LayoutGridIcon,
-    scope: "最近 30 天",
-    description: "每格一天，看出项目的活跃节奏",
-  },
-] as const;
-type ProjectView = (typeof views)[number]["value"];
-const viewStorageKey = "openrum-project-list-view";
-
-// Older builds stored "compact" or "trends"; anything unknown falls back to the table.
-function initialView(): ProjectView {
-  try {
-    return localStorage.getItem(viewStorageKey) === "cards" ? "cards" : "table";
-  } catch {
-    return "table";
-  }
-}
-
 export function ProjectListPage() {
-  const [view, setView] = useState<ProjectView>(initialView);
   const [selectedOrganizationId, setSelectedOrganizationId] = useState("");
   const organizationsQuery = useQuery({
     queryKey: ["organizations"],
@@ -112,7 +61,6 @@ export function ProjectListPage() {
     enabled: Boolean(organizationId),
   });
   const projects = projectsQuery.data?.projects ?? [];
-  const current = views.find((item) => item.value === view) ?? views[0];
 
   return (
     <ConsolePage width="wide">
@@ -196,70 +144,28 @@ export function ProjectListPage() {
         </div>
       ) : null}
       {projects.length ? (
-        <div className="flex flex-col gap-5">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <p className="text-sm font-medium">
-              {projects.length} 个项目
-              <span className="ml-2 font-normal text-muted-foreground">
-                {current.scope} · 全部环境 · {current.description}
-              </span>
-            </p>
-            <ToggleGroup
-              type="single"
-              value={view}
-              variant="selection"
-              aria-label="项目展示方式"
-              className="max-w-full rounded-full border bg-card p-1"
-              onValueChange={(value) => {
-                const next = views.find((item) => item.value === value)?.value;
-                if (!next) return;
-                setView(next);
-                try {
-                  localStorage.setItem(viewStorageKey, next);
-                } catch {
-                  /* Preference storage is optional. */
-                }
-              }}
-            >
-              {views.map(({ value, label, icon: Icon }) => (
-                <ToggleGroupItem key={value} value={value}>
-                  <Icon />
-                  {label}
-                </ToggleGroupItem>
-              ))}
-            </ToggleGroup>
-          </div>
-          {view === "table" ? (
-            <div className="overflow-x-auto rounded-xl border bg-card" aria-label="项目列表">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>项目</TableHead>
-                    <TableHead>状态</TableHead>
-                    <TableHead>24h PV</TableHead>
-                    <TableHead>24h UV</TableHead>
-                    <TableHead>错误事件</TableHead>
-                    <TableHead>PV 趋势</TableHead>
-                    <TableHead>最近上报</TableHead>
-                    <TableHead className="text-right">
-                      <span className="sr-only">操作</span>
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {projects.map((project) => (
-                    <ProjectTableRow key={project.id} project={project} />
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          ) : (
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3" aria-label="项目列表">
+        <div className="overflow-x-auto rounded-xl border bg-card" aria-label="项目列表">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>项目</TableHead>
+                <TableHead>状态</TableHead>
+                <TableHead>24h PV</TableHead>
+                <TableHead>24h UV</TableHead>
+                <TableHead>错误事件</TableHead>
+                <TableHead>PV 趋势</TableHead>
+                <TableHead>最近上报</TableHead>
+                <TableHead className="text-right">
+                  <span className="sr-only">操作</span>
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {projects.map((project) => (
-                <ProjectHeatmapCard key={project.id} project={project} />
+                <ProjectTableRow key={project.id} project={project} />
               ))}
-            </div>
-          )}
+            </TableBody>
+          </Table>
         </div>
       ) : null}
     </ConsolePage>
@@ -268,7 +174,7 @@ export function ProjectListPage() {
 
 const overviewTiming = { staleTime: 30_000, refetchInterval: 60_000 };
 
-/** The previous 24 complete hours, for the comparison table. */
+/** The previous 24 complete hours, for the project table. */
 function useProjectSummary(project: Project) {
   return useQuery({
     queryKey: ["project-list-summary", project.id, "24h", TIME_SERIES_MAX_POINTS],
@@ -284,22 +190,6 @@ function useProjectSummary(project: Project) {
         signal,
         TIME_SERIES_MAX_POINTS,
       );
-    },
-    ...overviewTiming,
-  });
-}
-
-/**
- * Thirty UTC days ending today, for the heatmap. Just under 30 days, so the shared
- * policy resolves to daily buckets; the last one is today and still filling.
- */
-function useProjectActivity(project: Project) {
-  return useQuery({
-    queryKey: ["project-list-activity", project.id, "30d", TIME_SERIES_MAX_POINTS],
-    queryFn: ({ signal }) => {
-      const to = new Date();
-      const from = new Date(Date.UTC(to.getUTCFullYear(), to.getUTCMonth(), to.getUTCDate() - 29));
-      return getOverview({ projectId: project.id, from, to }, signal, TIME_SERIES_MAX_POINTS);
     },
     ...overviewTiming,
   });
@@ -374,96 +264,6 @@ function PageViewSparkline({ overview }: { overview: OverviewResponse }) {
     <Sparkline values={values} color="var(--ds-chart-1)" className="h-8 w-28" />
   ) : (
     <span className="text-xs text-muted-foreground">暂无访问</span>
-  );
-}
-
-function ProjectHeatmapCard({ project }: { project: Project }) {
-  const query = useProjectActivity(project);
-  const data = query.data;
-  const heatmap = data
-    ? buildHeatmap(
-        data,
-        data.series.map((point) => ({ bucket: point.bucket, value: point.pageViews.value })),
-      )
-    : null;
-
-  return (
-    <Card className="gap-4">
-      <CardHeader>
-        <div className="flex min-w-0 items-center gap-3">
-          <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted">
-            <ProjectPlatformIcon platform={project.sdkPlatform} className="size-5" />
-          </div>
-          <div className="min-w-0">
-            <CardTitle className="text-base">
-              <ProjectNameLink project={project} className="block" />
-            </CardTitle>
-            <CardDescription className="truncate">
-              {getProjectPlatform(project.sdkPlatform).label}
-            </CardDescription>
-          </div>
-        </div>
-        <CardAction className="flex items-center gap-1">
-          <StatusBadge status={project.status} />
-          <ProjectSettingsLink project={project} />
-        </CardAction>
-      </CardHeader>
-      <CardContent className="flex flex-1 flex-col gap-3">
-        {data && heatmap ? (
-          <>
-            <dl className="grid grid-cols-3 gap-3">
-              <HeatmapStat icon={EyeIcon} label="30 天 PV" value={formatMetric(heatmap.total)} />
-              <HeatmapStat
-                icon={SunIcon}
-                label="活跃天数"
-                value={`${heatmap.activeDays}/${heatmap.cells.length}`}
-              />
-              <HeatmapStat
-                icon={CircleAlertIcon}
-                label="错误事件"
-                value={formatMetric(data.kpis.errorRate.numerator)}
-              />
-            </dl>
-            <ActivityHeatmap heatmap={heatmap} />
-          </>
-        ) : query.isError || (data && !heatmap) ? (
-          <p className="py-6 text-sm text-muted-foreground" role="status">
-            活动数据暂不可用，仍可进入项目。
-          </p>
-        ) : (
-          <Skeleton className="h-36" aria-label="正在加载项目活动" />
-        )}
-        {heatmap && !heatmap.hasData ? (
-          <p className="text-xs text-muted-foreground">暂无访问数据，完成 SDK 接入后会逐日点亮。</p>
-        ) : null}
-      </CardContent>
-      <CardFooter className="justify-between gap-2">
-        <div className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
-          {data ? <FreshnessLabel freshness={data.freshness} /> : null}
-        </div>
-        <ProjectEntry project={project} />
-      </CardFooter>
-    </Card>
-  );
-}
-
-function HeatmapStat({
-  icon: Icon,
-  label,
-  value,
-}: {
-  icon: typeof EyeIcon;
-  label: string;
-  value: string;
-}) {
-  return (
-    <div className="flex min-w-0 flex-col gap-0.5">
-      <dt className="flex items-center gap-1 text-xs text-muted-foreground">
-        <Icon className="size-3.5 shrink-0" aria-hidden="true" />
-        {label}
-      </dt>
-      <dd className="truncate text-base font-semibold tabular-nums">{value}</dd>
-    </div>
   );
 }
 

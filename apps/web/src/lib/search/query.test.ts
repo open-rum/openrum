@@ -59,7 +59,7 @@ describe("query text", () => {
       'browser:[A,"B C"]',
     );
     expect(writeShape("route", shape("包含", false, "contains"), ["pay"])).toBe("route:*pay*");
-    expect(writeShape("trace_id", shape("没有值", true, "has"), [])).toBe("!has:trace_id");
+    expect(writeShape("trace_id", shape("has no value", true, "has"), [])).toBe("!has:trace_id");
     expect(writeShape("duration", shape("大于", false, "gt"), ["2s"])).toBe("duration:>2s");
   });
 

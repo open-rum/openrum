@@ -2777,6 +2777,57 @@ body {
 .search-query__error {
   flex: 1 0 100%;
 }
+.search-query__option {
+  width: 100%;
+  min-height: 36px;
+  padding: 6px 10px;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  border-radius: 8px;
+  color: var(--ds-text);
+  font-size: var(--text-table);
+  text-align: left;
+}
+.search-query__option:hover,
+.search-query__option[data-highlighted] {
+  background: var(--ds-surface-hover);
+}
+.search-query__option > svg {
+  width: 14px;
+  flex: 0 0 auto;
+  color: var(--ds-text-muted);
+}
+.search-query__option > code {
+  color: var(--ds-text);
+  font-size: 13px;
+}
+.search-query__check {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--input);
+  border-radius: 4px;
+  color: transparent;
+}
+.search-query__check svg {
+  width: 12px;
+  stroke-width: 3;
+}
+.search-query__check[data-checked] {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
+.search-query__option-meta {
+  margin-left: auto;
+  flex: 0 0 auto;
+  color: var(--ds-text-muted);
+  font-size: var(--text-caption);
+}
 .search-query__code {
   font-family: var(--font-mono);
   font-size: 12px;
@@ -7860,82 +7911,6 @@ tr[data-disabled] td:first-child {
   opacity: 0.6;
 }
 
-/* Project list: daily page-view calendar in the style of a code-contribution graph.
-   Levels step through the palette's first chart colour; a day the server did not
-   return (null) is an outlined gap, never the same square as a real zero. */
-.activity-heatmap {
-  --heatmap-cell-height: 20px;
-  --heatmap-gap: 4px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  width: 100%;
-  margin: 0;
-  color: var(--ds-text-muted);
-  font-size: 11px;
-  line-height: 1;
-}
-.activity-heatmap__grid {
-  display: grid;
-  grid-template-columns: auto repeat(7, minmax(0, 1fr));
-  grid-auto-rows: var(--heatmap-cell-height);
-  gap: var(--heatmap-gap);
-  align-items: center;
-}
-.activity-heatmap__grid > :first-child,
-.activity-heatmap__weekday {
-  height: auto;
-}
-.activity-heatmap__weekday {
-  text-align: center;
-}
-.activity-heatmap__month {
-  min-width: 2.5em;
-  white-space: nowrap;
-}
-.activity-heatmap__cell,
-.activity-heatmap__slot {
-  height: 100%;
-  border-radius: 4px;
-}
-.activity-heatmap__cell {
-  box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--ds-text) 6%, transparent);
-}
-.activity-heatmap__cell[data-level="none"] {
-  box-shadow: none;
-  border: 1px dashed var(--ds-border);
-}
-.activity-heatmap__cell[data-level="0"] {
-  background: var(--ds-surface-subtle);
-}
-.activity-heatmap__cell[data-level="1"] {
-  background: color-mix(in oklch, var(--ds-chart-1) 30%, var(--ds-surface));
-}
-.activity-heatmap__cell[data-level="2"] {
-  background: color-mix(in oklch, var(--ds-chart-1) 55%, var(--ds-surface));
-}
-.activity-heatmap__cell[data-level="3"] {
-  background: color-mix(in oklch, var(--ds-chart-1) 80%, var(--ds-surface));
-}
-.activity-heatmap__cell[data-level="4"] {
-  background: var(--ds-chart-1);
-}
-.activity-heatmap__legend {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-.activity-heatmap__scale {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--heatmap-gap);
-}
-.activity-heatmap__scale .activity-heatmap__cell {
-  width: 11px;
-  height: 11px;
-  border-radius: 3px;
-}
 .project-status-dot {
   width: 6px;
   height: 6px;

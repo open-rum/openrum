@@ -48,6 +48,7 @@ export function IssueTable({
   onSortChange,
   selection,
   assignment,
+  onOpen,
 }: {
   issues: IssuesResponse["issues"];
   filters: IssueFilters;
@@ -55,7 +56,10 @@ export function IssueTable({
   /** Leave out for people who cannot change Issues; the checkbox column then disappears. */
   selection?: IssueSelection;
   assignment?: IssueAssignment;
+  /** Opens an Issue inside the app; without it, a row opens with a full page load. */
+  onOpen?: (href: string) => void;
 }) {
+  const open = onOpen ?? ((href: string) => window.location.assign(href));
   const selectedCount = selection
     ? issues.filter((issue) => selection.selected.has(issue.fingerprint)).length
     : 0;
@@ -72,7 +76,7 @@ export function IssueTable({
     href: string,
   ) {
     if (event.target !== event.currentTarget) return;
-    if (event.key === "Enter") window.location.assign(href);
+    if (event.key === "Enter") open(href);
     if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
     event.preventDefault();
     const rows = Array.from(document.querySelectorAll<HTMLTableRowElement>("[data-issue-row]"));
@@ -155,7 +159,7 @@ export function IssueTable({
                 )
                   return;
                 if (event.metaKey || event.ctrlKey) window.open(href, "_blank", "noopener");
-                else window.location.assign(href);
+                else open(href);
               }}
               onKeyDown={(event) => handleRowKey(event, index, href)}
             >
@@ -173,7 +177,25 @@ export function IssueTable({
               ) : null}
               <TableCell>
                 <div className="issue-list-heading-line">
-                  <a className="issue-list-title" href={href} title={issue.title}>
+                  <a
+                    className="issue-list-title"
+                    href={href}
+                    title={issue.title}
+                    onClick={(event) => {
+                      // Modified clicks keep the browser's new-tab and new-window behavior.
+                      if (
+                        !onOpen ||
+                        event.button !== 0 ||
+                        event.metaKey ||
+                        event.ctrlKey ||
+                        event.shiftKey ||
+                        event.altKey
+                      )
+                        return;
+                      event.preventDefault();
+                      onOpen(href);
+                    }}
+                  >
                     {issue.title}
                   </a>
                   {isNew ? (

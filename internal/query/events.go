@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -142,6 +143,8 @@ type EventDetail struct {
 type EventPage struct {
 	Events     []EventDetail `json:"events"`
 	NextCursor string        `json:"nextCursor,omitempty"`
+	// NewerCursor pages toward newer events (Toward "newer"); empty on the newest page.
+	NewerCursor string `json:"newerCursor,omitempty"`
 }
 
 type EventRepository struct{ database *sql.DB }
@@ -407,11 +410,25 @@ WHERE project_id=? AND event_type='error' AND fingerprint=? AND timestamp>=? AND
 	if err != nil {
 		return EventPage{}, err
 	}
+	// Newer and oldest pages read upward from their start, then flip to newest first.
+	newer, oldest := filters.Toward == "newer", filters.Toward == "oldest"
+	if (filters.Toward != "" && !newer && !oldest) || (newer && cursor == nil) || (oldest && cursor != nil) {
+		return EventPage{}, ErrInvalidIssueFilters
+	}
+	ascending := newer || oldest
 	if cursor != nil {
-		query += ` AND (timestamp < ? OR (timestamp = ? AND event_id < ?))`
+		comparison := "<"
+		if newer {
+			comparison = ">"
+		}
+		query += ` AND (timestamp ` + comparison + ` ? OR (timestamp = ? AND event_id ` + comparison + ` ?))`
 		arguments = append(arguments, cursor.Timestamp, cursor.Timestamp, cursor.EventID)
 	}
-	query += ` ORDER BY timestamp DESC,event_id DESC LIMIT ?`
+	order := "DESC"
+	if ascending {
+		order = "ASC"
+	}
+	query += ` ORDER BY timestamp ` + order + `,event_id ` + order + ` LIMIT ?`
 	arguments = append(arguments, limit+1)
 	rows, err := repository.database.QueryContext(ctx, query, arguments...)
 	if err != nil {
@@ -429,13 +446,28 @@ WHERE project_id=? AND event_type='error' AND fingerprint=? AND timestamp>=? AND
 	if err := rows.Err(); err != nil {
 		return EventPage{}, err
 	}
-	next := ""
-	if len(events) > limit {
+	more := len(events) > limit
+	if more {
 		events = events[:limit]
-		last := events[len(events)-1]
-		next = encodeEventCursor(last.Timestamp, last.EventID)
 	}
-	return EventPage{Events: events, NextCursor: next}, nil
+	if ascending {
+		slices.Reverse(events)
+	}
+	page := EventPage{Events: events}
+	if len(events) == 0 {
+		return page, nil
+	}
+	// Past a page there are more events where the read stopped early, and behind it
+	// wherever the read started from an event.
+	if (!ascending && more) || newer {
+		last := events[len(events)-1]
+		page.NextCursor = encodeEventCursor(last.Timestamp, last.EventID)
+	}
+	if (ascending && more) || (!ascending && cursor != nil) {
+		first := events[0]
+		page.NewerCursor = encodeEventCursor(first.Timestamp, first.EventID)
+	}
+	return page, nil
 }
 
 func (repository *EventRepository) relatedAPIs(ctx context.Context, event EventDetail) ([]RelatedAPI, error) {

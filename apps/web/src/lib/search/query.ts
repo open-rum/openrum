@@ -238,24 +238,24 @@ export type OperatorShape = {
 };
 
 const textShapes: OperatorShape[] = [
-  { label: "是", negated: false, shape: "eq" },
-  { label: "不是", negated: true, shape: "eq" },
-  { label: "属于其中之一", negated: false, shape: "in" },
-  { label: "不属于其中任何一个", negated: true, shape: "in" },
-  { label: "包含", negated: false, shape: "contains" },
-  { label: "不包含", negated: true, shape: "contains" },
-  { label: "开头是", negated: false, shape: "prefix" },
-  { label: "有值", negated: false, shape: "has" },
-  { label: "没有值", negated: true, shape: "has" },
+  { label: "is", negated: false, shape: "eq" },
+  { label: "is not", negated: true, shape: "eq" },
+  { label: "is one of", negated: false, shape: "in" },
+  { label: "is not one of", negated: true, shape: "in" },
+  { label: "contains", negated: false, shape: "contains" },
+  { label: "does not contain", negated: true, shape: "contains" },
+  { label: "starts with", negated: false, shape: "prefix" },
+  { label: "has value", negated: false, shape: "has" },
+  { label: "has no value", negated: true, shape: "has" },
 ];
 
 const numberShapes: OperatorShape[] = [
-  { label: "大于", negated: false, shape: "gt" },
-  { label: "大于等于", negated: false, shape: "gte" },
-  { label: "小于", negated: false, shape: "lt" },
-  { label: "小于等于", negated: false, shape: "lte" },
-  { label: "等于", negated: false, shape: "eq" },
-  { label: "不等于", negated: true, shape: "eq" },
+  { label: ">", negated: false, shape: "gt" },
+  { label: ">=", negated: false, shape: "gte" },
+  { label: "<", negated: false, shape: "lt" },
+  { label: "<=", negated: false, shape: "lte" },
+  { label: "=", negated: false, shape: "eq" },
+  { label: "!=", negated: true, shape: "eq" },
 ];
 
 export function operatorShapes(type: SearchFieldType): OperatorShape[] {

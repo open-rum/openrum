@@ -4,13 +4,21 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-libra
 import userEvent from "@testing-library/user-event";
 import { GlobeIcon, RouteIcon, TimerIcon, UserIcon } from "lucide-react";
 import { useState } from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import {
   SearchQueryInput,
   type SearchQueryError,
   type SearchQueryField,
   type SearchQueryOption,
 } from "./SearchQueryInput";
+
+// The operator Select is a Radix Select, which needs these in jsdom.
+beforeAll(() => {
+  Element.prototype.hasPointerCapture = () => false;
+  Element.prototype.setPointerCapture = () => undefined;
+  Element.prototype.releasePointerCapture = () => undefined;
+  Element.prototype.scrollIntoView = () => undefined;
+});
 
 afterEach(() => {
   cleanup();
@@ -81,8 +89,17 @@ describe("query text search box", () => {
     await user.click(screen.getByRole("option", { name: /浏览器/ }));
     expect(box().value).toBe('user.id:"customer 1" AND browser:');
     await user.click(screen.getByRole("option", { name: "Chrome" }));
-    expect(box().value).toBe('user.id:"customer 1" AND browser:Chrome');
+    expect(box().value).toBe('user.id:"customer 1" AND browser:Chrome ');
     expect(submitted()).toBe('user.id:"customer 1" AND browser:Chrome');
+  });
+
+  it("focusing with / continues after the existing conditions", async () => {
+    const user = userEvent.setup();
+    render(<Harness initial="browser:Chrome" />);
+    await user.keyboard("/");
+    expect(box().value).toBe("browser:Chrome ");
+    expect(box().selectionStart).toBe("browser:Chrome ".length);
+    expect(screen.getByRole("option", { name: /用户 ID/ })).toBeTruthy();
   });
 
   it("rewrites the condition under the caret when an operator is chosen", async () => {
@@ -95,9 +112,15 @@ describe("query text search box", () => {
       input.setSelectionRange(10, 10);
       fireEvent.select(input);
     });
-    expect(screen.getByText("当前条件：浏览器 是 Chrome")).toBeTruthy();
-    await user.click(screen.getByRole("button", { name: "不是" }));
-    expect(input.value).toBe("!browser:Chrome AND route:/a");
+    const operator = screen.getByRole("combobox", { name: "浏览器的条件" });
+    expect(operator.textContent).toBe("is");
+    await user.click(operator);
+    await user.click(await screen.findByRole("option", { name: "is not" }));
+    // Clicking in added the trailing space for a next condition.
+    expect(input.value).toBe("!browser:Chrome AND route:/a ");
+    // Focus comes back to the query with the caret after the rewritten condition.
+    expect(document.activeElement).toBe(input);
+    expect(input.selectionStart).toBe("!browser:Chrome".length);
   });
 
   it("collects a list and runs the search on Enter", async () => {
@@ -105,13 +128,24 @@ describe("query text search box", () => {
     render(<Harness />);
     await user.click(box());
     await user.click(screen.getByRole("option", { name: /浏览器/ }));
-    await user.click(screen.getByRole("button", { name: "属于其中之一" }));
+    await user.click(screen.getByRole("combobox", { name: "浏览器的条件" }));
+    await user.click(await screen.findByRole("option", { name: "is one of" }));
     await user.click(screen.getByRole("option", { name: "Chrome" }));
     await user.click(screen.getByRole("option", { name: "Safari" }));
     expect(box().value).toBe("browser:[Chrome,Safari]");
+    // Chosen values stay listed, ticked; choosing one again unticks it.
+    const chrome = screen.getByRole("option", { name: "Chrome" });
+    expect(chrome.getAttribute("aria-checked")).toBe("true");
+    await user.click(chrome);
+    expect(box().value).toBe("browser:[Safari]");
+    expect(screen.getByRole("option", { name: "Chrome" }).getAttribute("aria-checked")).toBe(
+      "false",
+    );
+    await user.click(screen.getByRole("option", { name: "Chrome" }));
+    expect(box().value).toBe("browser:[Safari,Chrome]");
     expect(submitted()).toBe("");
     await user.type(box(), "{Enter}");
-    expect(submitted()).toBe("browser:[Chrome,Safari]");
+    expect(submitted()).toBe("browser:[Safari,Chrome]");
   });
 
   it("adds has-conditions and shortcuts at once", async () => {
@@ -120,9 +154,13 @@ describe("query text search box", () => {
     await user.click(box());
     await user.click(screen.getByRole("button", { name: "有 Trace" }));
     expect(submitted()).toBe("has:trace_id");
-    await user.type(box(), " ");
+    // The finished condition is followed by a space with the caret after it.
+    expect(box().value).toBe("has:trace_id ");
+    expect(box().selectionStart).toBe("has:trace_id ".length);
+    await user.click(box());
     await user.click(screen.getByRole("option", { name: /页面 Route/ }));
-    await user.click(screen.getByRole("button", { name: "没有值" }));
+    await user.click(screen.getByRole("combobox", { name: "页面 Route的条件" }));
+    await user.click(await screen.findByRole("option", { name: "has no value" }));
     expect(submitted()).toBe("has:trace_id AND !has:route");
   });
 
@@ -131,7 +169,7 @@ describe("query text search box", () => {
     render(<Harness />);
     await user.click(box());
     await user.click(screen.getByRole("option", { name: /耗时/ }));
-    expect(screen.getByRole("button", { name: "大于" }).getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByRole("combobox", { name: "耗时的条件" }).textContent).toBe(">");
     await user.type(box(), ">2s attributes.plan:pro{Enter}");
     expect(submitted()).toBe("duration:>2s attributes.plan:pro");
   });

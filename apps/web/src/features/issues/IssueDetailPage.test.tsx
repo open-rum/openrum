@@ -124,10 +124,10 @@ describe("issue investigation context", () => {
       `${window.location.pathname}${window.location.search}&timePreset=7d`,
     );
     const view = renderDetail();
-    const preview = await waitFor(() => view.getByRole("list", { name: "版本分布" }));
-    const value = within(preview).getByRole("button", { name: /web@1\.2\.0/ });
-    expect(value.textContent).toContain("71%");
-    fireEvent.click(value);
+    const tag = await waitFor(() => view.getByRole("button", { name: "版本：web@1.2.0 71%" }));
+    fireEvent.click(tag);
+    const values = await waitFor(() => view.getByRole("list", { name: "版本取值" }));
+    fireEvent.click(within(values).getByRole("button", { name: /web@1\.2\.0/ }));
     await waitFor(() =>
       expect(vi.mocked(getIssueDetail).mock.lastCall?.[0].release).toBe("web@1.2.0"),
     );
