@@ -130,7 +130,7 @@ export function MembersPage() {
         <div>
           {canManage ? (
             <form
-              className="mb-5 grid gap-3 border border-border bg-card p-4 sm:grid-cols-[minmax(0,1fr)_150px_auto] sm:items-end"
+              className="mb-5 grid gap-3 border border-base-300 bg-card p-4 sm:grid-cols-[minmax(0,1fr)_150px_auto] sm:items-end"
               onSubmit={(event) => {
                 event.preventDefault();
                 const form = new FormData(event.currentTarget);
@@ -146,7 +146,7 @@ export function MembersPage() {
                   name="email"
                   type="email"
                   required
-                  className="mt-2 h-10 w-full rounded-full border border-input bg-background px-3 text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/15"
+                  className="input mt-2 w-full"
                   placeholder="developer@company.com"
                 />
               </label>
@@ -168,12 +168,12 @@ export function MembersPage() {
                   </SelectContent>
                 </Select>
               </div>
-              <Button type="submit" className="h-10" disabled={busy}>
+              <Button type="submit" variant="outline" className="h-10" disabled={busy}>
                 <Plus weight="bold" /> 添加成员
               </Button>
             </form>
           ) : (
-            <p className="mb-5 border border-border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
+            <p className="mb-5 border border-base-300 bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
               当前角色为 {organization?.role ?? "—"}，可以查看成员，但不能修改权限。
             </p>
           )}
@@ -204,7 +204,7 @@ export function MembersPage() {
                 <TabsTrigger value="requests">
                   加入申请
                   {pendingRequests.length ? (
-                    <span className="ml-1.5 rounded-full bg-primary px-1.5 text-xs text-primary-foreground">
+                    <span className="badge badge-xs badge-primary ml-1.5">
                       {pendingRequests.length}
                     </span>
                   ) : null}
@@ -220,7 +220,7 @@ export function MembersPage() {
               </TabsList>
             ) : null}
             <TabsContent value="members">
-              <div className="border border-border bg-card">
+              <div className="border border-base-300 bg-card">
                 <table className="w-full border-collapse text-left text-sm">
                   <thead className="hidden bg-muted/60 text-xs font-semibold tracking-wide text-muted-foreground uppercase sm:table-header-group">
                     <tr>
@@ -367,8 +367,8 @@ export function MembersPage() {
         </div>
 
         <aside className="space-y-4">
-          <div className="border border-border bg-card p-5">
-            <h2 className="text-base font-semibold">角色说明</h2>
+          <div className="border border-base-300 bg-card p-5">
+            <h2 className="card-title text-base">角色说明</h2>
             <dl className="mt-4 space-y-3 text-sm">
               <RoleDescription role="Owner" text="全部权限；可配置 OIDC 和管理其他 Owner。" />
               <RoleDescription role="Admin" text="管理项目、Key、采样、成员和通知渠道。" />
@@ -376,8 +376,8 @@ export function MembersPage() {
               <RoleDescription role="Viewer" text="只读查看仪表盘、事件与分析结果。" />
             </dl>
           </div>
-          <div className="border border-border bg-card p-5">
-            <h2 className="text-base font-semibold">项目设置</h2>
+          <div className="border border-base-300 bg-card p-5">
+            <h2 className="card-title text-base">项目设置</h2>
             <p className="mt-1 text-sm text-muted-foreground">
               Origin、环境、保留与客户端 DSN 都按项目配置。
             </p>

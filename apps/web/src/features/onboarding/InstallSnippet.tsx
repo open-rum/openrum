@@ -189,7 +189,7 @@ function CopyButton({ copied, onClick }: { copied: boolean; onClick: () => void 
 
 function Snippet({ value }: { value: string }) {
   return (
-    <pre className="overflow-x-auto rounded-lg bg-muted p-4 text-sm leading-6" tabIndex={0}>
+    <pre className="overflow-x-auto rounded-box bg-muted p-4 text-sm leading-6" tabIndex={0}>
       <code>{value}</code>
     </pre>
   );

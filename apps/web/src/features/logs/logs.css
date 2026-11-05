@@ -63,7 +63,7 @@
   font-family: var(--font-mono);
   font-size: 13px;
   line-height: 1.65;
-  border-radius: 4px;
+  border-radius: var(--radius-selector);
 }
 .logs-message-button:hover {
   text-decoration: underline;
@@ -100,8 +100,8 @@
 }
 .logs-message-full,
 .logs-setup {
-  padding: 16px;
-  border-radius: 8px;
+  padding: var(--card-padding);
+  border-radius: var(--radius-box);
   background: var(--ds-surface-subtle);
   font-family: var(--font-mono);
   font-size: 12px;

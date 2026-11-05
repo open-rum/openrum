@@ -196,8 +196,8 @@ function SampleDetail({ projectId, sample }: { projectId: string; sample: Behavi
       <section>
         <div className="event-sample-session-header">
           <div>
-            <h3>完整会话时间线</h3>
-            <p>页面、点击、自定义事件、API 与错误按发生顺序排列。</p>
+            <h3>会话时间线预览</h3>
+            <p>当前查询窗口内已保留事件，按发生顺序排列；完整调查请打开会话详情。</p>
           </div>
           {timeline.data ? <span>{timeline.data.events.length} 个事件</span> : null}
         </div>
@@ -220,6 +220,7 @@ function SampleDetail({ projectId, sample }: { projectId: string; sample: Behavi
             breadcrumbs={sample.breadcrumbs}
             sessionTimeline={timeline.data}
             anchorEventId={sample.eventId}
+            scrollToAnchor={false}
             projectId={projectId}
             from={range.from.toISOString()}
             to={range.to.toISOString()}

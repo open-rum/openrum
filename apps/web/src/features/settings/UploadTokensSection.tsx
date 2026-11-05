@@ -249,7 +249,7 @@ function CreateUploadTokenDialog({
               <AlertDescription>关闭后无法再次查看；丢失时请吊销并新建。</AlertDescription>
             </Alert>
             <code
-              className="block overflow-x-auto rounded-lg border border-border bg-muted/50 px-3 py-2 font-mono text-sm whitespace-nowrap"
+              className="block overflow-x-auto rounded-box border border-base-300 bg-muted/50 px-3 py-2 font-mono text-sm whitespace-nowrap"
               aria-label="上传令牌明文"
             >
               {secret}

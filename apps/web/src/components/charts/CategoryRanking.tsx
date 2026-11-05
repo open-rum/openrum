@@ -38,7 +38,7 @@ export function CategoryRanking({
       };
     })
     .sort((a, b) => (b.value ?? -1) - (a.value ?? -1));
-  const total = rows.reduce((sum, row) => sum + (row.value ?? 0), 0);
+  const total = data.distribution?.total ?? rows.reduce((sum, row) => sum + (row.value ?? 0), 0);
   const maximum = rows[0]?.value ?? 0;
   const sharesAvailable =
     data.distribution?.shareable !== false && total > 0 && rows.every((row) => row.value !== null);
@@ -142,7 +142,10 @@ export function CategoryRanking({
         {visible.length < rows.length
           ? `前 ${visible.length} / ${rows.length} 项 · 在「详细」中查看全部。`
           : ""}
-        占比按已返回分组合计计算，条形按最大值比较。
+        {data.distribution?.total !== undefined
+          ? "占比按全部匹配事件计算，未展示分组仍计入分母。"
+          : "占比按已返回分组合计计算。"}
+        条形按最大值比较。
         {data.distribution?.nonAdditive ? " 用户 / 会话可能跨分组重复。" : ""}
         {data.distribution?.shareable === false
           ? " 该指标不能按分组相加，不计算占比。"

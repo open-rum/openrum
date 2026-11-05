@@ -2,7 +2,7 @@
 
 Date: 2026-09-29
 
-Status: Accepted
+Status: Accepted. The Console parts (palettes, density, shadcn styling) are superseded by [ADR 0012](0012-console-adopts-daisyui.md); the public site still follows this record.
 
 ## Context
 

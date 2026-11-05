@@ -1,13 +1,27 @@
 // @vitest-environment jsdom
 
-import { render, within } from "@testing-library/react";
+import { cleanup, render, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { ConnectionStatus } from "./ConnectionStatus";
 import { rejectGuidance } from "./guidance";
 import { InstallSnippet } from "./InstallSnippet";
+import { ConnectionHealth } from "./ConnectionHealth";
+
+afterEach(cleanup);
 
 describe("onboarding states", () => {
+  it("shows later success alongside a historical rejection without declaring total failure", () => {
+    const view = render(<ConnectionHealth status={{ keyConfigured: true, lastSdkSeenAt: "2026-11-04T09:00:00Z", lastEventReceivedAt: "2026-11-04T09:00:00Z", lastEventQueryableAt: "2026-11-04T09:00:05Z", lastRejectReason: "INVALID_EVENT", lastRejectAt: "2026-11-03T09:00:00Z" }} />);
+    expect(view.getByText("历史拒收记录 · 此后已成功接收事件")).toBeTruthy();
+    expect(view.getByText(/拒收记录不代表全部事件失败/)).toBeTruthy();
+    expect(view.getByText(/事件格式不受支持/)).toBeTruthy();
+  });
+  it("keeps a rejection newer than the last accepted event visible as a current warning", () => {
+    const view = render(<ConnectionHealth status={{ keyConfigured: true, lastSdkSeenAt: null, lastEventReceivedAt: "2026-11-03T09:00:00Z", lastEventQueryableAt: null, lastRejectReason: "INVALID_EVENT", lastRejectAt: "2026-11-04T09:00:00Z" }} />);
+    expect(view.getByText("最近检测到事件拒收")).toBeTruthy();
+    expect(view.queryByText("历史拒收记录 · 此后已成功接收事件")).toBeNull();
+  });
   it("renders all four waiting stages for a first-time project", () => {
     const view = render(
       <ConnectionStatus

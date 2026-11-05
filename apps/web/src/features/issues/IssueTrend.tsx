@@ -1,11 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
-import {
-  BAR_RADIUS_TOP,
-  ChartContainer,
-  ChartTooltip,
-  ChartTooltipContent,
-} from "@/components/ui/chart";
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { useChartMotion } from "@/lib/charts/useChartMotion";
 import {
   bucketRows,
@@ -16,6 +11,7 @@ import {
 import { useChartWidth } from "@/lib/charts/useChartWidth";
 import type { IssueDetailResponse } from "@/lib/api/issues";
 import { formatIssueTrendTime, formatIssueTrendTooltip } from "./trendTime";
+import { useBarRadiusTop } from "@/lib/charts/useBarRadius";
 
 type Metric = "events" | "users";
 
@@ -39,6 +35,7 @@ export function IssueTrend({
   totals: { events: number; users: number };
   tags?: ReactNode;
 }) {
+  const barRadius = useBarRadiusTop();
   const animate = useChartMotion();
   const [metric, setMetric] = useState<Metric>("events");
   const data = bucketRows(trend, range);
@@ -104,7 +101,7 @@ export function IssueTrend({
               <Bar
                 dataKey={metric}
                 fill={`var(--color-${metric})`}
-                radius={BAR_RADIUS_TOP}
+                radius={barRadius}
                 maxBarSize={16}
                 isAnimationActive={animate}
               />

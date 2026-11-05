@@ -126,7 +126,7 @@ export function EmergencyStorageRecovery() {
       </CardHeader>
       <CardContent className="flex flex-col gap-5">
         {jobActive && job ? (
-          <div className="flex flex-col gap-3 rounded-lg border bg-muted/20 p-4">
+          <div className="card flex-col gap-3 bg-base-200 p-4">
             <div className="flex items-center justify-between gap-4">
               <div>
                 <p className="font-medium">正在清理旧数据</p>
@@ -183,7 +183,7 @@ export function EmergencyStorageRecovery() {
         ) : null}
 
         {!pressure.isLoading && !pressureActive && !jobActive ? (
-          <div className="flex items-start gap-3 rounded-lg border bg-muted/20 p-4">
+          <div className="card flex-row items-start gap-3 bg-base-200 p-4">
             <ShieldCheckIcon aria-hidden="true" />
             <div>
               <p className="font-medium">当前不需要紧急清理</p>
@@ -269,7 +269,7 @@ export function EmergencyStorageRecovery() {
                 </Alert>
               ) : null}
 
-              <div className="max-h-52 overflow-auto rounded-lg border">
+              <div className="max-h-52 overflow-auto rounded-box border">
                 <Table>
                   <TableHeader>
                     <TableRow>

@@ -11,7 +11,6 @@ import {
   YAxis,
 } from "recharts";
 import {
-  BAR_RADIUS_TOP,
   ChartContainer,
   ChartLegend,
   ChartLegendContent,
@@ -43,6 +42,7 @@ import { useChartMotion } from "@/lib/charts/useChartMotion";
 import { observeElementWidth } from "@/lib/charts/useChartWidth";
 import { CategoryRanking } from "./CategoryRanking";
 import { DonutDistribution } from "./DonutDistribution";
+import { useBarRadiusTop } from "@/lib/charts/useBarRadius";
 
 export type PlotView = "area" | "line" | "bar" | "table" | "donut" | "stacked-area" | "stacked-bar";
 
@@ -77,6 +77,7 @@ export function PlotChart({
   compact = false,
   legend = true,
 }: PlotChartProps) {
+  const barRadius = useBarRadiusTop();
   const gradientId = `module-${useId().replace(/:/g, "")}`;
   // Recharts names a stack's clip paths after its stackId, and ids are document-wide. A fixed
   // id lets a second stacked chart on the page (a drawer over its page) borrow the first one's
@@ -175,7 +176,11 @@ export function PlotChart({
                     x2="0"
                     y2="1"
                   >
-                    <stop offset="0%" stopColor={series.color} stopOpacity={0.55} />
+                    <stop
+                      offset="0%"
+                      stopColor={series.color}
+                      stopOpacity={currentSeries.length > 1 ? 0.3 : 0.55}
+                    />
                     <stop offset="100%" stopColor={series.color} stopOpacity={0.04} />
                   </linearGradient>
                 ))}
@@ -315,7 +320,7 @@ export function PlotChart({
                   />
                 ))}
               {data.stacked && view === "stacked-bar" ? (
-                <BarStack stackId={stackId} radius={BAR_RADIUS_TOP}>
+                <BarStack stackId={stackId} radius={barRadius}>
                   {currentSeries.map((series) => (
                     <Bar
                       key={series.key}
@@ -328,7 +333,7 @@ export function PlotChart({
                   ))}
                 </BarStack>
               ) : (
-                currentSeries.map((series, index) =>
+                currentSeries.map((series) =>
                   data.stacked ? (
                     <Area
                       key={series.key}
@@ -350,11 +355,11 @@ export function PlotChart({
                       dataKey={series.key}
                       yAxisId={axisId(series)}
                       fill={series.color}
-                      radius={BAR_RADIUS_TOP}
+                      radius={barRadius}
                       maxBarSize={categories ? 16 : 32}
                       isAnimationActive={animate}
                     />
-                  ) : view === "line" || index > 0 ? (
+                  ) : view === "line" ? (
                     <Line
                       key={series.key}
                       dataKey={series.key}
@@ -373,7 +378,7 @@ export function PlotChart({
                       yAxisId={axisId(series)}
                       {...smoothCurve}
                       stroke={series.ink}
-                      fill={`url(#${gradientId}-${index})`}
+                      fill={`url(#${gradientId}-${data.series.indexOf(series)})`}
                       strokeWidth={1.5}
                       dot={isolatedDot(data, series.key, series.ink)}
                       connectNulls={false}

@@ -3,10 +3,7 @@ import type { SamplingImpact } from "./impact";
 export function ImpactPreview({ impact }: { impact: SamplingImpact }) {
   const saving = impact.deltaPercent <= 0;
   return (
-    <section
-      className="rounded-lg border border-border bg-muted/30 p-5"
-      aria-labelledby="impact-title"
-    >
+    <section className="card card-border bg-base-100 p-5" aria-labelledby="impact-title">
       <p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
         保存前预览
       </p>

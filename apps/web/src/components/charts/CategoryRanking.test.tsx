@@ -27,6 +27,13 @@ function fixture(values: Array<number | null>): PlotData {
 }
 
 describe("category ranking", () => {
+  it("uses all matching events as the denominator when top groups omit other events", () => {
+    const data = fixture([200]);
+    data.distribution = { ...data.distribution!, total: 300 };
+    const { getByRole, container } = render(<CategoryRanking data={data} title="来源" />);
+    expect(getByRole("listitem").textContent).toContain("66.7%");
+    expect(container.textContent).toContain("未展示分组仍计入分母");
+  });
   it("shows direct values and shares, sorted bars scale against the maximum", () => {
     const data = fixture([20, 80]);
     const { getAllByRole, container } = render(<CategoryRanking data={data} title="来源" />);

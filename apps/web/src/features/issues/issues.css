@@ -53,7 +53,7 @@
 .issue-sort-button:focus-visible {
   outline: 2px solid var(--ds-ring);
   outline-offset: 2px;
-  border-radius: 4px;
+  border-radius: var(--radius-selector);
 }
 .issue-list-meta {
   margin-top: 6px;
@@ -69,28 +69,6 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.issue-status {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--ds-text-secondary);
-  white-space: nowrap;
-}
-.issue-status i {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--ds-danger);
-}
-.issue-status[data-status="regressed"] i {
-  background: var(--ds-warning);
-}
-.issue-status[data-status="resolved"] i {
-  background: var(--ds-success);
-}
-.issue-status[data-status="ignored"] i {
-  background: var(--ds-text-muted);
-}
 .issue-list-title {
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -100,20 +78,12 @@
   white-space: normal;
   font-weight: 500;
   line-height: 1.5;
-  color: var(--ds-text);
-}
-.issue-list-title:hover {
-  text-decoration: underline;
-}
-.issue-list-title:focus-visible {
-  outline: 2px solid var(--ds-ring);
-  outline-offset: 3px;
 }
 .issue-event-meter {
   height: 4px;
   margin-top: 8px;
   background: var(--ds-surface-subtle);
-  border-radius: 2px;
+  border-radius: min(2px, var(--radius-selector));
   overflow: hidden;
 }
 .issue-event-meter i {
@@ -273,7 +243,7 @@
   display: flex;
   align-items: baseline;
   gap: 6px;
-  border-radius: 8px;
+  border-radius: var(--radius-field);
   color: var(--ds-text-secondary);
   text-align: left;
 }
@@ -354,7 +324,7 @@
   padding: 6px 8px;
   display: grid;
   gap: 6px;
-  border-radius: 8px;
+  border-radius: var(--radius-selector);
   text-align: left;
 }
 .issue-tag:hover,
@@ -438,7 +408,7 @@
   grid-template-columns: 8px minmax(0, 1fr) auto;
   align-items: center;
   gap: var(--space-2);
-  border-radius: 6px;
+  border-radius: var(--radius-selector);
   color: var(--ds-text-secondary);
   font-size: var(--text-table);
   text-align: left;
@@ -507,7 +477,7 @@
 }
 .issue-events__jump {
   padding: 3px 8px;
-  border-radius: 6px;
+  border-radius: var(--radius-field);
   color: var(--ds-text-secondary);
   font-size: var(--text-table);
 }
@@ -546,7 +516,7 @@
   gap: 6px;
   padding: 2px 6px;
   margin-left: -6px;
-  border-radius: 6px;
+  border-radius: var(--radius-selector);
   color: var(--ds-text);
   font-size: 15px;
   font-weight: 650;
@@ -574,7 +544,7 @@
 }
 .issue-event-bar__links a {
   padding: 3px 8px;
-  border-radius: 6px;
+  border-radius: var(--radius-field);
   color: var(--ds-text-secondary);
 }
 .issue-event-bar__links a:hover {
@@ -828,7 +798,7 @@ li[data-library] .stack-frame__text {
 .issue-investigation .raw-stack {
   min-height: 0;
   max-height: 420px;
-  padding: var(--space-3);
+  padding: var(--card-padding-sm);
   border: 1px solid var(--ds-border);
   border-radius: var(--radius-surface);
   background: var(--ds-surface-subtle);
@@ -1054,28 +1024,11 @@ li[data-library] .stack-frame__text {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.issue-list-heading-line [data-slot="badge"] {
-  flex: 0 0 auto;
-}
 .issues-page__table .issues-list-table td {
   height: 64px;
 }
 .issues-list-table .issue-col-trend {
   padding-block: 0;
-}
-/* Sort menu: each order with a line on what it puts first. */
-.issue-sort-item span:has(> strong) {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 2px;
-}
-.issue-sort-item strong {
-  font-weight: 500;
-}
-.issue-sort-item small {
-  font-size: var(--text-caption, 12px);
-  color: var(--ds-text-muted);
 }
 
 /* The owner: a picture, or a dashed outline nobody fills yet. */
@@ -1087,10 +1040,6 @@ li[data-library] .stack-frame__text {
 .issue-assignee-trigger {
   display: inline-flex;
   align-items: center;
-}
-.issue-assignee-trigger {
-  gap: 4px;
-  padding-inline: 4px 8px;
 }
 .issue-assignee-empty {
   display: inline-flex;
@@ -1111,10 +1060,6 @@ li[data-library] .stack-frame__text {
 .issue-overview {
   display: grid;
   grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
-  border: 1px solid var(--ds-border);
-  border-radius: var(--radius-surface);
-  background: var(--ds-surface);
-  box-shadow: var(--shadow-control);
 }
 .issue-overview__trend,
 .issue-overview__ranking {
@@ -1130,27 +1075,6 @@ li[data-library] .stack-frame__text {
   align-items: center;
   justify-content: space-between;
   gap: var(--space-3);
-}
-.issue-overview__head h2 {
-  color: var(--ds-text);
-  font-size: var(--text-table);
-  font-weight: 600;
-}
-.issue-overview__total {
-  display: flex;
-  align-items: baseline;
-  gap: 6px;
-}
-.issue-overview__total strong {
-  color: var(--ds-text);
-  font-size: 24px;
-  font-weight: 600;
-  line-height: 1.1;
-  font-variant-numeric: tabular-nums;
-}
-.issue-overview__total span {
-  color: var(--ds-text-muted);
-  font-size: var(--text-table);
 }
 .issue-overview ol {
   display: grid;
@@ -1168,18 +1092,6 @@ li[data-library] .stack-frame__text {
   color: var(--ds-text-secondary);
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-.issue-overview__bar {
-  height: 6px;
-  overflow: hidden;
-  border-radius: 3px;
-  background: var(--ds-surface-subtle);
-}
-.issue-overview__bar i {
-  display: block;
-  height: 100%;
-  border-radius: 3px;
-  background: var(--ds-chart-1);
 }
 .issue-overview__share {
   color: var(--ds-text);

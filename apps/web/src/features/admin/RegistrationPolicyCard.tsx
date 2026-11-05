@@ -37,7 +37,7 @@ export function RegistrationPolicyCard({ canEdit }: { canEdit: boolean }) {
 
   return (
     <section
-      className="mb-5 rounded-2xl border border-border bg-card p-5"
+      className="card card-border mb-5 bg-base-100 p-6"
       aria-labelledby="registration-policy-title"
     >
       <div className="flex items-start justify-between gap-4">

@@ -255,7 +255,7 @@ function PipelineMetric({
 }) {
   return (
     <div className="flex items-start gap-3">
-      <div className="rounded-md bg-muted p-2">
+      <div className="rounded-field bg-muted p-2">
         <Icon className="size-4" />
       </div>
       <div>

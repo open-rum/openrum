@@ -23,7 +23,7 @@ export function SetupPage() {
   return (
     <AuthFrame>
       <div className="mb-8">
-        <span className="mb-5 grid size-11 place-items-center rounded-lg bg-muted text-foreground">
+        <span className="mb-5 grid size-11 place-items-center rounded-box bg-muted text-foreground">
           <CheckCircle className="size-6" weight="fill" />
         </span>
         <h2 className="text-3xl font-semibold tracking-[-0.035em] text-foreground">
@@ -112,7 +112,7 @@ export function SetupPage() {
 
         {clientError || setup.error ? (
           <p
-            className="rounded-md border border-destructive/25 bg-destructive/5 px-3 py-2.5 text-sm text-destructive"
+            className="rounded-field border border-destructive/25 bg-destructive/5 px-3 py-2.5 text-sm text-destructive"
             role="alert"
           >
             {clientError || (setup.error ? errorMessage(setup.error) : "")}

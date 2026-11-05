@@ -1,6 +1,5 @@
 import { useId, useState } from "react";
-import { useMutation } from "@tanstack/react-query";
-import { Link } from "@tanstack/react-router";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { LoaderCircleIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -36,6 +35,8 @@ import {
 import type { Project } from "@/lib/api/projects";
 import { HTTPError } from "@/lib/auth/session";
 import { ChannelKindIcon } from "@/features/settings/channels/ChannelKindIcon";
+import { ChannelDialog, type ChannelDialogState } from "@/features/settings/channels/ChannelDialog";
+import { channelKinds } from "@/features/settings/channels/channelKinds";
 import {
   blankRule,
   comparatorLabels,
@@ -105,6 +106,9 @@ export function RuleEditor({
   onSaved: (message: string) => void;
 }) {
   const id = useId();
+  const queryClient = useQueryClient();
+  const [channelEditor, setChannelEditor] = useState<ChannelDialogState | null>(null);
+  const [channelNotice, setChannelNotice] = useState("");
   const editing = state.mode === "edit";
   const [input, setInput] = useState(() => initialInput(state, rules, defaultEnvironment));
   const [thresholdText, setThresholdText] = useState(() => String(input.threshold));
@@ -167,7 +171,7 @@ export function RuleEditor({
               id={`${id}-name`}
               value={input.name}
               maxLength={120}
-              placeholder="如：结账页错误率突增"
+              placeholder="如：结账页错误率超标"
               aria-invalid={touched && Boolean(errors.name)}
               onChange={(event) => update({ name: event.target.value })}
             />
@@ -312,7 +316,7 @@ export function RuleEditor({
                               : [...input.channelIds, channel.id],
                           })
                         }
-                        className="alert-channel-option flex w-full items-center gap-2 rounded-xl border px-3 py-2 text-left text-sm"
+                        className="alert-channel-option flex w-full items-center gap-2 rounded-field border px-3 py-2 text-left text-sm"
                       >
                         <ChannelKindIcon kind={channel.kind} size="sm" />
                         <span className="min-w-0 flex-1 truncate">{channel.name}</span>
@@ -327,15 +331,34 @@ export function RuleEditor({
                 组织里还没有通知渠道，规则触发时只在控制台记录。
               </p>
             )}
-            <FieldDescription>
-              {canManageChannels ? (
-                <Link to="/settings/org/channels" className="underline underline-offset-4">
-                  {channels.length ? "管理通知渠道" : "去添加通知渠道，比如飞书群机器人"}
-                </Link>
-              ) : (
-                "通知渠道由组织的 Owner 或 Admin 配置。"
-              )}
-            </FieldDescription>
+            {canManageChannels ? (
+              <>
+                <div className="flex flex-wrap gap-2" aria-label="添加通知渠道">
+                  {channelKinds
+                    .filter((kind) => kind.status === "available")
+                    .map((kind) => (
+                      <Button
+                        key={kind.id}
+                        type="button"
+                        variant="outline"
+                        onClick={() => setChannelEditor({ mode: "create", kind })}
+                      >
+                        添加{kind.name}渠道
+                      </Button>
+                    ))}
+                </div>
+                <FieldDescription>
+                  在这里添加渠道，告警草稿会保留。保存渠道后可在上方选择。
+                </FieldDescription>
+              </>
+            ) : (
+              <FieldDescription>通知渠道由组织的 Owner 或 Admin 配置。</FieldDescription>
+            )}
+            {channelNotice ? (
+              <p role="status" className="text-sm text-base-content/70">
+                {channelNotice}
+              </p>
+            ) : null}
             {errors.channelIds ? <FieldError>{errors.channelIds}</FieldError> : null}
           </Field>
 
@@ -350,7 +373,7 @@ export function RuleEditor({
             </FieldLabel>
           </Field>
 
-          <p className="rounded-md bg-muted px-3 py-2.5 text-sm" aria-live="polite">
+          <p className="rounded-field bg-muted px-3 py-2.5 text-sm" aria-live="polite">
             {Number.isFinite(input.threshold)
               ? ruleSummary(
                   input,
@@ -376,6 +399,18 @@ export function RuleEditor({
           </Button>
         </SheetFooter>
       </SheetContent>
+      {channelEditor ? (
+        <ChannelDialog
+          organizationId={project.organizationId}
+          state={channelEditor}
+          onClose={() => setChannelEditor(null)}
+          onSaved={(message) => {
+            setChannelEditor(null);
+            setChannelNotice(message);
+            void queryClient.invalidateQueries({ queryKey: ["channels", project.organizationId] });
+          }}
+        />
+      ) : null}
     </Sheet>
   );
 }

@@ -12,7 +12,7 @@ vi.mock("@/lib/auth/registration", async (original) => ({
   getExternalProfile: vi.fn(),
   completeExternalRegistration: vi.fn(),
 }));
-vi.mock("@/components/theme/ThemeToggle", () => ({ ThemeToggle: () => null }));
+vi.mock("@/components/theme/ThemeController", () => ({ ThemeController: () => null }));
 
 const replace = vi.fn();
 

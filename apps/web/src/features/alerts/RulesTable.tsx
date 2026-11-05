@@ -50,7 +50,7 @@ export function RulesTable({
     );
   const byId = new Map(channels.map((channel) => [channel.id, channel]));
   return (
-    <div className="overflow-hidden rounded-2xl border">
+    <div className="overflow-hidden rounded-box border">
       <Table>
         <TableHeader>
           <TableRow>
@@ -99,7 +99,7 @@ export function RulesTable({
                       {ruleChannels.map((channel) => (
                         <li
                           key={channel.id}
-                          className="inline-flex items-center gap-1.5 rounded-full border px-1.5 py-0.5 text-xs"
+                          className="badge badge-sm badge-outline gap-1.5"
                           title={channel.enabled ? undefined : "渠道已停用"}
                         >
                           <ChannelKindIcon kind={channel.kind} size="sm" />
@@ -181,7 +181,7 @@ function RuleTemplates({
   return (
     <section
       aria-labelledby="alert-templates-title"
-      className="flex flex-col gap-4 rounded-2xl border border-dashed p-6"
+      className="flex flex-col gap-4 rounded-box border border-dashed p-6"
     >
       <div className="flex flex-col gap-1">
         <h2 id="alert-templates-title" className="text-base font-semibold">
@@ -200,7 +200,7 @@ function RuleTemplates({
               type="button"
               disabled={!canManage}
               onClick={() => onCreate(template.rule)}
-              className="alert-template-card flex h-full w-full flex-col gap-1 rounded-2xl border bg-card p-4 text-left"
+              className="alert-template-card flex h-full w-full flex-col gap-1 rounded-box border bg-card p-4 text-left"
             >
               <span className="text-sm font-medium">{template.rule.name}</span>
               <span className="text-xs text-muted-foreground">{template.description}</span>

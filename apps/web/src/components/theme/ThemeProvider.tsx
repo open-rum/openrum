@@ -6,28 +6,19 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import {
-  defaultDensity,
-  defaultPalette,
-  densityStorageKey,
-  isDensity,
-  isPalette,
-  paletteStorageKey,
-  type Density,
-  type Palette,
-} from "@openrum/design-tokens/catalog";
+import { DARK_DAISY_THEMES, isDaisyTheme, type DaisyTheme } from "@/components/daisy/daisyTheme";
 
-export type Theme = "light" | "dark" | "system";
-type ResolvedTheme = Exclude<Theme, "system">;
+/** "system" follows the OS with daisyUI's light and dark; anything else is a daisyUI theme. */
+export type Theme = "system" | DaisyTheme;
+type ResolvedTheme = "light" | "dark";
 
 type ThemeContextValue = {
   theme: Theme;
+  /** Whether the theme in effect is light or dark. */
   resolvedTheme: ResolvedTheme;
+  /** The daisyUI theme in effect, written to `<html data-theme>`. */
+  daisyTheme: DaisyTheme;
   setTheme: (theme: Theme) => void;
-  palette: Palette;
-  setPalette: (palette: Palette) => void;
-  density: Density;
-  setDensity: (density: Density) => void;
 };
 
 const STORAGE_KEY = "openrum-theme";
@@ -51,17 +42,7 @@ function writeStorage(key: string, value: string) {
 
 function getStoredTheme(): Theme {
   const stored = readStorage(STORAGE_KEY);
-  return stored === "light" || stored === "dark" || stored === "system" ? stored : "system";
-}
-
-function getStoredPalette(): Palette {
-  const stored = readStorage(paletteStorageKey);
-  return isPalette(stored) ? stored : defaultPalette;
-}
-
-function getStoredDensity(): Density {
-  const stored = readStorage(densityStorageKey);
-  return isDensity(stored) ? stored : defaultDensity;
+  return isDaisyTheme(stored) ? stored : "system";
 }
 
 function getSystemTheme(): ResolvedTheme {
@@ -70,10 +51,9 @@ function getSystemTheme(): ResolvedTheme {
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setThemeState] = useState<Theme>(getStoredTheme);
-  const [palette, setPaletteState] = useState<Palette>(getStoredPalette);
-  const [density, setDensityState] = useState<Density>(getStoredDensity);
   const [systemTheme, setSystemTheme] = useState<ResolvedTheme>(getSystemTheme);
-  const resolvedTheme = theme === "system" ? systemTheme : theme;
+  const daisyTheme: DaisyTheme = theme === "system" ? systemTheme : theme;
+  const resolvedTheme: ResolvedTheme = DARK_DAISY_THEMES.has(daisyTheme) ? "dark" : "light";
 
   useLayoutEffect(() => {
     const media = window.matchMedia("(prefers-color-scheme: dark)");
@@ -85,34 +65,23 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   useLayoutEffect(() => {
     const root = document.documentElement;
     root.classList.toggle("dark", resolvedTheme === "dark");
-    root.dataset.theme = resolvedTheme;
-    root.dataset.palette = palette;
-    root.dataset.density = density;
+    root.dataset.theme = daisyTheme;
     root.style.colorScheme = resolvedTheme;
     const canvas = getComputedStyle(root).getPropertyValue("--ds-canvas").trim();
     document.querySelector('meta[name="theme-color"]')?.setAttribute("content", canvas);
-  }, [density, palette, resolvedTheme]);
+  }, [daisyTheme, resolvedTheme]);
 
   const value = useMemo<ThemeContextValue>(
     () => ({
       theme,
       resolvedTheme,
+      daisyTheme,
       setTheme(nextTheme) {
         writeStorage(STORAGE_KEY, nextTheme);
         setThemeState(nextTheme);
       },
-      palette,
-      setPalette(nextPalette) {
-        writeStorage(paletteStorageKey, nextPalette);
-        setPaletteState(nextPalette);
-      },
-      density,
-      setDensity(nextDensity) {
-        writeStorage(densityStorageKey, nextDensity);
-        setDensityState(nextDensity);
-      },
     }),
-    [density, palette, resolvedTheme, theme],
+    [daisyTheme, resolvedTheme, theme],
   );
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;

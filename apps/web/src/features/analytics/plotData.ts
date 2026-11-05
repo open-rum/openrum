@@ -79,6 +79,7 @@ export function behaviorBreakdownPlot(
     empty: rows.length === 0,
     distribution: {
       dimension: result.dimension,
+      total: result.totals.events,
       limitReached: result.breakdown.length >= result.rowLimit,
       rowLimit: result.rowLimit,
       nonAdditive: false,

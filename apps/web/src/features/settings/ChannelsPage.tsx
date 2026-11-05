@@ -170,7 +170,7 @@ export function ChannelsPage() {
                     disabled={disabled}
                     title={soon ? `${kind.name}渠道即将支持` : undefined}
                     onClick={() => setDialog({ mode: "create", kind })}
-                    className="channel-kind-card flex w-full items-center gap-3 rounded-2xl border bg-card p-4 text-left"
+                    className="channel-kind-card card card-border w-full flex-row items-center gap-3 bg-base-100 p-4 text-left"
                   >
                     <ChannelKindIcon kind={kind.id} />
                     <span className="flex min-w-0 flex-1 flex-col gap-0.5">
@@ -194,7 +194,7 @@ export function ChannelsPage() {
           {channels.isPending && organizationId ? (
             <Skeleton className="h-32" />
           ) : channels.data?.channels.length ? (
-            <div className="overflow-hidden rounded-2xl border">
+            <div className="overflow-hidden rounded-box border">
               <Table>
                 <TableHeader>
                   <TableRow>

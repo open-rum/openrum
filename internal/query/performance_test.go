@@ -87,11 +87,17 @@ func TestPerformanceRepositoryFiltersRoutesFacetsDistributionAndSamples(t *testi
 	if checkout.PageViews != 2 || checkout.LCP.Samples != 80 || !checkout.LCP.Sufficient || checkout.LCP.P75 == nil {
 		t.Fatalf("checkout=%+v", checkout)
 	}
-	if result.Detail == nil || len(result.Detail.Trend) == 0 || len(result.Detail.Distribution) == 0 || len(result.Detail.Samples) != 25 || len(result.Detail.Browsers) != 2 || len(result.Detail.DeviceTypes) != 2 {
+	if result.Detail == nil || len(result.Detail.Trend) == 0 || len(result.Detail.Distribution) == 0 || len(result.Detail.Samples) != 25 || len(result.Detail.Browsers) != 2 || len(result.Detail.DeviceTypes) != 2 || len(result.Detail.Countries) != 2 || len(result.Detail.Releases) != 1 {
 		t.Fatalf("detail=%+v", result.Detail)
 	}
 	if result.Detail.Samples[0].Value >= 9999 || result.Detail.Samples[0].PageURL == "" || result.Detail.Browsers[0].Metric.Sufficient {
 		t.Fatalf("samples/facets=%+v %+v", result.Detail.Samples[:1], result.Detail.Browsers)
+	}
+	if release := result.Detail.Releases[0]; release.Value != "2.18.0" || release.FirstSeen == nil || !release.FirstSeen.Equal(from) || result.Detail.Browsers[0].FirstSeen != nil {
+		t.Fatalf("releases=%+v browsers=%+v", result.Detail.Releases, result.Detail.Browsers)
+	}
+	if result.Detail.Samples[0].SessionID == "" {
+		t.Fatalf("sample without session=%+v", result.Detail.Samples[0])
 	}
 
 	overview, err := NewPerformanceRepository(database).Get(ctx, PerformanceFilters{

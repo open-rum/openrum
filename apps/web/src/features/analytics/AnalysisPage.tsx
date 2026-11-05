@@ -115,11 +115,13 @@ function ProjectAnalysis({ project }: { project: Project }) {
               value={formatCompact(data.totals.events)}
               note={`${data.sampleCount.toLocaleString()} 个采集样本`}
             />
-            <BehaviorMetric
-              label="估算事件"
-              value={formatCompact(data.totals.estimated)}
-              note="按事件采样率还原"
-            />
+            {Math.abs(data.totals.estimated - data.totals.events) > 0.5 ? (
+              <BehaviorMetric
+                label="估算事件"
+                value={formatCompact(data.totals.estimated)}
+                note="按事件采样率还原"
+              />
+            ) : null}
             <BehaviorMetric
               label="用户"
               value={formatCompact(data.totals.uniqueUsers)}

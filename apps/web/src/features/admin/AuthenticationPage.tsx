@@ -145,7 +145,7 @@ export function AuthenticationPage() {
       ) : null}
       <RegistrationPolicyCard canEdit={session.data?.instanceRole === "instance_owner"} />
       <section
-        className="rounded-2xl border border-border bg-card p-5"
+        className="card card-border bg-base-100 p-6"
         aria-labelledby="provider-choices-title"
       >
         <h2 id="provider-choices-title" className="text-base font-semibold">
@@ -197,13 +197,10 @@ export function AuthenticationPage() {
         </div>
       </section>
       <div className="mt-5 grid gap-5 xl:grid-cols-[minmax(260px,0.8fr)_minmax(0,1.4fr)]">
-        <section
-          className="self-start rounded-2xl border border-border bg-card p-5"
-          aria-label="登录方式列表"
-        >
-          <h2 className="text-base font-semibold">已配置方式</h2>
+        <section className="card card-border self-start bg-base-100 p-6" aria-label="登录方式列表">
+          <h2 className="card-title text-base">已配置方式</h2>
           <div className="mt-4 space-y-2">
-            <div className="rounded-xl border border-border px-3 py-3 text-sm">
+            <div className="rounded-field border border-base-300 px-3 py-3 text-sm">
               邮箱与 OpenRUM 密码 · 始终启用
             </div>
             {query.data?.providers.map((provider) => (
@@ -235,10 +232,7 @@ export function AuthenticationPage() {
           </div>
         </section>
 
-        <section
-          className="rounded-2xl border border-border bg-card p-5"
-          aria-labelledby="provider-form-title"
-        >
+        <section className="card card-border bg-base-100 p-6" aria-labelledby="provider-form-title">
           <div className="flex items-center gap-2">
             <KeyRoundIcon className="size-5 text-primary" />
             <h2 id="provider-form-title" className="text-base font-semibold">
@@ -404,7 +398,7 @@ function StatusPill({ status }: { status: ProviderStatus }) {
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs font-medium",
+        "badge badge-sm badge-outline gap-1.5 font-medium",
         status.tone === "enabled" &&
           "border-transparent bg-[var(--ds-success-soft)] text-[var(--ds-success)]",
         status.tone === "configured" &&
@@ -431,7 +425,7 @@ function StatusPill({ status }: { status: ProviderStatus }) {
 // cards carry equal visual weight.
 function ProviderTypeIcon({ kind }: { kind: AuthMethod["kind"] }) {
   return (
-    <span className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-border bg-card">
+    <span className="flex size-10 shrink-0 items-center justify-center rounded-box border border-base-300 bg-card">
       {kind === "google" ? (
         <GoogleIcon className="size-5" />
       ) : kind === "github" ? (
@@ -524,7 +518,7 @@ function LDAPFields({
       <label className="grid gap-2 text-sm font-medium">
         自定义 CA 证书（PEM，可选）
         <textarea
-          className="min-h-24 rounded-xl border border-input bg-background p-3 font-mono text-xs"
+          className="textarea min-h-24 w-full font-mono text-xs"
           value={draft.settings.caCertificate ?? ""}
           disabled={disabled}
           onChange={(event) => update("caCertificate", event.target.value)}

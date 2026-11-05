@@ -1,7 +1,8 @@
 /* HoldButton, adapted from React Bits. Colours arrive as tokens through the --hb-*
    custom properties set by the component; nothing here is a colour literal. */
 .hold-button {
-  --hb-radius: 999px;
+  /* The theme's button radius, so a square theme gives a square hold button. */
+  --hb-radius: var(--radius-field);
   --hb-hold: 2000ms;
   --hb-release: 200ms;
   --hb-press: 0.97;

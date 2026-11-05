@@ -35,7 +35,7 @@ import { ProjectCreatePage } from "@/features/projects/ProjectCreatePage";
 import { uploadTokensPath } from "@/features/releases/releaseLinks";
 import { getProjectPlatform } from "@/features/projects/projectPlatforms";
 import { ConnectionStatus } from "./ConnectionStatus";
-import { rejectGuidance } from "./guidance";
+import { ConnectionHealth } from "./ConnectionHealth";
 import { InstallSnippet } from "./InstallSnippet";
 
 export function OnboardingPage() {
@@ -74,7 +74,7 @@ function ProjectOnboarding({
     queryFn: ({ signal }) => getConnectionStatus(project.id, signal),
     refetchInterval: (query) => {
       const current = query.state.data;
-      if (current?.lastEventQueryableAt) return false;
+      if (current?.lastEventQueryableAt) return 30_000;
       if (current?.lastEventReceivedAt) return 5_000;
       if (current?.lastSdkSeenAt) return 3_000;
       return Math.min(10_000, 2_000 * 2 ** Math.min(query.state.fetchFailureCount, 2));
@@ -100,15 +100,14 @@ function ProjectOnboarding({
   useEffect(() => {
     if (queryableAt) recordProductEvent("first_event_queryable", project.id);
   }, [project.id, queryableAt]);
-  const guidance = status?.lastRejectReason ? rejectGuidance[status.lastRejectReason] : undefined;
   const canSendTest = project.role !== "viewer";
 
   return (
     <ConsolePage width="narrow">
       <ConsolePageHeader
-        title="连接第一个真实页面"
+        title={queryableAt ? "接入状态" : "连接第一个真实页面"}
         titleId="onboarding-title"
-        description="依次确认凭证、SDK、事件接收和 ClickHouse 可查询状态。通常 60 秒内完成。"
+        description="查看最近采集记录，并验证凭证、SDK、事件接收和数据查询。"
         actions={
           <Button
             type="button"
@@ -122,13 +121,7 @@ function ProjectOnboarding({
         }
       />
 
-      {guidance ? (
-        <Alert variant="destructive">
-          <AlertTriangleIcon />
-          <AlertTitle>{guidance.title}</AlertTitle>
-          <AlertDescription>{guidance.action}</AlertDescription>
-        </Alert>
-      ) : null}
+      {status ? <ConnectionHealth status={status} /> : null}
       {statusQuery.error ? (
         <Alert variant="destructive">
           <AlertTriangleIcon />
@@ -139,6 +132,7 @@ function ProjectOnboarding({
         </Alert>
       ) : null}
 
+      <h2 className="text-base font-medium">接入验证进度 · 历史成功记录</h2>
       <ConnectionStatus
         status={status}
         loading={statusQuery.isLoading}
@@ -154,7 +148,7 @@ function ProjectOnboarding({
           </CardAction>
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
-          <code className="overflow-x-auto rounded-lg bg-muted p-3 text-sm">
+          <code className="overflow-x-auto rounded-box bg-muted p-3 text-sm">
             {dsn ??
               (hasLegacyKey
                 ? "旧版 DSN 无法从哈希恢复 · 创建新 DSN 后可持续查看"

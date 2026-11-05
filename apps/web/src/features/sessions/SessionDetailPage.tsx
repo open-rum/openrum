@@ -2,7 +2,6 @@ import { useInfiniteQuery } from "@tanstack/react-query";
 import { useParams } from "@tanstack/react-router";
 import {
   AlertCircleIcon,
-  ArrowLeftIcon,
   BracesIcon,
   CopyIcon,
   ExternalLinkIcon,
@@ -45,6 +44,7 @@ import {
   type SessionTimelineEvent,
 } from "@/lib/api/sessions";
 import { cn } from "@/lib/utils";
+import { ratingLabel, type PerformanceRating } from "@/features/performance/score";
 import { SessionClientMeta } from "./SessionClientMeta";
 import {
   sessionListReturnHref,
@@ -162,8 +162,10 @@ export function SessionDetailPage() {
           summary ? (
             <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
               <span>
-                {summary.userId || summary.visitorId || "匿名访客"} ·{" "}
-                {formatDateTime(summary.startedAt)} – {formatDateTime(summary.endedAt)}
+                {summary.userId
+                  ? `用户 ID：${summary.userId}`
+                  : `访客 ID：${summary.visitorId || "未采集"}`}{" "}
+                · {formatDateTime(summary.startedAt)} – {formatDateTime(summary.endedAt)}
               </span>
               <SessionClientMeta
                 country={summary.country}
@@ -176,20 +178,13 @@ export function SessionDetailPage() {
             "按页面阶段调查一次连续访问中的行为、错误、请求和性能信号。"
           )
         }
-        back={
-          <Button asChild variant="ghost" size="sm">
-            <a href={backHref}>
-              <ArrowLeftIcon data-icon="inline-start" />
-              返回会话列表
-            </a>
-          </Button>
-        }
+        breadcrumbs={[{ label: "会话", href: backHref }, { label: "会话详情" }]}
         actions={
           summary ? (
             <>
               <Button variant="outline" onClick={() => void copyText(summary.sessionId)}>
                 <CopyIcon data-icon="inline-start" />
-                复制 Session ID
+                复制会话 ID
               </Button>
               <Button variant="outline" onClick={() => void copyText(window.location.href)}>
                 <LinkIcon data-icon="inline-start" />
@@ -254,6 +249,20 @@ export function SessionDetailPage() {
         }
       />
 
+      {summary ? (
+        <div
+          className="sticky top-14 z-20 flex flex-wrap items-center justify-between gap-2 rounded-box border border-base-300 bg-base-100 px-4 py-3 text-sm"
+          aria-label="当前会话上下文"
+        >
+          <span className="min-w-0 break-all">
+            会话 {summary.sessionId} · {summary.entryRoute || "未知入口"} →{" "}
+            {summary.exitRoute || "未知退出"}
+          </span>
+          <a className="link shrink-0" href={backHref}>
+            返回会话列表
+          </a>
+        </div>
+      ) : null}
       <ConsolePageContent className="grid gap-6">
         {timeline.isLoading ? <DetailSkeleton /> : null}
         {timeline.error ? (
@@ -430,7 +439,7 @@ function EventInspector({
         <CardContent className="grid gap-5 pt-5">
           <dl className="session-inspector-fields">
             <InspectorField label="发生时间" value={formatDateTime(event.timestamp)} />
-            <InspectorField label="Route" value={event.route || event.pageUrl || "—"} />
+            <InspectorField label="路由" value={event.route || event.pageUrl || "—"} />
             {fields.map(([label, value]) => (
               <InspectorField key={label} label={label} value={value} />
             ))}
@@ -459,7 +468,7 @@ function EventInspector({
 
 function SessionState({ title, description }: { title: string; description: string }) {
   return (
-    <Empty className="min-h-80 border border-border">
+    <Empty className="min-h-80 border border-base-300">
       <EmptyHeader>
         <EmptyMedia variant="icon">
           <AlertCircleIcon />
@@ -610,9 +619,9 @@ function inspectorFields(event: SessionTimelineEvent): [string, string][] {
     return [
       ["类型", event.errorType || "Error"],
       ["消息", event.errorMessage || "—"],
-      ["Handled", event.handled ? "是" : "否"],
+      ["已捕获", event.handled ? "是" : "否"],
       ["指纹", event.fingerprint || "—"],
-      ["Mechanism", event.errorMechanism || "—"],
+      ["捕获机制", event.errorMechanism || "—"],
     ];
   if (event.kind === "api")
     return [
@@ -620,20 +629,20 @@ function inspectorFields(event: SessionTimelineEvent): [string, string][] {
       ["状态", String(event.apiStatus || "—")],
       ["耗时", `${Math.round(event.durationMs || 0)} ms`],
       ["失败原因", event.apiFailure || "—"],
-      ["Trace", event.traceId || "—"],
+      ["链路 ID", event.traceId || "—"],
     ];
   if (event.kind === "log")
     return [
       ["级别", event.logLevel || "—"],
-      ["Logger", event.logger || "—"],
+      ["日志来源", event.logger || "—"],
       ["内容", event.logMessage || "—"],
     ];
   if (event.kind === "web_vital")
     return [
       ["指标", event.metricName || "—"],
       ["值", formatMetric(event)],
-      ["评级", event.metricRating || "—"],
-      ["Delta", String(event.metricDelta ?? "—")],
+      ["评级", ratingLabel((event.metricRating ?? "unknown") as PerformanceRating)],
+      ["变化量", String(event.metricDelta ?? "—")],
     ];
   if (event.kind === "custom" || event.kind === "click")
     return [

@@ -196,16 +196,18 @@ describe("query text search box", () => {
   });
 
   it("has no 查询 button and says when an edit has not run yet", async () => {
+    // The hint wraps Enter in a <kbd>, so match the span by its whole text.
+    const pending = () => screen.queryByText((_, el) => el?.className === "search-query__pending");
     const user = userEvent.setup();
     render(<Harness />);
     expect(screen.queryByRole("button", { name: "查询" })).toBeNull();
     expect(box().getAttribute("enterkeyhint")).toBe("search");
-    expect(screen.queryByText("按 Enter 搜索")).toBeNull();
+    expect(pending()).toBeNull();
     await user.type(box(), "timeout");
-    expect(screen.getByText("按 Enter 搜索")).toBeTruthy();
+    expect(pending()?.textContent).toBe("按 Enter 搜索");
     await user.type(box(), "{Enter}");
     expect(submitted()).toBe("timeout");
-    expect(screen.queryByText("按 Enter 搜索")).toBeNull();
+    expect(pending()).toBeNull();
   });
 
   it("remembers submitted queries in this browser", async () => {

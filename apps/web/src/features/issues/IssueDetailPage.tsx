@@ -2,7 +2,6 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { useParams } from "@tanstack/react-router";
 import {
-  ArrowLeftIcon,
   CheckIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
@@ -308,15 +307,13 @@ function IssueInvestigation({
   return (
     <ConsolePage width="fluid" className="issue-investigation">
       <ConsolePageHeader
-        back={
-          <a
-            className="issue-back-link"
-            href={`/projects/${encodeURIComponent(project.id)}/issues?${withTimePreset(serializeIssueFilters(filters))}`}
-          >
-            <ArrowLeftIcon />
-            返回问题列表
-          </a>
-        }
+        breadcrumbs={[
+          {
+            label: "错误问题",
+            href: `/projects/${encodeURIComponent(project.id)}/issues?${withTimePreset(serializeIssueFilters(filters))}`,
+          },
+          { label: issue.errorType },
+        ]}
         title={
           <span className="issue-title-row">
             <span className="issue-title-type">{issue.errorType}</span>
@@ -503,7 +500,15 @@ function IssueInvestigation({
                 />
               ) : null}
               {!samples.isLoading && !samples.error && !pageEvents.length ? (
-                <p className="issue-empty-copy">当前筛选下没有可查看的事件。</p>
+                <div className="p-4 text-sm text-base-content/70" role="status">
+                  <p className="font-medium text-base-content">
+                    {issue.events > 0 ? "历史统计仍可用，原始事件现场不可用" : "当前筛选下没有可查看的原始事件"}
+                  </p>
+                  <p className="mt-2">
+                    {issue.events > 0 ? `当前范围的历史聚合记录了 ${issue.events.toLocaleString()} 次错误。` : ""}
+                    原始事件与聚合统计的保留时间可能不同；也可能没有符合当前筛选的现场。请调整时间或筛选条件，历史统计并不保证原始现场仍在保留期内。
+                  </p>
+                </div>
               ) : null}
               {event.data ? <EventSections key={event.data.eventId} event={event.data} /> : null}
             </section>
@@ -646,7 +651,7 @@ function EventNavigation({
             type="button"
             className="issue-events__jump"
             aria-current={isLatest ? true : undefined}
-            disabled={isLatest}
+            disabled={isLatest || (!pageSize && !canNewer)}
             onClick={onLatest}
           >
             最新
@@ -655,14 +660,14 @@ function EventNavigation({
             type="button"
             className="issue-events__jump"
             aria-current={isOldest ? true : undefined}
-            disabled={isOldest}
+            disabled={isOldest || (!pageSize && !canOlder)}
             onClick={onOldest}
           >
             最早
           </button>
           <Sheet>
             <SheetTrigger asChild>
-              <button type="button" className="issue-events__jump">
+              <button type="button" className="issue-events__jump" disabled={!pageSize}>
                 全部事件
               </button>
             </SheetTrigger>
@@ -702,14 +707,14 @@ function EventNavigation({
             <span className="issue-event-bar__count">加载中…</span>
           ) : null}
         </div>
-        <div className="issue-event-bar__links">
+        {event ? <div className="issue-event-bar__links">
           <span>跳转到</span>
           {eventSectionLinks.map(([id, label]) => (
             <a key={id} href={`#${id}`}>
               {label}
             </a>
           ))}
-        </div>
+        </div> : null}
       </div>
     </>
   );

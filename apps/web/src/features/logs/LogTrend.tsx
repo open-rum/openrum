@@ -1,7 +1,6 @@
 import { Bar, BarChart, BarStack, CartesianGrid, XAxis, YAxis } from "recharts";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
-  BAR_RADIUS_TOP,
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
@@ -9,6 +8,7 @@ import {
 } from "@/components/ui/chart";
 import { useChartMotion } from "@/lib/charts/useChartMotion";
 import { completeLogTrend, logLevels, type LogPage } from "@/lib/api/logs";
+import { useBarRadiusTop } from "@/lib/charts/useBarRadius";
 
 const colors = {
   trace: "var(--ds-text-muted)",
@@ -23,6 +23,7 @@ const config = Object.fromEntries(
 ) satisfies ChartConfig;
 
 export function LogTrend({ data, from, to }: { data: LogPage; from: string; to: string }) {
+  const barRadius = useBarRadiusTop();
   const animate = useChartMotion();
   const points = completeLogTrend(data, from, to);
   const date = new Intl.DateTimeFormat("zh-CN", {
@@ -68,7 +69,7 @@ export function LogTrend({ data, from, to }: { data: LogPage; from: string; to: 
                 />
               }
             />
-            <BarStack stackId="logs" radius={BAR_RADIUS_TOP}>
+            <BarStack stackId="logs" radius={barRadius}>
               {logLevels.map((level) => (
                 <Bar
                   key={level}

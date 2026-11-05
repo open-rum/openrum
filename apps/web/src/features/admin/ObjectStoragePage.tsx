@@ -682,7 +682,7 @@ function CorsHelp({ provider }: { provider: ObjectStorageStatus["provider"] }) {
     2,
   );
   return (
-    <details className="group rounded-[var(--radius-surface)] border border-border bg-card">
+    <details className="card card-border group bg-base-100">
       <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-4 text-sm font-medium">
         <span>
           控制台直传需要的跨域规则
@@ -692,7 +692,7 @@ function CorsHelp({ provider }: { provider: ObjectStorageStatus["provider"] }) {
         </span>
         <ChevronDownIcon className="size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
       </summary>
-      <div className="flex flex-col gap-4 border-t border-border px-5 py-4 text-sm">
+      <div className="flex flex-col gap-4 border-t border-base-300 px-5 py-4 text-sm">
         <dl className="grid gap-3 sm:grid-cols-3">
           <Fact label="来源（Origin）" value={origin} />
           <Fact label="允许的方法" value="PUT" />
@@ -704,9 +704,7 @@ function CorsHelp({ provider }: { provider: ObjectStorageStatus["provider"] }) {
             : "阿里云 OSS：在 Bucket 的「数据安全 → 跨域设置」中按上面三项新建规则。S3 兼容存储可使用下面的 CORS 配置。"}{" "}
           通过 Vite 插件或 CLI 在 CI 中上传不经过浏览器，不需要跨域规则。
         </p>
-        <pre className="overflow-x-auto rounded-[var(--radius-field)] bg-muted p-3 font-mono text-xs">
-          {s3Rule}
-        </pre>
+        <pre className="overflow-x-auto rounded-field bg-muted p-3 font-mono text-xs">{s3Rule}</pre>
         <div>
           <Button
             variant="outline"

@@ -57,7 +57,9 @@ afterEach(cleanup);
 describe("APICaptureForm", () => {
   it("starts with nothing captured and says what stays private", () => {
     mount();
-    expect(screen.getByText("还没有规则，所有 API 的头信息都不采集。")).toBeTruthy();
+    expect(
+      screen.getByText("还没有规则，所有 API 的请求头、响应头、请求体和响应体均不采集。"),
+    ).toBeTruthy();
     expect(screen.getByText(/默认全部不采集/)).toBeTruthy();
     expect(screen.getByText(/凭证类头永远不会采集/)).toBeTruthy();
     expect(screen.getByText(/请求体和响应体需要单独勾选/)).toBeTruthy();
@@ -134,7 +136,9 @@ describe("APICaptureForm", () => {
   it("removes a rule, which is how an endpoint is switched off", async () => {
     mount({ rules: [orders] });
     fireEvent.click(screen.getByRole("button", { name: "删除规则 1" }));
-    expect(screen.getByText("还没有规则，所有 API 的头信息都不采集。")).toBeTruthy();
+    expect(
+      screen.getByText("还没有规则，所有 API 的请求头、响应头、请求体和响应体均不采集。"),
+    ).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "保存" }));
     await waitFor(() => expect(save).toHaveBeenCalledWith(projectId, []));
   });

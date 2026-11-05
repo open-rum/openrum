@@ -91,7 +91,7 @@ export function EventSummary({
         info={
           <p>
             按事件次数排序的前 {Math.min(rankedRows, data.breakdown.length) || rankedRows}{" "}
-            个。占比按已返回的分组合计计算。
+            个。占比以当前筛选下全部事件为分母，包含未展示分组。
           </p>
         }
         action={
@@ -103,6 +103,18 @@ export function EventSummary({
         }
       >
         <CategoryRanking compact data={distribution} title={`${label}分布`} />
+        <p className="mt-2 text-xs text-base-content/70">
+          占全部匹配事件；所示前 {distribution.rows.length} 项覆盖约{" "}
+          {events
+            ? Math.min(
+                100,
+                (distribution.rows.reduce((sum, row) => sum + Number(row.events ?? 0), 0) /
+                  events) *
+                  100,
+              ).toFixed(1)
+            : "0"}
+          %
+        </p>
       </ChartCard>
     </div>
   );

@@ -64,15 +64,15 @@ export function JoinRequestsPanel({
 
   if (!requests.length) {
     return (
-      <p className="border border-border bg-card px-4 py-10 text-center text-sm text-muted-foreground">
+      <p className="border border-base-300 bg-card px-4 py-10 text-center text-sm text-muted-foreground">
         没有待处理的加入申请。对方通过邀请链接注册或登录后提交申请，会出现在这里。
       </p>
     );
   }
   return (
-    <div className="border border-border bg-card">
+    <div className="border border-base-300 bg-card">
       {error ? (
-        <p className="border-b border-border px-4 py-3 text-sm text-destructive" role="alert">
+        <p className="border-b border-base-300 px-4 py-3 text-sm text-destructive" role="alert">
           {error.message}
         </p>
       ) : null}
@@ -213,15 +213,15 @@ export function InvitationsPanel({
 
   if (!invitations.length) {
     return (
-      <p className="border border-border bg-card px-4 py-10 text-center text-sm text-muted-foreground">
+      <p className="border border-base-300 bg-card px-4 py-10 text-center text-sm text-muted-foreground">
         没有有效的邀请链接。点击右上角的「邀请成员」生成。
       </p>
     );
   }
   return (
-    <div className="border border-border bg-card">
+    <div className="border border-base-300 bg-card">
       {error ? (
-        <p className="border-b border-border px-4 py-3 text-sm text-destructive" role="alert">
+        <p className="border-b border-base-300 px-4 py-3 text-sm text-destructive" role="alert">
           {error.message}
         </p>
       ) : null}

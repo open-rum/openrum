@@ -9,23 +9,34 @@
     <title>OpenRUM</title>
     <script>
       try {
-        // Palette and density come before first paint, so nothing flashes the defaults.
-        const palette = localStorage.getItem("openrum-palette");
-        document.documentElement.dataset.palette = ["amber", "lime", "magenta"].includes(palette)
-          ? palette
-          : "amber";
-        document.documentElement.dataset.density =
-          localStorage.getItem("openrum-density") === "compact" ? "compact" : "comfortable";
+        // Any daisyUI theme name, or "system" for daisyUI's light and dark.
         const saved = localStorage.getItem("openrum-theme") || "system";
-        const resolved =
+        const theme =
           saved === "system"
             ? matchMedia("(prefers-color-scheme: dark)").matches
               ? "dark"
               : "light"
             : saved;
-        document.documentElement.classList.toggle("dark", resolved === "dark");
-        document.documentElement.dataset.theme = resolved;
-        document.documentElement.style.colorScheme = resolved;
+        // Keep in step with DARK_DAISY_THEMES in src/components/daisy/daisyTheme.ts.
+        const dark = [
+          "dark",
+          "synthwave",
+          "halloween",
+          "forest",
+          "aqua",
+          "black",
+          "luxury",
+          "dracula",
+          "business",
+          "night",
+          "coffee",
+          "dim",
+          "sunset",
+          "abyss",
+        ].includes(theme);
+        document.documentElement.classList.toggle("dark", dark);
+        document.documentElement.dataset.theme = theme;
+        document.documentElement.style.colorScheme = dark ? "dark" : "light";
       } catch {}
     </script>
   </head>

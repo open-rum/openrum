@@ -1,7 +1,9 @@
+import { environmentLabel, projectEnvironments } from "@/lib/projects/environments";
 /* eslint-disable react-refresh/only-export-components -- shared analysis context and toolbar are one product contract */
 import {
   createContext,
   lazy,
+  Fragment,
   Suspense,
   useCallback,
   useContext,
@@ -11,20 +13,9 @@ import {
   useSyncExternalStore,
   type ReactNode,
 } from "react";
-import { ArrowLeftIcon, CalendarRangeIcon, CheckIcon, ChevronRightIcon } from "lucide-react";
+import { ArrowLeftIcon, CalendarRangeIcon, ChevronDownIcon, ChevronRightIcon } from "lucide-react";
 import type { DateRange } from "react-day-picker";
-import { Button } from "@/components/ui/button";
-import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
-import {
-  Popover,
-  PopoverContent,
-  PopoverDescription,
-  PopoverHeader,
-  PopoverTitle,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import { Separator } from "@/components/ui/separator";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import type { Project } from "@/lib/api/projects";
 import { cn } from "@/lib/utils";
 
@@ -190,6 +181,29 @@ export function useAnalysisContext() {
   return useContext(AnalysisContext);
 }
 
+export function AnalysisEnvironmentFilter() {
+  const context = useAnalysisContext();
+  return context ? (
+    <select
+      className="select select-sm max-w-40 shrink-0"
+      aria-label="分析环境"
+      value={context.environment ?? "all"}
+      onChange={(event) =>
+        context.update({
+          environment: event.target.value === "all" ? undefined : event.target.value,
+        })
+      }
+    >
+      <option value="all">全部环境</option>
+      {projectEnvironments.map(({ id }) => (
+        <option key={id} value={id}>
+          {environmentLabel(id)} · {id}
+        </option>
+      ))}
+    </select>
+  ) : null;
+}
+
 export function AnalysisTimeFilter() {
   const context = useAnalysisContext();
   return context ? <AnalysisContextControls context={context} /> : null;
@@ -197,7 +211,12 @@ export function AnalysisTimeFilter() {
 
 export function AnalysisContextControls({ context }: { context: AnalysisContextValue }) {
   const [popoverOpen, setPopoverOpen] = useState(false);
-  const [view, setView] = useState<"presets" | "custom">("presets");
+  const wide = useWideLayout();
+  // On a phone the calendar sits behind one row, so the presets stay on the first screen.
+  const [customOpen, setCustomOpen] = useState(false);
+  // A preset under the pointer or focus previews its range on the calendar.
+  const [previewPreset, setPreviewPreset] = useState<AnalysisRangePreset | null>(null);
+  const [touched, setTouched] = useState(false);
   const [dateDraft, setDateDraft] = useState<DateRange>(() => ({
     from: context.from,
     to: context.to,
@@ -207,12 +226,27 @@ export function AnalysisContextControls({ context }: { context: AnalysisContextV
   const preset = findPreset(context.timePreset);
   const draftFrom = combineDateAndTime(dateDraft.from, fromTimeDraft);
   const draftTo = combineDateAndTime(dateDraft.to, toTimeDraft);
-  const customError = validateDraft(draftFrom, draftTo);
+  const customError = touched ? validateDraft(draftFrom, draftTo) : undefined;
+  const preview = previewPreset
+    ? resolvePresetRange(previewPreset, roundedMinute(new Date()))
+    : undefined;
 
-  const resetDraft = () => {
-    setDateDraft({ from: context.from, to: context.to });
-    setFromTimeDraft(toTimeInput(context.from));
-    setToTimeDraft(toTimeInput(context.to));
+  // While a preset is previewed the time fields show its bounds; an edit returns to the draft.
+  const shownFrom = preview?.from ?? dateDraft.from;
+  const shownTo = preview?.to ?? dateDraft.to;
+  const shownFromTime = preview ? toTimeInput(preview.from) : fromTimeDraft;
+  const shownToTime = preview ? toTimeInput(preview.to) : toTimeDraft;
+
+  const openPanel = (open: boolean) => {
+    if (open) {
+      setDateDraft({ from: context.from, to: context.to });
+      setFromTimeDraft(toTimeInput(context.from));
+      setToTimeDraft(toTimeInput(context.to));
+      setTouched(false);
+      setPreviewPreset(null);
+      setCustomOpen(false);
+    }
+    setPopoverOpen(open);
   };
 
   const applyPreset = (item: AnalysisRangePreset) => {
@@ -221,174 +255,257 @@ export function AnalysisContextControls({ context }: { context: AnalysisContextV
     setPopoverOpen(false);
   };
 
+  const summary = preview
+    ? {
+        caption: "预览",
+        label: previewPreset!.label,
+        range: formatCompactRange(preview.from, preview.to),
+      }
+    : touched
+      ? {
+          caption: "自定义：在日历上点开始和结束日期",
+          label: draftFrom && draftTo ? "自定义范围" : "选择结束日期",
+          range: draftFrom && draftTo ? formatCompactRange(draftFrom, draftTo) : "—",
+        }
+      : {
+          caption: preset && wide ? "当前范围 · 点左侧选项立即生效" : "当前范围",
+          label: preset?.label ?? "自定义范围",
+          range: formatCompactRange(context.from, context.to),
+        };
+
+  const presetButton = (item: AnalysisRangePreset, className: string, compact = false) => {
+    const available = validRangeForPreset(item);
+    const selected = preset?.value === item.value;
+    return (
+      <button
+        type="button"
+        className={className}
+        aria-pressed={selected}
+        disabled={!available}
+        title={available ? undefined : "当前月份已超过 30 天，请改用最近 30 天或自定义范围"}
+        onMouseEnter={() => available && setPreviewPreset(item)}
+        onFocus={() => available && setPreviewPreset(item)}
+        onClick={() => applyPreset(item)}
+        aria-label={compact ? item.label : undefined}
+      >
+        {/* Three to a row on a phone: 「最近」 is implied by the 相对时间 heading. */}
+        {compact ? item.label.replace(/^最近 /, "") : item.label}
+      </button>
+    );
+  };
+
+  const calendar = (
+    <div className="grid min-w-0 gap-3">
+      <div className="flex flex-wrap items-end justify-between gap-2">
+        <div className="grid min-w-0 gap-0.5">
+          <span className="text-xs text-base-content/70">{summary.caption}</span>
+          <span className="text-xl font-bold tracking-tight">{summary.label}</span>
+        </div>
+        <span className="badge badge-soft badge-primary font-mono">{summary.range}</span>
+      </div>
+      <Suspense fallback={<div className="analysis-time-popover__calendar-loading" />}>
+        <RangeCalendar
+          selected={preview ? { from: preview.from, to: preview.to } : dateDraft}
+          onSelect={(range) => {
+            setPreviewPreset(null);
+            setTouched(true);
+            setDateDraft(range ?? { from: undefined, to: undefined });
+          }}
+          defaultMonth={wide ? previousMonth(context.to) : context.to}
+          months={wide ? 2 : 1}
+        />
+      </Suspense>
+      <div className="grid grid-cols-2 gap-3 border-t border-base-300 pt-3">
+        <fieldset className="fieldset py-0">
+          <label className="fieldset-legend pb-1" htmlFor="analysis-range-from-time">
+            开始 · {formatDraftDay(shownFrom)}
+          </label>
+          <input
+            id="analysis-range-from-time"
+            type="time"
+            className={cn("input input-sm w-full", customError && "input-error")}
+            value={shownFromTime}
+            aria-invalid={Boolean(customError)}
+            onChange={(event) => {
+              setPreviewPreset(null);
+              setTouched(true);
+              setFromTimeDraft(event.target.value);
+            }}
+          />
+        </fieldset>
+        <fieldset className="fieldset py-0">
+          <label className="fieldset-legend pb-1" htmlFor="analysis-range-to-time">
+            结束 · {formatDraftDay(shownTo)}
+          </label>
+          <input
+            id="analysis-range-to-time"
+            type="time"
+            className={cn("input input-sm w-full", customError && "input-error")}
+            value={shownToTime}
+            aria-invalid={Boolean(customError)}
+            onChange={(event) => {
+              setPreviewPreset(null);
+              setTouched(true);
+              setToTimeDraft(event.target.value);
+            }}
+          />
+        </fieldset>
+      </div>
+      {customError ? (
+        <p role="alert" className="text-xs text-error">
+          {customError}
+        </p>
+      ) : null}
+      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-base-300 py-3">
+        <p className="text-xs text-base-content/70">
+          {resolvedTimeZone()} · 最长 30 天 · 应用后写入当前 URL
+        </p>
+        <div className="flex gap-2">
+          <button type="button" className="btn btn-sm" onClick={() => setPopoverOpen(false)}>
+            取消
+          </button>
+          <button
+            type="button"
+            className="btn btn-sm btn-primary"
+            disabled={!touched || Boolean(customError)}
+            onClick={() => {
+              if (!draftFrom || !draftTo || !validRange(draftFrom, draftTo)) return;
+              context.update({ from: draftFrom, to: draftTo });
+              setPopoverOpen(false);
+            }}
+          >
+            应用时间
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
   return (
     <div className="analysis-context-bar__controls" role="group" aria-label="全局分析筛选">
       <div className="analysis-time-filter">
-        <Popover
-          open={popoverOpen}
-          onOpenChange={(open) => {
-            if (open) setView("presets");
-            setPopoverOpen(open);
-          }}
-        >
+        <Popover open={popoverOpen} onOpenChange={openPanel}>
           <PopoverTrigger asChild>
-            <Button
+            <button
               type="button"
-              size="sm"
-              variant="outline"
-              className="analysis-time-filter__trigger"
+              className="analysis-time-filter__trigger btn btn-sm data-[state=open]:border-primary data-[state=open]:shadow-[0_0_0_3px_color-mix(in_oklab,var(--color-primary)_18%,transparent)]"
               aria-label={`选择时间范围，当前为 ${formatAbsoluteRange(context.from, context.to)}`}
             >
-              <CalendarRangeIcon data-icon="inline-start" aria-hidden="true" />
-              <span>{preset?.label ?? formatCompactRange(context.from, context.to)}</span>
-            </Button>
+              <CalendarRangeIcon className="size-4" aria-hidden="true" />
+              <span className="truncate font-semibold">{preset?.label ?? "自定义"}</span>
+              <span className="hidden truncate font-mono text-xs font-normal text-base-content/60 sm:inline">
+                {formatCompactRange(context.from, context.to)}
+              </span>
+              <ChevronDownIcon className="size-3.5 opacity-60" aria-hidden="true" />
+            </button>
           </PopoverTrigger>
-          <PopoverContent
-            className={cn(
-              "analysis-time-popover",
-              view === "presets"
-                ? "analysis-time-popover--presets"
-                : "analysis-time-popover--custom",
-            )}
-            align="start"
-            sideOffset={8}
-          >
-            {view === "presets" ? (
-              <>
+          <PopoverContent className="analysis-time-popover" align="start" sideOffset={8}>
+            {wide ? (
+              <div className="grid grid-cols-[300px_minmax(0,1fr)]">
                 <div
-                  className="analysis-time-popover__presets"
+                  className="grid grid-cols-2 content-start border-r border-base-300 bg-base-200/60 p-2"
                   role="group"
                   aria-label="快捷时间范围"
+                  onMouseLeave={() => setPreviewPreset(null)}
+                  onBlur={() => setPreviewPreset(null)}
                 >
                   {presetGroups.map((group) => (
-                    <div key={group.label} className="analysis-time-popover__column">
-                      <p className="analysis-time-popover__label">{group.label}</p>
-                      {group.items.map((item) => {
-                        const available = validRangeForPreset(item);
-                        const selected = preset?.value === item.value;
-                        return (
-                          <button
-                            key={item.value}
-                            type="button"
-                            className="analysis-time-popover__item"
-                            aria-pressed={selected}
-                            disabled={!available}
-                            title={
-                              available
-                                ? undefined
-                                : "当前月份已超过 30 天，请改用最近 30 天或自定义范围"
-                            }
-                            onClick={() => applyPreset(item)}
-                          >
-                            <span>{item.label}</span>
-                            {selected ? <CheckIcon aria-hidden="true" /> : null}
-                          </button>
-                        );
-                      })}
+                    <ul key={group.label} className="menu menu-sm w-full min-w-0 px-1">
+                      <li className="menu-title">{group.label}</li>
+                      {group.items.map((item) => (
+                        <li
+                          key={item.value}
+                          className={cn(!validRangeForPreset(item) && "menu-disabled")}
+                        >
+                          {presetButton(
+                            item,
+                            cn("h-8", preset?.value === item.value && "menu-active"),
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  ))}
+                </div>
+                <div className="min-w-0 px-5 pt-4">{calendar}</div>
+              </div>
+            ) : customOpen ? (
+              <div className="grid gap-2 p-3">
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm w-fit"
+                  onClick={() => setCustomOpen(false)}
+                >
+                  <ArrowLeftIcon className="size-4" aria-hidden="true" />
+                  快捷时间范围
+                </button>
+                {calendar}
+              </div>
+            ) : (
+              <div className="grid gap-3 p-3">
+                <div className="grid gap-3" role="group" aria-label="快捷时间范围">
+                  {presetGroups.map((group) => (
+                    <div key={group.label} className="grid gap-2">
+                      <span className="text-xs text-base-content/70">{group.label}</span>
+                      <div className="grid grid-cols-3 gap-2">
+                        {group.items.map((item) => (
+                          <Fragment key={item.value}>
+                            {presetButton(
+                              item,
+                              cn(
+                                "btn btn-sm h-11 whitespace-nowrap",
+                                preset?.value === item.value && "btn-primary",
+                              ),
+                              true,
+                            )}
+                          </Fragment>
+                        ))}
+                      </div>
                     </div>
                   ))}
                 </div>
-                <Separator />
-                <div className="analysis-time-popover__custom">
-                  <button
-                    type="button"
-                    className="analysis-time-popover__item"
-                    aria-pressed={!preset}
-                    onClick={() => {
-                      resetDraft();
-                      setView("custom");
-                    }}
-                  >
-                    <span>自定义</span>
-                    {!preset ? (
-                      <span className="analysis-time-popover__current" aria-hidden="true">
-                        {formatCompactRange(context.from, context.to)}
-                      </span>
-                    ) : null}
-                    <ChevronRightIcon aria-hidden="true" />
-                  </button>
-                </div>
-              </>
-            ) : (
-              <>
-                <PopoverHeader className="analysis-time-popover__header">
-                  <Button
-                    type="button"
-                    size="icon-sm"
-                    variant="ghost"
-                    aria-label="返回快捷时间范围"
-                    onClick={() => setView("presets")}
-                  >
-                    <ArrowLeftIcon />
-                  </Button>
-                  <div>
-                    <PopoverTitle>自定义时间范围</PopoverTitle>
-                    <PopoverDescription>
-                      {resolvedTimeZone()} · 最长 30 天 · 应用后会写入当前 URL
-                    </PopoverDescription>
-                  </div>
-                </PopoverHeader>
-                <Separator />
-                <div className="analysis-time-popover__calendar">
-                  <Suspense fallback={<div className="analysis-time-popover__calendar-loading" />}>
-                    <RangeCalendar
-                      selected={dateDraft}
-                      onSelect={(range) =>
-                        setDateDraft(range ?? { from: undefined, to: undefined })
-                      }
-                      defaultMonth={context.from}
-                    />
-                  </Suspense>
-                  <Separator />
-                  <FieldGroup className="analysis-time-popover__times">
-                    <Field data-invalid={Boolean(customError)}>
-                      <FieldLabel htmlFor="analysis-range-from-time">开始时间</FieldLabel>
-                      <Input
-                        id="analysis-range-from-time"
-                        type="time"
-                        value={fromTimeDraft}
-                        aria-invalid={Boolean(customError)}
-                        onChange={(event) => setFromTimeDraft(event.target.value)}
-                      />
-                    </Field>
-                    <Field data-invalid={Boolean(customError)}>
-                      <FieldLabel htmlFor="analysis-range-to-time">结束时间</FieldLabel>
-                      <Input
-                        id="analysis-range-to-time"
-                        type="time"
-                        value={toTimeDraft}
-                        aria-invalid={Boolean(customError)}
-                        onChange={(event) => setToTimeDraft(event.target.value)}
-                      />
-                    </Field>
-                  </FieldGroup>
-                  <div className="analysis-time-popover__footer">
-                    <FieldError>{customError}</FieldError>
-                    <div>
-                      <Button type="button" variant="outline" onClick={() => setPopoverOpen(false)}>
-                        取消
-                      </Button>
-                      <Button
-                        type="button"
-                        disabled={Boolean(customError)}
-                        onClick={() => {
-                          if (!draftFrom || !draftTo || !validRange(draftFrom, draftTo)) return;
-                          context.update({ from: draftFrom, to: draftTo });
-                          setPopoverOpen(false);
-                        }}
-                      >
-                        应用时间
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              </>
+                <ul className="menu w-full rounded-box border border-base-300 p-0">
+                  <li>
+                    <button
+                      type="button"
+                      className="min-h-12 content-center"
+                      onClick={() => setCustomOpen(true)}
+                    >
+                      <CalendarRangeIcon className="size-4" aria-hidden="true" />
+                      <span className="grow">自定义日期和时间</span>
+                      <ChevronRightIcon className="size-4 opacity-60" aria-hidden="true" />
+                    </button>
+                  </li>
+                </ul>
+              </div>
             )}
           </PopoverContent>
         </Popover>
       </div>
     </div>
   );
+}
+
+const WIDE_QUERY = "(min-width: 768px)";
+
+/** Whether the time panel has room for the presets beside a two-month calendar. */
+function useWideLayout() {
+  return useSyncExternalStore(
+    (listener) => {
+      if (typeof window.matchMedia !== "function") return () => {};
+      const media = window.matchMedia(WIDE_QUERY);
+      media.addEventListener?.("change", listener);
+      return () => media.removeEventListener?.("change", listener);
+    },
+    () =>
+      typeof window.matchMedia === "function"
+        ? (window.matchMedia(WIDE_QUERY)?.matches ?? true)
+        : true,
+    () => true,
+  );
+}
+
+function previousMonth(value: Date) {
+  return new Date(value.getFullYear(), value.getMonth() - 1, 1);
 }
 
 function resolveContext(
@@ -621,7 +738,15 @@ function validateDraft(from: Date | undefined, to: Date | undefined) {
   if (!from || !to) return "请在日历中选择完整的开始和结束日期。";
   if (to <= from) return "结束时间必须晚于开始时间。";
   if (to.getTime() - from.getTime() > MAX_RANGE) return "时间范围不能超过 30 天。";
+  if (to.getTime() > Date.now() + 60_000) return "结束时间不能晚于现在。";
   return undefined;
+}
+
+/** The day a time field belongs to, so each time reads with its date beside it. */
+function formatDraftDay(day: Date | undefined) {
+  return day
+    ? new Intl.DateTimeFormat("zh-CN", { month: "long", day: "numeric" }).format(day)
+    : "未选日期";
 }
 
 function formatAbsoluteRange(from: Date, to: Date) {

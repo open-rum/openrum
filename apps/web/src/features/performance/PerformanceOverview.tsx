@@ -1,15 +1,9 @@
 import { CartesianGrid, Line, LineChart, ReferenceLine, XAxis, YAxis } from "recharts";
 import { Badge } from "@/components/ui/badge";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChartContainer, ChartTooltip, type ChartConfig } from "@/components/ui/chart";
 import { useChartMotion } from "@/lib/charts/useChartMotion";
+import { cn } from "@/lib/utils";
 import { smoothCurve } from "@/lib/charts/smoothCurve";
 import {
   Table,
@@ -32,6 +26,7 @@ import {
   performanceRating,
   performanceScore,
   performanceThresholds,
+  ratingBadge,
   ratingLabel,
   scoreRating,
 } from "./score";
@@ -53,96 +48,106 @@ export function PerformanceOverview({
   trend,
   range,
   percentile,
-  onPercentileChange,
 }: {
   summary: PerformanceResponse["summary"];
   trend: PerformanceResponse["trend"];
   range?: { from?: string; to?: string; intervalSeconds?: number };
   percentile: PerformancePercentile;
-  onPercentileChange: (value: PerformancePercentile) => void;
 }) {
   const scoring = overallPerformanceScore(summary);
   return (
     <section className="performance-summary" aria-label="性能指标概览">
       <div className="performance-overview-top">
         <PerformanceScoreCard scoring={scoring} />
-        <CombinedVitalTrend
-          trend={trend}
-          range={range}
-          percentile={percentile}
-          onPercentileChange={onPercentileChange}
-        />
+        <CombinedVitalTrend trend={trend} range={range} percentile={percentile} />
       </div>
-      <div className="performance-summary-stats">
+      {/* daisyUI stats: one bordered group, a stat per vital with its thresholds drawn as a bar. */}
+      <div className="stats stats-vertical mt-4 w-full border border-base-300 bg-base-100 lg:stats-horizontal">
         {vitalSeries.map(({ key, name }) => {
           const metric = summary?.[key];
           const rating = performanceRating(metric?.sufficient ? metric.p75 : null, name);
           const score = metric && metric.samples > 0 ? performanceScore(metric.p75, name) : null;
+          const value = metric?.[percentile] ?? null;
           return (
-            <Card key={name} className="performance-metric-card" size="sm">
-              <CardHeader>
-                <CardTitle>
-                  {name}{" "}
-                  <span className="performance-metric-percentile">{percentile.toUpperCase()}</span>
-                </CardTitle>
-                <CardDescription>{metricDescriptions[name]}</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="performance-metric-value">
-                  <strong>{formatPerformanceMetric(metric?.[percentile] ?? null, name)}</strong>
-                  <span>{(metric?.samples ?? 0).toLocaleString()} 样本</span>
-                </div>
-              </CardContent>
-              <CardFooter className="performance-metric-footer" data-rating={rating}>
-                {metric?.sufficient
-                  ? `P75 ${ratingLabel(rating)} · ${score ?? "—"} 分`
-                  : (metric?.samples ?? 0) > 0
-                    ? "样本不足 · 暂不判定"
-                    : "暂无数据"}
-              </CardFooter>
-            </Card>
+            <div key={name} className="stat min-w-0 gap-1" data-rating={rating}>
+              <div className="stat-title flex items-center justify-between gap-2">
+                <span>
+                  {name} · {percentile.toUpperCase()}
+                </span>
+                {/* The rating always comes from P75, so name that whenever another percentile is shown. */}
+                <span
+                  className={cn(
+                    "badge badge-sm badge-soft",
+                    metric?.sufficient ? ratingBadge[rating] : "badge-ghost",
+                  )}
+                  title={metric?.sufficient ? "按 P75 判定，不随分位数切换" : undefined}
+                >
+                  {metric?.sufficient
+                    ? `${percentile === "p75" ? "" : "P75 "}${ratingLabel(rating)}`
+                    : (metric?.samples ?? 0) > 0
+                      ? "样本不足"
+                      : "暂无数据"}
+                </span>
+              </div>
+              <div className="stat-value text-2xl tabular-nums">
+                {value === null ? "—" : name === "CLS" ? value.toFixed(3) : Math.round(value)}
+                {value !== null && name !== "CLS" ? (
+                  <span className="ml-1 text-sm font-normal text-base-content/70">ms</span>
+                ) : null}
+              </div>
+              <VitalThresholdBar name={name} value={value} />
+              <div className="stat-desc whitespace-normal">
+                {metricDescriptions[name]} · {(metric?.samples ?? 0).toLocaleString()} 样本
+                {score === null ? "" : ` · P75 ${score} 分`}
+              </div>
+            </div>
           );
         })}
       </div>
-      <details className="performance-score-method">
-        <summary>评分口径与分位数对比</summary>
-        <p>
-          P50 看典型体验，P75 用于体验判定，P95 看长尾。图表展示原始值：耗时共用左侧毫秒轴，CLS
-          使用右侧无单位轴； 两轴独立缩放，曲线高低不可跨轴比较。时间桶缺失不补零。
-          整体值按当前筛选下保留期内的原始样本计算，不是路由分位数的平均；更长时间范围可能缺少历史样本。
-        </p>
-        <p>
-          性能评分沿用 OpenRUM 原有 0–100 分曲线：良好阈值为 90 分，较差阈值为 50
-          分，再分段线性变化。整体 P75 分别评分后按 Sentry 默认权重加权：
-          {scoring.metrics.map(({ name, weight }) => `${name} ${weight}%`).join("、")}。
-          环段大小表示默认权重，彩色长度表示单项得分比例，灰色为剩余部分。
-          切换分位数或隐藏曲线不会改变评分。
-          缺失项保留灰色环段，不填零或满分；总分按可用项权重重新归一。五项不全或任一项少于 75
-          个样本时仅显示参考评分。仅权重参考 Sentry，不采用其对数正态评分模型。 此分数不是 Sentry 或
-          Lighthouse 分数，也不等于 CWV 达标结论；建议分别筛选电脑与手机查看。
-        </p>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>指标</TableHead>
-              {performancePercentiles.map((p) => (
-                <TableHead key={p}>{p.toUpperCase()}</TableHead>
-              ))}
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {vitalSeries.map(({ key, name }) => (
-              <TableRow key={name}>
-                <TableCell>{name}</TableCell>
-                {performancePercentiles.map((p) => (
-                  <TableCell key={p}>
-                    {formatPerformanceMetric(summary?.[key]?.[p] ?? null, name)}
-                  </TableCell>
+      <details className="collapse collapse-arrow mt-4 border border-base-300 bg-base-100">
+        <summary className="collapse-title text-sm font-medium">评分口径与分位数对比</summary>
+        <div className="collapse-content text-xs leading-relaxed text-base-content/70">
+          <div className="grid gap-4">
+            <p>
+              P50 看典型体验，P75 用于体验判定，P95 看长尾。图表展示原始值：耗时共用左侧毫秒轴，CLS
+              使用右侧无单位轴； 两轴独立缩放，曲线高低不可跨轴比较。时间桶缺失不补零。
+              整体值按当前筛选下保留期内的原始样本计算，不是路由分位数的平均；更长时间范围可能缺少历史样本。
+            </p>
+            <p>
+              性能评分沿用 OpenRUM 原有 0–100 分曲线：良好阈值为 90 分，较差阈值为 50
+              分，再分段线性变化。整体 P75 分别评分后按 Sentry 默认权重加权：
+              {scoring.metrics.map(({ name, weight }) => `${name} ${weight}%`).join("、")}。
+              评分环按默认权重分段，每段的填色比例表示单项得分，颜色按得分区间显示（90
+              分以上绿色、50–89 分黄色、50 分以下红色）；悬停或聚焦一段可看它为总分贡献了多少分。
+              切换分位数或隐藏曲线不会改变评分。
+              缺失项保留灰色环段，不填零或满分；总分按可用项权重重新归一。五项不全或任一项少于 75
+              个样本时仅显示参考评分。仅权重参考 Sentry，不采用其对数正态评分模型。 此分数不是
+              Sentry 或 Lighthouse 分数，也不等于 CWV 达标结论；建议分别筛选电脑与手机查看。
+            </p>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>指标</TableHead>
+                  {performancePercentiles.map((p) => (
+                    <TableHead key={p}>{p.toUpperCase()}</TableHead>
+                  ))}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {vitalSeries.map(({ key, name }) => (
+                  <TableRow key={name}>
+                    <TableCell>{name}</TableCell>
+                    {performancePercentiles.map((p) => (
+                      <TableCell key={p}>
+                        {formatPerformanceMetric(summary?.[key]?.[p] ?? null, name)}
+                      </TableCell>
+                    ))}
+                  </TableRow>
                 ))}
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+              </TableBody>
+            </Table>
+          </div>
+        </div>
       </details>
     </section>
   );
@@ -155,13 +160,23 @@ function PerformanceScoreCard({
 }) {
   const rating = scoreRating(scoring.score);
   return (
-    <Card className="performance-summary-score" size="sm">
+    <Card className="performance-summary-score">
       <CardHeader>
         <div>
           <CardTitle>性能评分</CardTitle>
-          <CardDescription>加权评分 · P75</CardDescription>
+          <CardDescription>按权重合成 · 固定按 P75</CardDescription>
         </div>
-        <Badge variant="outline">
+        <Badge
+          variant={
+            scoring.score === null || !scoring.complete
+              ? "ghost"
+              : rating === "good"
+                ? "success"
+                : rating === "poor"
+                  ? "destructive"
+                  : "warning"
+          }
+        >
           {scoring.score === null
             ? "暂无数据"
             : scoring.complete
@@ -171,13 +186,56 @@ function PerformanceScoreCard({
       </CardHeader>
       <CardContent>
         <PerformanceScoreRing scoring={scoring} />
+        <p className="performance-ring-legend text-base-content/70">
+          环段长度 = 权重 · 颜色按得分 · 悬停查看贡献
+        </p>
         {!scoring.complete ? (
-          <p>
+          <p className="text-xs text-base-content/70">
             {scoring.available}/{scoring.metrics.length} 项有数据 · 仅供参考
           </p>
         ) : null}
       </CardContent>
     </Card>
+  );
+}
+
+function thresholdText(value: number, name: PerformanceMetricName) {
+  if (name === "CLS") return String(value);
+  return value >= 1000 ? `${value / 1000}s` : `${value}ms`;
+}
+
+/**
+ * Good, needs-improvement and poor bands on one track, with the P75 as a marker. The track
+ * runs to 1.5× the poor threshold; slower values pin to its end.
+ */
+export function VitalThresholdBar({
+  name,
+  value,
+}: {
+  name: PerformanceMetricName;
+  value: number | null;
+}) {
+  const { good, poor } = performanceThresholds[name];
+  const max = poor * 1.5;
+  return (
+    <div className="mt-1" aria-hidden="true">
+      <div className="performance-threshold">
+        <span className="bg-success" style={{ width: `${(good / max) * 100}%` }} />
+        <span className="bg-warning" style={{ width: `${((poor - good) / max) * 100}%` }} />
+        <span className="flex-1 bg-error" />
+        {value === null ? null : (
+          <i
+            className="bg-base-content"
+            data-threshold-marker=""
+            style={{ left: `${Math.min(99, (value / max) * 100).toFixed(1)}%` }}
+          />
+        )}
+      </div>
+      <div className="mt-1 flex justify-between font-mono text-[11px] text-base-content/70">
+        <span>≤ {thresholdText(good, name)}</span>
+        <span>&gt; {thresholdText(poor, name)}</span>
+      </div>
+    </div>
   );
 }
 

@@ -93,7 +93,7 @@ export function DeliveryLog({
           </Select>
         ) : null}
       </div>
-      <div className="overflow-hidden rounded-2xl border">
+      <div className="overflow-hidden rounded-box border">
         <Table>
           <TableHeader>
             <TableRow>
@@ -143,7 +143,7 @@ export function DeliveryLog({
                             <li
                               key={delivery.channelId}
                               title={detail}
-                              className="inline-flex items-center gap-1.5 rounded-full border px-1.5 py-0.5 text-xs"
+                              className="badge badge-sm badge-outline gap-1.5"
                             >
                               <ChannelKindIcon kind={delivery.channelKind} size="sm" />
                               <span>{delivery.channelName}</span>

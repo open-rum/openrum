@@ -24,7 +24,7 @@ export function AwaitingAccessPage() {
   return (
     <AuthFrame>
       <div className="space-y-5 text-center">
-        <span className="mx-auto grid size-12 place-items-center rounded-xl bg-muted text-foreground">
+        <span className="mx-auto grid size-12 place-items-center rounded-box bg-muted text-foreground">
           <Clock3Icon aria-hidden="true" />
         </span>
         <div>

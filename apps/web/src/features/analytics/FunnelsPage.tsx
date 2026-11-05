@@ -1,7 +1,10 @@
+import { readFunnelDraft, rememberFunnelDraft } from "./funnelDraft";
+import { equalsTerm } from "@/lib/search/legacy";
+import { analysisSessionsHref } from "./investigationLinks";
 import { useQuery } from "@tanstack/react-query";
 import { useParams } from "@tanstack/react-router";
 import { ArrowDownIcon, FilterIcon, PlusIcon, RefreshCwIcon, Trash2Icon } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ConsolePage, ConsolePageHeader, ConsolePageTabs } from "@/components/layout/ConsolePage";
 import { AsyncError } from "@/components/ui/AsyncState";
 import { Button } from "@/components/ui/button";
@@ -61,7 +64,7 @@ export function FunnelsPage() {
       />
     );
   }
-  return <ProjectFunnels project={project} />;
+  return <ProjectFunnels key={project.id} project={project} />;
 }
 
 function ProjectFunnels({ project }: { project: Project }) {
@@ -89,6 +92,7 @@ function ProjectFunnels({ project }: { project: Project }) {
         signal,
       ),
   });
+  const [restored] = useState(() => readFunnelDraft(project.id));
   const [draft, setDraft] = useState<FunnelDefinition>(() => ({
     projectId: project.id,
     from: rangeFrom,
@@ -97,10 +101,14 @@ function ProjectFunnels({ project }: { project: Project }) {
     dimension: "country",
     windowSeconds: 3600,
     steps: defaultSteps,
+    ...restored?.draft,
   }));
-  const [applied, setApplied] = useState(draft);
+  const [applied, setApplied] = useState<FunnelDefinition | null>(() =>
+    restored?.applied ? { ...draft, ...restored.applied } : null,
+  );
+  useEffect(() => rememberFunnelDraft(project.id, draft, applied), [project.id, draft, applied]);
   const effectiveApplied = {
-    ...applied,
+    ...(applied ?? draft),
     from: rangeFrom,
     to: rangeTo,
     environment: analysisContext?.environment,
@@ -108,16 +116,27 @@ function ProjectFunnels({ project }: { project: Project }) {
   const result = useQuery({
     queryKey: ["funnel", effectiveApplied],
     queryFn: ({ signal }) => queryFunnel(effectiveApplied, signal),
+    enabled: applied !== null,
   });
   const options = useMemo(() => {
     const values = new Map<string, FunnelStep>();
     for (const step of defaultSteps) values.set(stepKey(step), step);
+    // Keep a restored selection visible even if it has no events in the current range.
+    for (const step of draft.steps) values.set(stepKey(step), step);
     values.set("navigation:navigation", { kind: "navigation", name: "navigation" });
     for (const item of catalog.data?.catalog ?? []) {
       values.set(`${item.kind}:${item.name}`, { kind: item.kind, name: item.name });
     }
     return [...values.values()];
-  }, [catalog.data]);
+  }, [catalog.data, draft.steps]);
+  const unobserved = catalog.data
+    ? (applied ?? draft).steps.filter(
+        (step) =>
+          !catalog.data.catalog.some(
+            (item) => stepKey(item) === stepKey(step) && item.metric.events > 0,
+          ),
+      )
+    : [];
 
   const updateStep = (index: number, value: string) => {
     const next = options.find((item) => stepKey(item) === value);
@@ -138,8 +157,11 @@ function ProjectFunnels({ project }: { project: Project }) {
             size="icon"
             variant="outline"
             aria-label="刷新漏斗"
-            onClick={() => void result.refetch()}
-            disabled={result.isFetching}
+            onClick={() => {
+              void catalog.refetch();
+              if (applied) void result.refetch();
+            }}
+            disabled={catalog.isFetching || result.isFetching}
           >
             <RefreshCwIcon />
           </Button>
@@ -153,7 +175,7 @@ function ProjectFunnels({ project }: { project: Project }) {
         <div className="behavior-panel__header">
           <div>
             <h2 id="funnel-builder-title">漏斗步骤</h2>
-            <p>配置 2–5 个受控事件；输入值不会被采集或参与分析。</p>
+            <p>选择 2–5 个步骤后运行漏斗；本标签页会保留已选步骤，方便返回继续分析。</p>
           </div>
           <Button
             variant="outline"
@@ -259,6 +281,37 @@ function ProjectFunnels({ project }: { project: Project }) {
         </div>
       </section>
 
+      {catalog.error ? (
+        <AsyncError
+          error={catalog.error}
+          title="无法检查步骤事件"
+          remediation="事件可用性暂时未知，请重试后确认步骤。"
+          onRetry={() => void catalog.refetch()}
+        />
+      ) : null}
+      {unobserved.length ? (
+        <div className="alert alert-soft alert-warning" role="status">
+          <span>
+            当前时间与环境下未观测到：
+            {unobserved.map((step) => eventLabel(step.kind, step.name)).join("、")}。
+            请检查事件采集或调整范围；这些步骤为 0 不能单独说明业务流失。
+          </span>
+        </div>
+      ) : null}
+      {!applied ? (
+        <p className="text-sm text-base-content/70">
+          确认步骤和事件采集后，点击“运行漏斗”查看结果。
+        </p>
+      ) : null}
+
+      {applied &&
+      (JSON.stringify(draft.steps) !== JSON.stringify(applied.steps) ||
+        draft.windowSeconds !== applied.windowSeconds ||
+        draft.dimension !== applied.dimension) ? (
+        <p role="status" className="alert alert-soft alert-info">
+          步骤或设置已修改，下方仍是上次运行结果。点击“运行漏斗”应用新设置。
+        </p>
+      ) : null}
       {result.isLoading ? <FunnelSkeleton compact /> : null}
       {result.error ? (
         <AsyncError
@@ -268,12 +321,26 @@ function ProjectFunnels({ project }: { project: Project }) {
           onRetry={() => void result.refetch()}
         />
       ) : null}
-      {result.data ? <FunnelResults data={result.data} /> : null}
+      {applied && result.data ? (
+        <FunnelResults
+          projectId={project.id}
+          environment={analysisContext?.environment}
+          data={result.data}
+        />
+      ) : null}
     </ConsolePage>
   );
 }
 
-function FunnelResults({ data }: { data: Awaited<ReturnType<typeof queryFunnel>> }) {
+function FunnelResults({
+  data,
+  projectId,
+  environment,
+}: {
+  data: Awaited<ReturnType<typeof queryFunnel>>;
+  projectId: string;
+  environment?: string;
+}) {
   const first = data.steps[0]?.sessions ?? 0;
   return (
     <>
@@ -297,13 +364,13 @@ function FunnelResults({ data }: { data: Awaited<ReturnType<typeof queryFunnel>>
                 <small>{step.sessions.toLocaleString()} 个会话</small>
               </div>
               <div className="funnel-result-track">
-                <span
-                  style={{ width: `${Math.max(first ? (step.sessions / first) * 100 : 0, 2)}%` }}
-                />
+                <span style={{ width: `${first ? (step.sessions / first) * 100 : 0}%` }} />
               </div>
               <div className="funnel-result-rate">
                 <strong>
-                  {formatRate(step.conversionFromFirst ?? (step.index === 1 ? 1 : null))}
+                  {formatRate(
+                    first ? (step.conversionFromFirst ?? (step.index === 1 ? 1 : null)) : null,
+                  )}
                 </strong>
                 <span>
                   {step.index === 1
@@ -350,7 +417,7 @@ function FunnelResults({ data }: { data: Awaited<ReturnType<typeof queryFunnel>>
           <div className="behavior-panel__header">
             <div>
               <h2 id="funnel-samples-title">会话样本</h2>
-              <p>用于后续打开行为时间线与回放。</p>
+              <p>顺序匹配到的会话样本。</p>
             </div>
             <span>最多 20 条</span>
           </div>
@@ -366,7 +433,19 @@ function FunnelResults({ data }: { data: Awaited<ReturnType<typeof queryFunnel>>
               {data.samples.map((sample) => (
                 <TableRow key={sample.sessionId}>
                   <TableCell title={sample.sessionId}>
-                    <strong>…{sample.sessionId.slice(-8)}</strong>
+                    <a
+                      className="link link-hover"
+                      aria-label={`查看会话 ${sample.sessionId}`}
+                      href={analysisSessionsHref(
+                        projectId,
+                        { ...data, environment },
+                        equalsTerm("session_id", sample.sessionId),
+                        `${window.location.pathname}${window.location.search}`,
+                        sample.sessionId,
+                      )}
+                    >
+                      …{sample.sessionId.slice(-8)}
+                    </a>
                   </TableCell>
                   <TableCell>步骤 {sample.reachedStep}</TableCell>
                   <TableCell>{formatTime(sample.lastSeenAt)}</TableCell>

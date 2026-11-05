@@ -142,7 +142,7 @@ describe("project list", () => {
     expect(await view.findByText("摘要暂不可用")).toBeTruthy();
     expect(view.queryByText("≈0")).toBeNull();
     expect(view.getByRole("link", { name: /进入项目/ }).getAttribute("href")).toContain(
-      "/projects/project/analytics",
+      "/projects/project/overview",
     );
   });
 });

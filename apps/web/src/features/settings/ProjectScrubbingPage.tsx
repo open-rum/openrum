@@ -110,23 +110,27 @@ function ScrubbingForm({
       }}
     >
       {!canManage ? (
-        <p className="border border-border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
+        <p className="border border-base-300 bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
           当前角色为 {role ?? "未知"}，只有 Owner 或 Admin 可以修改脱敏规则。
         </p>
       ) : null}
 
-      <section className="border border-border bg-card p-6">
+      <section className="border border-base-300 bg-card p-6">
         <div className="flex flex-wrap items-baseline justify-between gap-3">
-          <h2 className="text-lg font-semibold text-foreground">追加正则</h2>
+          <h2 className="card-title text-lg">追加正则</h2>
           <span className="text-xs text-muted-foreground">
             {draft.patterns.length} / {maxScrubPatterns}
           </span>
         </div>
-        <p className="mt-2 text-sm leading-6 text-muted-foreground">
-          命中的部分会被替换成 <code>[REDACTED]</code>
-          。规则只在服务端跑，所以这里用的是完整正则（Go RE2 语法）；RE2 没有回溯，写不出会卡死
-          Consumer 的模式。 匹配空串的正则会被拒绝——它会在每个字符之间插入标记。
+        <p className="mt-2 text-sm leading-6 text-base-content/70">
+          匹配的敏感内容将替换为 <code>[REDACTED]</code>。只影响新写入的数据，历史数据不会被重写。
         </p>
+        <details className="collapse collapse-arrow mt-3 border border-base-300">
+          <summary className="collapse-title text-sm font-medium">正则语法与执行细节</summary>
+          <div className="collapse-content text-sm text-base-content/70">
+            规则在服务端执行，使用 Go RE2 语法，不支持回溯引用和环视；匹配空串的表达式会被拒绝。
+          </div>
+        </details>
         <p className="mt-2 text-sm leading-6 text-muted-foreground">
           覆盖范围：页面标题、错误类型 / 消息 / 堆栈 / 机制、自定义事件名、面包屑、属性值，以及 URL
           的路径部分（查询串在更早的阶段就已经被丢掉了）。
@@ -134,13 +138,13 @@ function ScrubbingForm({
         </p>
 
         {draft.patterns.length === 0 ? (
-          <p className="mt-5 border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">
+          <p className="mt-5 border border-dashed border-base-300 px-4 py-6 text-center text-sm text-muted-foreground">
             还没有追加规则。内置那几条覆盖不到的业务标识符——订单号、工单号、内部账号——放在这里。
           </p>
         ) : (
           <ul className="mt-5 flex flex-col gap-4">
             {draft.patterns.map((pattern, index) => (
-              <li key={pattern.id} className="border border-border p-4">
+              <li key={pattern.id} className="card card-border bg-base-100 p-4">
                 <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
                   <Field label="正则">
                     <input
@@ -203,9 +207,9 @@ function ScrubbingForm({
         </Button>
       </section>
 
-      <section className="border border-border bg-card p-6">
+      <section className="border border-base-300 bg-card p-6">
         <div className="flex flex-wrap items-baseline justify-between gap-3">
-          <h2 className="text-lg font-semibold text-foreground">敏感 key</h2>
+          <h2 className="card-title text-lg">敏感 key</h2>
           <span className="text-xs text-muted-foreground">
             {draft.sensitiveKeys.length} / {maxSensitiveKeys}
           </span>
@@ -289,7 +293,7 @@ function ScrubbingForm({
         </p>
       ) : null}
 
-      <div className="flex items-center gap-3">
+      <div className="flex flex-row-reverse flex-wrap justify-start items-center gap-3">
         <Button type="submit" disabled={disabled}>
           {mutation.isPending ? "保存中…" : "保存"}
         </Button>
@@ -313,8 +317,8 @@ function Field({
   children: React.ReactNode;
 }) {
   return (
-    <label className="flex flex-col gap-1.5 text-sm">
-      <span className="font-medium text-foreground">{label}</span>
+    <label className="flex flex-col gap-1.5 text-sm [&_input:not([type=checkbox],[type=radio])]:input [&_input:not([type=checkbox],[type=radio])]:w-full [&_select]:select [&_select]:w-full [&_textarea]:textarea [&_textarea]:w-full">
+      <span className="font-medium text-base-content">{label}</span>
       {children}
       {hint ? <span className="text-xs text-muted-foreground">{hint}</span> : null}
     </label>

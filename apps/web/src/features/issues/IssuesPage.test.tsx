@@ -79,6 +79,9 @@ describe("issues page states", () => {
     const view = renderPage();
     await waitFor(() => expect(view.getByText("TypeError: checkout failed")).toBeTruthy());
     expect(view.getByText("本页 1 个问题")).toBeTruthy();
+    await waitFor(() => expect(view.getByText(/历史聚合中有错误记录/)).toBeTruthy());
+    expect(view.getByText("原始错误事件")).toBeTruthy();
+    expect(view.queryByText("当前范围暂无错误数据")).toBeNull();
   });
 
   it("renders real overview charts and switches impact and distribution dimensions", async () => {

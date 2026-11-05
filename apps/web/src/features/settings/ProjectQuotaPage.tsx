@@ -147,7 +147,7 @@ function RateLimitForm({
           icon={<GaugeIcon aria-hidden="true" />}
           title="当前生效上限"
           value={`${effectiveLimit.toLocaleString("zh-CN")} 请求/秒`}
-          detail={inheritsDefault ? "继承 Instance 默认值" : "Project 自定义值"}
+          detail={inheritsDefault ? "继承实例默认值" : "项目自定义值"}
         />
         <SummaryCard
           icon={<InfoIcon aria-hidden="true" />}
@@ -158,8 +158,8 @@ function RateLimitForm({
         <SummaryCard
           icon={<UsersIcon aria-hidden="true" />}
           title="共享范围"
-          value={`${environmentCount} 个 Environment`}
-          detail="同一 Project 下的环境共用这个上限"
+          value={`${environmentCount} 个环境`}
+          detail="同一项目下的环境共用这个上限"
         />
         <SummaryCard
           icon={<ShieldCheckIcon aria-hidden="true" />}
@@ -173,7 +173,7 @@ function RateLimitForm({
         <CardHeader>
           <CardTitle>请求上限</CardTitle>
           <CardDescription>
-            限制按请求计数，不按事件计数。所有 DSN 和 Environment 共享 Project 上限。
+            限制按请求计数，不按事件计数。项目的所有 DSN 和环境共享上限，保存后最多约 30 秒生效。
           </CardDescription>
           <CardAction>
             <Badge>当前生效 {effectiveLimit.toLocaleString("zh-CN")}/秒</Badge>
@@ -200,10 +200,10 @@ function RateLimitForm({
                 }}
               >
                 <ToggleGroupItem value="default" className="min-h-10">
-                  继承 Instance 默认
+                  继承实例默认
                 </ToggleGroupItem>
                 <ToggleGroupItem value="custom" className="min-h-10">
-                  Project 自定义
+                  项目自定义
                 </ToggleGroupItem>
               </ToggleGroup>
             </FieldSet>
@@ -236,7 +236,7 @@ function RateLimitForm({
         </CardContent>
         <CardFooter className="justify-between gap-3">
           <span className="text-sm text-muted-foreground">
-            Instance 默认值：{project.defaultIngestRateLimit.toLocaleString("zh-CN")} 请求/秒
+            实例默认值：{project.defaultIngestRateLimit.toLocaleString("zh-CN")} 请求/秒
           </span>
           <Badge variant="outline">固定 1 秒窗口</Badge>
         </CardFooter>
@@ -292,14 +292,13 @@ function RateLimitForm({
         </CardContent>
       </Card>
 
-      <Alert>
-        <InfoIcon />
-        <AlertTitle>部署与故障语义</AlertTitle>
-        <AlertDescription>
-          Redis 正常时由所有 Ingest 副本共享计数。Redis 不可用时，每个副本会以 Project
-          上限的一半独立保护自己，因此集群总量不再是精确上限。修改后最多约 30 秒进入 Ingest 缓存。
-        </AlertDescription>
-      </Alert>
+      <details className="collapse collapse-arrow border border-base-300 bg-base-100">
+        <summary className="collapse-title font-medium">分布式限流技术细节</summary>
+        <div className="collapse-content text-sm text-base-content/70">
+          Redis 正常时由所有 Ingest 副本共享计数。Redis
+          不可用时，每个副本会以项目上限的一半独立保护自己，因此集群总量不再是精确上限。
+        </div>
+      </details>
 
       {mutation.error ? (
         <Alert variant="destructive">
@@ -310,7 +309,7 @@ function RateLimitForm({
         </Alert>
       ) : null}
 
-      <div className="flex flex-wrap items-center gap-3">
+      <div className="flex flex-row-reverse flex-wrap justify-start items-center gap-3">
         <Button type="submit" disabled={disabled || Boolean(limitError)}>
           {mutation.isPending ? "保存中…" : "保存速率限制"}
         </Button>

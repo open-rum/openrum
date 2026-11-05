@@ -189,7 +189,7 @@ function LogWorkspace({
         ) : null}
         {data && !query.error ? (
           <>
-            <LogTrend data={data} from={filters.from} to={filters.to} />
+            {data.total > 0 ? <LogTrend data={data} from={filters.from} to={filters.to} /> : null}
             <Card className="min-w-0">
               <CardHeader className="logs-table-heading">
                 <CardTitle>
@@ -262,14 +262,22 @@ function LogWorkspace({
                     <EmptyState
                       icon={FileTextIcon}
                       title="当前范围没有日志"
-                      description="尝试调整时间、环境或搜索条件。尚未接入时，请在浏览器 SDK 中显式启用日志。"
+                      description="当前范围没有可查询的日志，可能与时间、环境、搜索或保留期有关。请调整筛选；尚未采集时可显式调用 logger，或单独配置 captureConsole。"
                     />
                     <pre className="logs-setup">
                       {
-                        'const rum = OpenRUM.init({ dsn: "你的 DSN", enableLogs: true });\nrum.logger.info("checkout started", { "order.id": "123" });'
+                        'const rum = OpenRUM.init({ dsn: "你的 DSN" });\nrum.logger.info("checkout started", { "order.id": "123" });'
                       }
                     </pre>
-                    <div className="px-4">
+                    <div className="flex flex-wrap gap-2 px-4">
+                      {filters.q ? (
+                        <Button
+                          variant="outline"
+                          onClick={() => update({ q: undefined, cursor: undefined })}
+                        >
+                          清除搜索条件
+                        </Button>
+                      ) : null}
                       <Button asChild variant="link">
                         <a href={`/projects/${filters.projectId}/onboarding`}>查看项目接入信息</a>
                       </Button>

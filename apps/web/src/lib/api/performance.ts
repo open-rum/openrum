@@ -34,6 +34,11 @@ const detail = z.object({
   ),
   browsers: z.array(z.object({ value: z.string(), metric })),
   deviceTypes: z.array(z.object({ value: z.string(), metric })),
+  // Older APIs omit these; an empty list keeps the detail renderable.
+  countries: z.array(z.object({ value: z.string(), metric })).default([]),
+  releases: z
+    .array(z.object({ value: z.string(), metric, firstSeen: isoTime.optional() }))
+    .default([]),
   samples: z.array(
     z.object({
       eventId: z.string(),
@@ -44,6 +49,7 @@ const detail = z.object({
       deviceType: z.string().optional(),
       country: z.string().optional(),
       release: z.string().optional(),
+      sessionId: z.string().optional(),
     }),
   ),
 });

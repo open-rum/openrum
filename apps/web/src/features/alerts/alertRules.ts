@@ -115,7 +115,7 @@ export function ruleTemplates(environment: string): RuleTemplate[] {
       description: "5 分钟内错误率达到 2%",
       rule: {
         ...base,
-        name: "错误率突增",
+        name: "错误率超标",
         metric: "error_rate",
         threshold: 2,
         windowMinutes: 5,

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import type { Organization, Project } from "@/lib/api/projects";
@@ -42,12 +42,28 @@ async function openMenu(role: Organization["role"]) {
       </ProjectSwitcher>
     </QueryClientProvider>,
   );
-  await user.hover(screen.getByRole("button", { name: "切换项目" }));
+  await user.click(screen.getByRole("button", { name: "切换项目" }));
   await screen.findByText("当前组织");
   return user;
 }
 
 describe("project switcher footer", () => {
+  it("opens with the keyboard, closes on Escape and returns focus to the trigger", async () => {
+    const user = userEvent.setup();
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <ProjectSwitcher organization={organization("owner")} projects={[]} loading={false}>
+          <button>切换项目</button>
+        </ProjectSwitcher>
+      </QueryClientProvider>,
+    );
+    await user.tab();
+    await user.keyboard("{Enter}");
+    await screen.findByText("当前组织");
+    await user.keyboard("{Escape}");
+    expect(screen.queryByText("当前组织")).toBeNull();
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "切换项目" }));
+  });
   it("lists every entry as its own button, with invitations for managers", async () => {
     await openMenu("owner");
     const footer = document.querySelector(".project-hover-card__footer") as HTMLElement;
@@ -66,5 +82,47 @@ describe("project switcher footer", () => {
     const user = await openMenu("admin");
     await user.click(screen.getByRole("button", { name: "邀请成员" }));
     expect((await screen.findByRole("dialog")).textContent).toContain("Acme");
+  });
+});
+
+describe("project switcher environment", () => {
+  it("stays open while the environment menu is open, so a pick lands on the menu", async () => {
+    // Radix Select needs these pointer and scrolling APIs, which jsdom lacks.
+    Element.prototype.hasPointerCapture ??= () => false;
+    Element.prototype.releasePointerCapture ??= () => {};
+    Element.prototype.scrollIntoView ??= () => {};
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => Response.json({ environments: [{ name: "production" }] })),
+    );
+    const onEnvironmentChange = vi.fn();
+    const user = userEvent.setup();
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <ProjectSwitcher
+          organization={organization("owner")}
+          projects={[]}
+          project={{ id: "p1", name: "Shop" } as Project}
+          loading={false}
+          onEnvironmentChange={onEnvironmentChange}
+        >
+          <button type="button">切换项目</button>
+        </ProjectSwitcher>
+      </QueryClientProvider>,
+    );
+    await user.click(screen.getByRole("button", { name: "切换项目" }));
+    await user.click(await screen.findByRole("combobox", { name: "切换数据环境" }));
+    const option = await screen.findByRole("option", { name: /production/ });
+    // Moving onto the portalled menu leaves the card; it must not close under the pointer.
+    for (const element of [
+      screen.getByRole("button", { name: "切换项目", hidden: true }),
+      document.querySelector(".project-hover-card")!,
+    ])
+      fireEvent.pointerLeave(element, { pointerType: "mouse" });
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    expect(screen.getByText("当前组织")).toBeTruthy();
+    await user.click(option);
+    expect(onEnvironmentChange).toHaveBeenCalledWith("production");
+    vi.unstubAllGlobals();
   });
 });

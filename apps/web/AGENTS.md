@@ -167,7 +167,10 @@ When implementing from a selected generated mock, treat that image as the source
   reintroduce map charts or geo dependencies. A saved `map` view reads as ranked
   bars in the Console and is rejected by the backend on save; country data uses
   Bar, Table or donut like every other dimension.
-- Project overviews are personal, per-user/per-project dashboards. Keep normal
+- Project overviews are personal, per-user/per-project dashboards. Keep
+  viewing entirely module-driven (user decision, 2026-11-05): users choose what
+  to focus on by adding modules. Do not add a fixed priority/attention summary
+  outside the configurable module grid, including on the built-in default. Keep normal
   viewing uncluttered; reveal a settings menu on card hover/focus (always accessible
   on touch/narrow screens), without requiring edit mode first. Modules support
   adding, configuring, duplicating, removing, drag sorting and preset widths.
@@ -195,7 +198,7 @@ When implementing from a selected generated mock, treat that image as the source
 - Dashboards are fluid up to 1920px and then centred; from 1680px grid gaps and chart
   heights grow. Sizes are compact (stat only), third, half and full (3/4/6/12 of 12
   columns). Tabbed cards (user request, 2026-10-02) combine two or three adjacent
-  chart/table modules sharing a `groupId`: a sliding switch at the card's top-right,
+  chart/table modules sharing a `groupId`: a daisyUI `tabs-box` switch at the card's top-right,
   only the visible tab queried, one shared size, merge via the card menu's 合并到…,
   split with 移出为独立卡片. Stat cards never join; Go validates the same rules.
 - The e-commerce overview (收入、订单数、客单价、购买漏斗、来源、渠道收入) is a dashboard
@@ -279,23 +282,18 @@ When implementing from a selected generated mock, treat that image as the source
   `docs/agents/alerts.md`.
 - Authentication pages use a simple, centered single column: shared brand mark,
   concise copy, and a narrow form on a plain theme-aware background. Avoid split
-  screens, promotional side panels, and decorative glows. Login actions use
-  black/white contrast tokens and retain the compact theme toggle. A notice that
+  screens, promotional side panels, and decorative glows. The login action is the
+  page's one `btn-primary`, and the top-right keeps the theme switch. A notice that
   explains why the person is on the page (an expired session) uses the warning Alert with
   an icon and a single line; the default Alert is nearly invisible on the plain background.
 - The accepted layout target is `../../output/imagegen/openrum-dashboard-stripe.png`.
-- Use the shadcn theme on the shared four-color card: neutral white/graphite surfaces,
-  amber primary by default (lime and magenta are user-selectable palettes), lime, sky
-  and magenta accents, subtle radii and shadows. Keep red reserved for destructive and
-  error semantics. Read `--ds-primary*`, `--ds-accent-*` and `--ds-{hue}-*` tokens; never
-  hard-code a hue or assume which palette is active.
-- In light mode, keep canvas, cards, tables, text, and primary page actions neutral;
-  main actions stay black with white text. Use the primary only for compact badges,
-  icons, focus rings, progress, and selected/effective form states. Selected options
-  use the shared selection tokens (soft primary surface, stronger primary border);
-  ordinary hover remains neutral. Use the `amber`/`lime`/`sky`/`magenta` Badge variants
-  for categories and `brand` for the current primary. The Rate Limits page is the
-  settings-form reference. See `docs/design.md`, "Brand accent hierarchy".
+- The Console runs on daisyUI 5 (user decision, 2026-11-03); the public site and docs do
+  not. Before changing any component, page style, theme, colour, radius or spacing, read
+  `docs/agents/console-ui.md` and load the `daisyui` skill. Use daisyUI classes and colour
+  names (`base-*`, `primary`…`error`), never `dark:` with them and never fixed Tailwind
+  colours for text. The page is `base-200`, surfaces `base-100` with `base-300` borders;
+  `btn-primary` marks a view's one main action, and red stays reserved for destructive and
+  error states. The Rate Limits page is the settings-form reference.
 - The overview must treat country, device, browser, and custom dimensions/metrics as first-class analysis surfaces.
 - Use the typed Go query APIs for implemented product areas; keep deterministic frontend fixtures for unit tests and explicit demo states only.
 - Preserve the planned React + TypeScript + Vite stack and the `apps/web` project location.
@@ -304,29 +302,24 @@ When implementing from a selected generated mock, treat that image as the source
   controls are 40px high and table rows are at least 44px. Compact variants are
   opt-in for secondary inline actions, toolbars, and icon rails; never use them
   for a page's primary form or main action without a documented reason.
-- Users choose palette (amber/lime/magenta) and density (comfortable/compact) in the
-  account menu's Appearance group; `ThemeProvider` stores them and sets
-  `html[data-palette]` and `html[data-density]`, and `index.html` applies both before
-  first paint. Compact density only rewrites size tokens, so read heights, paddings
-  and gaps from tokens (`--control-*`, `--table-*`, `--nav-item-height`,
-  `--page-padding-*`, `--page-gap`) rather than fixed pixels. Pages never force compact.
-- The user selected Maia (`b1skV8ORc`, 2026-09-30) for the whole site. Buttons,
-  single-line inputs, Select triggers, badges and segmented controls use full pill
-  rounding at every size. Multiline fields use `--radius-field`, cards and menus
-  use `--radius-surface`, and dialogs use `--radius-overlay`. Shared tokens own the
-  radius scale. Keep the existing palette and density choices; wrapping filter
+- Themes are daisyUI's: `ThemeProvider` stores `system` or any built-in theme, writes
+  `<html data-theme>`, and `index.html` applies it before first paint. The theme switch
+  sits top-right (daisyUI's swatch icon and theme menu); the account menu keeps the
+  system/light/dark quick buttons. Palettes and compact density were removed; do not bring
+  back `data-palette`, `data-density` or a density setting.
+- Radius follows the theme: `rounded-box` for cards, menus and dialogs, `rounded-field` for
+  buttons, inputs and options, `rounded-selector` for badges and chips. Wrapping filter
   composers cap their corner radius at half one control row. Preserve line-style
-  navigation tabs, contiguous group joins, focus rings and disabled states.
-- Maia-style Console chart columns use 6px top corners and a square baseline.
-  Round only the outer contour of stacked columns with Recharts `BarStack`;
-  compact Stat bars use 4px top corners and horizontal bars use 6px trailing
-  corners. Keep chart data, buckets, axes, legends and tooltips intact.
-- Segmented controls slide (user request, 2026-10-02): a horizontal single-select
-  `ToggleGroup` with `variant="outline"` (or `segmented`) and default-variant `Tabs`
-  render one pill track whose selection is the shared `SlidingIndicator`, moving
-  between options; reduced motion disables the slide. Do not hand-roll segmented
-  buttons. `selection` chips, multi-select legends and line tabs keep their own
-  styles. The public landing tour tabs use the same sliding pill.
+  navigation tabs, contiguous group joins (`join`), focus rings and disabled states.
+- Console chart columns take the theme's `--radius-selector` capped at 6px
+  (`useBarRadiusTop()`), with a square baseline, so square themes draw square columns.
+  Round only the outer contour of stacked columns with Recharts `BarStack`. Keep chart
+  data, buckets, axes, legends and tooltips intact.
+- Single-select segmented controls are a horizontal `ToggleGroup` with `variant="outline"`
+  (or `segmented`), drawn as daisyUI's `join` of buttons with the selection in
+  `btn-primary`; default-variant `Tabs` are `tabs-box`, line Tabs `tabs-border`. Do not
+  hand-roll segmented buttons. `selection` chips and multi-select legends keep their own
+  styles.
 - Shared Select menus open below the trigger with their left edges aligned.
   Preserve a usable scrollable list for long option sets and let collision
   handling reposition a menu at the viewport edge.
@@ -335,7 +328,7 @@ When implementing from a selected generated mock, treat that image as the source
   including after reload or returning to the tab; custom date ranges stay fixed.
   Carry the selected preset across analysis routes and never label an old fixed
   interval as a live relative range.
-- Settings navigation follows Maia's heading hierarchy: scope headings are
+- Settings navigation keeps a two-level heading hierarchy: scope headings are
   muted caption text, while destination labels use darker, medium-weight body
   text. Keep long organization or project names truncated so scope names stay
   on one line, and preserve the existing active background and route groups.
@@ -343,9 +336,9 @@ When implementing from a selected generated mock, treat that image as the source
   project) with `toast.success()` / `toast.error()` from `sonner`; the shadcn `<Toaster />`
   (`components/ui/sonner.tsx`, top centre) is mounted once in `main.tsx`. Keep inline status text for results the user is still looking at, and never
   use a toast as the only place an error appears.
-- Use shadcn/ui (Radix Maia + Tailwind CSS v4) for reusable UI primitives. Keep
-  component source local, use semantic tokens, and support light, dark, and
-  system appearance without component-level theme colors.
+- Reusable primitives live in `components/ui`: Radix keeps behaviour (dialogs, sheets,
+  selects, menus, popovers, tooltips) and their class strings are daisyUI's. Keep component
+  source local and never give a component its own light/dark colours.
 - Leave a small top gap between the Console project switcher and the first
   primary navigation item in both expanded and collapsed sidebars.
 - Show Google's standard full-color G for Google authentication in provider
@@ -452,21 +445,13 @@ When implementing from a selected generated mock, treat that image as the source
   show predicted disk usage, require explicit phrase and Owner password
   confirmation, and track one global background job. Do not expose SQL or reuse
   ordinary retention mutations for this path.
-- Omit navigation breadcrumbs from Console page headers. The sidebar selection
-  and page title carry location; keep event breadcrumbs only where they represent
-  observed session or error context rather than navigation.
-- The layout reference is the user's dashboard9 screenshot (2026-09-12); colors come
-  from the amber four-color card (ADR 0010). Logos follow the palette primary
-  (`--ds-logo`, eyes are mask cut-outs); favicons are static amber. Headings,
-  KPI values, labels and navigation use neutral text; selected navigation uses
-  the neutral sidebar accent. Chart strokes and fills share chart-series tokens:
-  chart 1 the palette primary, charts 2–4 its accents, prior periods neutral gray
-  plus dashes.
-  Axes and annotations use muted text; grids and cursors use borders. Reserve
-  success/warning/danger for actual statuses and thresholds. Link ink (`--ds-brand`)
-  uses neutral text in both modes; underline prose links. Never use this token
-  for logos or chart outlines. See `docs/design.md`,
-  "Chart color contract", and the live `/design` workbench.
+- The layout reference is the user's dashboard9 screenshot (2026-09-12); colours come from
+  the active daisyUI theme. Logos follow the theme primary (`--ds-logo`, eyes are mask
+  cut-outs); favicons are static amber. Headings, KPI values, labels and navigation use
+  `base-content`. Chart series 1–8 are primary, secondary, accent, info, success, warning,
+  error and neutral; prior periods are neutral gray plus dashes. Axes and annotations use
+  muted text; grids and cursors use borders. Reserve success/warning/error for actual
+  statuses and thresholds; underline prose links.
 - Keep primary header brand lockups on the shared 36px mark / 18px wordmark / 9px
   gap ratio, including the collapsed sidebar. Console, public site and docs share
   the pixel signal scout in `@openrum/design-tokens/brand`. Use its tight 20-unit
@@ -478,22 +463,32 @@ When implementing from a selected generated mock, treat that image as the source
   `isAnimationActive={useChartMotion()}` rather than hard-coding `false`.
 - Keep the performance workspace full-width. The user explicitly wants LCP,
   INP, and CLS in one combined date-based chart and the performance score kept.
-  Its page header contains only the title, without a subtitle or refresh button;
+  Its page header contains the title and the percentile dropdown, without a subtitle or refresh button;
+  in development only, a soft warning "造性能数据" button sits beside the title (`titleAside`) and
+  opens the shared dev-data dialog with the web-vitals preset (user request, 2026-11-04);
   retain retry actions within error states.
-  Use one SVG segmented score ring with a centered total and metric names directly
-  outside their sectors, matching the user's ring reference (2026-09-13).
-  Size sectors by default score weight (LCP/INP 30%, CLS/FCP 15%, TTFB 10%),
-  using the same weight definition as the total. Center SVG score text with
-  `text-anchor="middle"` and `dominant-baseline="central"`, not the x-height-based
-  `middle` baseline. Use neutral unearned-score tracks,
-  and retain the shared series colors; use INP, not the reference's legacy FID.
-  Do not add concentric rings or a separate legend below the ring.
+  The score is one Lighthouse-style SVG ring (user reference, 2026-11-03): sectors sized by
+  default weight (LCP/INP 30%, CLS/FCP 15%, TTFB 10%, the same weights as the total), thin
+  with round caps, each filled along its length by the metric's score over a faint track of
+  the same colour. Colours follow the score, not the metric: 90+ success, 50–89 warning,
+  below 50 error; the centre total and the tinted inner disc use the total's colour. Labels
+  outside the ring carry only the metric name. Pointing at or focusing a sector thickens it,
+  dims the rest and replaces the total with that metric's contribution (`+N`, on the
+  renormalised weights) and a "名称 · 分 · 权重" caption. Missing metrics keep a neutral
+  track. There is no separate score list. Use INP, not legacy FID.
+  The score and trend cards share one row and height; the trend card wraps below once it
+  would drop under 560px.
   Place it beside one real-value trend chart, with five compact
-  metric cards (LCP, INP, CLS, FCP, TTFB) below. Do not normalize to threshold
+  metric stats (LCP, INP, CLS, FCP, TTFB) below, each with a good/needs/poor threshold
+  bar whose marker follows the page percentile, like the value above it. The score,
+  sector scores and each stat's rating badge stay on P75 and say so ("固定按 P75",
+  "P75 良好" when another percentile is shown). The trend card's `ChartSwitch` offers 折线/面积/柱状; it changes
+  presentation only, never the buckets. Do not normalize to threshold
   percentages or plot score contributions: timing metrics share a millisecond
   left axis and CLS uses a clearly labeled unitless right axis; cross-axis height
-  is not comparable. Put P50/P75/P95 in one compact dropdown at the chart's top
-  right. The combined trend follows the shared ~30-bucket policy with null gaps,
+  is not comparable. P50/P75/P95 is one page-wide dropdown at the right of the page
+  title row (user request, 2026-11-04; default P75), shared by the trend, vitals, route
+  table and route detail; cards carry no percentile control of their own. The combined trend follows the shared ~30-bucket policy with null gaps,
   shows LCP, INP and CLS by default (FCP/TTFB opt-in), and draws timing series solid
   with only the right-axis CLS dashed. Keep small, muted metric visibility toggles inside the card content
   below the plot, without a separate gray footer, divider or outlined pills.
@@ -508,6 +503,16 @@ When implementing from a selected generated mock, treat that image as the source
   as reference. It is separate
   from CWV status and unaffected by chart visibility or P50/P75/P95
   selection. Compute overall values from matching samples, never route averages.
+  The route detail (user request, 2026-11-04) shows facts and comparisons only, never an
+  inferred cause or "worse since release X": a summary line (value, P75 rating, previous
+  period value and change, poor share), a five-metric picker with each metric's change, the
+  trend with the previous window as a grey dashed line, the histogram coloured by rating
+  with good/needs/poor shares ("约" when a threshold splits a bucket), a
+  device/browser/region/release breakdown and the slowest samples with session links. The
+  route is the page title. The histogram marks P50/P75/P95 on their buckets; the trend draws
+  releases first seen inside the window; the summary shows the two newest releases' values
+  side by side. The previous window is the same-length range just before, fetched with the
+  same filters. Network breakdown, per-segment rating mix and attribution wait for data.
   The right-side `AnalysisFilterSidebar` dimension filter was retired and removed
   (user decision, 2026-10-02); do not reintroduce it. Performance narrows only by
   the shared time/environment and the route drill-down from the route table.

@@ -1,5 +1,6 @@
 import { useMemo, useSyncExternalStore } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { Link, useParams } from "@tanstack/react-router";
 import { NetworkIcon, RefreshCwIcon } from "lucide-react";
 import { AsyncError } from "@/components/ui/AsyncState";
 import {
@@ -22,6 +23,7 @@ import {
 import {
   apiFailureLevel,
   apiFailureRate,
+  formatAPIFailureRate,
   defaultAPIFilters,
   formatAPIDuration,
   getAPIs,
@@ -30,14 +32,13 @@ import {
   type APIFilters,
 } from "@/lib/api/apis";
 import { listOrganizations, listProjects, type Project } from "@/lib/api/projects";
-import { projectIdFromPathname } from "@/lib/projects/currentProject";
 import { ApiDetail, MethodBadge } from "./ApiDetail";
 import { searchErrorFrom } from "@/lib/api/search";
 import { ApiFilterBar } from "./ApiFilters";
 import { ApiOverview } from "./ApiOverview";
 
 export function ApisPage() {
-  const projectId = projectIdFromPathname(window.location.pathname);
+  const { projectId } = useParams({ strict: false }) as { projectId?: string };
   const organizations = useQuery({ queryKey: ["organizations"], queryFn: listOrganizations });
   const organization = organizations.data?.organizations[0];
   const projects = useQuery({
@@ -191,7 +192,7 @@ function ProjectAPIs({ project }: { project: Project }) {
                     </TableCell>
                     <TableCell>
                       <span data-level={apiFailureLevel(apiFailureRate(endpoint))}>
-                        {apiFailureRate(endpoint).toFixed(2)}%
+                        {formatAPIFailureRate(endpoint)}
                       </span>
                       <small>{endpoint.clientErrors} 次 4xx 未计入</small>
                     </TableCell>
@@ -222,12 +223,27 @@ function ProjectAPIs({ project }: { project: Project }) {
           </section>
         ) : null}
         {query.data && !query.data.endpoints.length ? (
-          <div className="border border-border">
+          <div className="card card-border bg-base-100">
             <EmptyState
               icon={NetworkIcon}
               title="当前范围没有 API 请求"
-              description="确认 fetch/XHR 自动采集已开启，且请求不是 OpenRUM 自身 endpoint。"
+              description="当前筛选下没有请求样本，不能据此判断 API 健康。请调整时间与环境；尚未采集时检查 SDK 的 fetch/XHR 配置。"
             />
+            <div className="card-actions justify-center px-6 pb-6">
+              {filters.q ? (
+                <Button
+                  variant="outline"
+                  onClick={() => update({ q: undefined, method: undefined, url: undefined })}
+                >
+                  清除搜索条件
+                </Button>
+              ) : null}
+              <Button asChild variant="outline">
+                <Link to="/projects/$projectId/onboarding" params={{ projectId: project.id }}>
+                  检查项目接入
+                </Link>
+              </Button>
+            </div>
           </div>
         ) : null}
         {query.data?.detail ? (

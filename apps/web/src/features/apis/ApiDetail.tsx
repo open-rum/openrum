@@ -23,6 +23,7 @@ import {
 import {
   apiFailureLevel,
   apiFailureRate,
+  formatAPIFailureRate,
   formatAPIBytes,
   formatAPIDuration,
   formatAPILatencyBucket,
@@ -65,12 +66,12 @@ export function ApiDetail({
               <MethodBadge method={detail.endpoint.method} />
               <Badge
                 variant={
-                  { danger: "destructive", warning: "warning", normal: "secondary" }[
+                  { danger: "destructive", warning: "warning", normal: "secondary", unknown: "outline" }[
                     apiFailureLevel(failureRate)
-                  ] as "destructive" | "warning" | "secondary"
+                  ] as "destructive" | "warning" | "secondary" | "outline"
                 }
               >
-                {failureRate.toFixed(1)}% 失败
+                {failureRate === null ? "暂无请求样本" : `${formatAPIFailureRate(detail.endpoint, 1)} 失败`}
               </Badge>
             </span>
             <DrawerTitle>{detail.endpoint.url}</DrawerTitle>
@@ -284,7 +285,7 @@ function DimensionBreakdown({
                 <TableCell>{facet.value}</TableCell>
                 <TableCell>{facet.requests.toLocaleString()}</TableCell>
                 <TableCell>
-                  <span data-level={apiFailureLevel(rate)}>{rate.toFixed(2)}%</span>
+                  <span data-level={apiFailureLevel(rate)}>{formatAPIFailureRate(facet)}</span>
                 </TableCell>
                 <TableCell>
                   <span data-slower={slower}>{formatAPIDuration(facet.p95)}</span>

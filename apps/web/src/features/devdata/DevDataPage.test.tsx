@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Project } from "@/lib/api/projects";
 import { generateDevData, getDevDataPresets } from "@/lib/api/devData";
 import { getSessionTimelinePage } from "@/lib/api/sessions";
-import { DevDataForm } from "./DevDataPage";
+import { DevDataForm, DevDataQuickEntry } from "./DevDataPage";
 
 vi.mock("@/lib/api/devData", () => ({
   devDataWindows: [{ label: "最近 1 小时", minutes: 60 }],
@@ -148,5 +148,41 @@ describe("development generator", () => {
     await view.findByText("存储硬熔断");
     expect(view.queryByText("已确认样本入库，页面数据已刷新")).toBeNull();
     expect(getSessionTimelinePage).not.toHaveBeenCalled();
+  });
+});
+
+describe("page-level quick entry", () => {
+  it("opens from a custom trigger with the given preset for a single project", async () => {
+    vi.mocked(getDevDataPresets).mockResolvedValue({
+      presets: [{ id: "web-vitals", name: "Vitals", description: "Vitals" }],
+      scenario: { seed: 1, environment: "test", sessions: 10, baseUrl: "https://shop.example.com" },
+    });
+    vi.mocked(generateDevData).mockResolvedValue(result);
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const view = render(
+      <QueryClientProvider client={client}>
+        <DevDataQuickEntry
+          projects={[project]}
+          project={project}
+          preset="web-vitals"
+          trigger={<button type="button">造性能数据</button>}
+        />
+      </QueryClientProvider>,
+    );
+    // The custom trigger replaces the floating button.
+    expect(view.queryByRole("button", { name: "造数据" })).toBeNull();
+    fireEvent.click(view.getByRole("button", { name: "造性能数据" }));
+    await waitFor(() => expect(getDevDataPresets).toHaveBeenCalledWith("p1", "web-vitals", 60));
+    // One project needs no project picker.
+    expect(view.queryByText("目标项目")).toBeNull();
+    const submit = await view.findByRole("button", { name: "生成测试数据" });
+    await waitFor(() => expect((submit as HTMLButtonElement).disabled).toBe(false));
+    fireEvent.click(submit);
+    await waitFor(() =>
+      expect(generateDevData).toHaveBeenCalledWith(
+        "p1",
+        expect.objectContaining({ preset: "web-vitals", from: expect.any(String) }),
+      ),
+    );
   });
 });

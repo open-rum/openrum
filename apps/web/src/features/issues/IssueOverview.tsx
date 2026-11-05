@@ -1,19 +1,19 @@
 import { useMemo, useState } from "react";
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
 import {
-  BAR_RADIUS_TOP,
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
   type ChartConfig,
 } from "@/components/ui/chart";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { countryLabel } from "@/features/filters/dimensionLabels";
 import { useChartMotion } from "@/lib/charts/useChartMotion";
+import { ChartSwitch } from "@/components/daisy/ChartSwitch";
 import { bucketRows, chartTicks, intervalLabel } from "@/lib/charts/timeSeries";
 import { useChartWidth } from "@/lib/charts/useChartWidth";
 import type { IssueOverviewResponse } from "@/lib/api/issues";
 import { formatIssueTrendTime, formatIssueTrendTooltip } from "./trendTime";
+import { useBarRadiusTop } from "@/lib/charts/useBarRadius";
 
 type Series = "events" | "sessions" | "anonymousUsers";
 type Distribution = "errorTypes" | "pages" | "countries";
@@ -39,7 +39,11 @@ const distributionLabels: Record<Distribution, string> = {
  * or users) beside a ranked breakdown (type, page or country). It replaces three tall charts
  * so the list the person acts on starts on the first screen.
  */
-export function IssueOverview({ overview }: { overview: IssueOverviewResponse }) {
+export function IssueOverview({ overview, hasHistoricalIssues = false }: {
+  overview: IssueOverviewResponse;
+  hasHistoricalIssues?: boolean;
+}) {
+  const barRadius = useBarRadiusTop();
   const animate = useChartMotion();
   const [series, setSeries] = useState<Series>("events");
   const [dimension, setDimension] = useState<Distribution>("errorTypes");
@@ -58,29 +62,21 @@ export function IssueOverview({ overview }: { overview: IssueOverviewResponse })
   }, [dimension, overview, totalEvents]);
 
   return (
-    <section className="issue-overview" aria-label="错误概览">
+    <section className="issue-overview card card-border bg-base-100" aria-label="错误概览">
       <div className="issue-overview__trend">
         <div className="issue-overview__head">
-          <div className="issue-overview__total">
-            <strong>{totalEvents.toLocaleString()}</strong>
-            <span>事件</span>
+          <div className="stat p-0">
+            <div className="stat-title">原始错误事件</div>
+            <div className="stat-value text-2xl tabular-nums">{totalEvents.toLocaleString()}</div>
           </div>
-          <ToggleGroup
-            type="single"
-            size="sm"
-            variant="outline"
+          <ChartSwitch
+            label="切换趋势指标"
+            options={Object.entries(seriesLabels) as [Series, string][]}
             value={series}
-            aria-label="切换趋势指标"
-            onValueChange={(value) => value && setSeries(value as Series)}
-          >
-            {(Object.keys(seriesLabels) as Series[]).map((key) => (
-              <ToggleGroupItem key={key} value={key}>
-                {seriesLabels[key]}
-              </ToggleGroupItem>
-            ))}
-          </ToggleGroup>
+            onChange={setSeries}
+          />
         </div>
-        {data.length ? (
+        {totalEvents > 0 ? (
           <ChartContainer
             ref={ref}
             config={config}
@@ -120,33 +116,32 @@ export function IssueOverview({ overview }: { overview: IssueOverviewResponse })
               <Bar
                 dataKey={series}
                 fill={`var(--color-${series})`}
-                radius={BAR_RADIUS_TOP}
+                radius={barRadius}
                 maxBarSize={14}
                 isAnimationActive={animate}
               />
             </BarChart>
           </ChartContainer>
         ) : (
-          <p className="issue-overview__empty">当前范围暂无错误数据</p>
+          <p className="issue-overview__empty">
+            {hasHistoricalIssues
+              ? "历史聚合中有错误记录，当前范围没有可查看的原始事件。原始事件可能已超过保留期，或不匹配当前筛选。"
+              : "当前范围没有可查看的原始错误事件"}
+          </p>
         )}
+        <p className="mt-2 text-xs text-base-content/70">
+          概览基于保留中的原始事件；问题列表与详情使用历史聚合，保留时间可能不同。
+        </p>
       </div>
       <div className="issue-overview__ranking">
         <div className="issue-overview__head">
-          <h2>错误分布</h2>
-          <ToggleGroup
-            type="single"
-            size="sm"
-            variant="outline"
+          <h2 className="card-title text-sm">错误分布</h2>
+          <ChartSwitch
+            label="切换错误分布维度"
+            options={Object.entries(distributionLabels) as [Distribution, string][]}
             value={dimension}
-            aria-label="切换错误分布维度"
-            onValueChange={(value) => value && setDimension(value as Distribution)}
-          >
-            {(Object.keys(distributionLabels) as Distribution[]).map((key) => (
-              <ToggleGroupItem key={key} value={key}>
-                {distributionLabels[key]}
-              </ToggleGroupItem>
-            ))}
-          </ToggleGroup>
+            onChange={setDimension}
+          />
         </div>
         {ranking.length ? (
           <ol aria-label={`按${distributionLabels[dimension]}的错误占比`}>
@@ -155,9 +150,12 @@ export function IssueOverview({ overview }: { overview: IssueOverviewResponse })
                 <span className="issue-overview__label" title={item.label}>
                   {item.label}
                 </span>
-                <span className="issue-overview__bar" aria-hidden="true">
-                  <i style={{ width: `${item.width}%` }} />
-                </span>
+                <progress
+                  className="progress progress-primary"
+                  value={item.width}
+                  max={100}
+                  aria-hidden="true"
+                />
                 <span className="issue-overview__share">{formatShare(item.share)}</span>
               </li>
             ))}

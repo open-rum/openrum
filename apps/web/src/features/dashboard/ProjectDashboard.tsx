@@ -3,41 +3,22 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useBlocker, useNavigate } from "@tanstack/react-router";
 import {
   CheckIcon,
+  CircleXIcon,
+  InfoIcon,
   LayoutGridIcon,
-  LoaderCircleIcon,
   PlusIcon,
   RotateCcwIcon,
   PencilIcon,
   Settings2Icon,
+  TriangleAlertIcon,
 } from "lucide-react";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { Button, buttonVariants } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import {
   ConsolePage,
   ConsolePageContent,
   ConsolePageHeader,
 } from "@/components/layout/ConsolePage";
-import {
-  Empty,
-  EmptyContent,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-} from "@/components/ui/empty";
-import { Skeleton } from "@/components/ui/skeleton";
 import { AsyncError } from "@/components/ui/AsyncState";
+import { DaisyModal } from "@/components/daisy/DaisyModal";
 import {
   createDashboard,
   getNamedDashboard,
@@ -81,7 +62,7 @@ export default function ProjectDashboard({
   dashboardId?: string;
 }) {
   const session = useQuery(sessionQueryOptions());
-  if (session.isPending) return <Skeleton className="h-80" />;
+  if (session.isPending) return <div className="skeleton h-80" />;
   if (!session.data)
     return (
       <AsyncError
@@ -106,13 +87,13 @@ export default function ProjectDashboard({
 function DashboardSkeleton() {
   return (
     <ConsolePage width="fluid" aria-label="正在加载仪表盘">
-      <Skeleton className="h-20" />
+      <div className="skeleton h-20" />
       <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
         {Array.from({ length: 4 }, (_, index) => (
-          <Skeleton key={index} className="h-40" />
+          <div key={index} className="skeleton h-40" />
         ))}
       </div>
-      <Skeleton className="h-80" />
+      <div className="skeleton h-80" />
     </ConsolePage>
   );
 }
@@ -352,17 +333,23 @@ function PersonalDashboard({
     return (
       <ConsolePage width="fluid">
         {gone ? (
-          <Empty className="min-h-80 border border-dashed">
-            <EmptyHeader>
-              <EmptyTitle>这个仪表盘已不存在</EmptyTitle>
-              <EmptyDescription>
+          <div className="card card-dash min-h-80 bg-base-100">
+            <div className="card-body items-center justify-center text-center">
+              <h2 className="card-title">这个仪表盘已不存在</h2>
+              <p className="text-base-content/70">
                 它可能已在其他设备上删除。你的其他仪表盘不受影响。
-              </EmptyDescription>
-            </EmptyHeader>
-            <EmptyContent>
-              <Button onClick={() => onNavigate(undefined, true)}>打开其他仪表盘</Button>
-            </EmptyContent>
-          </Empty>
+              </p>
+              <div className="card-actions mt-2">
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={() => onNavigate(undefined, true)}
+                >
+                  打开其他仪表盘
+                </button>
+              </div>
+            </div>
+          </div>
         ) : (
           <AsyncError
             error={saved.error}
@@ -398,55 +385,66 @@ function PersonalDashboard({
               // Hovering the gear reveals both actions. They stay in the DOM and focusable,
               // so tabbing to them reveals them too; touch and narrow screens show them always.
               <div className="dashboard-page-actions" role="group" aria-label="仪表盘操作">
-                <div className="dashboard-page-actions-reveal">
-                  <Button variant="outline" disabled={!compatible} onClick={startEditing}>
-                    <PencilIcon data-icon="inline-start" />
+                <div className="dashboard-page-actions-reveal join">
+                  <button
+                    type="button"
+                    className="btn join-item"
+                    disabled={!compatible}
+                    onClick={startEditing}
+                  >
+                    <PencilIcon className="size-4" aria-hidden="true" />
                     编辑
-                  </Button>
-                  <Button
-                    variant="outline"
+                  </button>
+                  <button
+                    type="button"
+                    className="btn join-item"
                     disabled={!compatible || config.widgets.length >= MAX_WIDGETS}
                     onClick={addModule}
                   >
-                    <PlusIcon data-icon="inline-start" />
+                    <PlusIcon className="size-4" aria-hidden="true" />
                     添加模块
-                  </Button>
+                  </button>
                 </div>
-                <span
-                  className={`dashboard-page-actions-trigger ${buttonVariants({ variant: "outline", size: "icon" })}`}
-                  aria-hidden="true"
-                >
-                  <Settings2Icon />
+                <span className="dashboard-page-actions-trigger btn btn-square" aria-hidden="true">
+                  <Settings2Icon className="size-4" />
                 </span>
               </div>
             ) : (
               <>
                 {!builtIn ? (
-                  <Button variant="ghost" disabled={busy} onClick={() => setConfirmation("reset")}>
-                    <RotateCcwIcon data-icon="inline-start" />
+                  <button
+                    type="button"
+                    className="btn btn-ghost"
+                    disabled={busy}
+                    onClick={() => setConfirmation("reset")}
+                  >
+                    <RotateCcwIcon className="size-4" aria-hidden="true" />
                     恢复默认
-                  </Button>
+                  </button>
                 ) : null}
-                <Button
-                  variant="outline"
+                <button
+                  type="button"
+                  className="btn"
                   disabled={busy}
                   onClick={() => (dirty ? setConfirmation("cancel") : cancelEditing())}
                 >
                   取消
-                </Button>
-                <Button
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary"
                   disabled={!dirty || busy || editor !== null || (builtIn && full)}
                   onClick={() => {
                     if (draft) save.mutate({ config: draft.config, revision: draft.revision });
                   }}
                 >
                   {save.isPending ? (
-                    <LoaderCircleIcon className="animate-spin" data-icon="inline-start" />
+                    <span className="loading loading-spinner loading-sm" aria-hidden="true" />
                   ) : (
-                    <CheckIcon data-icon="inline-start" />
+                    <CheckIcon className="size-4" aria-hidden="true" />
                   )}
                   {builtIn ? "另存为我的仪表盘" : "保存"}
-                </Button>
+                </button>
               </>
             )}
           </>
@@ -454,84 +452,91 @@ function PersonalDashboard({
       />
       <ConsolePageContent className="grid gap-6">
         {notice ? (
-          <p className="text-sm text-muted-foreground" role="status">
-            {notice}
-          </p>
+          <div role="status" className="alert alert-success alert-soft">
+            <CheckIcon className="size-4" aria-hidden="true" />
+            <span>{notice}</span>
+          </div>
         ) : null}
         {filters.release || filters.route ? (
-          <Alert>
-            <AlertTitle>链接筛选正在生效</AlertTitle>
-            <AlertDescription>
-              <span>
+          <div role="alert" className="alert alert-info alert-soft sm:alert-horizontal">
+            <InfoIcon className="size-5" aria-hidden="true" />
+            <div>
+              <h3 className="font-bold">链接筛选正在生效</h3>
+              <p className="text-sm">
                 版本 {filters.release || "全部"} · 路由 {filters.route || "全部"}
                 。作用于经典概览与指标目录模块；事件模块和业务数值模块使用自己的配置。
-              </span>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => updateFilters({ release: undefined, route: undefined }, "replace")}
-              >
-                清除链接筛选
-              </Button>
-            </AlertDescription>
-          </Alert>
+              </p>
+            </div>
+            <button
+              type="button"
+              className="btn btn-sm"
+              onClick={() => updateFilters({ release: undefined, route: undefined }, "replace")}
+            >
+              清除链接筛选
+            </button>
+          </div>
         ) : null}
         {!compatible ? (
-          <Alert>
-            <AlertTitle>此仪表盘使用了暂不支持的配置版本</AlertTitle>
-            <AlertDescription>请更新控制台后再编辑，已保存的配置不会被覆盖。</AlertDescription>
-          </Alert>
+          <div role="alert" className="alert alert-warning alert-soft">
+            <TriangleAlertIcon className="size-5" aria-hidden="true" />
+            <div>
+              <h3 className="font-bold">此仪表盘使用了暂不支持的配置版本</h3>
+              <p className="text-sm">请更新控制台后再编辑，已保存的配置不会被覆盖。</p>
+            </div>
+          </div>
         ) : null}
         {save.isError ? (
-          <Alert variant="destructive">
-            <AlertTitle>
-              {save.error instanceof HTTPError && save.error.status === 409
-                ? "仪表盘已在其他设备更新"
-                : "仪表盘保存失败"}
-            </AlertTitle>
-            <AlertDescription>
-              <span>
+          <div role="alert" className="alert alert-error alert-soft sm:alert-horizontal">
+            <CircleXIcon className="size-5" aria-hidden="true" />
+            <div>
+              <h3 className="font-bold">
+                {save.error instanceof HTTPError && save.error.status === 409
+                  ? "仪表盘已在其他设备更新"
+                  : "仪表盘保存失败"}
+              </h3>
+              <p className="text-sm">
                 {save.error instanceof HTTPError && save.error.status === 409
                   ? "当前草稿已保留。重新加载最新仪表盘后，再进行编辑。"
                   : "当前草稿已保留，请检查连接后重新保存。"}
-              </span>
-              {save.error instanceof HTTPError && save.error.status === 409 ? (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={busy}
-                  onClick={() => setConfirmation("reload")}
-                >
-                  重新加载最新仪表盘
-                </Button>
-              ) : null}
-            </AlertDescription>
-          </Alert>
+              </p>
+            </div>
+            {save.error instanceof HTTPError && save.error.status === 409 ? (
+              <button
+                type="button"
+                className="btn btn-sm"
+                disabled={busy}
+                onClick={() => setConfirmation("reload")}
+              >
+                重新加载最新仪表盘
+              </button>
+            ) : null}
+          </div>
         ) : null}
         {editing ? (
           <div className="dashboard-edit-toolbar">
             <div className="flex flex-wrap items-center gap-2">
-              <Badge variant="secondary">编辑模式</Badge>
-              <span className="text-sm text-muted-foreground">
+              <span className="badge badge-primary badge-soft">编辑模式</span>
+              <span className="text-sm text-base-content/70">
                 {config.widgets.length} / {MAX_WIDGETS} 个模块 · 拖动手柄调整顺序
               </span>
-              {dirty ? <Badge variant="outline">未保存</Badge> : null}
+              {dirty ? <span className="badge badge-warning badge-outline">未保存</span> : null}
               {builtIn ? (
-                <span className="text-sm text-muted-foreground">
+                <span className="text-sm text-base-content/70">
                   {full
                     ? `你已有 ${MAX_DASHBOARDS} 个仪表盘，删除一个后才能另存。`
                     : "默认仪表盘不会被修改，保存后另存为你的专属仪表盘。"}
                 </span>
               ) : null}
             </div>
-            <Button
-              variant="outline"
+            <button
+              type="button"
+              className="btn btn-sm"
               disabled={busy || config.widgets.length >= MAX_WIDGETS}
               onClick={() => setEditor({})}
             >
-              <PlusIcon data-icon="inline-start" />
+              <PlusIcon className="size-4" aria-hidden="true" />
               添加模块
-            </Button>
+            </button>
           </div>
         ) : null}
         {compatible ? (
@@ -550,39 +555,36 @@ function PersonalDashboard({
           />
         ) : null}
         {compatible && !config.widgets.length ? (
-          <Empty className="min-h-80 border border-dashed">
-            <EmptyHeader>
-              <EmptyMedia variant="icon">
-                <LayoutGridIcon />
-              </EmptyMedia>
-              <EmptyTitle>从一个模块开始</EmptyTitle>
-              <EmptyDescription>添加指标卡、趋势或事件分布，组合你的仪表盘。</EmptyDescription>
-            </EmptyHeader>
-            <EmptyContent>
-              <Button
-                onClick={() => {
-                  addModule();
-                }}
-              >
-                <PlusIcon data-icon="inline-start" />
-                添加模块
-              </Button>
-            </EmptyContent>
-          </Empty>
+          <div className="card card-dash min-h-80 bg-base-100">
+            <div className="card-body items-center justify-center text-center">
+              <LayoutGridIcon className="size-8 opacity-50" aria-hidden="true" />
+              <h2 className="card-title">从一个模块开始</h2>
+              <p className="text-base-content/70">添加指标卡、趋势或事件分布，组合你的仪表盘。</p>
+              <div className="card-actions mt-2">
+                <button type="button" className="btn btn-primary" onClick={addModule}>
+                  <PlusIcon className="size-4" aria-hidden="true" />
+                  添加模块
+                </button>
+              </div>
+            </div>
+          </div>
         ) : null}
         {!editing ? (
           <div className="flex justify-end">
-            <Button variant="link" size="sm" asChild>
-              <Link to="/projects/$projectId/onboarding" params={{ projectId: project.id }}>
-                没有数据？检查接入状态
-              </Link>
-            </Button>
+            <Link
+              className="link link-hover text-sm text-base-content/70"
+              to="/projects/$projectId/onboarding"
+              params={{ projectId: project.id }}
+            >
+              没有数据？检查接入状态
+            </Link>
           </div>
         ) : null}
         {editor ? (
           <Suspense
             fallback={
-              <p role="status" className="text-sm text-muted-foreground">
+              <p role="status" className="flex items-center gap-2 text-sm text-base-content/70">
+                <span className="loading loading-spinner loading-xs" aria-hidden="true" />
                 正在打开模块配置…
               </p>
             }
@@ -604,68 +606,75 @@ function PersonalDashboard({
             />
           </Suspense>
         ) : null}
-        <AlertDialog
+        <DaisyModal
           open={confirmation !== null}
-          onOpenChange={(open) => {
-            if (!open && !reloading) setConfirmation(null);
-          }}
-        >
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>
-                {confirmation === "reset"
-                  ? "恢复默认模块布局？"
-                  : confirmation === "reload"
-                    ? "放弃草稿并加载最新仪表盘？"
-                    : "放弃本次修改？"}
-              </AlertDialogTitle>
-              <AlertDialogDescription>
-                {confirmation === "reset"
-                  ? "草稿将替换为默认仪表盘的模块。点击保存后才会更新这个仪表盘。"
-                  : "尚未保存的布局和模块配置将被丢弃。"}
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            {reloading ? <p role="status">正在加载…</p> : null}
-            {saved.isError && confirmation === "reload" ? (
-              <p role="alert" className="text-sm text-destructive">
-                加载失败，草稿仍保留，请重试。
-              </p>
-            ) : null}
-            <AlertDialogFooter>
-              <AlertDialogCancel disabled={reloading}>继续编辑</AlertDialogCancel>
-              <AlertDialogAction
+          dismissible={!reloading}
+          onClose={() => setConfirmation(null)}
+          title={
+            confirmation === "reset"
+              ? "恢复默认模块布局？"
+              : confirmation === "reload"
+                ? "放弃草稿并加载最新仪表盘？"
+                : "放弃本次修改？"
+          }
+          description={
+            confirmation === "reset"
+              ? "草稿将替换为默认仪表盘的模块。点击保存后才会更新这个仪表盘。"
+              : "尚未保存的布局和模块配置将被丢弃。"
+          }
+          actions={
+            <>
+              <button
+                type="button"
+                className="btn"
                 disabled={reloading}
-                onClick={(event) => {
-                  event.preventDefault();
-                  void confirmAction();
-                }}
+                onClick={() => setConfirmation(null)}
+              >
+                继续编辑
+              </button>
+              <button
+                type="button"
+                className={confirmation === "reset" ? "btn btn-primary" : "btn btn-error"}
+                disabled={reloading}
+                onClick={() => void confirmAction()}
               >
                 {confirmation === "reset"
                   ? "恢复默认"
                   : confirmation === "reload"
                     ? "加载最新仪表盘"
                     : "放弃修改"}
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-        <AlertDialog
-          open={blocker.status === "blocked"}
-          onOpenChange={(open) => {
-            if (!open && blocker.status === "blocked") blocker.reset();
-          }}
+              </button>
+            </>
+          }
         >
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>离开并放弃未保存的修改？</AlertDialogTitle>
-              <AlertDialogDescription>当前仪表盘草稿尚未保存。</AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel onClick={() => blocker.reset?.()}>继续编辑</AlertDialogCancel>
-              <AlertDialogAction onClick={() => blocker.proceed?.()}>离开页面</AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+          {reloading ? (
+            <p role="status" className="flex items-center gap-2">
+              <span className="loading loading-spinner loading-sm" aria-hidden="true" />
+              正在加载…
+            </p>
+          ) : null}
+          {saved.isError && confirmation === "reload" ? (
+            <p role="alert" className="text-sm text-error">
+              加载失败，草稿仍保留，请重试。
+            </p>
+          ) : null}
+        </DaisyModal>
+        <DaisyModal
+          open={blocker.status === "blocked"}
+          onClose={() => blocker.reset?.()}
+          title="离开并放弃未保存的修改？"
+          description="当前仪表盘草稿尚未保存。"
+          actions={
+            <>
+              <button type="button" className="btn" onClick={() => blocker.reset?.()}>
+                继续编辑
+              </button>
+              <button type="button" className="btn btn-error" onClick={() => blocker.proceed?.()}>
+                离开页面
+              </button>
+            </>
+          }
+        />
       </ConsolePageContent>
     </ConsolePage>
   );

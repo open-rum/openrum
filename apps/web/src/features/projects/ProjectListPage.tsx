@@ -121,7 +121,7 @@ export function ProjectListPage() {
       !organizationsQuery.error &&
       !projectsQuery.error &&
       projects.length === 0 ? (
-        <div className="border border-border bg-card">
+        <div className="border border-base-300 bg-card">
           <EmptyState
             icon={FolderKanbanIcon}
             title="还没有项目"
@@ -144,12 +144,12 @@ export function ProjectListPage() {
         </div>
       ) : null}
       {projects.length ? (
-        <div className="overflow-x-auto rounded-xl border bg-card" aria-label="项目列表">
+        <div className="overflow-x-auto rounded-box border bg-card" aria-label="项目列表">
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>项目</TableHead>
-                <TableHead>状态</TableHead>
+                <TableHead>项目开关</TableHead>
                 <TableHead>24h PV</TableHead>
                 <TableHead>24h UV</TableHead>
                 <TableHead>错误事件</TableHead>
@@ -272,7 +272,7 @@ function ProjectNameLink({ project, className }: { project: Project; className?:
     <Link
       className={cn("truncate font-medium hover:underline", className)}
       title={project.name}
-      to="/projects/$projectId/analytics"
+      to="/projects/$projectId/overview"
       params={{ projectId: project.id }}
       onClick={() => rememberProject(project)}
     >
@@ -285,7 +285,7 @@ function ProjectEntry({ project }: { project: Project }) {
   return (
     <Button asChild size="sm" variant="outline">
       <Link
-        to="/projects/$projectId/analytics"
+        to="/projects/$projectId/overview"
         params={{ projectId: project.id }}
         onClick={() => rememberProject(project)}
       >
@@ -348,5 +348,5 @@ function formatRelativeTime(seconds: number) {
 }
 
 function statusLabel(status: Project["status"]) {
-  return { active: "已启用", disabled: "已停用", deleting: "删除中" }[status];
+  return { active: "接收已启用", disabled: "接收已停用", deleting: "删除中" }[status];
 }

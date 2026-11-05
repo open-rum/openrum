@@ -103,7 +103,8 @@ export function ConsolePageHeader({
   title,
   description,
   actions,
-  back,
+  titleAside,
+  breadcrumbs,
   titleId,
   documentTitle,
   className,
@@ -111,7 +112,10 @@ export function ConsolePageHeader({
   title: ReactNode;
   description?: ReactNode;
   actions?: ReactNode;
-  back?: ReactNode;
+  /** Small controls beside the title, kept outside the heading element. */
+  titleAside?: ReactNode;
+  /** Path from the list page to this detail; the last item is the current page. */
+  breadcrumbs?: ConsoleBreadcrumb[];
   titleId?: string;
   /** Browser tab title; defaults to `title` when it is plain text. */
   documentTitle?: string;
@@ -121,15 +125,18 @@ export function ConsolePageHeader({
   useDocumentTitle(tabTitle);
   return (
     <header className={cn("flex min-w-0 flex-col gap-2", className)} data-console-page-header="">
-      {back ? <div className="mb-1">{back}</div> : null}
+      {breadcrumbs?.length ? <ConsoleBreadcrumbs items={breadcrumbs} /> : null}
       <div className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
-          <h1
-            id={titleId}
-            className="text-2xl leading-tight font-semibold tracking-tight text-foreground"
-          >
-            {title}
-          </h1>
+          <div className="flex min-w-0 flex-wrap items-center gap-3">
+            <h1
+              id={titleId}
+              className="text-2xl leading-tight font-semibold tracking-tight text-foreground"
+            >
+              {title}
+            </h1>
+            {titleAside}
+          </div>
           {description ? (
             <div className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
               {description}
@@ -154,7 +161,10 @@ export function ConsolePageTabs({
   className?: string;
 }) {
   return (
-    <div className={cn("min-w-0 border-b border-border", className)} data-console-page-tabs="">
+    // daisyUI's `tabs-border` marks only the active tab; a full-width rule under it would
+    // read as a second, unrelated line. Tabs sit closer to their content than to the
+    // header so they read as that content's navigation.
+    <div className={cn("-mb-3 min-w-0", className)} data-console-page-tabs="">
       {children}
     </div>
   );
@@ -236,4 +246,54 @@ function useDocumentTitle(page?: string) {
       document.title = "OpenRUM";
     };
   }, [page]);
+}
+
+export type ConsoleBreadcrumb = {
+  label: ReactNode;
+  href?: string;
+  /** In-page navigation for a plain click; modified clicks still follow `href`. */
+  onNavigate?: () => void;
+};
+
+function ConsoleBreadcrumbs({ items }: { items: ConsoleBreadcrumb[] }) {
+  return (
+    <nav aria-label="面包屑" className="breadcrumbs -mt-1 py-0 text-sm text-base-content/70">
+      <ul>
+        {items.map((item, index) => {
+          const current = index === items.length - 1;
+          return (
+            <li key={index} className="min-w-0">
+              {current || !item.href ? (
+                <span
+                  aria-current={current ? "page" : undefined}
+                  className="max-w-[40ch] cursor-default truncate text-base-content no-underline"
+                >
+                  {item.label}
+                </span>
+              ) : (
+                <a
+                  href={item.href}
+                  onClick={(event) => {
+                    if (
+                      !item.onNavigate ||
+                      event.button !== 0 ||
+                      event.metaKey ||
+                      event.ctrlKey ||
+                      event.shiftKey ||
+                      event.altKey
+                    )
+                      return;
+                    event.preventDefault();
+                    item.onNavigate();
+                  }}
+                >
+                  {item.label}
+                </a>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </nav>
+  );
 }

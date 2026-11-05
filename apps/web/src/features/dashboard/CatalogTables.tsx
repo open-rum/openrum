@@ -1,15 +1,6 @@
 import { useState } from "react";
 import { ArrowDownIcon, ArrowUpIcon, TrendingDownIcon, TrendingUpIcon } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { cn } from "@/lib/utils";
 import { changeTone, formatChange } from "@/lib/charts/comparison";
 import { categoryColor } from "@/lib/charts/palette";
 import { Sparkline } from "@/lib/charts/Sparkline";
@@ -19,6 +10,7 @@ import type { MatrixData, RankedData } from "./adaptCatalog";
 import { donutShare } from "@/components/charts/donutData";
 import { drilldownURL } from "./drilldown";
 import { catalogDimensionLabels } from "./model";
+import { toneBadge } from "./comparison";
 
 function ChangeBadge({
   change,
@@ -33,27 +25,27 @@ function ChangeBadge({
   const tone = changeTone(change, ratio, direction);
   // The arrow and the signed text carry the direction, so colour is never the only signal.
   return (
-    <Badge
-      variant="outline"
-      className="dashboard-comparison"
-      data-tone={tone}
+    <span
+      className={cn("dashboard-comparison badge badge-sm badge-soft", toneBadge[tone])}
       aria-label={change === null ? "无对比" : `较上一周期 ${label}`}
     >
-      {change !== null && change > 0 ? <TrendingUpIcon aria-hidden="true" /> : null}
-      {change !== null && change < 0 ? <TrendingDownIcon aria-hidden="true" /> : null}
+      {change !== null && change > 0 ? (
+        <TrendingUpIcon className="size-3" aria-hidden="true" />
+      ) : null}
+      {change !== null && change < 0 ? (
+        <TrendingDownIcon className="size-3" aria-hidden="true" />
+      ) : null}
       {label}
-    </Badge>
+    </span>
   );
 }
 
 function EmptyTable() {
   return (
-    <Empty className="min-h-48">
-      <EmptyHeader>
-        <EmptyTitle>当前范围暂无数据</EmptyTitle>
-        <EmptyDescription>可以调整时间、环境或模块筛选；配置会保留。</EmptyDescription>
-      </EmptyHeader>
-    </Empty>
+    <div className="flex min-h-48 flex-col items-center justify-center gap-1 text-center">
+      <p className="font-medium">当前范围暂无数据</p>
+      <p className="text-sm text-base-content/70">可以调整时间、环境或模块筛选；配置会保留。</p>
+    </div>
   );
 }
 
@@ -82,26 +74,24 @@ export function RankedTable({
         role="region"
         aria-label={`${title} 排行滚动区域`}
       >
-        <Table aria-label={`${title} 排行`}>
-          <TableHeader className="sticky top-0 z-10 bg-card">
-            <TableRow>
-              <TableHead className="w-10">#</TableHead>
-              <TableHead>{dimensionName}</TableHead>
-              <TableHead className="text-right">{data.meta.label}</TableHead>
-              <TableHead className="text-right">变化</TableHead>
-              <TableHead className="dashboard-catalog-trend w-28">趋势</TableHead>
-              {data.shareable ? (
-                <TableHead className="dashboard-catalog-share text-right">占比</TableHead>
-              ) : null}
-            </TableRow>
-          </TableHeader>
-          <TableBody>
+        <table className="table table-sm" aria-label={`${title} 排行`}>
+          <thead className="sticky top-0 z-10 bg-card">
+            <tr>
+              <th className="w-10">#</th>
+              <th>{dimensionName}</th>
+              <th className="text-right">{data.meta.label}</th>
+              <th className="text-right">变化</th>
+              <th className="dashboard-catalog-trend w-28">趋势</th>
+              {data.shareable ? <th className="dashboard-catalog-share text-right">占比</th> : null}
+            </tr>
+          </thead>
+          <tbody>
             {rows.map((row, index) => {
               const href = drilldownURL(data.meta.id, data.dimension, row.value, filters);
               return (
-                <TableRow key={row.value} data-insufficient={row.sufficient ? undefined : true}>
-                  <TableCell className="text-muted-foreground tabular-nums">{index + 1}</TableCell>
-                  <TableCell className="max-w-56">
+                <tr key={row.value} data-insufficient={row.sufficient ? undefined : true}>
+                  <td className="text-base-content/70 tabular-nums">{index + 1}</td>
+                  <td className="max-w-56">
                     {href ? (
                       <a
                         href={href}
@@ -115,40 +105,40 @@ export function RankedTable({
                         {row.label}
                       </span>
                     )}
-                  </TableCell>
-                  <TableCell className="text-right font-medium tabular-nums">
+                  </td>
+                  <td className="text-right font-medium tabular-nums">
                     {formatMetric(row.current, data.unit)}
                     {row.sufficient ? null : (
                       <span
-                        className="ml-1 text-xs text-muted-foreground"
+                        className="ml-1 text-xs text-base-content/70"
                         title="样本不足，仅供参考"
                       >
                         *
                       </span>
                     )}
-                  </TableCell>
-                  <TableCell className="text-right">
+                  </td>
+                  <td className="text-right">
                     <ChangeBadge
                       change={row.change}
                       ratio={data.ratio}
                       direction={data.meta.direction}
                     />
-                  </TableCell>
-                  <TableCell className="dashboard-catalog-trend">
+                  </td>
+                  <td className="dashboard-catalog-trend">
                     <Sparkline values={row.sparkline} color={categoryColor(0)} />
-                  </TableCell>
+                  </td>
                   {data.shareable ? (
-                    <TableCell className="dashboard-catalog-share text-right text-muted-foreground tabular-nums">
+                    <td className="dashboard-catalog-share text-right text-base-content/70 tabular-nums">
                       {total > 0 && row.current !== null ? donutShare(row.current / total) : "—"}
-                    </TableCell>
+                    </td>
                   ) : null}
-                </TableRow>
+                </tr>
               );
             })}
-          </TableBody>
-        </Table>
+          </tbody>
+        </table>
       </div>
-      <p className="text-xs text-muted-foreground">
+      <p className="text-xs text-base-content/70">
         {data.note}
         {data.limitReached ? ` · 仅展示前 ${data.topN} 个分组` : ""}
         {data.rows.some((row) => !row.sufficient) ? " · * 样本不足，仅供参考" : ""}
@@ -199,14 +189,14 @@ export function MetricTable({
         role="region"
         aria-label={`${title} 指标表滚动区域`}
       >
-        <Table aria-label={`${title} 指标表`}>
-          <TableHeader className="sticky top-0 z-10 bg-card">
-            <TableRow>
-              <TableHead className="sticky left-0 z-10 bg-card">{dimensionName}</TableHead>
+        <table className="table table-sm" aria-label={`${title} 指标表`}>
+          <thead className="sticky top-0 z-10 bg-card">
+            <tr>
+              <th className="sticky left-0 z-10 bg-card">{dimensionName}</th>
               {data.columns.map((column) => {
                 const active = sort.key === column.key;
                 return (
-                  <TableHead
+                  <th
                     key={column.key}
                     className="text-right"
                     aria-sort={
@@ -219,7 +209,7 @@ export function MetricTable({
                       onClick={() => toggle(column.key)}
                     >
                       {column.meta.label}
-                      <span className="text-muted-foreground">{unitHint(column.unit)}</span>
+                      <span className="text-base-content/70">{unitHint(column.unit)}</span>
                       {active ? (
                         sort.direction === "desc" ? (
                           <ArrowDownIcon className="size-3" aria-hidden="true" />
@@ -228,41 +218,41 @@ export function MetricTable({
                         )
                       ) : null}
                     </button>
-                  </TableHead>
+                  </th>
                 );
               })}
-            </TableRow>
-          </TableHeader>
-          <TableBody>
+            </tr>
+          </thead>
+          <tbody>
             {rows.map((row) => (
-              <TableRow key={row.value}>
-                <TableCell className="sticky left-0 max-w-56 bg-card">
+              <tr key={row.value}>
+                <td className="sticky left-0 max-w-56 bg-card">
                   <span className="block truncate" title={row.label}>
                     {row.label}
                   </span>
-                </TableCell>
+                </td>
                 {data.columns.map((column) => {
                   const cell = row.cells[column.key];
                   return (
-                    <TableCell key={column.key} className="text-right tabular-nums">
+                    <td key={column.key} className="text-right tabular-nums">
                       {formatDetailedMetric(cell?.value ?? null, column.unit)}
                       {cell && !cell.sufficient ? (
                         <span
-                          className="ml-1 text-xs text-muted-foreground"
+                          className="ml-1 text-xs text-base-content/70"
                           title="样本不足，仅供参考"
                         >
                           *
                         </span>
                       ) : null}
-                    </TableCell>
+                    </td>
                   );
                 })}
-              </TableRow>
+              </tr>
             ))}
-          </TableBody>
-        </Table>
+          </tbody>
+        </table>
       </div>
-      <p className="text-xs text-muted-foreground">
+      <p className="text-xs text-base-content/70">
         {data.note}
         {data.limitReached ? ` · 仅展示前 ${data.topN} 个分组` : ""}
       </p>

@@ -24,7 +24,7 @@ afterEach(() => {
 });
 
 describe("analysis time filter", () => {
-  it("opens with the grouped preset list and applies a relative range", async () => {
+  it("opens on the presets beside the calendar and applies a relative range", async () => {
     const user = userEvent.setup();
     const update = vi.fn();
     renderFilter(update);
@@ -33,10 +33,13 @@ describe("analysis time filter", () => {
 
     const presets = screen.getByRole("group", { name: "快捷时间范围" });
     expect(within(presets).getAllByRole("button")).toHaveLength(15);
-    expect(screen.getByRole("button", { name: "自定义" })).toBeTruthy();
     expect(within(presets).getByRole("button", { name: "上周的今天" })).toBeTruthy();
     expect(within(presets).getByRole("button", { name: "本月" })).toBeTruthy();
-    expect(document.querySelector('[data-slot="calendar"]')).toBeNull();
+    // One panel: the calendar is there from the start, with no second step to reach it.
+    await waitFor(() => expect(document.querySelector('[data-slot="calendar"]')).toBeTruthy(), {
+      timeout: 5000,
+    });
+    expect(document.querySelectorAll('input[type="time"]')).toHaveLength(2);
 
     await user.click(screen.getByRole("button", { name: "最近 5 分钟" }));
 
@@ -45,23 +48,55 @@ describe("analysis time filter", () => {
     expect(screen.queryByRole("group", { name: "快捷时间范围" })).toBeNull();
   });
 
-  it("only shows the calendar after choosing custom and can return to presets", async () => {
+  it("previews a preset under the pointer and applies a custom range only once edited", async () => {
+    const user = userEvent.setup();
+    const update = vi.fn();
+    renderFilter(update);
+
+    await user.click(screen.getByRole("button", { name: /选择时间范围，当前为/ }));
+    await waitFor(() => expect(document.querySelector('[data-slot="calendar"]')).toBeTruthy(), {
+      timeout: 5000,
+    });
+    const apply = screen.getByRole("button", { name: "应用时间" }) as HTMLButtonElement;
+    expect(apply.disabled).toBe(true);
+
+    await user.hover(screen.getByRole("button", { name: "最近 7 天" }));
+    expect(screen.getByText("预览")).toBeTruthy();
+    expect(update).not.toHaveBeenCalled();
+
+    fireEvent.change(document.getElementById("analysis-range-from-time")!, {
+      target: { value: "00:00" },
+    });
+    expect(apply.disabled).toBe(false);
+    await user.click(apply);
+    expect(update).toHaveBeenCalledWith({ from: expect.any(Date), to: expect.any(Date) });
+  });
+
+  it("keeps the presets first on a phone and opens the calendar from one row", async () => {
+    vi.stubGlobal(
+      "matchMedia",
+      vi.fn().mockReturnValue({
+        matches: false,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      }),
+    );
     const user = userEvent.setup();
     renderFilter(vi.fn());
 
     await user.click(screen.getByRole("button", { name: /选择时间范围，当前为/ }));
-    await user.click(screen.getByRole("button", { name: "自定义" }));
+    expect(screen.getByRole("group", { name: "快捷时间范围" })).toBeTruthy();
+    expect(document.querySelector('[data-slot="calendar"]')).toBeNull();
 
-    expect(screen.getByText("自定义时间范围")).toBeTruthy();
-    // The calendar is a separate module that loads when the custom range opens.
+    await user.click(screen.getByRole("button", { name: "自定义日期和时间" }));
     await waitFor(() => expect(document.querySelector('[data-slot="calendar"]')).toBeTruthy(), {
       timeout: 5000,
     });
-    expect(document.querySelectorAll('input[type="time"]')).toHaveLength(2);
+    expect(document.querySelectorAll(".rdp-month")).toHaveLength(1);
 
-    await user.click(screen.getByRole("button", { name: "返回快捷时间范围" }));
+    await user.click(screen.getByRole("button", { name: "快捷时间范围" }));
     expect(screen.getByRole("group", { name: "快捷时间范围" })).toBeTruthy();
-    expect(document.querySelector('[data-slot="calendar"]')).toBeNull();
+    vi.unstubAllGlobals();
   });
 
   it("resolves yesterday as the previous local calendar day", async () => {
@@ -92,12 +127,12 @@ describe("analysis time filter", () => {
     );
     render(<ContextProbe />);
 
-    expect(screen.getByTestId("range-label").textContent).toBe("最近 6 小时");
+    expect(screen.getByTestId("range-label").textContent).toMatch(/^最近 6 小时/);
     expect(screen.getByTestId("range-to").textContent).toBe("2026-09-30T10:00:00.000Z");
     expect(new URL(window.location.href).searchParams.get("to")).toBe("2026-09-30T10:00:00.000Z");
 
     act(() => vi.advanceTimersByTime(50_100));
-    expect(screen.getByTestId("range-label").textContent).toBe("最近 6 小时");
+    expect(screen.getByTestId("range-label").textContent).toMatch(/^最近 6 小时/);
     expect(screen.getByTestId("range-to").textContent).toBe("2026-09-30T10:01:00.000Z");
     expect(new URL(window.location.href).searchParams.get("to")).toBe("2026-09-30T10:01:00.000Z");
   });
@@ -112,9 +147,9 @@ describe("analysis time filter", () => {
     );
     render(<ContextProbe />);
 
-    expect(screen.getByTestId("range-label").textContent).toBe("最近 6 小时");
+    expect(screen.getByTestId("range-label").textContent).toMatch(/^最近 6 小时/);
     fireEvent.click(screen.getByRole("button", { name: "Apply custom range" }));
-    expect(screen.getByTestId("range-label").textContent).not.toBe("最近 6 小时");
+    expect(screen.getByTestId("range-label").textContent).not.toMatch(/^最近 6 小时/);
     act(() => vi.advanceTimersByTime(3 * 60_000));
     expect(screen.getByTestId("range-to").textContent).toBe("2026-09-30T10:00:00.000Z");
     expect(new URL(window.location.href).searchParams.has("timePreset")).toBe(false);

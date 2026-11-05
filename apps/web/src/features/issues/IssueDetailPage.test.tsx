@@ -73,10 +73,17 @@ function renderDetail() {
 }
 
 describe("issue investigation context", () => {
+  it("explains unavailable raw evidence separately from retained aggregate counts", async () => {
+    const view = renderDetail();
+    await waitFor(() => expect(view.getByText("历史统计仍可用，原始事件现场不可用")).toBeTruthy());
+    expect(view.getByText(/历史聚合记录了 42 次错误/)).toBeTruthy();
+    expect(view.queryByRole("link", { name: "堆栈追踪" })).toBeNull();
+    expect((view.getByRole("button", { name: "全部事件" }) as HTMLButtonElement).disabled).toBe(true);
+  });
   it("retains project and filters in the return link", async () => {
     const view = renderDetail();
     await waitFor(() => expect(view.getByText("Checkout failed")).toBeTruthy());
-    const href = view.getByText("返回问题列表").getAttribute("href")!;
+    const href = view.getByRole("link", { name: "错误问题" }).getAttribute("href")!;
     expect(href).toContain("/projects/project-1/issues?");
     expect(href).toContain("cursor=second");
     expect(href).toContain("browser=Safari");
@@ -97,7 +104,9 @@ describe("issue investigation context", () => {
     await waitFor(() =>
       expect(vi.mocked(getIssueEvents).mock.lastCall?.[0].environment).toBe("canary"),
     );
-    expect(view.getByText("返回问题列表").getAttribute("href")).toContain("environment=canary");
+    expect(view.getByRole("link", { name: "错误问题" }).getAttribute("href")).toContain(
+      "environment=canary",
+    );
   });
 
   it("rolls back a failed status mutation and allows retry", async () => {

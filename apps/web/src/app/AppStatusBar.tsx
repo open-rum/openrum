@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { Clock3Icon } from "lucide-react";
-import { ThemeToggle } from "@/components/theme/ThemeToggle";
+import { ThemeController } from "@/components/theme/ThemeController";
 import { Badge } from "@/components/ui/badge";
 
 export function AppStatusBar({
@@ -22,7 +22,7 @@ export function AppStatusBar({
             <Clock3Icon aria-hidden="true" /> 数据延迟
           </Badge>
         ) : null}
-        <ThemeToggle compact />
+        <ThemeController />
       </div>
     </header>
   );

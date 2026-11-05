@@ -1,6 +1,7 @@
-import { useMemo, useState, useSyncExternalStore } from "react";
+import { lazy, Suspense, useMemo, useState, useSyncExternalStore } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { ActivityIcon } from "lucide-react";
+import { useParams } from "@tanstack/react-router";
+import { ActivityIcon, FlaskConicalIcon } from "lucide-react";
 import { AsyncError } from "@/components/ui/AsyncState";
 import {
   ConsolePage,
@@ -15,7 +16,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -38,14 +38,25 @@ import {
   type PerformanceMetricName,
 } from "@/lib/api/performance";
 import { listOrganizations, listProjects, type Project } from "@/lib/api/projects";
-import { projectIdFromPathname } from "@/lib/projects/currentProject";
+import { PercentileSelect } from "./PerformanceControls";
 import { RouteDetail } from "./RouteDetail";
+import { previousRange } from "./routeDetailModel";
 import { PerformanceOverview } from "./PerformanceOverview";
-import { performanceRating, ratingLabel } from "./score";
+import { performanceRating, ratingBadge, ratingLabel, type PerformanceRating } from "./score";
 import "./performance.css";
 
+// Development-only shortcut to the dev-data dialog with the web-vitals preset. The lazy import
+// sits inside the branch so a production bundle carries no reference to the generator.
+const DevDataQuickEntry = import.meta.env.DEV
+  ? lazy(() =>
+      import("@/features/devdata/DevDataPage").then((module) => ({
+        default: module.DevDataQuickEntry,
+      })),
+    )
+  : null;
+
 export function PerformancePage() {
-  const projectId = projectIdFromPathname(window.location.pathname);
+  const { projectId } = useParams({ strict: false }) as { projectId?: string };
   const organizations = useQuery({ queryKey: ["organizations"], queryFn: listOrganizations });
   const organization = organizations.data?.organizations[0];
   const projects = useQuery({
@@ -98,6 +109,21 @@ function ProjectPerformance({ project }: { project: Project }) {
     queryFn: ({ signal }) => getPerformance(filters, signal),
     placeholderData: keepPreviousData,
   });
+  // The route detail compares against the window of the same length just before this one.
+  const previousFilters = useMemo(
+    () => (filters.route ? { ...filters, ...previousRange(filters.from, filters.to) } : null),
+    [filters],
+  );
+  const previous = useQuery({
+    queryKey: [
+      "performance",
+      project.id,
+      "previous",
+      previousFilters ? serializePerformanceFilters(previousFilters).toString() : "",
+    ],
+    queryFn: ({ signal }) => getPerformance(previousFilters!, signal),
+    enabled: Boolean(previousFilters),
+  });
   const update = (patch: Partial<PerformanceFilters>) => {
     const parameters = serializePerformanceFilters({ ...filters, ...patch });
     window.history.pushState({}, "", `${window.location.pathname}?${parameters}`);
@@ -118,7 +144,60 @@ function ProjectPerformance({ project }: { project: Project }) {
       );
   return (
     <ConsolePage width="fluid">
-      <ConsolePageHeader title="真实用户性能" />
+      <ConsolePageHeader
+        // A route detail takes the route as its title; the breadcrumb returns to the list.
+        title={
+          filters.route ? (
+            <span className="font-mono break-all">{filters.route}</span>
+          ) : (
+            "真实用户性能"
+          )
+        }
+        documentTitle={filters.route ? `${filters.route} · 真实用户性能` : "真实用户性能"}
+        breadcrumbs={
+          filters.route
+            ? [
+                {
+                  label: "真实用户性能",
+                  href: `${window.location.pathname}?${serializePerformanceFilters({ ...filters, route: undefined })}`,
+                  onNavigate: () => update({ route: undefined }),
+                },
+                { label: <span className="font-mono">{filters.route}</span> },
+              ]
+            : undefined
+        }
+        description={
+          filters.route && query.data?.summary
+            ? `${query.data.summary.pageViews.toLocaleString()} 次页面浏览 · ${formatRange(filters.from, filters.to)}`
+            : undefined
+        }
+        titleAside={
+          DevDataQuickEntry ? (
+            <Suspense fallback={null}>
+              <DevDataQuickEntry
+                projects={[project]}
+                project={project}
+                preset="web-vitals"
+                trigger={
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-soft btn-warning"
+                    title="本地开发 · 生成性能测试数据"
+                  >
+                    <FlaskConicalIcon className="size-4" aria-hidden="true" />
+                    造性能数据
+                    <span className="badge badge-xs badge-warning">开发</span>
+                  </button>
+                }
+              />
+            </Suspense>
+          ) : null
+        }
+        // One percentile for the whole page: trend, vitals, routes and route detail.
+        actions={
+          <PercentileSelect value={percentile} onChange={(percentile) => update({ percentile })} />
+        }
+      />
       <ConsolePageContent className="grid gap-6">
         {query.isLoading ? <PerformanceSkeleton compact /> : null}
         {query.error ? (
@@ -131,10 +210,14 @@ function ProjectPerformance({ project }: { project: Project }) {
         ) : null}
         {query.data?.detail ? (
           <RouteDetail
+            projectId={project.id}
             detail={query.data.detail}
+            summary={query.data.summary}
+            previousSummary={previous.data?.summary}
+            previousTrend={previous.data?.detail?.trend}
+            durationMs={filters.to.getTime() - filters.from.getTime()}
+            range={query.data}
             percentile={percentile}
-            onBack={() => update({ route: undefined })}
-            onPercentileChange={(percentile) => update({ percentile })}
             onMetricChange={(metric) => update({ metric })}
           />
         ) : null}
@@ -145,7 +228,6 @@ function ProjectPerformance({ project }: { project: Project }) {
               trend={query.data.trend}
               range={query.data}
               percentile={percentile}
-              onPercentileChange={(percentile) => update({ percentile })}
             />
             <RoutesTable
               filters={filters}
@@ -156,11 +238,26 @@ function ProjectPerformance({ project }: { project: Project }) {
           </>
         ) : null}
         {query.data && !hasSamples ? (
-          <div className="border border-border">
+          <div className="card card-border bg-base-100">
             <EmptyState
               icon={ActivityIcon}
               title="当前范围没有性能样本"
-              description="确认 SDK 已启用 Web Vitals，或扩大时间范围后重试。"
+              description="当前时间与环境下没有可查询的性能样本。请调整范围或检查 Web Vitals 采集；历史原始样本也可能已超过保留期，不能据此判断性能良好。"
+              action={
+                <div className="flex flex-wrap justify-center gap-2">
+                  {filters.route ? (
+                    <button className="btn btn-sm" onClick={() => update({ route: undefined })}>
+                      查看全部路由
+                    </button>
+                  ) : null}
+                  <a
+                    className="btn btn-sm btn-outline"
+                    href={`/projects/${encodeURIComponent(project.id)}/onboarding`}
+                  >
+                    检查性能采集
+                  </a>
+                </div>
+              }
             />
           </div>
         ) : null}
@@ -181,10 +278,10 @@ function RoutesTable({
   onMetricChange: (metric: PerformanceMetricName) => void;
 }) {
   return (
-    <section className="performance-routes" aria-label="Route 性能列表">
-      <div className="performance-routes-heading">
+    <section className="performance-routes card card-border bg-base-100" aria-label="路由性能列表">
+      <div className="card-body gap-1 border-b border-base-300 pb-4">
         <div className="performance-routes-title">
-          <h2>路由性能</h2>
+          <h2 className="card-title">路由性能</h2>
           <Select
             value={filters.metric}
             onValueChange={(value) => onMetricChange(value as PerformanceMetricName)}
@@ -203,7 +300,7 @@ function RoutesTable({
             </SelectContent>
           </Select>
         </div>
-        <p>
+        <p className="text-xs text-base-content/70">
           按 {filters.metric} {(filters.percentile ?? "p75").toUpperCase()} 从慢到快 · 最多 100 条 ·
           点击路由查看趋势与慢样本
         </p>
@@ -211,11 +308,11 @@ function RoutesTable({
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Route</TableHead>
+            <TableHead>路由</TableHead>
             <TableHead>{filters.metric} P75 判定</TableHead>
-            <TableHead>PV</TableHead>
+            <TableHead className="text-right">PV</TableHead>
             {performanceMetricNames.map((name) => (
-              <TableHead key={name}>
+              <TableHead key={name} className="text-right">
                 {name} {(filters.percentile ?? "p75").toUpperCase()}
               </TableHead>
             ))}
@@ -231,26 +328,36 @@ function RoutesTable({
             return (
               <TableRow key={route.route}>
                 <TableCell>
-                  <Button
-                    variant="link"
-                    className="h-auto max-w-72 justify-start whitespace-normal break-all p-0 text-left"
+                  <button
+                    type="button"
+                    className="link link-hover max-w-72 text-left font-mono text-[13px] break-all whitespace-normal"
                     onClick={() => onSelect(route.route)}
                   >
                     {route.route}
-                  </Button>
+                  </button>
                 </TableCell>
                 <TableCell>
-                  <span className={`performance-table-rating performance-table-rating--${rating}`}>
+                  <span
+                    className={`badge badge-sm badge-soft ${selected?.sufficient ? ratingBadge[rating] : "badge-ghost"}`}
+                  >
                     {selected?.sufficient ? ratingLabel(rating) : "样本不足"}
                   </span>
                 </TableCell>
-                <TableCell>{route.pageViews.toLocaleString()}</TableCell>
+                <TableCell className="text-right tabular-nums">
+                  {route.pageViews.toLocaleString()}
+                </TableCell>
                 {performanceMetricNames.map((name) => (
                   <MetricCell
                     key={name}
                     metric={route[name.toLowerCase() as PerformanceMetricKey]}
                     name={name}
                     percentile={filters.percentile ?? "p75"}
+                    // The sorting metric carries the row's verdict colour.
+                    tone={
+                      name === filters.metric && selected?.sufficient
+                        ? ratingText[rating]
+                        : undefined
+                    }
                   />
                 ))}
               </TableRow>
@@ -261,19 +368,30 @@ function RoutesTable({
     </section>
   );
 }
+const ratingText: Record<PerformanceRating, string | undefined> = {
+  good: undefined,
+  "needs-improvement": "text-warning",
+  poor: "text-error",
+  unknown: undefined,
+};
+
 function MetricCell({
   metric,
   name,
   percentile,
+  tone,
 }: {
   metric: Awaited<ReturnType<typeof getPerformance>>["routes"][number]["lcp"] | undefined;
   name: string;
   percentile: PerformancePercentile;
+  tone?: string;
 }) {
   return (
-    <TableCell>
-      <strong>{formatPerformanceMetric(metric?.[percentile] ?? null, name)}</strong>
-      <small className="block text-muted-foreground">{metric?.samples ?? 0} 样本</small>
+    <TableCell className="text-right tabular-nums">
+      <strong className={tone}>
+        {formatPerformanceMetric(metric?.[percentile] ?? null, name)}
+      </strong>
+      <small className="block text-base-content/70">{metric?.samples ?? 0} 样本</small>
     </TableCell>
   );
 }
@@ -294,4 +412,16 @@ function subscribeLocation(callback: () => void) {
     window.removeEventListener("popstate", callback);
     window.removeEventListener("openrum:urlchange", callback);
   };
+}
+
+function formatRange(from: Date, to: Date) {
+  const format = (value: Date) =>
+    value.toLocaleString("zh-CN", {
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    });
+  return `${format(from)} – ${format(to)}`;
 }

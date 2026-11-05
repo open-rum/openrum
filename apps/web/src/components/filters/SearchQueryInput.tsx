@@ -489,9 +489,11 @@ export function SearchQueryInput({
             {/* There is no 查询 button: Enter, a chosen value or a has-condition runs the
                 search. An edit that has not run yet says so instead of the / hint. */}
             {draft.trim() !== value.trim() ? (
-              <span className="search-query__pending">按 Enter 搜索</span>
+              <span className="search-query__pending">
+                按 <kbd className="kbd kbd-sm">Enter</kbd> 搜索
+              </span>
             ) : (
-              <kbd>/</kbd>
+              <kbd className="kbd kbd-sm">/</kbd>
             )}
           </div>
         </PopoverAnchor>

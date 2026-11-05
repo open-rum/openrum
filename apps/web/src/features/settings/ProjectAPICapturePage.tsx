@@ -112,50 +112,19 @@ export function APICaptureForm({
       }}
     >
       {!canManage ? (
-        <p className="border border-border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
+        <p className="border border-base-300 bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
           当前角色为 {role ?? "未知"}，只有 Owner 或 Admin 可以修改采集规则。
         </p>
       ) : null}
 
-      <section className="border border-border bg-card p-6" aria-labelledby="capture-rules-intro">
-        <h2 id="capture-rules-intro" className="text-lg font-semibold text-foreground">
-          怎么工作
-        </h2>
-        <ul className="mt-3 flex flex-col gap-2 text-sm leading-6 text-muted-foreground">
-          <li>
-            <strong>默认全部不采集。</strong>
-            没有规则时，SDK 不读取任何头，服务端也不会存。
-          </li>
-          <li>
-            每条规则只作用于它匹配的 API，并且只记录你列出的头名。规则只对<strong>开启之后</strong>
-            的新请求生效。
-          </li>
-          <li>
-            <strong>凭证类头永远不会采集</strong>：名字里含 auth、cookie、token、secret、password、
-            session、csrf、signature、api-key，以及 x-forwarded-for 这类客户端地址头。这是硬规则，
-            无法配置。
-          </li>
-          <li>
-            头值里的邮箱、Bearer、JWT、银行卡号会被自动遮盖，每个值最多 256 个字符，每个方向最多{" "}
-            {initial.maxHeaders} 个头。
-          </li>
-          <li>
-            <strong>请求体和响应体需要单独勾选。</strong>
-            只读取文本、JSON 和表单，超过 64 KB 的不采集，其余最多保留 {BODY_LIMIT_KB} KB。 JSON
-            里名字含 password、token、secret、cardNumber、email、phone 等的字段，值会被替换成{" "}
-            <code>[REDACTED]</code>，邮箱、Bearer、JWT 和银行卡号也会被遮盖。
-          </li>
-          <li>
-            记录的头和内容在 <strong>{initial.retentionDays} 天</strong>
-            后自动删除，期间项目内所有成员都能在 API
-            监控的请求详情里看到。请只列出对排查有用、且不含个人信息的头。
-          </li>
-        </ul>
-      </section>
+      <p className="text-sm text-base-content/70">
+        默认不采集请求头、响应头或内容；每条规则单独开启。仅影响新请求，记录保留{" "}
+        {initial.retentionDays} 天，项目成员可见。请避免采集个人信息。
+      </p>
 
-      <section className="border border-border bg-card p-6" aria-labelledby="capture-rules-list">
+      <section className="border border-base-300 bg-card p-6" aria-labelledby="capture-rules-list">
         <div className="flex flex-wrap items-baseline justify-between gap-3">
-          <h2 id="capture-rules-list" className="text-lg font-semibold text-foreground">
+          <h2 id="capture-rules-list" className="card-title text-lg">
             采集规则
           </h2>
           <span className="text-xs text-muted-foreground">
@@ -170,20 +139,20 @@ export function APICaptureForm({
         {started && !saved ? (
           <p
             role="status"
-            className="mt-4 border border-border bg-muted/40 px-4 py-3 text-sm text-muted-foreground"
+            className="mt-4 border border-base-300 bg-muted/40 px-4 py-3 text-sm text-muted-foreground"
           >
             已按你在 API 监控中查看的端点预填了一条规则。核对头名后保存才会生效。
           </p>
         ) : null}
 
         {draft.length === 0 ? (
-          <p className="mt-5 border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">
-            还没有规则，所有 API 的头信息都不采集。
+          <p className="mt-5 border border-dashed border-base-300 px-4 py-6 text-center text-sm text-muted-foreground">
+            还没有规则，所有 API 的请求头、响应头、请求体和响应体均不采集。
           </p>
         ) : (
           <ul className="mt-5 flex flex-col gap-4">
             {draft.map((rule, index) => (
-              <li key={rule.id} className="border border-border p-4">
+              <li key={rule.id} className="card card-border bg-base-100 p-4">
                 <div className="grid gap-3 sm:grid-cols-[7rem_minmax(0,1fr)_auto] sm:items-end">
                   <Field label="方法">
                     <select
@@ -304,13 +273,50 @@ export function APICaptureForm({
         </Button>
       </section>
 
+      <details className="collapse collapse-arrow border border-base-300 bg-base-100">
+        <summary className="collapse-title font-medium">采集与隐私技术细节</summary>
+        <div className="collapse-content">
+          <ul className="mt-3 flex flex-col gap-2 text-sm leading-6 text-muted-foreground">
+            <li>
+              <strong>默认全部不采集。</strong>
+              没有规则时，SDK 不读取任何头，服务端也不会存。
+            </li>
+            <li>
+              每条规则只作用于它匹配的 API，并且只记录你列出的头名。规则只对
+              <strong>开启之后</strong>
+              的新请求生效。
+            </li>
+            <li>
+              <strong>凭证类头永远不会采集</strong>：名字里含
+              auth、cookie、token、secret、password、 session、csrf、signature、api-key，以及
+              x-forwarded-for 这类客户端地址头。这是硬规则， 无法配置。
+            </li>
+            <li>
+              头值里的邮箱、Bearer、JWT、银行卡号会被自动遮盖，每个值最多 256 个字符，每个方向最多{" "}
+              {initial.maxHeaders} 个头。
+            </li>
+            <li>
+              <strong>请求体和响应体需要单独勾选。</strong>
+              只读取文本、JSON 和表单，超过 64 KB 的不采集，其余最多保留 {BODY_LIMIT_KB} KB。 JSON
+              里名字含 password、token、secret、cardNumber、email、phone 等的字段，值会被替换成{" "}
+              <code>[REDACTED]</code>，邮箱、Bearer、JWT 和银行卡号也会被遮盖。
+            </li>
+            <li>
+              记录的头和内容在 <strong>{initial.retentionDays} 天</strong>
+              后自动删除，期间项目内所有成员都能在 API
+              监控的请求详情里看到。请只列出对排查有用、且不含个人信息的头。
+            </li>
+          </ul>
+        </div>
+      </details>
+
       {mutation.error ? (
         <p role="alert" className="text-sm text-destructive">
           保存失败：{mutation.error instanceof Error ? mutation.error.message : "未知错误"}
         </p>
       ) : null}
 
-      <div className="flex items-center gap-3">
+      <div className="flex flex-row-reverse flex-wrap justify-start items-center gap-3">
         <Button type="submit" disabled={disabled}>
           {mutation.isPending ? "保存中…" : "保存"}
         </Button>
@@ -334,8 +340,8 @@ function Field({
   children: React.ReactNode;
 }) {
   return (
-    <label className="flex flex-col gap-1.5 text-sm">
-      <span className="font-medium text-foreground">{label}</span>
+    <label className="flex flex-col gap-1.5 text-sm [&_input:not([type=checkbox],[type=radio])]:input [&_input:not([type=checkbox],[type=radio])]:w-full [&_select]:select [&_select]:w-full [&_textarea]:textarea [&_textarea]:w-full">
+      <span className="font-medium text-base-content">{label}</span>
       {children}
       {hint ? <span className="text-xs text-muted-foreground">{hint}</span> : null}
     </label>

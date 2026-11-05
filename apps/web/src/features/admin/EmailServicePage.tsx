@@ -595,7 +595,7 @@ const providers: Array<{ name: string; host: string; port: string; note: string 
 
 function ProviderHelp() {
   return (
-    <details className="group rounded-[var(--radius-surface)] border border-border bg-card">
+    <details className="card card-border group bg-base-100">
       <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-4 text-sm font-medium">
         <span>
           常见服务商参数
@@ -603,7 +603,7 @@ function ProviderHelp() {
         </span>
         <ChevronDownIcon className="size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
       </summary>
-      <div className="overflow-x-auto border-t border-border px-5 py-4">
+      <div className="overflow-x-auto border-t border-base-300 px-5 py-4">
         <table className="w-full text-left text-sm">
           <thead className="text-xs text-muted-foreground">
             <tr>
@@ -615,7 +615,7 @@ function ProviderHelp() {
           </thead>
           <tbody>
             {providers.map((provider) => (
-              <tr key={provider.name} className="border-t border-border">
+              <tr key={provider.name} className="border-t border-base-300">
                 <td className="py-2 pr-4 font-medium">{provider.name}</td>
                 <td className="py-2 pr-4 font-mono text-xs">{provider.host}</td>
                 <td className="py-2 pr-4">{provider.port}</td>
