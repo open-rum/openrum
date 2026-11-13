@@ -66,7 +66,7 @@ export function ProjectListPage() {
     <ConsolePage width="wide">
       <ConsolePageHeader
         title="项目"
-        description="确认各项目是否持续上报、访问规模与错误情况，进入项目或项目设置。"
+        description="查看各项目的上报状态、访问量与错误情况。"
         actions={
           <>
             {organizations.length > 1 ? (
@@ -311,18 +311,19 @@ function ProjectSettingsLink({ project }: { project: Project }) {
   );
 }
 
+const statusVariant = {
+  active: "success",
+  disabled: "secondary",
+  deleting: "warning",
+} as const satisfies Record<Project["status"], string>;
+
 function StatusBadge({ status }: { status: Project["status"] }) {
-  return (
-    <Badge variant="outline" className="gap-1.5">
-      <span className="project-status-dot" data-status={status} aria-hidden="true" />
-      {statusLabel(status)}
-    </Badge>
-  );
+  return <Badge variant={statusVariant[status]}>{statusLabel(status)}</Badge>;
 }
 
 function FreshnessLabel({ freshness }: { freshness: OverviewResponse["freshness"] }) {
   if (!freshness.latestReceivedAt || freshness.ageSeconds === null) {
-    return <Badge variant="outline">等待上报</Badge>;
+    return <Badge variant="secondary">等待上报</Badge>;
   }
   return (
     <span className="flex items-center gap-1 text-xs text-muted-foreground">

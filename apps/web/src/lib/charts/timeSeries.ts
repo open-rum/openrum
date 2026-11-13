@@ -78,17 +78,47 @@ export function bucketRows(
 }
 
 // Keep actual bucket positions (including gaps) and a small, width-based label budget.
+const DAY_MS = 86_400_000;
+
+/**
+ * The 2–6 bucket labels a time axis names. Over more than two days the labels are dates, so
+ * they sit on the first bucket of a local day and step by whole days: evenly spaced buckets
+ * would name 11/05, 11/07, 11/08 at uneven distances and at arbitrary times of day. The
+ * partial first day is skipped. Shorter ranges spread the labels evenly across the buckets.
+ */
 export function chartTicks(rows: TimeSeriesRow[], width: number): string[] {
   const count = Math.max(2, Math.min(6, Math.floor((width - 72) / 110)));
   if (rows.length <= count) return rows.map((row) => String(row.label));
+  const times = rows.map((row) => Date.parse(String(row.label)));
+  if (times.every(Number.isFinite) && times[times.length - 1] - times[0] > 2 * DAY_MS) {
+    const day = (time: number) => new Date(time).toDateString();
+    const starts = rows
+      .map((row, index) => ({ label: String(row.label), index }))
+      .filter(({ index }) => index > 0 && day(times[index - 1]) !== day(times[index]))
+      .map(({ label }) => label);
+    if (starts.length >= 2) {
+      const step = Math.ceil(starts.length / count);
+      return starts.filter((_, index) => index % step === 0);
+    }
+  }
   return Array.from({ length: count }, (_, index) =>
     String(rows[Math.round((index * (rows.length - 1)) / (count - 1))].label),
   );
 }
 
+/**
+ * A bucket's label on the time axis. A range of a day or more names the same clock time on
+ * two dates (24 hours runs from 21:00 to 21:00), so its labels carry the date as well.
+ */
 export function timeTickLabel(value: string, rangeMs: number) {
   const date = new Date(value);
-  if (rangeMs > 2 * 86400000)
+  if (rangeMs > 2 * DAY_MS)
     return date.toLocaleDateString("zh-CN", { month: "2-digit", day: "2-digit" });
-  return date.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit", hour12: false });
+  const time = date.toLocaleTimeString("zh-CN", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+  if (rangeMs < DAY_MS) return time;
+  return `${date.toLocaleDateString("zh-CN", { month: "2-digit", day: "2-digit" })} ${time}`;
 }

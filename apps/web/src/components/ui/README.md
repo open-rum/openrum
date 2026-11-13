@@ -7,7 +7,7 @@ Components in this directory keep the shadcn file layout and Radix behaviour (di
 sheets, selects, menus, popovers, tooltips, checkboxes, switches), but their classes are
 daisyUI's: `Button` is `btn`, `Badge` is `badge`, `Card` is `card card-border`, `Input` is
 `input`, `Select` is `select`, `Tabs` are `tabs-box` / `tabs-border`, `ToggleGroup` is a
-`join`, `Checkbox` and `Switch` are `checkbox` and `toggle`, `Table` is `table`, `Alert` is
+track with a sliding thumb, `Checkbox` and `Switch` are `checkbox` and `toggle`, `Table` is `table`, `Alert` is
 `alert`, `Skeleton` is `skeleton` and `Progress` is `progress`. daisyUI-only helpers live in
 `components/daisy` (`DaisyDropdown`, `DaisyModal`, `ThemeSwatch`).
 
@@ -21,7 +21,7 @@ daisyUI's: `Button` is `btn`, `Badge` is `badge`, `Card` is `card card-border`, 
 
 ## Themes
 
-- `ThemeProvider` stores `system` or any daisyUI theme under `openrum-theme` and writes
+- `ThemeProvider` stores any daisyUI theme (default `light`) under `openrum-theme` and writes
   `<html data-theme>`; dark themes also set `.dark`.
 - `styles/daisy.css` points the older `--ds-*` and shadcn variables at the active theme so
   page CSS and charts follow it. New code uses daisyUI classes rather than those aliases.

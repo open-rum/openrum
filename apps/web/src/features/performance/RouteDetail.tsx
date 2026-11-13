@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { timeAxis, valueAxis, VALUE_AXIS_MARGIN_TOP } from "@/lib/charts/axes";
 import {
   Bar,
   BarChart,
@@ -317,29 +318,24 @@ function RouteTrendChart({
       role="img"
       aria-label={`${metric} ${percentile.toUpperCase()} 趋势，与上一周期对比`}
     >
-      <LineChart accessibilityLayer data={data} margin={{ top: 10, right: 6, bottom: 0, left: 0 }}>
+      <LineChart
+        accessibilityLayer
+        data={data}
+        margin={{ top: VALUE_AXIS_MARGIN_TOP, right: 0, bottom: 0, left: 0 }}
+      >
         <CartesianGrid vertical={false} stroke="var(--ds-border-soft)" strokeDasharray="2 3" />
         <XAxis
           dataKey="bucket"
-          axisLine={false}
-          tickLine={false}
-          tickMargin={8}
           minTickGap={32}
-          tickFormatter={(value) => formatTrendDate(value, short)}
+          {...timeAxis((value) => formatTrendDate(String(value), short))}
         />
         <YAxis
-          axisLine={false}
-          tickLine={false}
-          tickMargin={6}
-          width={44}
           domain={[0, "auto"]}
-          tickFormatter={(value: number) =>
-            metric === "CLS"
-              ? value.toFixed(2)
-              : value >= 1000
-                ? `${(value / 1000).toFixed(1)}s`
-                : `${Math.round(value)}`
-          }
+          {...valueAxis({
+            unit: metric === "CLS" ? undefined : "ms",
+            format: (value) =>
+              metric === "CLS" ? value.toFixed(2) : Math.round(value).toLocaleString("zh-CN"),
+          })}
         />
         {percentile === "p75" ? (
           <>
@@ -464,18 +460,21 @@ function DistributionCard({ detail, metric: current }: { detail: Detail; metric?
                 : `${metric} 样本分布`
             }
           >
-            <BarChart accessibilityLayer data={distribution} margin={{ top: 18, right: 4 }}>
+            <BarChart
+              accessibilityLayer
+              data={distribution}
+              margin={{ top: VALUE_AXIS_MARGIN_TOP, right: 0, left: 0 }}
+            >
               <CartesianGrid vertical={false} stroke="var(--ds-border-soft)" />
               <XAxis
                 dataKey="from"
-                axisLine={false}
-                tickLine={false}
                 minTickGap={30}
-                tickFormatter={(value) =>
-                  `${distribution.find((bucket) => bucket.from === value)?.overflow ? "≥ " : ""}${formatPerformanceMetric(value, metric)}`
-                }
+                {...timeAxis(
+                  (value) =>
+                    `${distribution.find((bucket) => bucket.from === value)?.overflow ? "≥ " : ""}${formatPerformanceMetric(Number(value), metric)}`,
+                )}
               />
-              <YAxis allowDecimals={false} width={40} axisLine={false} tickLine={false} />
+              <YAxis allowDecimals={false} {...valueAxis({ unit: "个样本" })} />
               <ChartTooltip
                 cursor={{ fill: "var(--color-base-200)" }}
                 content={({ active, payload }) => {

@@ -265,6 +265,16 @@ export function sampleCountLabel(requests: number): string | undefined {
   return requests > API_SAMPLE_LIMIT ? `${API_SAMPLE_LIMIT}+` : String(Math.round(requests));
 }
 
+/**
+ * How many events the estimate was scaled up from, or nothing when no scaling happened: with
+ * every request collected, the note would only repeat the figure above it.
+ */
+export function sampledNote(counts: { requests: number; estimated: number }) {
+  return Math.round(counts.estimated) === counts.requests
+    ? undefined
+    : `由 ${counts.requests.toLocaleString()} 个采样事件估算`;
+}
+
 export function formatAPIDuration(value: number | null) {
   return value === null ? "—" : `${Math.round(value)} ms`;
 }

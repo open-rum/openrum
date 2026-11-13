@@ -5,7 +5,7 @@ import { Key, Plus, Trash, UserPlus, UsersThree } from "@phosphor-icons/react";
 import { ConsolePage, ConsolePageHeader } from "@/components/layout/ConsolePage";
 import { Button } from "@/components/ui/button";
 import { UserAvatar } from "@/components/account/UserAvatar";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent, TabsCount, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { InviteDialog } from "@/features/invitations/InviteDialog";
 import { invitationsQueryKey, listInvitations, listJoinRequests } from "@/lib/api/invitations";
 import {
@@ -89,7 +89,7 @@ export function MembersPage() {
     <ConsolePage width="wide">
       <ConsolePageHeader
         title="成员与权限"
-        description="角色权限在服务端逐 API 校验；组织始终必须保留至少一名 Owner。"
+        description="管理组织成员与角色。组织至少需要保留一名 Owner。"
         actions={
           <div className="flex items-end gap-3">
             {canManage && organization ? (
@@ -196,26 +196,18 @@ export function MembersPage() {
                 <TabsTrigger value="members">
                   成员
                   {membersQuery.data ? (
-                    <span className="ml-1.5 text-xs text-muted-foreground">
-                      {membersQuery.data.members.length}
-                    </span>
+                    <TabsCount>{membersQuery.data.members.length}</TabsCount>
                   ) : null}
                 </TabsTrigger>
                 <TabsTrigger value="requests">
                   加入申请
                   {pendingRequests.length ? (
-                    <span className="badge badge-xs badge-primary ml-1.5">
-                      {pendingRequests.length}
-                    </span>
+                    <span className="badge badge-xs badge-primary">{pendingRequests.length}</span>
                   ) : null}
                 </TabsTrigger>
                 <TabsTrigger value="invitations">
                   邀请链接
-                  {openInvitations.length ? (
-                    <span className="ml-1.5 text-xs text-muted-foreground">
-                      {openInvitations.length}
-                    </span>
-                  ) : null}
+                  {openInvitations.length ? <TabsCount>{openInvitations.length}</TabsCount> : null}
                 </TabsTrigger>
               </TabsList>
             ) : null}

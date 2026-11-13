@@ -18,7 +18,7 @@ const rising = { direction: "up" as const };
 export function ecommerceWidgets(): Widget[] {
   return [
     stat("收入", {
-      metrics: ["measurement.sum"],
+      metrics: ["measurement.estimated"],
       measurement: "amount",
       filters: purchase,
       ...rising,
@@ -42,7 +42,7 @@ export function ecommerceWidgets(): Widget[] {
     createCatalogWidget(
       "timeseries",
       {
-        metrics: ["measurement.sum"],
+        metrics: ["measurement.estimated"],
         measurement: "amount",
         filters: purchase,
         compare: "previous",
@@ -72,7 +72,7 @@ export function ecommerceWidgets(): Widget[] {
     createCatalogWidget(
       "breakdown",
       {
-        metrics: ["measurement.sum"],
+        metrics: ["measurement.estimated"],
         measurement: "amount",
         dimension: "source",
         filters: purchase,

@@ -53,6 +53,28 @@
   --ds-success-soft: color-mix(in oklab, var(--color-success) 15%, transparent);
   --ds-warning: var(--color-warning);
   --ds-warning-soft: color-mix(in oklab, var(--color-warning) 15%, transparent);
+  /* A semantic colour is a fill colour: as text on a white card, warning is about 1.8:1 and
+     error 2.9:1. Text and icons on a tint use the colour mixed toward body text. Dark themes
+     already clear 4.5:1 with the raw colour, so they keep it (the share is 100%). One recipe
+     serves buttons, text, icons and the hold button, so a danger action reads the same
+     wherever it is drawn. */
+  --ds-ink-mix: 55%;
+  --ds-warning-ink-mix: 40%;
+  --ds-warning-ink: color-mix(
+    in oklab,
+    var(--color-warning) var(--ds-warning-ink-mix),
+    var(--color-base-content)
+  );
+  --ds-danger-ink: color-mix(
+    in oklab,
+    var(--color-error) var(--ds-ink-mix),
+    var(--color-base-content)
+  );
+  --ds-success-ink: color-mix(
+    in oklab,
+    var(--color-success) var(--ds-ink-mix),
+    var(--color-base-content)
+  );
   --ds-danger: var(--color-error);
   --ds-danger-soft: color-mix(in oklab, var(--color-error) 15%, transparent);
   --ds-destructive: var(--color-error);
@@ -135,6 +157,71 @@
     var(--badge-color, var(--color-base-content)) 55%,
     var(--color-base-content)
   );
+}
+
+/* Dark themes keep the raw colours (see --ds-ink-mix above). `.dark` is set for exactly the
+   themes listed in DARK_DAISY_THEMES. */
+:root.dark[data-theme] {
+  --ds-ink-mix: 100%;
+  --ds-warning-ink-mix: 100%;
+}
+
+/* Soft buttons get the same treatment: a pale tint behind text in the raw semantic colour
+   read 1.7:1 (warning) and 2.7:1 (error) in the light theme.
+   Only the resting state is tinted: on hover, press and keyboard focus daisyUI turns the
+   button solid and switches to --btn-fg, so overriding `color` there gives red on red. */
+@utility btn-soft {
+  &:not(
+    :hover,
+    :active,
+    :focus-visible,
+    .btn-active,
+    [aria-pressed="true"],
+    [aria-expanded="true"]
+  ) {
+    color: color-mix(
+      in oklab,
+      var(--btn-color, var(--color-base-content)) var(--ds-ink-mix),
+      var(--color-base-content)
+    );
+  }
+}
+
+/* Soft alerts put the raw colour on the same pale tint; warning text read about 1.7:1. */
+@utility alert-soft {
+  color: color-mix(
+    in oklab,
+    var(--alert-color, var(--color-base-content)) var(--ds-ink-mix),
+    var(--color-base-content)
+  );
+}
+
+/* Plain semantic text has the same problem on a white card: warning is 1.8:1 and error 2.9:1.
+   Unlayered, so these win over the generated `text-*` utilities of the same name. */
+.text-warning {
+  color: var(--ds-warning-ink);
+}
+.text-error {
+  color: var(--ds-danger-ink);
+}
+.text-success {
+  color: var(--ds-success-ink);
+}
+
+/* daisyUI draws inactive tabs at half-strength body text, about 3.3:1 on white. Inactive tabs
+   take the Console's muted text token (72%, see console-ui.md); selected and hovered tabs keep
+   daisyUI's full-strength colour. */
+.tabs
+  > .tab:not(
+    [aria-selected="true"],
+    [aria-current="page"],
+    [aria-current="true"],
+    .tab-active,
+    .tab-disabled,
+    [disabled],
+    :hover
+  ) {
+  color: var(--ds-text-muted);
 }
 
 /*

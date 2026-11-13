@@ -58,6 +58,19 @@ When implementing from a selected generated mock, treat that image as the source
   Support explicit `user.id` query terms and show captured user/anonymous visitor
   IDs in log details, with same-user and same-visitor actions. Never infer a
   current user from a Session or fabricate profile fields not captured by the SDK.
+  Logs trends are compact and expanded by default (user decision, 2026-11-13),
+  with optional collapse. Keep log rows visible in the first desktop viewport.
+  Relative-time updates must not close an open log or reset its reading position.
+  Log detail selection is URL-backed; complete related-log actions replace the
+  search explicitly and offer a return to the original search, while attribute
+  filters append to it. Put structured attributes before collapsible context.
+  Keep one global time picker; chart clicks update that range, without a second
+  range control (user correction, 2026-11-13). Log rows support inline expansion,
+  message search highlighting and user-selected attribute columns remembered per
+  Project in this browser. Attribute actions include filtering, exclusion and
+  adding a column. Related logs open chronologically around the selected log,
+  mark that original log and allow paging in both directions (user-approved
+  Logs iteration, 2026-11-13).
   Issues keeps its high-frequency status as a Select immediately left of the
   shared search and its sort as a Select after it. Its fields start with Issue-specific title,
   error type and Fingerprint, followed by user.id, release, browser, device, country and Route. Issue-title
@@ -75,7 +88,7 @@ When implementing from a selected generated mock, treat that image as the source
   English like the query syntax, user request 2026-10-28; not a
   wall of pill buttons) above the values. Under is one of / is not one of the values are
   checkboxes: chosen ones stay listed and ticked, choosing a ticked one unticks it, and Enter
-  runs the search (user request, 2026-10-28). Choosing writes text and puts ` AND ` before a new
+  runs the search (user request, 2026-10-28). Choosing writes text and puts `AND` before a new
   condition; a finished condition (a value or has-condition) is followed by a space with the
   caret after it, and focusing by keyboard or `/` adds that space after the existing query
   and puts the caret at the end (user request, 2026-10-28; a click keeps its own caret, and
@@ -163,10 +176,32 @@ When implementing from a selected generated mock, treat that image as the source
   disclose query limits and overlapping user/session counts. Preserve all groups
   in enlarged details and support keyboard focus as well as pointer highlighting.
 
-- The world map view was removed at the user's request (2026-09-28). Do not
-  reintroduce map charts or geo dependencies. A saved `map` view reads as ranked
-  bars in the Console and is rejected by the backend on save; country data uses
+- Dashboard modules currently have no map view: a saved `map` view reads as ranked
+  bars in the Console and is rejected by the backend on save, and country data uses
   Bar, Table or donut like every other dimension.
+- 用户行为分析 › 总览 (`/projects/:id/analytics`, user request 2026-11-09) is a
+  business overview for product and operations, led by a card with a world map of
+  country outlines (user request, 2026-11-09: shapes, not dots). The card follows the
+  theme (no forced dark surface in light themes); the map sits on an inset `base-200`
+  panel, countries without data fill `base-300` and the rest shade `primary` on a
+  square-root scale. Pointing at any country shows its figures beside the pointer; the
+  selected country keeps a label when nothing is pointed at. There is no 3D globe (tried
+  and removed at the user's request, 2026-11-09). The outlines are precomputed by
+  `scripts/build-world-map.mjs` into `features/analytics/overview/worldMap.json`
+  (Natural Earth 1:110m via world-atlas, Equal Earth projection, split at the
+  antimeridian, loaded as its own chunk), so it needs no runtime geo library. Positions are country level only; rings mark the six countries with
+  the most active users. The card shows "过去 30 分钟活跃用户" (users with any
+  behaviour event, `behavior.users`; never call it 在线 or 实时), refreshed every 10
+  seconds, with per-minute bars whose last bar is the unfinished minute. The map
+  metric switch offers 活跃用户, 会话, 收入 and 购买转化率; the side ranking is the
+  keyboard path to select a country. Below it: revenue numbers (收入, 订单, 客单价,
+  购买转化率, 每访客收入), the purchase funnel and 来源与收入. Everything reads the
+  metric catalog with the dashboard's e-commerce convention (Custom Events
+  view_item, add_to_cart, begin_checkout, purchase; revenue is purchase's `amount`,
+  labelled with the Project's 收入币种 symbol when one is set, never converted). Show values and previous-period comparisons
+  only, never verdicts or good/bad colouring. Conversion by country or source needs
+  at least 50 sessions. The former 总览 (event trends and breakdowns) is the 事件
+  tab at `/analytics/events`.
 - Project overviews are personal, per-user/per-project dashboards. Keep
   viewing entirely module-driven (user decision, 2026-11-05): users choose what
   to focus on by adding modules. Do not add a fixed priority/attention summary
@@ -270,10 +305,19 @@ When implementing from a selected generated mock, treat that image as the source
   configured Table views and edit-mode controls. Opening details must not save
   configuration or request the same module again.
 - The Alerts page (`/projects/:projectId/alerts`) has two URL-backed line tabs, 规则 and
-  通知记录. Rules are a table with a one-line condition, channel chips, last status,
-  an enable switch and a row menu (编辑/复制/删除); an empty project shows rule templates
-  that prefill the editor instead of creating rules. The rule editor is a right Sheet
-  (560px) that ends with a one-sentence summary of the rule. 通知记录 shows each breach's
+  通知记录. With rules, a four-cell overview (正在超阈值, 近 24 小时触发, 送达失败, 需要处理的规则)
+  sits above the tabs; each cell opens the matching rules or records. The rule table ranks
+  breaching rules, then delivery failures, evaluation failures and rules without a usable
+  channel, then healthy ones, then paused ones (`ruleAttentions` and `rankRules` in
+  `alertPresentation.ts`). Columns: rule and condition, current status with one bar per
+  recent evaluation (API `recentStatuses`, newest 24, oldest first), last trigger with its
+  delivery result, channel chips, an enable switch and a row menu (编辑/复制/删除). The whole
+  row opens the rule details. Status filters are a `join` of buttons with counts (全部,
+  超阈值, 需处理, 已停用), and templates live in a 从模板添加 menu. A project without rules
+  shows templates beside a three-step checklist driven by the real channel state; templates
+  prefill the editor instead of creating rules. The overview counts only the newest 100
+  loaded notifications and says so when they stop inside the 24-hour window. The rule
+  editor is a right Sheet (560px) that ends with a one-sentence summary of the rule. 通知记录 shows each breach's
   delivery state and per-channel result, with failure reasons in plain words. The
   Notification channels page lists channel kinds as cards (飞书 and Webhook available;
   钉钉、企业微信、Slack、邮件 disabled with 即将支持), then configured channels with enable,
@@ -302,10 +346,12 @@ When implementing from a selected generated mock, treat that image as the source
   controls are 40px high and table rows are at least 44px. Compact variants are
   opt-in for secondary inline actions, toolbars, and icon rails; never use them
   for a page's primary form or main action without a documented reason.
-- Themes are daisyUI's: `ThemeProvider` stores `system` or any built-in theme, writes
-  `<html data-theme>`, and `index.html` applies it before first paint. The theme switch
+- Themes are daisyUI's: `ThemeProvider` stores any built-in theme (default `light`; there is no follow-the-system option, user decision 2026-11-05), writes
+  `<html data-theme>`, and `index.html` applies it before first paint. Custom themes (user
+  request, 2026-11-09) are random daisyUI-generator themes: 随机 always previews, a hold
+  saves the preview as a new theme; see `docs/agents/console-ui.md`. The theme switch
   sits top-right (daisyUI's swatch icon and theme menu); the account menu keeps the
-  system/light/dark quick buttons. Palettes and compact density were removed; do not bring
+  light/dark quick buttons. Palettes and compact density were removed; do not bring
   back `data-palette`, `data-density` or a density setting.
 - Radius follows the theme: `rounded-box` for cards, menus and dialogs, `rounded-field` for
   buttons, inputs and options, `rounded-selector` for badges and chips. Wrapping filter
@@ -316,8 +362,9 @@ When implementing from a selected generated mock, treat that image as the source
   Round only the outer contour of stacked columns with Recharts `BarStack`. Keep chart
   data, buckets, axes, legends and tooltips intact.
 - Single-select segmented controls are a horizontal `ToggleGroup` with `variant="outline"`
-  (or `segmented`), drawn as daisyUI's `join` of buttons with the selection in
-  `btn-primary`; default-variant `Tabs` are `tabs-box`, line Tabs `tabs-border`. Do not
+  (or `segmented`): the options sit on a `base-200` track and a `primary` thumb
+  slides to the selection (user request, 2026-11-09; theme colours only, reduced motion
+  turns the slide off, no animation library). Tabs keep their own styles; default-variant `Tabs` are `tabs-box`, line Tabs `tabs-border`. Do not
   hand-roll segmented buttons. `selection` chips and multi-select legends keep their own
   styles.
 - Shared Select menus open below the trigger with their left edges aligned.
@@ -356,6 +403,9 @@ When implementing from a selected generated mock, treat that image as the source
   read; a refused delete saves with a warning. Show probe failures from a rejected
   save, and keep the collapsible CORS help for Console direct uploads. RAM/IAM roles
   and deployment-managed Secrets remain the advanced production path.
+- Constrained Console content (`narrow` and `wide`) is horizontally centred in the
+  available workspace when there is no contextual rail (user decision, 2026-11-06).
+  Keep `fluid` pages full width and preserve rail/main-column alignment on pages with a rail.
 - Every authenticated Console route uses the shared Console page components.
   Choose only `fluid`, `wide`, or `narrow`; render the desktop `ContextRail`
   only when the page supplies contextual navigation, and compose header,
@@ -368,8 +418,8 @@ When implementing from a selected generated mock, treat that image as the source
   settings rail. 接入、发布、用量, data
   governance, quota, and development data generation live
   in that page's contextual navigation. Keep the account popover concise:
-  unchanged user identity, one Account entry, one horizontal three-icon
-  appearance switcher (system/light/dark), then sign out. Personal,
+  unchanged user identity, one Account entry, one horizontal two-icon
+  appearance switcher (light/dark), then sign out. Personal,
   Organization, and notification destinations live in the Account and Project
   settings rail.
 - Entering any settings route replaces the primary sidebar navigation with the
@@ -389,7 +439,7 @@ When implementing from a selected generated mock, treat that image as the source
   header open `InviteDialog`: a role Select, then default-variant Tabs 复制链接 / 发送邮件
   (disabled with its reason when the instance has no mail server). The dialog's open state
   lives in `ProjectSwitcher`, outside the hover card, or it unmounts when the pointer leaves.
-  A link only lets its holder *ask*: `/invite/:token` registers a new account (kept pending)
+  A link only lets its holder _ask_: `/invite/:token` registers a new account (kept pending)
   or signs an existing one in, files a join request, and an Owner or Admin approves it under
   成员与权限 → 加入申请 (line Tabs 成员 / 加入申请 / 邀请链接, with counts). Never let a link
   grant membership by itself, never offer Owner, and do not promise the person a

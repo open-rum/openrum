@@ -107,20 +107,17 @@ export function EmergencyStorageRecovery() {
   return (
     <Card id="emergency-storage-recovery">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <DatabaseZapIcon aria-hidden="true" />
-          紧急存储恢复
-        </CardTitle>
+        <CardTitle>紧急存储恢复</CardTitle>
         <CardDescription>
           空间不足时，OpenRUM 会推荐可安全删除的完整旧月份；释放到安全线后自动恢复数据接入。
         </CardDescription>
         <CardAction>
           {pressureActive ? (
-            <Badge variant={pressure.data?.mode === "blocked" ? "destructive" : "outline"}>
+            <Badge variant={pressure.data?.mode === "blocked" ? "destructive" : "warning"}>
               {pressure.data?.mode === "blocked" ? "接入已暂停" : "空间不足"}
             </Badge>
           ) : (
-            <Badge variant="outline">当前安全</Badge>
+            <Badge variant="success">当前安全</Badge>
           )}
         </CardAction>
       </CardHeader>
@@ -134,7 +131,9 @@ export function EmergencyStorageRecovery() {
                   已完成 {job.completedSteps}/{job.totalSteps} 个数据分区，完成后会重新检测空间。
                 </p>
               </div>
-              <Badge variant="outline">{job.status === "retry" ? "正在重试" : "处理中"}</Badge>
+              <Badge variant={job.status === "retry" ? "warning" : "sky"}>
+                {job.status === "retry" ? "正在重试" : "处理中"}
+              </Badge>
             </div>
             <Progress value={progress} aria-label={`紧急清理进度 ${progress}%`} />
             <div className="flex justify-between gap-4 text-xs text-muted-foreground">

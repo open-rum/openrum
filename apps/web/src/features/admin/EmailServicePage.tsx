@@ -219,10 +219,7 @@ function EmailOverview({
       <CardHeader className="border-b">
         <CardTitle className="flex items-center gap-2">
           当前邮件服务
-          <Badge variant="outline" className="gap-1.5">
-            <span className="project-status-dot" data-status="active" aria-hidden="true" />
-            已启用
-          </Badge>
+          <Badge variant="success">已启用</Badge>
         </CardTitle>
         <CardDescription>
           {managed

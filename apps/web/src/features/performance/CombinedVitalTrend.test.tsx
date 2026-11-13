@@ -37,12 +37,12 @@ const trend = ["2026-11-01T00:00:00Z", "2026-11-01T01:00:00Z", "2026-11-01T02:00
 describe("CombinedVitalTrend", () => {
   it("switches the same buckets between line, area and bar views", async () => {
     const { container } = render(<CombinedVitalTrend trend={trend} percentile="p75" />);
-    const switcher = screen.getByRole("group", { name: "图表类型" });
-    expect(switcher.className).toContain("tabs-box");
-    expect(screen.getByRole("button", { name: "折线" }).getAttribute("aria-pressed")).toBe("true");
+    const switcher = screen.getByRole("radiogroup", { name: "图表类型" });
+    expect(switcher.querySelector('[data-slot="toggle-group-thumb"]')).not.toBeNull();
+    expect(screen.getByRole("radio", { name: "折线" }).getAttribute("aria-checked")).toBe("true");
     await waitFor(() => expect(container.querySelectorAll(".recharts-line")).toHaveLength(3));
 
-    await userEvent.click(screen.getByRole("button", { name: "面积" }));
+    await userEvent.click(screen.getByRole("radio", { name: "面积" }));
     expect(screen.getByRole("img", { name: /面积图/ })).toBeTruthy();
     await waitFor(() => expect(container.querySelectorAll(".recharts-area")).toHaveLength(3));
     const fills = [...container.querySelectorAll(".recharts-area-area")].map((area) =>
@@ -52,7 +52,7 @@ describe("CombinedVitalTrend", () => {
     expect(new Set(fills).size).toBe(3);
     for (const fill of fills) expect(fill).toMatch(/^url\(#.+-(lcp|inp|cls)\)$/);
 
-    await userEvent.click(screen.getByRole("button", { name: "柱状" }));
+    await userEvent.click(screen.getByRole("radio", { name: "柱状" }));
     expect(screen.getByRole("img", { name: /柱状图/ })).toBeTruthy();
     await waitFor(() => expect(container.querySelectorAll(".recharts-bar")).toHaveLength(3));
     expect(container.querySelectorAll(".recharts-line")).toHaveLength(0);

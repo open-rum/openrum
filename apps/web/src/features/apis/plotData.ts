@@ -38,15 +38,16 @@ function rowsOf(
 const rangeMs = (range: ApiTrendRange) => Date.parse(range.to) - Date.parse(range.from);
 
 /**
- * Request count and failed requests on the left axis, success rate on the right. Failures are
- * 5xx and network failures; a 4xx is the caller's mistake and is shown in the status chart.
+ * Request count on the left axis, failure rate on the right. Failures are 5xx and network
+ * failures; a 4xx is the caller's mistake and is shown in the errors chart. The rate is drawn
+ * rather than the failure count: next to the request count, a count that is 1% of it is a
+ * flat line along the baseline.
  */
 export function apiRequestsPlot(trend: readonly APITrendPoint[], range: ApiTrendRange): PlotData {
-  const keys = ["requests", "failures", "successRate"];
+  const keys = ["requests", "failureRate"];
   const { seconds, rows } = rowsOf(trend, range, keys, (point) => ({
     requests: point.requests,
-    failures: point.failures,
-    successRate: point.requests ? (1 - point.failures / point.requests) * 100 : null,
+    failureRate: point.requests ? (point.failures / point.requests) * 100 : null,
   }));
   const {
     rows: plotted,
@@ -57,8 +58,7 @@ export function apiRequestsPlot(trend: readonly APITrendPoint[], range: ApiTrend
     keys,
     series: [
       define("requests", "请求次数", "count", categoryColor(0)),
-      define("failures", "失败请求次数", "count", "var(--ds-danger)"),
-      define("successRate", "成功率", "percent", "var(--ds-success)", { axis: "right" }),
+      define("failureRate", "失败率", "percent", "var(--ds-danger)", { axis: "right" }),
     ],
     from: range.from,
     to: range.to,
@@ -113,13 +113,13 @@ export function apiLatencyPlot(trend: readonly APITrendPoint[], range: ApiTrendR
 }
 
 /**
- * What the responses were, as a stack that adds up to the bucket's requests: fine, 4xx, 5xx,
- * or no response at all. The classes never overlap, so the stack is the request count.
+ * The responses that were not a success, stacked by class: 4xx, 5xx, or no response at all.
+ * Successes are left out: they are nearly every request, so a stack that included them would
+ * repeat the request count and squeeze the errors into a sliver at the top.
  */
-export function apiStatusPlot(trend: readonly APITrendPoint[], range: ApiTrendRange): PlotData {
-  const keys = ["ok", "client", "server", "network"];
+export function apiErrorsPlot(trend: readonly APITrendPoint[], range: ApiTrendRange): PlotData {
+  const keys = ["client", "server", "network"];
   const { seconds, rows } = rowsOf(trend, range, keys, (point) => ({
-    ok: Math.max(0, point.requests - point.clientErrors - point.serverErrors - point.networkErrors),
     client: point.clientErrors,
     server: point.serverErrors,
     network: point.networkErrors,
@@ -127,7 +127,6 @@ export function apiStatusPlot(trend: readonly APITrendPoint[], range: ApiTrendRa
   return {
     kind: "series",
     series: [
-      define("ok", "成功（2xx / 3xx）", "count", "var(--ds-success)"),
       define("client", "4xx", "count", "var(--ds-warning)"),
       define("server", "5xx", "count", "var(--ds-danger)"),
       define("network", "网络错误", "count", OTHER_COLOR),
@@ -139,4 +138,9 @@ export function apiStatusPlot(trend: readonly APITrendPoint[], range: ApiTrendRa
     note: "按采样事件计数",
     empty: trend.every((point) => point.requests === 0),
   };
+}
+
+/** Whether any request in the range ended in a 4xx, a 5xx or no response. */
+export function hasApiErrors(trend: readonly APITrendPoint[]) {
+  return trend.some((point) => point.clientErrors + point.serverErrors + point.networkErrors > 0);
 }

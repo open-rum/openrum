@@ -36,14 +36,14 @@ describe("e-commerce dashboard template", () => {
     const revenue = readWidget(widgets()[0])!;
     expect(revenue.title).toBe("收入");
     expect(revenue.data).toMatchObject({
-      metrics: ["measurement.sum"],
+      metrics: ["measurement.estimated"],
       measurement: "amount",
       filters: { eventName: "purchase" },
       direction: "up",
     });
     expect(ecommerceMetrics()).toEqual(
       expect.arrayContaining([
-        "measurement.sum",
+        "measurement.estimated",
         "measurement.avg",
         "behavior.events",
         "traffic.sessions",

@@ -519,7 +519,7 @@ function PersonalDashboard({
               <span className="text-sm text-base-content/70">
                 {config.widgets.length} / {MAX_WIDGETS} 个模块 · 拖动手柄调整顺序
               </span>
-              {dirty ? <span className="badge badge-warning badge-outline">未保存</span> : null}
+              {dirty ? <span className="badge badge-warning badge-soft">未保存</span> : null}
               {builtIn ? (
                 <span className="text-sm text-base-content/70">
                   {full

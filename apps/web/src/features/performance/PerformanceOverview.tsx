@@ -1,4 +1,5 @@
 import { CartesianGrid, Line, LineChart, ReferenceLine, XAxis, YAxis } from "recharts";
+import { timeAxis, valueAxis, VALUE_AXIS_MARGIN_TOP } from "@/lib/charts/axes";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChartContainer, ChartTooltip, type ChartConfig } from "@/components/ui/chart";
@@ -280,34 +281,29 @@ export function VitalTrendChart({
       role="img"
       aria-label={`${metric} ${percentile.toUpperCase()} 日期趋势`}
     >
-      <LineChart accessibilityLayer data={data} margin={{ top: 10, right: 6, bottom: 0, left: 0 }}>
+      <LineChart
+        accessibilityLayer
+        data={data}
+        margin={{ top: VALUE_AXIS_MARGIN_TOP, right: 0, bottom: 0, left: 0 }}
+      >
         <CartesianGrid vertical={false} stroke="var(--ds-border-soft)" strokeDasharray="2 3" />
         <XAxis
           dataKey="bucket"
-          axisLine={false}
-          tickLine={false}
-          tickMargin={8}
           minTickGap={32}
-          tickFormatter={(value) =>
+          {...timeAxis((value) =>
             formatTrendDate(
-              value,
+              String(value),
               Date.parse(data[data.length - 1].bucket) - Date.parse(data[0].bucket) < 2 * 86400000,
-            )
-          }
+            ),
+          )}
         />
         <YAxis
-          axisLine={false}
-          tickLine={false}
-          tickMargin={6}
-          width={44}
-          tickFormatter={(value: number) =>
-            metric === "CLS"
-              ? value.toFixed(2)
-              : value >= 1000
-                ? `${(value / 1000).toFixed(1)}s`
-                : `${Math.round(value)}`
-          }
           domain={[0, "auto"]}
+          {...valueAxis({
+            unit: metric === "CLS" ? undefined : "ms",
+            format: (value) =>
+              metric === "CLS" ? value.toFixed(2) : Math.round(value).toLocaleString("zh-CN"),
+          })}
         />
         {percentile === "p75" ? (
           <>

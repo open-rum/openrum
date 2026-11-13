@@ -2,10 +2,16 @@ import { useMemo } from "react";
 import { ChartCard } from "@/components/charts/ChartCard";
 import { PlotChart } from "@/components/charts/PlotChart";
 import type { APITrendPoint } from "@/lib/api/apis";
-import { apiLatencyPlot, apiRequestsPlot, apiStatusPlot, type ApiTrendRange } from "./plotData";
+import {
+  apiErrorsPlot,
+  apiLatencyPlot,
+  apiRequestsPlot,
+  hasApiErrors,
+  type ApiTrendRange,
+} from "./plotData";
 
 /**
- * Request count, request time and response status for the current filter, side by side in
+ * Request count, request time and failed responses for the current filter, side by side in
  * cards of one height. The same three charts describe every endpoint together and a single
  * endpoint, so the page reads the same wherever you are.
  */
@@ -21,7 +27,7 @@ export function ApiCharts({
 }) {
   const requests = useMemo(() => apiRequestsPlot(trend, range), [trend, range]);
   const latency = useMemo(() => apiLatencyPlot(trend, range), [trend, range]);
-  const status = useMemo(() => apiStatusPlot(trend, range), [trend, range]);
+  const errors = useMemo(() => apiErrorsPlot(trend, range), [trend, range]);
   return (
     <div className="api-charts">
       <ChartCard
@@ -29,7 +35,7 @@ export function ApiCharts({
         title="请求数"
         info={
           <>
-            <p>{scope}的请求次数与失败请求次数（5xx 和网络失败，不含 4xx），成功率读右侧坐标轴。</p>
+            <p>{scope}的请求次数，失败率（5xx 和网络失败，不含 4xx）读右侧坐标轴。</p>
             <p>次数按采样事件计数。{requests.edgeNote ? `${requests.edgeNote}。` : ""}</p>
           </>
         }
@@ -52,16 +58,22 @@ export function ApiCharts({
         <PlotChart data={latency} view="line" title="请求耗时" compact />
       </ChartCard>
       <ChartCard
-        id="api-status-title"
-        title="状态码"
+        id="api-errors-title"
+        title="异常响应"
         info={
           <p>
             {scope}
-            的响应状态，按类别堆叠：成功、4xx、5xx、网络错误（没有收到响应）。每根柱的高度就是该时段的请求数。
+            没有成功的请求，按类别堆叠：4xx、5xx、网络错误（没有收到响应）。成功的请求不在图里，数量见请求数。
           </p>
         }
       >
-        <PlotChart data={status} view="stacked-bar" title="状态码" compact />
+        {/* No requests at all is the chart's own empty state; requests without a single
+            error is good news and says so. */}
+        {errors.empty || hasApiErrors(trend) ? (
+          <PlotChart data={errors} view="stacked-bar" title="异常响应" compact />
+        ) : (
+          <p className="api-charts__none">这段时间没有 4xx、5xx 或网络错误。</p>
+        )}
       </ChartCard>
     </div>
   );

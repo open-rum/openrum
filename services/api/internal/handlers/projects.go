@@ -66,7 +66,9 @@ type updateProjectRequest struct {
 	// the override as it is, null clears it back to the instance default.
 	IngestRateLimit   **int32                     `json:"ingestRateLimit"`
 	OverLimitBehavior *metadata.OverLimitBehavior `json:"overLimitBehavior"`
-	Status            *metadata.ProjectStatus     `json:"status"`
+	// RevenueCurrency labels revenue in the Console; an empty string clears it.
+	RevenueCurrency *string                 `json:"revenueCurrency"`
+	Status          *metadata.ProjectStatus `json:"status"`
 }
 
 type projectDataPurgeRequest struct {
@@ -103,12 +105,14 @@ type projectResponse struct {
 	// DefaultIngestRateLimit is the ceiling that applies when there is no
 	// override. Reported alongside so the Console can show what "default"
 	// currently means without hard-coding a number that lives in the ingest.
-	DefaultIngestRateLimit int                       `json:"defaultIngestRateLimit"`
-	Status                 metadata.ProjectStatus    `json:"status"`
-	Role                   metadata.OrganizationRole `json:"role,omitempty"`
-	CreatedAt              string                    `json:"createdAt"`
-	UpdatedAt              string                    `json:"updatedAt"`
-	DSN                    string                    `json:"dsn,omitempty"`
+	DefaultIngestRateLimit int `json:"defaultIngestRateLimit"`
+	// RevenueCurrency is an ISO 4217 code, or empty when none was chosen.
+	RevenueCurrency string                    `json:"revenueCurrency"`
+	Status          metadata.ProjectStatus    `json:"status"`
+	Role            metadata.OrganizationRole `json:"role,omitempty"`
+	CreatedAt       string                    `json:"createdAt"`
+	UpdatedAt       string                    `json:"updatedAt"`
+	DSN             string                    `json:"dsn,omitempty"`
 }
 
 func NewProjectHandler(organizations *metadata.OrganizationRepository, projects *metadata.ProjectRepository, ingestEndpoint string, logger zerolog.Logger) *ProjectHandler {
@@ -371,7 +375,7 @@ func validateCreateProject(payload createProjectRequest, organizationID uuid.UUI
 func validateUpdateProject(payload updateProjectRequest) (metadata.UpdateProjectInput, bool) {
 	if payload.Name == nil && payload.Slug == nil && payload.SDKPlatform == nil && payload.AllowedOrigins == nil && payload.Environment == nil && payload.Environments == nil &&
 		payload.RetentionDays == nil && payload.EventSampleRate == nil && payload.APISampleRate == nil &&
-		payload.ErrorSampleRate == nil && payload.Status == nil {
+		payload.ErrorSampleRate == nil && payload.RevenueCurrency == nil && payload.Status == nil {
 		return metadata.UpdateProjectInput{}, false
 	}
 	if payload.Name != nil {
@@ -439,6 +443,9 @@ func validateUpdateProject(payload updateProjectRequest) (metadata.UpdateProject
 		return metadata.UpdateProjectInput{}, false
 	}
 	if payload.Status != nil && *payload.Status != metadata.ProjectStatusActive && *payload.Status != metadata.ProjectStatusDisabled {
+		return metadata.UpdateProjectInput{}, false
+	}
+	if payload.RevenueCurrency != nil && !validRevenueCurrency(*payload.RevenueCurrency) {
 		return metadata.UpdateProjectInput{}, false
 	}
 	return metadata.UpdateProjectInput(payload), true
@@ -516,6 +523,21 @@ func validSampleRate(value float64) bool {
 	return value >= 0 && value <= 1 && !math.IsNaN(value) && !math.IsInf(value, 0)
 }
 
+// revenueCurrencies are the labels the Console offers; the list mirrors
+// `apps/web/src/lib/currency.ts`. Amounts are never converted between them.
+var revenueCurrencies = map[string]struct{}{
+	"CNY": {}, "USD": {}, "EUR": {}, "GBP": {}, "JPY": {}, "KRW": {}, "HKD": {}, "TWD": {},
+	"SGD": {}, "AUD": {}, "CAD": {}, "INR": {}, "BRL": {}, "IDR": {}, "THB": {}, "VND": {},
+}
+
+func validRevenueCurrency(value string) bool {
+	if value == "" {
+		return true
+	}
+	_, ok := revenueCurrencies[value]
+	return ok
+}
+
 func validSDKPlatform(value metadata.SDKPlatform) bool {
 	_, ok := validSDKPlatforms[value]
 	return ok
@@ -528,8 +550,9 @@ func projectDTO(project metadata.Project, role metadata.OrganizationRole) projec
 		EventSampleRate: project.EventSampleRate, APISampleRate: project.APISampleRate,
 		ErrorSampleRate: project.ErrorSampleRate, IngestRateLimit: project.IngestRateLimit,
 		OverLimitBehavior: project.OverLimitBehavior, DefaultIngestRateLimit: ingest.DefaultProjectRequestsPerSecond,
-		Status: project.Status,
-		Role:   role, CreatedAt: project.CreatedAt.UTC().Format(timeFormat), UpdatedAt: project.UpdatedAt.UTC().Format(timeFormat),
+		RevenueCurrency: project.RevenueCurrency,
+		Status:          project.Status,
+		Role:            role, CreatedAt: project.CreatedAt.UTC().Format(timeFormat), UpdatedAt: project.UpdatedAt.UTC().Format(timeFormat),
 	}
 }
 

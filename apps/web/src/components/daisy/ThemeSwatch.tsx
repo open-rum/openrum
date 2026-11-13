@@ -1,11 +1,10 @@
 import { cn } from "@/lib/utils";
-import type { DaisyTheme } from "./daisyTheme";
 
 /**
  * daisyUI's theme preview: base content, primary, secondary and accent drawn in the theme
  * itself. `lg` is the theme controller's icon; the default size sits in menu rows.
  */
-export function ThemeSwatch({ theme, size = "sm" }: { theme: DaisyTheme; size?: "sm" | "lg" }) {
+export function ThemeSwatch({ theme, size = "sm" }: { theme: string; size?: "sm" | "lg" }) {
   const dot = "size-1.5 rounded-full";
   return (
     <span

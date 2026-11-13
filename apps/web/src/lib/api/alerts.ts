@@ -26,6 +26,8 @@ const ruleSchema = z.object({
   channelIds: z.array(z.string()).default([]),
   lastStatus: z.enum(["", "ok", "breached", "suppressed", "failed"]).catch(""),
   lastEvaluatedAt: iso.optional(),
+  /** Statuses of up to the last 24 evaluations, oldest first. */
+  recentStatuses: z.array(z.string()).default([]),
 });
 export type AlertRule = z.infer<typeof ruleSchema>;
 export type AlertRuleInput = Pick<

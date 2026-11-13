@@ -266,12 +266,7 @@ function StorageOverview({
       <CardHeader className="border-b">
         <CardTitle className="flex items-center gap-2">
           当前存储
-          <Badge variant={storage.deleteAllowed ? "outline" : "warning"} className="gap-1.5">
-            <span
-              className="project-status-dot"
-              data-status={storage.deleteAllowed ? "active" : "deleting"}
-              aria-hidden="true"
-            />
+          <Badge variant={storage.deleteAllowed ? "success" : "warning"}>
             {storage.deleteAllowed ? "已启用" : "删除受限"}
           </Badge>
         </CardTitle>

@@ -19,7 +19,9 @@ the Alerts and Notification channels pages.
    attempts per channel, counted from `alert_deliveries`.
 
 The API (`services/api/internal/handlers/{alerts,channels}.go`) serves rule and channel
-CRUD, the notification history with per-channel outcomes, and test sends.
+CRUD, the notification history with per-channel outcomes, and test sends. Each listed rule
+also carries `recentStatuses`, the statuses of its newest `RecentEvaluationCount` (24)
+evaluations, oldest first; the Console draws them as a bar per evaluation.
 
 ## Channel kinds
 

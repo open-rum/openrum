@@ -1,3 +1,4 @@
+import { environmentLabel } from "@/lib/projects/environments";
 import type {
   AlertComparator,
   AlertMetric,
@@ -65,23 +66,32 @@ export function formatDuration(minutes: number) {
   return `${minutes} 分钟`;
 }
 
-/** "错误率 ≥ 2% · 最近 5 分钟" */
+/** "错误率 ≥ 2% · 5 分钟固定窗口" */
 export function conditionText(
   rule: Pick<AlertRule, "metric" | "comparator" | "threshold" | "windowMinutes">,
 ) {
   const definition = metricDefinitions[rule.metric];
-  return `${definition.label} ${comparatorLabels[rule.comparator]} ${formatMetricValue(rule.metric, rule.threshold)} · 最近 ${formatDuration(rule.windowMinutes)}`;
+  return `${definition.label} ${comparatorLabels[rule.comparator]} ${formatMetricValue(rule.metric, rule.threshold)} · ${formatDuration(rule.windowMinutes)}固定窗口`;
 }
 
-/** The editor's live sentence, e.g. "当 production 环境最近 5 分钟错误率 ≥ 2% 时，通知 飞书·前端值班群". */
-export function ruleSummary(input: AlertRuleInput, channelNames: string[]) {
+/** The editor's live sentence, based on the last completed fixed window. */
+export function ruleSummary(
+  input: AlertRuleInput,
+  channelNames: string[],
+  unavailableChannels = false,
+) {
   const definition = metricDefinitions[input.metric];
-  const scope = input.environment ? `${input.environment} 环境` : "所有环境";
+  const scope = input.environment ? `${environmentLabel(input.environment)}环境` : "所有环境合并";
   const condition = `${definition.label} ${comparatorLabels[input.comparator]} ${formatMetricValue(input.metric, input.threshold)}`;
   const target = channelNames.length
     ? `通知 ${channelNames.join("、")}`
-    : "只在控制台记录，不发送通知";
-  return `当${scope}最近 ${formatDuration(input.windowMinutes)}${condition}时，${target}。同一规则 ${formatDuration(input.cooldownMinutes)}内最多通知一次。`;
+    : unavailableChannels
+      ? "暂无可用通知渠道"
+      : "只在控制台记录，不发送通知";
+  const cooldown = channelNames.length
+    ? `通知成功后，${formatDuration(input.cooldownMinutes)}内不重复通知。`
+    : "";
+  return `当${scope}最近完成的 ${formatDuration(input.windowMinutes)}固定窗口内，${condition}时，${target}。${cooldown}`;
 }
 
 /** Mirrors validAlertRule in internal/metadata/alerts.go. Returns field → message. */
@@ -110,6 +120,18 @@ export type RuleTemplate = { id: string; description: string; rule: AlertRuleInp
 export function ruleTemplates(environment: string): RuleTemplate[] {
   const base = { environment, enabled: true, channelIds: [], comparator: "gte" as const };
   return [
+    {
+      id: "error-count",
+      description: "5 分钟内错误事件达到 10 次，适合低流量项目",
+      rule: {
+        ...base,
+        name: "错误数超标",
+        metric: "error_count",
+        threshold: 10,
+        windowMinutes: 5,
+        cooldownMinutes: 30,
+      },
+    },
     {
       id: "error-rate",
       description: "5 分钟内错误率达到 2%",
@@ -178,10 +200,10 @@ export const ruleStatusLabels: Record<
   { label: string; tone: "ok" | "danger" | "muted" | "warning" }
 > = {
   "": { label: "尚未评估", tone: "muted" },
-  ok: { label: "正常", tone: "ok" },
-  breached: { label: "已触发", tone: "danger" },
-  suppressed: { label: "冷却中", tone: "warning" },
-  failed: { label: "读取失败", tone: "warning" },
+  ok: { label: "未超阈值", tone: "ok" },
+  breached: { label: "超过阈值", tone: "danger" },
+  suppressed: { label: "冷却期命中", tone: "warning" },
+  failed: { label: "评估失败", tone: "warning" },
 };
 
 export const deliveryStateLabels: Record<
@@ -191,9 +213,9 @@ export const deliveryStateLabels: Record<
   delivered: { label: "已送达", tone: "ok" },
   partial: { label: "部分失败", tone: "warning" },
   failed: { label: "发送失败", tone: "danger" },
-  pending: { label: "发送中", tone: "muted" },
-  no_channels: { label: "未配置渠道", tone: "muted" },
-  cooldown: { label: "冷却中", tone: "muted" },
+  pending: { label: "等待投递", tone: "muted" },
+  no_channels: { label: "仅控制台记录", tone: "muted" },
+  cooldown: { label: "冷却期跳过", tone: "muted" },
 };
 
 const errorCodeLabels: Record<string, string> = {

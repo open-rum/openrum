@@ -353,11 +353,11 @@ export const library: LibraryEntry[] = [
   {
     id: "revenue-stat",
     name: "收入总和",
-    description: "自定义事件 amount 数值的总和",
+    description: "自定义事件 amount 数值的总和（按采样率还原）",
     domain: "business",
     preview: "stat",
-    requires: ["measurement.sum"],
-    create: () => withDirection(stat("measurement.sum", "收入总和", "amount"), "up"),
+    requires: ["measurement.estimated"],
+    create: () => withDirection(stat("measurement.estimated", "收入总和", "amount"), "up"),
   },
   {
     id: "order-value-stat",
@@ -374,11 +374,11 @@ export const library: LibraryEntry[] = [
     description: "amount 总和走势，叠加上一周期虚线",
     domain: "business",
     preview: "line",
-    requires: ["measurement.sum"],
+    requires: ["measurement.estimated"],
     create: () =>
       createCatalogWidget(
         "timeseries",
-        { metrics: ["measurement.sum"], measurement: "amount", compare: "previous" },
+        { metrics: ["measurement.estimated"], measurement: "amount", compare: "previous" },
         { title: "收入趋势", view: "area" },
       ),
   },
@@ -405,11 +405,11 @@ export const library: LibraryEntry[] = [
     description: "amount 总和按国家排行",
     domain: "business",
     preview: "bars",
-    requires: ["measurement.sum"],
+    requires: ["measurement.estimated"],
     create: () =>
       createCatalogWidget(
         "breakdown",
-        { metrics: ["measurement.sum"], measurement: "amount", dimension: "country" },
+        { metrics: ["measurement.estimated"], measurement: "amount", dimension: "country" },
         { title: "各国收入", view: "bar" },
       ),
   },

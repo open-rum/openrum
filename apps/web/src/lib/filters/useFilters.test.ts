@@ -25,4 +25,35 @@ describe("useFilters", () => {
     expect(window.location.href).toBe(sharedURL);
     reloaded.unmount();
   });
+
+  it("keeps the relative time preset the analysis bar wrote to the URL", () => {
+    window.history.replaceState(
+      {},
+      "",
+      "/?from=2026-09-01T00%3A00%3A00.000Z&to=2026-09-02T00%3A00%3A00.000Z&timePreset=24h",
+    );
+    const hook = renderHook(() => useFilters(projectId));
+    expect(new URL(window.location.href).searchParams.get("timePreset")).toBe("24h");
+
+    act(() => hook.result.current.updateFilters({ release: "web-42" }));
+    expect(new URL(window.location.href).searchParams.get("timePreset")).toBe("24h");
+    hook.unmount();
+  });
+
+  it("drops the preset when this hook changes the range itself", () => {
+    window.history.replaceState(
+      {},
+      "",
+      "/?from=2026-09-01T00%3A00%3A00.000Z&to=2026-09-02T00%3A00%3A00.000Z&timePreset=24h",
+    );
+    const hook = renderHook(() => useFilters(projectId));
+    act(() =>
+      hook.result.current.updateFilters({
+        from: new Date("2026-09-03T00:00:00.000Z"),
+        to: new Date("2026-09-04T00:00:00.000Z"),
+      }),
+    );
+    expect(new URL(window.location.href).searchParams.has("timePreset")).toBe(false);
+    hook.unmount();
+  });
 });

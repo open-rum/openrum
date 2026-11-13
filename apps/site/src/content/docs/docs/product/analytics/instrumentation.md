@@ -33,6 +33,11 @@ is total revenue, its average is order value, and its median is the one to quote
 large orders would drag the mean. Select it with `property:payment` as the dimension to split
 revenue by payment method.
 
+OpenRUM does not convert currencies; the `currency` attribute is only for filtering and
+splitting. Report every `amount` in a Project in one currency, then choose it under
+**Project settings → General → Revenue currency** and the Console labels amounts with its
+symbol.
+
 ## Feature adoption
 
 ```ts

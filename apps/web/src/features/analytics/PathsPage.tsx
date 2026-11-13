@@ -1,7 +1,7 @@
 import { analysisSessionsHref, pathNodeQuery } from "./investigationLinks";
 import { useQuery } from "@tanstack/react-query";
 import { useParams } from "@tanstack/react-router";
-import { ArrowRightIcon, GitBranchIcon, RefreshCwIcon } from "lucide-react";
+import { ArrowRightIcon, GitBranchIcon } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import {
   ConsoleFilterBar,
@@ -10,7 +10,6 @@ import {
   ConsolePageTabs,
 } from "@/components/layout/ConsolePage";
 import { AsyncError } from "@/components/ui/AsyncState";
-import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { useAnalysisContext } from "@/features/filters/AnalysisContextBar";
 import {
@@ -91,18 +90,7 @@ function ProjectPaths({ project }: { project: Project }) {
     <ConsolePage width="fluid">
       <ConsolePageHeader
         title="用户路径"
-        description="查看会话中最常见的有限事件序列，快速发现用户实际如何到达关键动作。"
-        actions={
-          <Button
-            size="icon"
-            variant="outline"
-            aria-label="刷新用户路径"
-            onClick={() => void query.refetch()}
-            disabled={query.isFetching}
-          >
-            <RefreshCwIcon />
-          </Button>
-        }
+        description="查看会话中最常见的事件序列，了解用户到达关键行为的路径。"
       />
       <ConsolePageTabs>
         <AnalysisTabs projectId={project.id} active="paths" />

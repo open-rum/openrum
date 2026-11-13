@@ -13,9 +13,16 @@ import {
   useSyncExternalStore,
   type ReactNode,
 } from "react";
-import { ArrowLeftIcon, CalendarRangeIcon, ChevronDownIcon, ChevronRightIcon } from "lucide-react";
+import { ArrowLeftIcon, CalendarRangeIcon, ChevronRightIcon } from "lucide-react";
 import type { DateRange } from "react-day-picker";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import type { Project } from "@/lib/api/projects";
 import { cn } from "@/lib/utils";
 
@@ -84,7 +91,7 @@ const AnalysisContext = createContext<AnalysisContextValue | null>(null);
 
 export function isAnalysisRoute(pathname: string) {
   return (
-    /^\/projects\/[^/]+\/(?:analytics(?:\/(?:funnels|paths|retention))?|overview(?:\/[^/]+)?|issues(?:\/[^/]+)?|performance|events|logs|apis|sessions)\/?$/.test(
+    /^\/projects\/[^/]+\/(?:analytics(?:\/(?:events|funnels|paths|retention))?|overview(?:\/[^/]+)?|issues(?:\/[^/]+)?|performance|events|logs|apis|sessions)\/?$/.test(
       pathname,
     ) || /^\/(?:funnels|paths|retention|sessions|events|issues|performance|apis)\/?$/.test(pathname)
   );
@@ -184,23 +191,24 @@ export function useAnalysisContext() {
 export function AnalysisEnvironmentFilter() {
   const context = useAnalysisContext();
   return context ? (
-    <select
-      className="select select-sm max-w-40 shrink-0"
-      aria-label="分析环境"
+    <Select
       value={context.environment ?? "all"}
-      onChange={(event) =>
-        context.update({
-          environment: event.target.value === "all" ? undefined : event.target.value,
-        })
+      onValueChange={(value) =>
+        context.update({ environment: value === "all" ? undefined : value })
       }
     >
-      <option value="all">全部环境</option>
-      {projectEnvironments.map(({ id }) => (
-        <option key={id} value={id}>
-          {environmentLabel(id)} · {id}
-        </option>
-      ))}
-    </select>
+      <SelectTrigger size="sm" aria-label="分析环境" className="min-w-36 max-w-48 shrink-0">
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="all">全部环境</SelectItem>
+        {projectEnvironments.map(({ id }) => (
+          <SelectItem key={id} value={id}>
+            {environmentLabel(id)} · {id}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
   ) : null;
 }
 
@@ -388,15 +396,15 @@ export function AnalysisContextControls({ context }: { context: AnalysisContextV
           <PopoverTrigger asChild>
             <button
               type="button"
-              className="analysis-time-filter__trigger btn btn-sm data-[state=open]:border-primary data-[state=open]:shadow-[0_0_0_3px_color-mix(in_oklab,var(--color-primary)_18%,transparent)]"
+              // Same field as the environment select beside it: daisyUI's `select` draws the arrow.
+              className="analysis-time-filter__trigger select select-sm items-center gap-2 data-[state=open]:border-primary"
               aria-label={`选择时间范围，当前为 ${formatAbsoluteRange(context.from, context.to)}`}
             >
-              <CalendarRangeIcon className="size-4" aria-hidden="true" />
-              <span className="truncate font-semibold">{preset?.label ?? "自定义"}</span>
-              <span className="hidden truncate font-mono text-xs font-normal text-base-content/60 sm:inline">
+              <CalendarRangeIcon className="size-4 shrink-0 opacity-70" aria-hidden="true" />
+              <span className="truncate">{preset?.label ?? "自定义"}</span>
+              <span className="hidden truncate font-mono text-xs text-base-content/60 sm:inline">
                 {formatCompactRange(context.from, context.to)}
               </span>
-              <ChevronDownIcon className="size-3.5 opacity-60" aria-hidden="true" />
             </button>
           </PopoverTrigger>
           <PopoverContent className="analysis-time-popover" align="start" sideOffset={8}>

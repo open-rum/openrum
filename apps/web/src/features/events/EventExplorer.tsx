@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { ListTreeIcon, TriangleAlertIcon } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -96,41 +97,45 @@ function EventContextBar({
   const age = freshness.latestReceivedAt
     ? `数据更新于 ${formatRelative(freshness.ageSeconds)}`
     : "暂无新鲜度信息";
+  const stale = freshness.stale && !isFetching;
   return (
-    <div className="event-context">
-      <div className="event-context__selection">
-        {selected ? (
-          <>
-            <span>正在查看</span>
-            <strong>
-              {filters.eventName
-                ? eventLabel(filters.eventKind ?? "custom", filters.eventName)
-                : kindLabel(filters.eventKind ?? "custom")}
-            </strong>
-            {/* Built-in kinds are named after their only event; saying it twice adds nothing. */}
-            {filters.eventKind &&
-            filters.eventName &&
-            kindLabel(filters.eventKind) !== eventLabel(filters.eventKind, filters.eventName) ? (
-              <Badge variant="outline">{kindLabel(filters.eventKind)}</Badge>
-            ) : null}
-            <Button variant="ghost" size="sm" onClick={onClear}>
-              清除选择
-            </Button>
-          </>
-        ) : (
-          <span>全部事件</span>
-        )}
+    <>
+      <div className="event-context">
+        <div className="event-context__selection">
+          {selected ? (
+            <>
+              <span>正在查看</span>
+              <strong>
+                {filters.eventName
+                  ? eventLabel(filters.eventKind ?? "custom", filters.eventName)
+                  : kindLabel(filters.eventKind ?? "custom")}
+              </strong>
+              {/* Built-in kinds are named after their only event; saying it twice adds nothing. */}
+              {filters.eventKind &&
+              filters.eventName &&
+              kindLabel(filters.eventKind) !== eventLabel(filters.eventKind, filters.eventName) ? (
+                <Badge variant="outline">{kindLabel(filters.eventKind)}</Badge>
+              ) : null}
+              <Button variant="ghost" size="sm" onClick={onClear}>
+                清除选择
+              </Button>
+            </>
+          ) : (
+            <span>全部事件</span>
+          )}
+        </div>
+        <div className="event-freshness">
+          <span>{isFetching ? "正在更新…" : age}</span>
+          <small>统计为近似去重</small>
+        </div>
       </div>
-      <div
-        className="event-freshness"
-        data-stale={(!isFetching && freshness.stale) || undefined}
-        role={freshness.stale ? "status" : undefined}
-      >
-        {freshness.stale && !isFetching ? <TriangleAlertIcon aria-hidden="true" /> : null}
-        <span>{isFetching ? "正在更新…" : freshness.stale ? `${age}，可能不是最新` : age}</span>
-        <small>统计为近似去重</small>
-      </div>
-    </div>
+      {stale ? (
+        <Alert variant="warning" role="status">
+          <TriangleAlertIcon aria-hidden="true" />
+          <AlertDescription>{age}，可能不是最新。</AlertDescription>
+        </Alert>
+      ) : null}
+    </>
   );
 }
 

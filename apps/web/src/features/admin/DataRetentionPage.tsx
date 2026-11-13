@@ -4,7 +4,6 @@ import {
   ArchiveIcon,
   DatabaseZapIcon,
   HardDriveIcon,
-  HistoryIcon,
   LockKeyholeIcon,
   TriangleAlertIcon,
 } from "lucide-react";
@@ -386,10 +385,7 @@ function MaintenanceJobs({
   return (
     <Card className="h-fit">
       <CardHeader className="border-b">
-        <CardTitle className="flex items-center gap-2">
-          <HistoryIcon className="size-4" />
-          后台维护任务
-        </CardTitle>
+        <CardTitle>后台维护任务</CardTitle>
         <CardDescription>正在运行的任务每 3 秒刷新。</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4 pt-5">

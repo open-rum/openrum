@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { ChevronsUpDown, LogOut, Monitor, Moon, Settings, Sun, UserRound } from "lucide-react";
+import { ChevronsUpDown, LogOut, Moon, Settings, Sun, UserRound } from "lucide-react";
 import { UserAvatar } from "@/components/account/UserAvatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -11,7 +11,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useTheme, type Theme } from "@/components/theme/ThemeProvider";
+import { useTheme } from "@/components/theme/ThemeProvider";
 
 type AccountMenuProps = {
   userId: string;
@@ -86,7 +86,6 @@ export function AccountMenu({
           <div className="account-menu__theme-options">
             {(
               [
-                ["system", Monitor, "跟随系统"],
                 ["light", Sun, "亮色模式"],
                 ["dark", Moon, "暗色模式"],
               ] as const
@@ -99,7 +98,7 @@ export function AccountMenu({
                 aria-label={label}
                 aria-pressed={theme === value}
                 title={label}
-                onClick={() => setTheme(value as Theme)}
+                onClick={() => setTheme(value)}
               >
                 <Icon aria-hidden="true" />
               </button>

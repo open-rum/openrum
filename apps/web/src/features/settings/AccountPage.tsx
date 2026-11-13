@@ -1,6 +1,5 @@
 import { useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
-import { KeyRoundIcon, Link2Icon, UserRoundIcon } from "lucide-react";
 
 import { ConsolePage, ConsolePageHeader } from "@/components/layout/ConsolePage";
 import { Button } from "@/components/ui/button";
@@ -78,7 +77,6 @@ export function AccountPage() {
 
       <section className="card card-border bg-base-100 p-6" aria-labelledby="profile-title">
         <div className="flex items-center gap-2">
-          <UserRoundIcon className="size-5 text-primary" aria-hidden="true" />
           <h2 id="profile-title" className="card-title text-base">
             用户信息
           </h2>
@@ -105,7 +103,6 @@ export function AccountPage() {
 
       <section className="card card-border bg-base-100 p-6" aria-labelledby="linked-methods-title">
         <div className="flex items-center gap-2">
-          <Link2Icon className="size-5 text-primary" aria-hidden="true" />
           <h2 id="linked-methods-title" className="card-title text-base">
             已连接的登录方式
           </h2>
@@ -263,7 +260,6 @@ export function AccountPage() {
         aria-labelledby="password-title"
       >
         <div className="flex items-center gap-2">
-          <KeyRoundIcon className="size-5 text-primary" aria-hidden="true" />
           <h2 id="password-title" className="card-title text-base">
             {hasPassword ? "修改密码" : "设置 OpenRUM 密码"}
           </h2>

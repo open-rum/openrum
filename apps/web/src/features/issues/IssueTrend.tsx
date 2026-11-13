@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from "react";
+import { timeAxis, valueAxis, VALUE_AXIS_MARGIN_TOP } from "@/lib/charts/axes";
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { useChartMotion } from "@/lib/charts/useChartMotion";
@@ -76,7 +77,7 @@ export function IssueTrend({
             <BarChart
               accessibilityLayer
               data={data}
-              margin={{ top: 6, right: 28, bottom: 0, left: 0 }}
+              margin={{ top: VALUE_AXIS_MARGIN_TOP, right: 0, bottom: 0, left: 0 }}
             >
               <CartesianGrid vertical={false} />
               {/* Columns need a band axis; ticks still name actual bucket positions. */}
@@ -84,17 +85,9 @@ export function IssueTrend({
                 dataKey="timestamp"
                 ticks={chartTicks(data, width).map((label) => Date.parse(label))}
                 interval={0}
-                tickFormatter={formatIssueTrendTime}
-                axisLine={false}
-                tickLine={false}
+                {...timeAxis((value) => formatIssueTrendTime(Number(value)))}
               />
-              <YAxis
-                allowDecimals={false}
-                width={36}
-                tickCount={3}
-                axisLine={false}
-                tickLine={false}
-              />
+              <YAxis allowDecimals={false} tickCount={3} {...valueAxis()} />
               <ChartTooltip
                 content={<ChartTooltipContent labelFormatter={formatIssueTrendTooltip} />}
               />

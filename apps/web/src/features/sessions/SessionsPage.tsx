@@ -6,7 +6,6 @@ import {
   ChevronLeftIcon,
   ChevronRightIcon,
   Clock3Icon,
-  RefreshCwIcon,
   ServerOffIcon,
   UsersIcon,
 } from "lucide-react";
@@ -163,7 +162,7 @@ function ProjectSessions({ project }: { project: Project }) {
     <ConsolePage width="fluid">
       <ConsolePageHeader
         title="会话"
-        description="从一次连续访问还原用户旅程，结合行为、错误、API 和性能信号快速定位问题。"
+        description="按会话还原用户的访问过程，包括行为、错误、API 请求与性能数据。"
         breadcrumbs={
           analysisReturnHref(project.id, window.location.search)
             ? [
@@ -174,17 +173,6 @@ function ProjectSessions({ project }: { project: Project }) {
                 { label: "会话" },
               ]
             : undefined
-        }
-        actions={
-          <Button
-            size="icon"
-            variant="outline"
-            aria-label="刷新会话"
-            onClick={() => void query.refetch()}
-            disabled={query.isFetching}
-          >
-            <RefreshCwIcon />
-          </Button>
         }
       />
 

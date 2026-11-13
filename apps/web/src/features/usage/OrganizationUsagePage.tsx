@@ -1,8 +1,9 @@
 import { UsageFilters } from "./UsageFilters";
+import { timeAxis, valueAxis, VALUE_AXIS_MARGIN_TOP } from "@/lib/charts/axes";
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useRouterState } from "@tanstack/react-router";
-import { RefreshCwIcon, ChartColumnIcon, FolderIcon } from "lucide-react";
+import { ChartColumnIcon, FolderIcon } from "lucide-react";
 import { Bar, BarChart, BarStack, CartesianGrid, XAxis, YAxis } from "recharts";
 import { ConsolePage, ConsolePageHeader, ConsoleFilterBar } from "@/components/layout/ConsolePage";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
@@ -111,16 +112,6 @@ export function OrganizationUsagePage() {
       <ConsolePageHeader
         title="组织用量"
         description="从组织视角查看各项目的数据接收与处理情况，覆盖全部环境。"
-        actions={
-          <Button
-            variant="outline"
-            disabled={usage.isFetching}
-            onClick={() => void usage.refetch()}
-          >
-            <RefreshCwIcon data-icon="inline-start" />
-            刷新
-          </Button>
-        }
       />
       <ConsoleFilterBar
         primary={
@@ -232,16 +223,18 @@ export function OrganizationUsagePage() {
                   initialDimension={{ width: 960, height: 256 }}
                   aria-label="事件处理结果趋势"
                 >
-                  <BarChart data={summary.series} accessibilityLayer>
+                  <BarChart
+                    data={summary.series}
+                    accessibilityLayer
+                    margin={{ top: VALUE_AXIS_MARGIN_TOP, right: 0, bottom: 0, left: 0 }}
+                  >
                     <CartesianGrid vertical={false} />
                     <XAxis
                       dataKey="bucket"
-                      tickFormatter={(value) => date.format(new Date(value))}
                       minTickGap={50}
-                      tickLine={false}
-                      axisLine={false}
+                      {...timeAxis((value) => date.format(new Date(String(value))))}
                     />
-                    <YAxis width={58} tickLine={false} axisLine={false} />
+                    <YAxis {...valueAxis({ unit: "条事件" })} />
                     <ChartTooltip
                       content={
                         <ChartTooltipContent

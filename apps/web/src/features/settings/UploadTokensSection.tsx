@@ -149,7 +149,7 @@ export function UploadTokensSection({ projectId }: { projectId: string }) {
                     </TableCell>
                     <TableCell>
                       {revoked ? (
-                        <Badge variant="outline" title={formatDate(token.revokedAt!)}>
+                        <Badge variant="secondary" title={formatDate(token.revokedAt!)}>
                           已吊销
                         </Badge>
                       ) : (

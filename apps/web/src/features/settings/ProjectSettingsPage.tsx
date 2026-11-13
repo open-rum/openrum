@@ -17,6 +17,7 @@ import {
   type SDKPlatform,
 } from "@/lib/api/projects";
 import { ProjectPlatformSelector } from "@/features/projects/ProjectPlatformSelector";
+import { REVENUE_CURRENCIES } from "@/lib/currency";
 import { SettingsShell } from "./SettingsShell";
 
 export function ProjectSettingsRoute() {
@@ -92,6 +93,7 @@ function GeneralForm({ project, canManage }: { project: Project; canManage: bool
           sdkPlatform,
           allowedOrigins: parseOrigins(String(form.get("allowedOrigins") ?? "")),
           retentionDays: Number(form.get("retentionDays") ?? project.retentionDays),
+          revenueCurrency: String(form.get("revenueCurrency") ?? ""),
         });
       }}
     >
@@ -105,6 +107,23 @@ function GeneralForm({ project, canManage }: { project: Project; canManage: bool
           onValueChange={setSDKPlatform}
           disabled={disabled}
         />
+      </div>
+      <div className="mt-5 grid items-start gap-5 sm:grid-cols-2">
+        <Field label="收入币种" hint="仅用于标注金额，不进行汇率换算">
+          <select
+            name="revenueCurrency"
+            className="select mt-2 w-full font-normal"
+            defaultValue={project.revenueCurrency ?? ""}
+            disabled={disabled}
+          >
+            <option value="">不标注币种</option>
+            {REVENUE_CURRENCIES.map((currency) => (
+              <option key={currency.code} value={currency.code}>
+                {currency.name}（{currency.code}）
+              </option>
+            ))}
+          </select>
+        </Field>
       </div>
       <div className="mt-5">
         <Field label="允许的 Origin" hint="每行一个，不含路径；移除后该站点的上报立即被拒绝">

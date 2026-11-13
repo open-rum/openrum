@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { timeAxis, valueAxis, VALUE_AXIS_MARGIN_TOP } from "@/lib/charts/axes";
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
 import {
   ChartContainer,
@@ -39,7 +40,10 @@ const distributionLabels: Record<Distribution, string> = {
  * or users) beside a ranked breakdown (type, page or country). It replaces three tall charts
  * so the list the person acts on starts on the first screen.
  */
-export function IssueOverview({ overview, hasHistoricalIssues = false }: {
+export function IssueOverview({
+  overview,
+  hasHistoricalIssues = false,
+}: {
   overview: IssueOverviewResponse;
   hasHistoricalIssues?: boolean;
 }) {
@@ -91,24 +95,16 @@ export function IssueOverview({ overview, hasHistoricalIssues = false }: {
             <BarChart
               accessibilityLayer
               data={data}
-              margin={{ top: 6, right: 8, bottom: 0, left: 0 }}
+              margin={{ top: VALUE_AXIS_MARGIN_TOP, right: 0, bottom: 0, left: 0 }}
             >
               <CartesianGrid vertical={false} />
               <XAxis
                 dataKey="timestamp"
                 ticks={chartTicks(data, width).map((label) => Date.parse(label))}
                 interval={0}
-                tickFormatter={formatIssueTrendTime}
-                axisLine={false}
-                tickLine={false}
+                {...timeAxis((value) => formatIssueTrendTime(Number(value)))}
               />
-              <YAxis
-                allowDecimals={false}
-                width={36}
-                tickCount={3}
-                axisLine={false}
-                tickLine={false}
-              />
+              <YAxis allowDecimals={false} tickCount={3} {...valueAxis()} />
               <ChartTooltip
                 cursor={false}
                 content={<ChartTooltipContent labelFormatter={formatIssueTrendTooltip} />}

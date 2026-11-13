@@ -161,10 +161,13 @@ export function ConsolePageTabs({
   className?: string;
 }) {
   return (
-    // daisyUI's `tabs-border` marks only the active tab; a full-width rule under it would
-    // read as a second, unrelated line. Tabs sit closer to their content than to the
-    // header so they read as that content's navigation.
-    <div className={cn("-mb-3 min-w-0", className)} data-console-page-tabs="">
+    // A full-width rule runs under the tabs and the active indicator (daisyUI draws it at the
+    // tab's bottom edge) sits on it: the list overlaps the rule by its own 1px. Sizes and
+    // colours live with `[data-console-page-tabs]` in styles.css.
+    <div
+      className={cn("min-w-0 border-b border-base-content/15", className)}
+      data-console-page-tabs=""
+    >
       {children}
     </div>
   );

@@ -61,6 +61,7 @@ export function adminOverviewQueryOptions() {
     queryKey: ["admin", "overview"],
     queryFn: ({ signal }) => requestJSON(adminOverviewSchema, "/api/v1/admin/overview", { signal }),
     staleTime: 15_000,
+    refetchInterval: 30_000,
   });
 }
 

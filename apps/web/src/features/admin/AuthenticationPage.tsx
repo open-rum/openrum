@@ -4,6 +4,7 @@ import { SiGithub } from "@icons-pack/react-simple-icons";
 import { Building2Icon, CheckIcon, KeyRoundIcon, ShieldCheckIcon } from "lucide-react";
 import { GoogleIcon } from "@/components/icons/GoogleIcon";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -393,31 +394,15 @@ export function AuthenticationPage() {
 type ProviderStatus = { tone: "enabled" | "configured" | "empty"; label: string };
 
 // Enabled is the only state that changes the sign-in page, so it gets the strongest
-// treatment; configured-but-off warns, and unconfigured stays a quiet dashed outline.
+// treatment; configured-but-off warns, and unconfigured stays neutral.
+const statusPillVariant = {
+  enabled: "success",
+  configured: "warning",
+  empty: "secondary",
+} as const;
+
 function StatusPill({ status }: { status: ProviderStatus }) {
-  return (
-    <span
-      className={cn(
-        "badge badge-sm badge-outline gap-1.5 font-medium",
-        status.tone === "enabled" &&
-          "border-transparent bg-[var(--ds-success-soft)] text-[var(--ds-success)]",
-        status.tone === "configured" &&
-          "border-transparent bg-[var(--ds-warning-soft)] text-[var(--ds-warning)]",
-        status.tone === "empty" && "border-dashed border-border text-muted-foreground",
-      )}
-    >
-      <span
-        className={cn(
-          "size-1.5 rounded-full",
-          status.tone === "enabled" && "bg-[var(--ds-success)]",
-          status.tone === "configured" && "bg-[var(--ds-warning)]",
-          status.tone === "empty" && "bg-[var(--ds-text-muted)]",
-        )}
-        aria-hidden="true"
-      />
-      {status.label}
-    </span>
-  );
+  return <Badge variant={statusPillVariant[status.tone]}>{status.label}</Badge>;
 }
 
 // Brands keep their own mark (Google's multicolour G, GitHub's black Octocat);

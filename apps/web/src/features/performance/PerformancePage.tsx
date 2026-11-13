@@ -169,7 +169,9 @@ function ProjectPerformance({ project }: { project: Project }) {
         description={
           filters.route && query.data?.summary
             ? `${query.data.summary.pageViews.toLocaleString()} 次页面浏览 · ${formatRange(filters.from, filters.to)}`
-            : undefined
+            : filters.route
+              ? undefined
+              : "用真实访问的 Core Web Vitals 评估体验，先看整体评分，再定位拖慢体验的路由。"
         }
         titleAside={
           DevDataQuickEntry ? (

@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useParams } from "@tanstack/react-router";
-import { ListTreeIcon, RefreshCwIcon } from "lucide-react";
+import { ListTreeIcon } from "lucide-react";
 import { AsyncError } from "@/components/ui/AsyncState";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -67,17 +67,6 @@ function ProjectEvents({ project }: { project: Project }) {
       <ConsolePageHeader
         title="事件管理与探索"
         description="检查事件目录、趋势、属性定义和脱敏原始样本，并沿会话时间线复现行为。"
-        actions={
-          <Button
-            size="icon"
-            variant="outline"
-            aria-label="刷新事件数据"
-            onClick={() => void query.refetch()}
-            disabled={query.isFetching}
-          >
-            <RefreshCwIcon className={query.isFetching ? "animate-spin" : undefined} />
-          </Button>
-        }
       />
       <ConsoleFilterBar
         primary={

@@ -6,7 +6,7 @@ import { describe, expect, it, vi } from "vitest";
 import { ChartSwitch } from "./ChartSwitch";
 
 describe("ChartSwitch", () => {
-  it("marks the chosen option as the active boxed tab and reports a new choice", async () => {
+  it("is the segmented control: the chosen option is checked and a new choice is reported", async () => {
     const onChange = vi.fn();
     render(
       <ChartSwitch
@@ -19,13 +19,15 @@ describe("ChartSwitch", () => {
         onChange={onChange}
       />,
     );
-    const group = screen.getByRole("group", { name: "切换趋势指标" });
-    expect(group.className).toContain("tabs-box");
-    const events = screen.getByRole("button", { name: "事件" });
-    expect(events.getAttribute("aria-pressed")).toBe("true");
-    expect(events.className).toContain("tab-active");
-    expect(screen.getByRole("button", { name: "用户" }).className).not.toContain("tab-active");
-    await userEvent.click(screen.getByRole("button", { name: "用户" }));
+    const group = screen.getByRole("radiogroup", { name: "切换趋势指标" });
+    expect(group.querySelector('[data-slot="toggle-group-thumb"]')).not.toBeNull();
+    expect(screen.getByRole("radio", { name: "事件" }).getAttribute("aria-checked")).toBe("true");
+    expect(screen.getByRole("radio", { name: "用户" }).getAttribute("aria-checked")).toBe("false");
+    await userEvent.click(screen.getByRole("radio", { name: "用户" }));
     expect(onChange).toHaveBeenCalledWith("users");
+    // Clicking the chosen option again never clears the chart's choice.
+    onChange.mockClear();
+    await userEvent.click(screen.getByRole("radio", { name: "事件" }));
+    expect(onChange).not.toHaveBeenCalled();
   });
 });

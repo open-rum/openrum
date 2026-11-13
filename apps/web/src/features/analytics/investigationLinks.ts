@@ -35,7 +35,7 @@ export function analysisReturnHref(projectId: string, search: string) {
     const url = new URL(value, window.location.origin);
     const base = `/projects/${encodeURIComponent(projectId)}/analytics`;
     return url.origin === window.location.origin &&
-      [base, `${base}/funnels`, `${base}/paths`].includes(url.pathname)
+      [base, `${base}/events`, `${base}/funnels`, `${base}/paths`].includes(url.pathname)
       ? `${url.pathname}${url.search}`
       : undefined;
   } catch {

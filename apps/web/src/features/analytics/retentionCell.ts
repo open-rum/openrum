@@ -14,11 +14,13 @@ export function retentionCell(
   const from = Date.parse(data.from);
   const to = Date.parse(data.to);
   if (start >= now) return { label: "待观察", description: "该自然周尚未开始" };
-  if (start >= to || end <= from) return { label: "范围外", description: "该自然周不在当前查询范围内" };
+  if (start >= to || end <= from)
+    return { label: "范围外", description: "该自然周不在当前查询范围内" };
   if (cohort.users === 0) return { label: "无数据", description: "没有可用的起始用户" };
   const point = cohort.retention.find((item) => item.weekIndex === weekIndex);
   const partial = end > Math.min(to, now) || start < from;
-  if (!point && partial) return { label: "观察中", description: "当前只覆盖部分自然周，尚未观测到回访" };
+  if (!point && partial)
+    return { label: "观察中", description: "当前只覆盖部分自然周，尚未观测到回访" };
   // The query emits a point only for an observed active week. A missing, fully
   // queried week is a measured zero, while future/out-of-range weeks remain unknown.
   const rate = point?.rate ?? 0;

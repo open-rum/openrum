@@ -4,6 +4,7 @@ import {
   apiFailureRate,
   formatAPIFailureRate,
   formatAPIDuration,
+  sampledNote,
   type APISummary,
   type APITrendPoint,
 } from "@/lib/api/apis";
@@ -32,14 +33,18 @@ export function ApiOverview({
         <SummaryCard
           label="请求量"
           value={Math.round(summary.estimated).toLocaleString()}
-          note={`${summary.requests.toLocaleString()} 个采样事件`}
+          note={summary.requests ? (sampledNote(summary) ?? "按全部请求计数") : "暂无请求样本"}
           change={relativeChange(summary.estimated, previous?.estimated)}
           direction="neutral"
         />
         <SummaryCard
           label="失败率"
           value={formatAPIFailureRate(summary)}
-          note={failureRate === null ? "暂无请求样本，无法计算失败率" : `${summary.failures.toLocaleString()} 次失败 · 不含 4xx`}
+          note={
+            failureRate === null
+              ? "暂无请求样本，无法计算失败率"
+              : `5xx 与网络错误 · 不含 ${summary.clientErrors.toLocaleString()} 次 4xx`
+          }
           change={pointChange(failureRate, previousFailureRate)}
           direction="inverse"
         />
@@ -47,18 +52,24 @@ export function ApiOverview({
           label="P95 延迟"
           value={formatAPIDuration(summary.p95)}
           note={`P50 ${formatAPIDuration(summary.p50)} · P75 ${formatAPIDuration(summary.p75)}`}
-          change={summary.requests > 0 && previous && previous.requests > 0 ? relativeChange(summary.p95, previous.p95) : undefined}
+          change={
+            summary.requests > 0 && previous && previous.requests > 0
+              ? relativeChange(summary.p95, previous.p95)
+              : undefined
+          }
           direction="inverse"
         />
         <SummaryCard
-          label="网络错误"
-          value={summary.networkErrors.toLocaleString()}
-          note={`${summary.serverErrors.toLocaleString()} 次 5xx · ${summary.clientErrors.toLocaleString()} 次 4xx`}
-          change={relativeChange(summary.networkErrors, previous?.networkErrors)}
+          label="失败请求"
+          value={summary.failures.toLocaleString()}
+          note={`${summary.serverErrors.toLocaleString()} 次 5xx · ${summary.networkErrors.toLocaleString()} 次网络错误`}
+          change={relativeChange(summary.failures, previous?.failures)}
           direction="inverse"
         />
       </div>
-      {summary.requests > 0 ? <ApiCharts trend={trend} range={range} scope="全部 endpoint" /> : null}
+      {summary.requests > 0 ? (
+        <ApiCharts trend={trend} range={range} scope="全部 endpoint" />
+      ) : null}
     </section>
   );
 }

@@ -1,14 +1,14 @@
 import { useQuery } from "@tanstack/react-query";
 import { useParams } from "@tanstack/react-router";
-import { ChartNoAxesCombinedIcon, RefreshCwIcon } from "lucide-react";
+import { ChartNoAxesCombinedIcon, TriangleAlertIcon } from "lucide-react";
 import {
   ConsoleFilterBar,
   ConsolePage,
   ConsolePageHeader,
   ConsolePageTabs,
 } from "@/components/layout/ConsolePage";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AsyncError } from "@/components/ui/AsyncState";
-import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -73,21 +73,10 @@ function ProjectAnalysis({ project }: { project: Project }) {
     <ConsolePage width="fluid">
       <ConsolePageHeader
         title="用户行为分析"
-        description="从访问、用户和会话趋势理解产品使用情况，再按受控维度定位差异。"
-        actions={
-          <Button
-            size="icon"
-            variant="outline"
-            aria-label="刷新行为分析"
-            onClick={() => void query.refetch()}
-            disabled={query.isFetching}
-          >
-            <RefreshCwIcon />
-          </Button>
-        }
+        description="查看访问、用户与会话趋势，并按维度对比差异。"
       />
       <ConsolePageTabs>
-        <AnalysisTabs projectId={project.id} active="overview" />
+        <AnalysisTabs projectId={project.id} active="events" />
       </ConsolePageTabs>
       <ConsoleFilterBar
         primary={<BehaviorControls filters={filters} data={data} onChange={update} />}
@@ -103,10 +92,14 @@ function ProjectAnalysis({ project }: { project: Project }) {
       ) : null}
       {data && data.totals.events > 0 ? (
         <>
-          <div className="behavior-freshness" data-stale={data.freshness.stale || undefined}>
-            {data.freshness.latestReceivedAt
-              ? `数据更新于 ${formatRelative(data.freshness.ageSeconds)}`
-              : "暂无新鲜度信息"}
+          {data.freshness.stale ? (
+            <Alert variant="warning" role="status">
+              <TriangleAlertIcon aria-hidden="true" />
+              <AlertDescription>{freshnessLabel(data.freshness)}，可能不是最新。</AlertDescription>
+            </Alert>
+          ) : null}
+          <div className="behavior-freshness">
+            {freshnessLabel(data.freshness)}
             <span>统计为近似去重，采样估算已单独标记</span>
           </div>
           <section className="behavior-kpis" aria-label="行为核心指标">
@@ -378,4 +371,13 @@ function kindLabel(value: string) {
       >
     )[value] ?? value
   );
+}
+
+function freshnessLabel(freshness: {
+  latestReceivedAt?: string | null;
+  ageSeconds: number | null;
+}) {
+  return freshness.latestReceivedAt
+    ? `数据更新于 ${formatRelative(freshness.ageSeconds)}`
+    : "暂无新鲜度信息";
 }

@@ -32,8 +32,8 @@ function ToggleGroup({
     spacing?: number;
     orientation?: "horizontal" | "vertical";
   }) {
-  // Every horizontal single-select outline group is a segmented control: daisyUI's `join`
-  // of buttons, the selected one in the primary colour.
+  // Every horizontal single-select outline group is a segmented control: the options sit on
+  // a `base-200` track and a `primary` thumb slides to the selected one.
   const segmented =
     props.type === "single" &&
     orientation === "horizontal" &&
@@ -49,11 +49,12 @@ function ToggleGroup({
       style={{ "--gap": segmented ? 0 : spacing } as React.CSSProperties}
       className={cn(
         "group/toggle-group flex w-fit flex-row items-center gap-[--spacing(var(--gap))] rounded-full data-vertical:rounded-box data-vertical:flex-col data-vertical:items-stretch",
-        segmented && "join",
+        segmented && "relative gap-0 rounded-[calc(var(--radius-field)+0.25rem)] bg-base-200 p-1",
         className,
       )}
       {...props}
     >
+      {segmented ? <SegmentedThumb /> : null}
       <ToggleGroupContext.Provider
         value={{
           variant: itemVariant,
@@ -65,6 +66,57 @@ function ToggleGroup({
         {children}
       </ToggleGroupContext.Provider>
     </ToggleGroupPrimitive.Root>
+  );
+}
+
+/**
+ * The sliding thumb behind the selected option. It follows the item whose `data-state` is
+ * `on`, whether the group is controlled or not, and re-measures when the group resizes.
+ * The first position is set without a transition; reduced motion turns the slide off.
+ */
+function SegmentedThumb() {
+  const ref = React.useRef<HTMLSpanElement>(null);
+  const [box, setBox] = React.useState<{ left: number; width: number } | null>(null);
+  const [ready, setReady] = React.useState(false);
+
+  React.useLayoutEffect(() => {
+    const group = ref.current?.parentElement;
+    if (!group) return;
+    const measure = () => {
+      const item = group.querySelector<HTMLElement>(
+        ':scope > [data-slot="toggle-group-item"][data-state="on"]',
+      );
+      setBox(item ? { left: item.offsetLeft, width: item.offsetWidth } : null);
+    };
+    measure();
+    const frame = requestAnimationFrame(() => setReady(true));
+    const mutations = new MutationObserver(measure);
+    mutations.observe(group, { attributes: true, attributeFilter: ["data-state"], subtree: true });
+    const resize = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(measure);
+    resize?.observe(group);
+    return () => {
+      cancelAnimationFrame(frame);
+      mutations.disconnect();
+      resize?.disconnect();
+    };
+  }, []);
+
+  return (
+    <span
+      ref={ref}
+      aria-hidden="true"
+      data-slot="toggle-group-thumb"
+      className={cn(
+        "pointer-events-none absolute inset-y-1 left-0 rounded-field bg-primary shadow-sm",
+        ready &&
+          "transition-[translate,width,opacity] duration-300 ease-[cubic-bezier(0.34,1.3,0.64,1)] motion-reduce:transition-none",
+      )}
+      style={{
+        width: box?.width ?? 0,
+        translate: `${box?.left ?? 0}px 0`,
+        opacity: box ? 1 : 0,
+      }}
+    />
   );
 }
 

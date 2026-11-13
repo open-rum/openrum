@@ -87,3 +87,14 @@ func TestChannelSettingsAreNormalizedPerKind(t *testing.T) {
 		t.Fatal("a webhook resolving to a private address must be refused when it is saved")
 	}
 }
+
+func TestAlertRuleResponseCarriesRecentStatuses(t *testing.T) {
+	response := alertRuleDTO(metadata.AlertRule{RecentStatuses: []string{"ok", "breached"}})
+	if len(response.RecentStatuses) != 2 || response.RecentStatuses[1] != "breached" {
+		t.Fatalf("recent statuses were dropped: %+v", response)
+	}
+	// A rule that was never evaluated still serializes an empty list, not null.
+	if empty := alertRuleDTO(metadata.AlertRule{}); empty.RecentStatuses == nil {
+		t.Fatal("a never-evaluated rule must report an empty list")
+	}
+}

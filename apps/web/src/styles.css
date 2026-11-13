@@ -653,6 +653,14 @@ select {
   justify-content: center;
   padding: 8px 0 10px;
 }
+/* The project switcher is only a name, an environment and an up/down caret; with the names
+   hidden the caret would stand alone beside the mark. The mark still links to the projects. */
+.app-shell[data-sidebar-state="collapsed"] .sidebar__brand-row > button.brand {
+  display: none;
+}
+.app-shell[data-sidebar-state="collapsed"] .sidebar__brand-row > a {
+  padding-left: 0;
+}
 .app-shell[data-sidebar-state="collapsed"] .brand__identity,
 .app-shell[data-sidebar-state="collapsed"] .nav-item span,
 .app-shell[data-sidebar-state="collapsed"] .sidebar__utility-nav > small,
@@ -715,6 +723,57 @@ select {
   min-width: 0;
   min-height: 100vh;
 }
+/* The development-only 造数据 button floats bottom-right; leave room so the end of a page
+   (table edges, pagination, form buttons) can scroll clear of it. */
+.app-shell[data-floating-tools] [data-console-page] {
+  padding-bottom: 6rem;
+}
+/* Page-level tabs (ConsolePageTabs) are a page's main navigation, so they are larger than
+   the line tabs inside cards: 15px labels on a 44px row, the selected label in semibold with
+   a primary indicator, the others muted. Unlayered so it wins over daisyUI's tab rules. */
+[data-console-page-tabs] [data-slot="tabs-list"] {
+  --tab-height: 2.75rem;
+  gap: 0.5rem;
+  margin-bottom: -1px;
+}
+[data-console-page-tabs] [data-slot="tabs-trigger"] {
+  --tab-p: 0.75rem;
+  font-size: 0.9375rem;
+  color: color-mix(in oklab, var(--color-base-content) 70%, transparent);
+}
+[data-console-page-tabs] [data-slot="tabs-trigger"]:hover,
+[data-console-page-tabs] [data-slot="tabs-trigger"][aria-selected="true"] {
+  color: var(--color-base-content);
+}
+[data-console-page-tabs] [data-slot="tabs-trigger"][aria-selected="true"] {
+  font-weight: 600;
+}
+[data-console-page-tabs] [data-slot="tabs-trigger"][aria-selected="true"]::before {
+  background-color: var(--color-primary);
+}
+/* The theme menu's action row (hold to add, random) sits in a menu `li` but is not a menu
+   item: no item padding, hover fill or pointer. Unlayered so it wins over daisyUI's menu. */
+[data-theme-actions] > div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.25rem 0.25rem 0.5rem;
+  border-bottom: 1px solid var(--color-base-300);
+  margin-bottom: 0.25rem;
+  border-radius: 0;
+  background: transparent;
+  cursor: default;
+}
+[data-theme-actions] > div:hover {
+  background: transparent;
+}
+/* Both actions share one size: the hold button's small size uses caption text otherwise. */
+[data-theme-actions] .hold-button {
+  height: calc(var(--size-field, 0.25rem) * 8);
+  font-size: 0.875rem;
+  font-weight: 400;
+}
+
 .route-loading {
   display: flex;
   align-items: center;
@@ -749,8 +808,9 @@ select {
   min-height: 58px;
   padding: 7px clamp(16px, 2.5vw, 32px) 7px 8px;
   padding-right: 8px;
-  border-bottom: 1px solid var(--ds-border);
-  background: color-mix(in srgb, var(--ds-canvas) 92%, transparent);
+  border-bottom: 1px solid var(--line);
+  /* Same surface as the sidebar, so the two frame the page canvas as one L. */
+  background: color-mix(in srgb, var(--ds-sidebar) 92%, transparent);
   backdrop-filter: blur(12px);
   display: flex;
   align-items: center;
@@ -2079,16 +2139,6 @@ body {
   align-items: center;
   gap: var(--space-2);
 }
-.analysis-tabs {
-  border-bottom: 1px solid var(--ds-border);
-}
-.analysis-tabs [data-slot="tabs-list"] {
-  height: 36px;
-}
-.analysis-tabs [data-slot="tabs-trigger"] {
-  min-width: 64px;
-  padding-inline: 12px;
-}
 .behavior-toolbar {
   min-height: 52px;
   padding: 9px;
@@ -2112,9 +2162,6 @@ body {
   gap: var(--space-3);
   color: var(--ds-text-muted);
   font-size: var(--text-caption);
-}
-.behavior-freshness[data-stale] {
-  color: var(--ds-warning);
 }
 .behavior-freshness span {
   padding-left: var(--space-3);
@@ -3530,17 +3577,6 @@ dd.event-session {
   height: 14px;
   flex: none;
 }
-.event-freshness[data-stale] {
-  padding: 4px 10px;
-  border-radius: var(--radius-control);
-  color: var(--ds-warning);
-  background: var(--ds-warning-soft);
-  font-size: var(--text-table);
-  font-weight: 550;
-}
-.event-freshness[data-stale] small {
-  display: none;
-}
 .event-chips__more {
   cursor: help;
 }
@@ -4322,7 +4358,7 @@ dd.event-session {
   font-size: var(--text-caption);
 }
 .stack-frames__failure {
-  color: var(--ds-warning);
+  color: var(--ds-warning-ink);
   font-size: var(--text-caption);
   line-height: 1.4;
   white-space: normal;
@@ -4342,7 +4378,7 @@ dd.event-session {
   width: 18px;
   margin-top: 2px;
   flex: 0 0 auto;
-  color: var(--ds-warning);
+  color: var(--ds-warning-ink);
 }
 .stack-guidance > div {
   min-width: 220px;
@@ -4616,7 +4652,7 @@ dd.event-session {
 }
 .event-breadcrumbs__icon[data-category="log"][data-level="warn"],
 .event-breadcrumbs__icon[data-category="log"][data-level="warning"] {
-  color: var(--ds-warning);
+  color: var(--ds-warning-ink);
   background: var(--ds-warning-soft);
 }
 .event-breadcrumbs__icon[data-category="api"][data-failed],
@@ -4863,7 +4899,7 @@ dd.event-session {
   background: var(--ds-success-soft);
 }
 .performance-icon--needs-improvement {
-  color: var(--ds-warning);
+  color: var(--ds-warning-ink);
   background: var(--ds-warning-soft);
 }
 .performance-icon--poor {
@@ -4880,7 +4916,7 @@ dd.event-session {
 }
 .performance-rating--needs-improvement {
   border-color: color-mix(in srgb, var(--ds-warning) 40%, var(--ds-border));
-  color: var(--ds-warning);
+  color: var(--ds-warning-ink);
   background: var(--ds-warning-soft);
 }
 .performance-rating--poor {
@@ -5289,7 +5325,7 @@ dd.event-session {
   font-size: var(--text-caption);
 }
 .apis-table td small.apis-insufficient {
-  color: var(--ds-warning);
+  color: var(--ds-warning-ink);
   font-weight: 600;
 }
 .apis-table td span[data-level="danger"],
@@ -5299,8 +5335,47 @@ dd.event-session {
 }
 .apis-table td span[data-level="warning"],
 .api-detail-section td span[data-level="warning"] {
-  color: var(--ds-warning);
+  color: var(--ds-warning-ink);
   font-weight: 650;
+}
+/* Figures line up on the right so a column can be compared at a glance. */
+.apis-table th.apis-number,
+.apis-table td.apis-number {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.apis-sort-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.apis-sort-button svg {
+  width: 13px;
+  height: 13px;
+  opacity: 0;
+}
+.apis-sort-button:hover,
+.apis-sort-button[data-active] {
+  color: var(--ds-text);
+}
+.apis-sort-button:hover svg {
+  opacity: 0.45;
+}
+.apis-sort-button[data-active] svg {
+  opacity: 1;
+}
+.apis-sort-button:focus-visible {
+  outline: 2px solid var(--ds-ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-selector);
+}
+.api-charts__none {
+  color: var(--ds-text-muted);
+  font-size: var(--text-table);
+  text-align: center;
 }
 .apis-truncated {
   padding: var(--space-3) var(--space-4);
@@ -6061,7 +6136,7 @@ dd.event-session {
   font-size: var(--text-caption);
 }
 .api-detail-section td span[data-slower="true"] {
-  color: var(--ds-warning);
+  color: var(--ds-warning-ink);
   font-weight: 650;
 }
 .api-detail-section td a {
@@ -6350,7 +6425,7 @@ dd.event-session {
   min-width: 0;
 }
 .artifact-drop__blocked {
-  color: var(--ds-warning) !important;
+  color: var(--ds-warning-ink) !important;
 }
 .artifact-drop__actions {
   display: flex;
@@ -7643,17 +7718,4 @@ body {
 }
 tr[data-disabled] td:first-child {
   opacity: 0.6;
-}
-
-.project-status-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--ds-text-muted);
-}
-.project-status-dot[data-status="active"] {
-  background: var(--ds-success);
-}
-.project-status-dot[data-status="deleting"] {
-  background: var(--ds-warning);
 }

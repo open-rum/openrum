@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { SearchIcon, ShieldCheckIcon } from "lucide-react";
+import { SearchIcon } from "lucide-react";
 import { AsyncError, AsyncLoading } from "@/components/ui/AsyncState";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -36,10 +36,7 @@ export function AuditPage() {
     >
       <Card>
         <CardHeader className="border-b">
-          <CardTitle className="flex items-center gap-2">
-            <ShieldCheckIcon className="size-4" />
-            最近 100 条操作
-          </CardTitle>
+          <CardTitle>最近 100 条操作</CardTitle>
           <CardDescription>按操作人、资源路径或 Request ID 搜索。</CardDescription>
         </CardHeader>
         <CardContent className="pt-5">

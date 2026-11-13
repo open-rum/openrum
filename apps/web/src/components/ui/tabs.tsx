@@ -64,6 +64,17 @@ function TabsTrigger({ className, ...props }: React.ComponentProps<typeof TabsPr
   );
 }
 
+/** A tab's item count. Counts that need attention (pending requests) use a badge instead. */
+function TabsCount({ className, ...props }: React.ComponentProps<"span">) {
+  return (
+    <span
+      data-slot="tabs-count"
+      className={cn("text-xs text-muted-foreground tabular-nums", className)}
+      {...props}
+    />
+  );
+}
+
 function TabsContent({ className, ...props }: React.ComponentProps<typeof TabsPrimitive.Content>) {
   return (
     <TabsPrimitive.Content
@@ -74,4 +85,4 @@ function TabsContent({ className, ...props }: React.ComponentProps<typeof TabsPr
   );
 }
 
-export { Tabs, TabsList, TabsTrigger, TabsContent };
+export { Tabs, TabsList, TabsTrigger, TabsCount, TabsContent };

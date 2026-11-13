@@ -162,7 +162,7 @@ function ProjectIssues({ project }: { project: Project }) {
     <ConsolePage width="fluid">
       <ConsolePageHeader
         title="错误问题"
-        description="先判断影响，再定位原因。相同异常聚合为一个问题，点击查看堆栈与事件现场。"
+        description="相同异常聚合为一个问题，可查看影响范围、堆栈与事件现场。"
       />
       <ConsoleFilterBar
         primary={

@@ -178,7 +178,7 @@ export function ArtifactUploader({
                       <code>{artifactNameFor(file.relativePath, prefix)}</code>
                       <small>{formatBytes(file.file.size)}</small>
                     </div>
-                    <Badge variant="outline">待上传</Badge>
+                    <Badge variant="secondary">待上传</Badge>
                   </li>
                 ))}
           </ol>

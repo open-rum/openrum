@@ -2,7 +2,7 @@ import { UsageFilters } from "./UsageFilters";
 import { useMemo } from "react";
 import { Link, useRouterState, useNavigate, useParams } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { DownloadIcon, GaugeIcon, SlidersHorizontalIcon } from "lucide-react";
+import { DownloadIcon, SlidersHorizontalIcon } from "lucide-react";
 import { ConsolePage, ConsolePageHeader, ConsoleFilterBar } from "@/components/layout/ConsolePage";
 import { AsyncError } from "@/components/ui/AsyncState";
 import { Button } from "@/components/ui/button";
@@ -142,7 +142,6 @@ function ProjectUsage({ project }: { project: Project }) {
           </section>
           <section className="card card-border mt-8 overflow-hidden bg-base-100">
             <div className="flex items-center gap-2 border-b border-base-300 px-5 py-4">
-              <GaugeIcon className="size-4" />
               <h2 className="font-semibold">原因明细</h2>
             </div>
             <div className="overflow-x-auto">
@@ -158,6 +157,13 @@ function ProjectUsage({ project }: { project: Project }) {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
+                  {usage.data.breakdown.length === 0 ? (
+                    <tr>
+                      <td className="px-5 py-10 text-center text-muted-foreground" colSpan={6}>
+                        当前范围没有用量记录。
+                      </td>
+                    </tr>
+                  ) : null}
                   {usage.data.breakdown
                     .slice(-20)
                     .reverse()

@@ -20,14 +20,14 @@ describe("ThemeController", () => {
     );
   });
 
-  it("applies and remembers a daisyUI theme, and follows the system again", async () => {
+  it("applies and remembers a daisyUI theme, and offers no system option", async () => {
     const user = userEvent.setup();
     render(
       <ThemeProvider>
         <ThemeController />
       </ThemeProvider>,
     );
-    expect(screen.getByRole("button", { name: "切换主题，当前为 跟随系统" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "切换主题，当前为 light" })).toBeTruthy();
     expect(document.documentElement.dataset.theme).toBe("light");
 
     await user.click(screen.getByRole("button", { name: "dracula", hidden: true }));
@@ -38,8 +38,10 @@ describe("ThemeController", () => {
     await user.click(screen.getByRole("button", { name: "cupcake", hidden: true }));
     expect(document.documentElement.classList.contains("dark")).toBe(false);
 
-    await user.click(screen.getByRole("button", { name: "跟随系统", hidden: true }));
+    expect(screen.queryByRole("button", { name: "跟随系统", hidden: true })).toBeNull();
+
+    await user.click(screen.getByRole("button", { name: "light", hidden: true }));
     expect(document.documentElement.dataset.theme).toBe("light");
-    expect(window.localStorage.getItem("openrum-theme")).toBe("system");
+    expect(window.localStorage.getItem("openrum-theme")).toBe("light");
   });
 });

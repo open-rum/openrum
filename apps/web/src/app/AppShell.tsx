@@ -18,7 +18,11 @@ export function AppShell({
   contentKey?: string;
 }) {
   return (
-    <div className="app-shell" data-sidebar-state={sidebarCollapsed ? "collapsed" : "expanded"}>
+    <div
+      className="app-shell"
+      data-sidebar-state={sidebarCollapsed ? "collapsed" : "expanded"}
+      data-floating-tools={floatingTools ? "" : undefined}
+    >
       <a className="skip-link" href="#main-content">
         跳到主要内容
       </a>

@@ -119,7 +119,6 @@ export function ProjectKeys({ projectId }: ProjectKeysProps) {
           <div className="flex flex-col gap-5">
             <div>
               <div className="flex items-center gap-2">
-                <Key className="size-5 text-primary" weight="fill" aria-hidden="true" />
                 <h2 id="default-dsn-title" className="text-base font-semibold text-foreground">
                   默认 DSN
                 </h2>

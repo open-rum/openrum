@@ -20,8 +20,8 @@ decided to keep it for the Console only.
 - **daisyUI 5 for the Console.** `apps/web` loads `@plugin "daisyui" { themes: all; }`.
   Components use daisyUI classes and colour names; Radix primitives keep their behaviour with
   daisyUI-styled class strings. The rules live in `docs/agents/console-ui.md`.
-- **Themes, not palettes.** The theme is any built-in daisyUI theme or `system` (daisyUI light
-  or dark by the OS), stored as `openrum-theme` and written to `<html data-theme>` before
+- **Themes, not palettes.** The theme is any built-in daisyUI theme (`light` by default; "follow
+  the system" was removed on 2026-11-05), stored as `openrum-theme` and written to `<html data-theme>` before
   first paint. A top-right theme switch shows daisyUI's swatch icon. The amber/lime/magenta
   palettes and compact density are removed from the Console.
 - **Existing CSS follows the theme.** `styles/daisy.css` maps every `--ds-*` token and shadcn

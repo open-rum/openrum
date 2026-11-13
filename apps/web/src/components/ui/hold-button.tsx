@@ -57,10 +57,11 @@ export type HoldButtonProps = {
 };
 
 const tones = {
+  // Rest state matches `btn btn-error btn-soft`: same tint, same ink.
   destructive: {
-    background: "var(--ds-danger-soft)",
+    background: "color-mix(in oklab, var(--ds-danger) 8%, var(--ds-surface))",
     fill: "var(--ds-danger)",
-    text: "var(--ds-danger)",
+    text: "var(--ds-danger-ink)",
     fillText: "var(--ds-danger-foreground)",
   },
   primary: {

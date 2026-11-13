@@ -4,7 +4,12 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testi
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import type { Project } from "@/lib/api/projects";
-import { AnalysisContextControls, useAnalysisContextState } from "./AnalysisContextBar";
+import {
+  AnalysisContextControls,
+  AnalysisContextProvider,
+  AnalysisEnvironmentFilter,
+  useAnalysisContextState,
+} from "./AnalysisContextBar";
 
 const projectId = "11111111-1111-4111-8111-111111111111";
 const project = { id: projectId } as Project;
@@ -21,6 +26,44 @@ afterEach(() => {
   vi.useRealTimers();
   window.localStorage.removeItem(`openrum-analysis-context:${projectId}`);
   window.history.replaceState({}, "", "/");
+});
+
+describe("analysis environment filter", () => {
+  it("uses the shared select and clears the environment for 全部环境", async () => {
+    globalThis.ResizeObserver ??= class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    };
+    Element.prototype.hasPointerCapture = () => false;
+    Element.prototype.setPointerCapture = () => undefined;
+    Element.prototype.releasePointerCapture = () => undefined;
+    Element.prototype.scrollIntoView = () => undefined;
+    const user = userEvent.setup();
+    const update = vi.fn();
+    render(
+      <AnalysisContextProvider
+        value={{
+          projectId,
+          from: new Date("2026-09-11T09:28:00.000Z"),
+          to: new Date("2026-09-12T09:28:00.000Z"),
+          environment: "production",
+          update,
+        }}
+      >
+        <AnalysisEnvironmentFilter />
+      </AnalysisContextProvider>,
+    );
+
+    const trigger = screen.getByRole("combobox", { name: "分析环境" });
+    expect(trigger.getAttribute("data-slot")).toBe("select-trigger");
+    expect(trigger.textContent).toContain("生产 · production");
+
+    await user.click(trigger);
+    await user.click(await screen.findByRole("option", { name: "全部环境" }));
+
+    expect(update).toHaveBeenCalledWith({ environment: undefined });
+  });
 });
 
 describe("analysis time filter", () => {

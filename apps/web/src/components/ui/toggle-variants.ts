@@ -12,9 +12,11 @@ export const toggleVariants = cva(
         outline: "border-base-300 data-[state=on]:btn-active aria-pressed:btn-active",
         selection:
           "border-base-300 data-[state=on]:border-primary data-[state=on]:bg-primary/10 data-[state=on]:text-base-content aria-pressed:border-primary aria-pressed:bg-primary/10",
-        // Single-select segmented control: a `join-item` inside the group's `join`.
+        // Single-select segmented control: transparent options over the group's track; the
+        // group draws the sliding thumb behind the selected one. Utilities override daisyUI's
+        // pressed and hover button colours, which would otherwise fill the option itself.
         segmented:
-          "join-item btn-soft border-base-300 data-[state=on]:btn-primary data-[state=on]:btn-active",
+          "relative z-10 border-0 bg-transparent text-base-content/70 shadow-none hover:bg-transparent hover:text-base-content data-[state=on]:bg-transparent data-[state=on]:text-primary-content data-[state=on]:hover:text-primary-content",
         legend:
           "border-transparent bg-transparent font-normal text-base-content/70 shadow-none data-[state=on]:bg-transparent data-[state=off]:line-through data-[state=off]:opacity-50",
       },

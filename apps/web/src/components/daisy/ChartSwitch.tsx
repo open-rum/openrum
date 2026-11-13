@@ -1,10 +1,10 @@
 import type { ReactNode } from "react";
-import { cn } from "@/lib/utils";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
 /**
- * Switches what a chart card shows (its metric or dimension). daisyUI's small boxed tabs:
- * the chosen option is a raised `tab-active` in the text colour, so the switch stays quieter
- * than the data it controls. Form choices keep `ToggleGroup`.
+ * Switches what a chart card shows (its metric, dimension or chart type). It is the shared
+ * segmented control in its small size: a `base-200` track with the `primary` thumb sliding to
+ * the chosen option, like every other single choice in the Console (user request, 2026-11-11).
  */
 export function ChartSwitch<Key extends string>({
   label,
@@ -20,22 +20,24 @@ export function ChartSwitch<Key extends string>({
   className?: string;
 }) {
   return (
-    <div
-      className={cn("tabs tabs-box tabs-xs w-fit flex-nowrap", className)}
-      role="group"
+    <ToggleGroup
+      type="single"
+      variant="segmented"
+      size="sm"
       aria-label={label}
+      value={value}
+      // Radix reports an empty value when the chosen option is clicked again; a chart always
+      // shows something, so that click keeps the current choice.
+      onValueChange={(next) => {
+        if (next) onChange(next as Key);
+      }}
+      className={className}
     >
       {options.map(([key, text]) => (
-        <button
-          key={key}
-          type="button"
-          aria-pressed={key === value}
-          className={cn("tab gap-1.5 whitespace-nowrap", key === value && "tab-active")}
-          onClick={() => onChange(key)}
-        >
+        <ToggleGroupItem key={key} value={key} className="gap-1.5 whitespace-nowrap">
           {text}
-        </button>
+        </ToggleGroupItem>
       ))}
-    </div>
+    </ToggleGroup>
   );
 }

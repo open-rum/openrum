@@ -13,16 +13,34 @@ vi.mock("@/lib/api/projects", () => ({
   listProjects: async () => ({ projects: [{ id: "p1" }] }),
 }));
 vi.mock("@/lib/api/analytics", () => ({ getRetention: vi.fn() }));
-const context = { projectId: "p1", from: new Date("2026-11-04T00:00:00Z"), to: new Date("2026-11-05T00:00:00Z"), environment: "production", update: vi.fn() };
+const context = {
+  projectId: "p1",
+  from: new Date("2026-11-04T00:00:00Z"),
+  to: new Date("2026-11-05T00:00:00Z"),
+  environment: "production",
+  update: vi.fn(),
+};
 afterEach(cleanup);
 beforeEach(() => {
   vi.clearAllMocks();
   context.from = new Date("2026-11-04T00:00:00Z");
-  vi.mocked(getRetention).mockImplementation(async (input) => ({ from: input.from.toISOString(), to: input.to.toISOString(), weeks: input.weeks, identity: "anonymous_user_id", approximate: true, definition: "", cohorts: [] }));
+  vi.mocked(getRetention).mockImplementation(async (input) => ({
+    from: input.from.toISOString(),
+    to: input.to.toISOString(),
+    weeks: input.weeks,
+    identity: "anonymous_user_id",
+    approximate: true,
+    definition: "",
+    cohorts: [],
+  }));
 });
 function renderPage() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(<QueryClientProvider client={client}><RetentionPage /></QueryClientProvider>);
+  return render(
+    <QueryClientProvider client={client}>
+      <RetentionPage />
+    </QueryClientProvider>,
+  );
 }
 describe("weekly retention range", () => {
   it("offers 28 days without silently changing the shared range or environment", async () => {
@@ -30,7 +48,10 @@ describe("weekly retention range", () => {
     const button = await view.findByRole("button", { name: "查看截至所选时间的 28 天" });
     expect(context.update).not.toHaveBeenCalled();
     fireEvent.click(button);
-    expect(context.update).toHaveBeenCalledWith({ from: new Date("2026-10-08T00:00:00Z"), to: context.to });
+    expect(context.update).toHaveBeenCalledWith({
+      from: new Date("2026-10-08T00:00:00Z"),
+      to: context.to,
+    });
     await waitFor(() => expect(getRetention).toHaveBeenCalled());
     expect(vi.mocked(getRetention).mock.calls[0][0].environment).toBe("production");
   });

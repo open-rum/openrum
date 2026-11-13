@@ -1,4 +1,5 @@
 import { useId, useState } from "react";
+import { timeAxis, valueAxis, VALUE_AXIS_MARGIN_TOP } from "@/lib/charts/axes";
 import { ChartAreaIcon, ChartColumnIcon, ChartLineIcon } from "lucide-react";
 import { Area, Bar, CartesianGrid, ComposedChart, Line, XAxis, YAxis } from "recharts";
 import { ChartSwitch } from "@/components/daisy/ChartSwitch";
@@ -89,10 +90,7 @@ export function CombinedVitalTrend({
         </div>
       </CardHeader>
       <CardContent>
-        <div className="performance-axis-description">
-          <span>{hasTiming ? "左轴 · 耗时 ms" : ""}</span>
-          <span>{hasCLS ? "右轴 · CLS（无单位）" : ""}</span>
-        </div>
+        {/* Units sit on the axes themselves ("3,400 ms", "0.1 CLS"), so no caption row. */}
         {hasData ? (
           <ChartContainer
             className="performance-combined-chart"
@@ -104,7 +102,7 @@ export function CombinedVitalTrend({
             <ComposedChart
               accessibilityLayer
               data={data}
-              margin={{ top: 8, right: 0, bottom: 4, left: 0 }}
+              margin={{ top: VALUE_AXIS_MARGIN_TOP, right: 0, bottom: 4, left: 0 }}
               barCategoryGap="25%"
               barGap={1}
             >
@@ -127,30 +125,27 @@ export function CombinedVitalTrend({
               />
               <XAxis
                 dataKey="bucket"
-                tickLine={false}
-                axisLine={false}
                 minTickGap={40}
-                tickMargin={10}
-                tickFormatter={(value) => formatTrendDate(value, shortRange)}
+                {...timeAxis((value) => formatTrendDate(String(value), shortRange))}
               />
               <YAxis
                 yAxisId="time"
                 hide={!hasTiming}
-                tickLine={false}
-                axisLine={false}
-                width={52}
                 domain={[0, "auto"]}
-                tickFormatter={(value: number) => Math.round(value).toLocaleString()}
+                {...valueAxis({
+                  unit: "ms",
+                  format: (value) => Math.round(value).toLocaleString("zh-CN"),
+                })}
               />
               <YAxis
                 yAxisId="cls"
-                orientation="right"
                 hide={!hasCLS}
-                tickLine={false}
-                axisLine={false}
-                width={42}
                 domain={[0, "auto"]}
-                tickFormatter={(value: number) => Number(value.toFixed(3)).toString()}
+                {...valueAxis({
+                  side: "right",
+                  unit: "CLS",
+                  format: (value) => Number(value.toFixed(3)).toString(),
+                })}
               />
               <ChartTooltip
                 cursor={

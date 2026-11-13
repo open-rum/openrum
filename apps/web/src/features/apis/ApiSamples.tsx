@@ -28,6 +28,8 @@ import {
   versioned,
 } from "./sampleFormat";
 import { SampleExtras } from "./SampleExtras";
+import { useMockData } from "@/components/dev/mockData";
+import { mockAPISamples } from "./mockApis";
 
 /** Waits for typing to pause, so a user ID is searched once rather than once per keystroke. */
 function useSettled(value: string, delay = 300) {
@@ -56,9 +58,10 @@ export function ApiSamples({
   const [typed, setTyped] = useState("");
   const user = useSettled(typed.trim());
   const [selectedId, setSelectedId] = useState<string>();
+  const mock = useMockData();
   const query = useQuery({
     queryKey: [
-      "api-samples",
+      mock ? "api-samples-mock" : "api-samples",
       filters.projectId,
       filters.from.toISOString(),
       filters.to.toISOString(),
@@ -69,7 +72,8 @@ export function ApiSamples({
       filters.url,
       user,
     ],
-    queryFn: ({ signal }) => getAPISamples(filters, user, signal),
+    queryFn: ({ signal }) =>
+      mock ? Promise.resolve(mockAPISamples(filters, user)) : getAPISamples(filters, user, signal),
     // A new search keeps the previous list on screen until its answer arrives.
     placeholderData: keepPreviousData,
   });

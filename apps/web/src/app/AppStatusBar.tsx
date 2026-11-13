@@ -13,12 +13,12 @@ export function AppStatusBar({
   dataDelayed?: boolean;
 }) {
   return (
-    <header className="app-status-bar" role="region" aria-label="应用状态栏">
+    <header className="app-status-bar" aria-label="应用状态栏">
       {navigationToggle}
       {context}
-      <div className="app-status-bar__actions" aria-label="全局操作">
+      <div className="app-status-bar__actions" role="group" aria-label="全局操作">
         {dataDelayed ? (
-          <Badge variant="outline" title="最新接收事件尚未完成查询入库" role="status">
+          <Badge variant="warning" title="最新接收事件尚未完成查询入库" role="status">
             <Clock3Icon aria-hidden="true" /> 数据延迟
           </Badge>
         ) : null}

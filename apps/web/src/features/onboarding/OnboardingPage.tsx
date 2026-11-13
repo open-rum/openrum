@@ -5,7 +5,6 @@ import {
   KeyRoundIcon,
   CheckIcon,
   CopyIcon,
-  RefreshCwIcon,
   SendIcon,
   TriangleAlertIcon as AlertTriangleIcon,
 } from "lucide-react";
@@ -108,17 +107,6 @@ function ProjectOnboarding({
         title={queryableAt ? "接入状态" : "连接第一个真实页面"}
         titleId="onboarding-title"
         description="查看最近采集记录，并验证凭证、SDK、事件接收和数据查询。"
-        actions={
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => void statusQuery.refetch()}
-            disabled={statusQuery.isFetching}
-          >
-            <RefreshCwIcon data-icon="inline-start" />
-            刷新状态
-          </Button>
-        }
       />
 
       {status ? <ConnectionHealth status={status} /> : null}

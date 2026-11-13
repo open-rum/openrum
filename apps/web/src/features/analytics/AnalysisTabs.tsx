@@ -1,7 +1,11 @@
 import { useNavigate } from "@tanstack/react-router";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-export type AnalysisTab = "overview" | "funnels" | "paths" | "retention";
+export type AnalysisTab = "overview" | "events" | "funnels" | "paths" | "retention";
+
+// These tabs switch routes, not panels: there is no TabsContent, so Radix's aria-controls would
+// point at an element that does not exist.
+const noPanel = { "aria-controls": undefined } as const;
 
 export function AnalysisTabs({ projectId, active }: { projectId: string; active: AnalysisTab }) {
   const navigate = useNavigate();
@@ -10,6 +14,13 @@ export function AnalysisTabs({ projectId, active }: { projectId: string; active:
     if (tab === "overview") {
       void navigate({
         to: "/projects/$projectId/analytics",
+        params: { projectId },
+      });
+      return;
+    }
+    if (tab === "events") {
+      void navigate({
+        to: "/projects/$projectId/analytics/events",
         params: { projectId },
       });
       return;
@@ -37,12 +48,23 @@ export function AnalysisTabs({ projectId, active }: { projectId: string; active:
   };
 
   return (
-    <Tabs className="analysis-tabs" value={active} onValueChange={changeTab}>
+    <Tabs value={active} onValueChange={changeTab}>
       <TabsList variant="line" aria-label="分析功能">
-        <TabsTrigger value="overview">总览</TabsTrigger>
-        <TabsTrigger value="funnels">漏斗</TabsTrigger>
-        <TabsTrigger value="paths">路径</TabsTrigger>
-        <TabsTrigger value="retention">留存</TabsTrigger>
+        <TabsTrigger value="overview" {...noPanel}>
+          总览
+        </TabsTrigger>
+        <TabsTrigger value="events" {...noPanel}>
+          事件
+        </TabsTrigger>
+        <TabsTrigger value="funnels" {...noPanel}>
+          漏斗
+        </TabsTrigger>
+        <TabsTrigger value="paths" {...noPanel}>
+          路径
+        </TabsTrigger>
+        <TabsTrigger value="retention" {...noPanel}>
+          留存
+        </TabsTrigger>
       </TabsList>
     </Tabs>
   );

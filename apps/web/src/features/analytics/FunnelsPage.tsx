@@ -3,7 +3,7 @@ import { equalsTerm } from "@/lib/search/legacy";
 import { analysisSessionsHref } from "./investigationLinks";
 import { useQuery } from "@tanstack/react-query";
 import { useParams } from "@tanstack/react-router";
-import { ArrowDownIcon, FilterIcon, PlusIcon, RefreshCwIcon, Trash2Icon } from "lucide-react";
+import { ArrowDownIcon, FilterIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { ConsolePage, ConsolePageHeader, ConsolePageTabs } from "@/components/layout/ConsolePage";
 import { AsyncError } from "@/components/ui/AsyncState";
@@ -152,20 +152,6 @@ function ProjectFunnels({ project }: { project: Project }) {
       <ConsolePageHeader
         title="漏斗分析"
         description="观察同一会话内用户按顺序完成关键行为的转化和流失。"
-        actions={
-          <Button
-            size="icon"
-            variant="outline"
-            aria-label="刷新漏斗"
-            onClick={() => {
-              void catalog.refetch();
-              if (applied) void result.refetch();
-            }}
-            disabled={catalog.isFetching || result.isFetching}
-          >
-            <RefreshCwIcon />
-          </Button>
-        }
       />
       <ConsolePageTabs>
         <AnalysisTabs projectId={project.id} active="funnels" />
