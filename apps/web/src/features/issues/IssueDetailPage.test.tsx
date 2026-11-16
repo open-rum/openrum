@@ -78,7 +78,9 @@ describe("issue investigation context", () => {
     await waitFor(() => expect(view.getByText("历史统计仍可用，原始事件现场不可用")).toBeTruthy());
     expect(view.getByText(/历史聚合记录了 42 次错误/)).toBeTruthy();
     expect(view.queryByRole("link", { name: "堆栈追踪" })).toBeNull();
-    expect((view.getByRole("button", { name: "全部事件" }) as HTMLButtonElement).disabled).toBe(true);
+    expect((view.getByRole("button", { name: "全部事件" }) as HTMLButtonElement).disabled).toBe(
+      true,
+    );
   });
   it("retains project and filters in the return link", async () => {
     const view = renderDetail();

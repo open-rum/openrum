@@ -502,10 +502,14 @@ function IssueInvestigation({
               {!samples.isLoading && !samples.error && !pageEvents.length ? (
                 <div className="p-4 text-sm text-base-content/70" role="status">
                   <p className="font-medium text-base-content">
-                    {issue.events > 0 ? "历史统计仍可用，原始事件现场不可用" : "当前筛选下没有可查看的原始事件"}
+                    {issue.events > 0
+                      ? "历史统计仍可用，原始事件现场不可用"
+                      : "当前筛选下没有可查看的原始事件"}
                   </p>
                   <p className="mt-2">
-                    {issue.events > 0 ? `当前范围的历史聚合记录了 ${issue.events.toLocaleString()} 次错误。` : ""}
+                    {issue.events > 0
+                      ? `当前范围的历史聚合记录了 ${issue.events.toLocaleString()} 次错误。`
+                      : ""}
                     原始事件与聚合统计的保留时间可能不同；也可能没有符合当前筛选的现场。请调整时间或筛选条件，历史统计并不保证原始现场仍在保留期内。
                   </p>
                 </div>
@@ -707,14 +711,16 @@ function EventNavigation({
             <span className="issue-event-bar__count">加载中…</span>
           ) : null}
         </div>
-        {event ? <div className="issue-event-bar__links">
-          <span>跳转到</span>
-          {eventSectionLinks.map(([id, label]) => (
-            <a key={id} href={`#${id}`}>
-              {label}
-            </a>
-          ))}
-        </div> : null}
+        {event ? (
+          <div className="issue-event-bar__links">
+            <span>跳转到</span>
+            {eventSectionLinks.map(([id, label]) => (
+              <a key={id} href={`#${id}`}>
+                {label}
+              </a>
+            ))}
+          </div>
+        ) : null}
       </div>
     </>
   );

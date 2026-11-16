@@ -224,7 +224,12 @@ function ProjectIssues({ project }: { project: Project }) {
             onRetry={() => void overviewQuery.refetch()}
           />
         ) : null}
-        {overviewQuery.data ? <IssueOverview overview={overviewQuery.data} hasHistoricalIssues={issues.some((issue) => issue.events > 0)} /> : null}
+        {overviewQuery.data ? (
+          <IssueOverview
+            overview={overviewQuery.data}
+            hasHistoricalIssues={issues.some((issue) => issue.events > 0)}
+          />
+        ) : null}
         {query.isLoading ? <IssueTableSkeleton /> : null}
         {query.error ? (
           <AsyncError
