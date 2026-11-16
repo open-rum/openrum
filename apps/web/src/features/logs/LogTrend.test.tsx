@@ -1,57 +1,92 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen, within } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
-import type { ChartConfig } from "@/components/ui/chart";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { type LogPage } from "@/lib/api/logs";
 import { LogTrend } from "./LogTrend";
-import type { LogPage } from "@/lib/api/logs";
-vi.mock("@/lib/charts/useChartWidth", () => ({
-  useChartWidth: () => ({ ref: undefined, width: 800 }),
-}));
-vi.mock("@/components/ui/chart", async (original) => {
-  const chart = await original<typeof import("@/components/ui/chart")>();
-  return {
-    ...chart,
-    ChartContainer: ({ children, config }: { children: React.ReactNode; config: ChartConfig }) => (
-      <div>
-        <chart.ChartStyle id="test-log-chart" config={config} />
-        {children}
-      </div>
-    ),
-  };
+
+vi.mock("@/lib/charts/useChartMotion", () => ({ useChartMotion: () => false }));
+
+beforeEach(() => {
+  vi.stubGlobal(
+    "ResizeObserver",
+    class {
+      constructor(private readonly callback: ResizeObserverCallback) {}
+      observe(target: Element) {
+        this.callback(
+          [{ target, contentRect: { width: 800, height: 112 } } as ResizeObserverEntry],
+          this as unknown as ResizeObserver,
+        );
+      }
+      unobserve() {}
+      disconnect() {}
+    },
+  );
 });
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+});
+
+const from = "2026-11-13T05:00:00Z";
+const to = "2026-11-13T05:02:00Z";
 const data: LogPage = {
-  total: 2,
   items: [],
+  total: 21,
   nextCursor: "",
-  intervalSeconds: 3600,
-  trend: [
-    { bucket: "2026-11-11T10:00:00Z", trace: 0, debug: 0, info: 0, warn: 0, error: 2, fatal: 0 },
-  ],
+  intervalSeconds: 120,
+  trend: [{ bucket: from, trace: 1, debug: 2, info: 3, warn: 4, error: 5, fatal: 6 }],
 };
-describe("Logs trend controls", () => {
-  it("keeps the reporting chart visible with a descriptive legend and no extra controls", () => {
-    render(
-      <LogTrend
-        data={data}
-        from="2026-11-11T10:15:00Z"
-        to="2026-11-11T10:45:00Z"
-        onRange={vi.fn()}
-      />,
-    );
+
+describe("LogTrend legend", () => {
+  it("keeps the chart expanded and theme colors separate from series variables", () => {
+    render(<LogTrend data={data} from={from} to={to} onRange={vi.fn()} />);
     expect(screen.getByRole("heading", { name: "日志上报量" })).toBeTruthy();
-    expect(screen.getByText("每 1 小时")).toBeTruthy();
+    expect(screen.getByText("每 2 分钟")).toBeTruthy();
     expect(screen.queryByRole("button", { name: /趋势/ })).toBeNull();
     expect(screen.queryByRole("combobox")).toBeNull();
     const legend = screen.getByRole("list", { name: "日志级别图例" });
     expect(
       within(legend)
-        .getAllByRole("listitem")
+        .getAllByRole("button")
         .map((item) => item.textContent),
     ).toEqual(["TRACE", "DEBUG", "INFO", "WARN", "ERROR", "FATAL"]);
-    expect(within(legend).queryByRole("button")).toBeNull();
     const styles = document.querySelector("style")?.textContent ?? "";
     expect(styles).toContain("var(--color-error)");
     expect(styles).not.toMatch(/--color-(error|info)\s*:/);
+  });
+
+  it("toggles series with pointer and keyboard without changing the analysis range", async () => {
+    const onRange = vi.fn();
+    const user = userEvent.setup();
+    const { container } = render(<LogTrend data={data} from={from} to={to} onRange={onRange} />);
+    await waitFor(() => expect(container.querySelectorAll(".recharts-bar")).toHaveLength(6));
+    const info = screen.getByRole("button", { name: "INFO", pressed: true });
+    await user.click(info);
+    expect(info.getAttribute("aria-pressed")).toBe("false");
+    await waitFor(() => expect(container.querySelectorAll(".recharts-bar")).toHaveLength(5));
+    await user.keyboard("{Enter}");
+    expect(info.getAttribute("aria-pressed")).toBe("true");
+    await waitFor(() => expect(container.querySelectorAll(".recharts-bar")).toHaveLength(6));
+    expect(onRange).not.toHaveBeenCalled();
+  });
+
+  it("highlights a series on hover or focus and restores the others on leave", async () => {
+    const { container } = render(<LogTrend data={data} from={from} to={to} onRange={vi.fn()} />);
+    await waitFor(() => expect(container.querySelectorAll(".recharts-bar")).toHaveLength(6));
+    const info = screen.getByRole("button", { name: "INFO" });
+    const opacity = (level: string) =>
+      container
+        .querySelector(`path[fill="var(--color-logs_${level})"]`)
+        ?.getAttribute("fill-opacity");
+    fireEvent.mouseEnter(info);
+    expect(opacity("info")).toBe("1");
+    expect(opacity("error")).toBe("0.25");
+    fireEvent.mouseLeave(info);
+    expect(opacity("error")).toBe("1");
+    fireEvent.focus(info);
+    expect(opacity("error")).toBe("0.25");
+    fireEvent.blur(info);
+    expect(opacity("error")).toBe("1");
   });
 });

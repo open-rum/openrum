@@ -16,7 +16,7 @@ export const toggleVariants = cva(
         // group draws the sliding thumb behind the selected one. Utilities override daisyUI's
         // pressed and hover button colours, which would otherwise fill the option itself.
         segmented:
-          "relative z-10 border-0 bg-transparent text-base-content/70 shadow-none hover:bg-transparent hover:text-base-content data-[state=on]:bg-transparent data-[state=on]:text-primary-content data-[state=on]:hover:text-primary-content",
+          "relative z-10 border-0 bg-transparent text-base-content/70 shadow-none hover:bg-transparent hover:text-base-content data-[state=on]:bg-transparent data-[state=on]:text-[color:var(--segmented-content,var(--color-primary-content))] data-[state=on]:hover:text-[color:var(--segmented-content,var(--color-primary-content))]",
         legend:
           "border-transparent bg-transparent font-normal text-base-content/70 shadow-none data-[state=on]:bg-transparent data-[state=off]:line-through data-[state=off]:opacity-50",
       },

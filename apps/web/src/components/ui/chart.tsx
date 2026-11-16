@@ -1,19 +1,34 @@
 import { cloneElement, isValidElement, useEffect, useState, type ComponentProps } from "react";
 import { DefaultTooltipContent, type TooltipContentProps } from "recharts";
 import type { NameType, ValueType } from "recharts/types/component/DefaultTooltipContent";
-import { ChartTooltip as SharedChartTooltip } from "@openrum/ui/chart";
+import {
+  ChartContainer as SharedChartContainer,
+  ChartTooltip as SharedChartTooltip,
+} from "@openrum/ui/chart";
+import { cn } from "@/lib/utils";
 
 export {
   BAR_RADIUS_TOP,
   BAR_RADIUS_COMPACT,
   BAR_RADIUS_TRAILING,
-  ChartContainer,
   ChartLegend,
   ChartLegendContent,
   ChartStyle,
   ChartTooltipContent,
   type ChartConfig,
 } from "@openrum/ui/chart";
+
+export function ChartContainer({
+  className,
+  ...props
+}: ComponentProps<typeof SharedChartContainer>) {
+  return (
+    <SharedChartContainer
+      className={cn("[&_.recharts-cartesian-grid_line]:stroke-base-content/20", className)}
+      {...props}
+    />
+  );
+}
 
 /**
  * Recharts slides the tooltip from wherever it last stood, so the first hover glided in from

@@ -7,6 +7,9 @@ import { ToggleGroup as ToggleGroupPrimitive } from "radix-ui";
 
 import { toggleVariants } from "@/components/ui/toggle-variants";
 
+export type ToggleGroupColor =
+  "primary" | "secondary" | "accent" | "neutral" | "info" | "success" | "warning" | "error";
+
 const ToggleGroupContext = React.createContext<
   VariantProps<typeof toggleVariants> & {
     spacing?: number;
@@ -23,6 +26,8 @@ function ToggleGroup({
   className,
   variant,
   size,
+  color = "primary",
+  style,
   spacing = 2,
   orientation = "horizontal",
   children,
@@ -31,9 +36,11 @@ function ToggleGroup({
   VariantProps<typeof toggleVariants> & {
     spacing?: number;
     orientation?: "horizontal" | "vertical";
+    /** Selected fill and text use the matching daisyUI theme colour pair. */
+    color?: ToggleGroupColor;
   }) {
   // Every horizontal single-select outline group is a segmented control: the options sit on
-  // a `base-200` track and a `primary` thumb slides to the selected one.
+  // a `base-200` track and a semantic-colour thumb slides to the selected one.
   const segmented =
     props.type === "single" &&
     orientation === "horizontal" &&
@@ -44,9 +51,21 @@ function ToggleGroup({
       data-slot="toggle-group"
       data-variant={itemVariant}
       data-size={size}
+      data-color={segmented ? color : undefined}
       data-spacing={segmented ? "segmented" : spacing}
       data-orientation={orientation}
-      style={{ "--gap": segmented ? 0 : spacing } as React.CSSProperties}
+      style={
+        {
+          "--gap": segmented ? 0 : spacing,
+          ...(segmented
+            ? {
+                "--segmented-color": `var(--color-${color})`,
+                "--segmented-content": `var(--color-${color}-content)`,
+              }
+            : {}),
+          ...style,
+        } as React.CSSProperties
+      }
       className={cn(
         "group/toggle-group flex w-fit flex-row items-center gap-[--spacing(var(--gap))] rounded-full data-vertical:rounded-box data-vertical:flex-col data-vertical:items-stretch",
         segmented && "relative gap-0 rounded-[calc(var(--radius-field)+0.25rem)] bg-base-200 p-1",
@@ -107,7 +126,7 @@ function SegmentedThumb() {
       aria-hidden="true"
       data-slot="toggle-group-thumb"
       className={cn(
-        "pointer-events-none absolute inset-y-1 left-0 rounded-field bg-primary shadow-sm",
+        "pointer-events-none absolute inset-y-1 left-0 rounded-field bg-[var(--segmented-color,var(--color-primary))] shadow-sm",
         ready &&
           "transition-[translate,width,opacity] duration-300 ease-[cubic-bezier(0.34,1.3,0.64,1)] motion-reduce:transition-none",
       )}

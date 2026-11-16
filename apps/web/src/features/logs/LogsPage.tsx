@@ -18,7 +18,13 @@ import { AsyncError } from "@/components/ui/AsyncState";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useAnalysisContext } from "@/features/filters/AnalysisContextBar";
 import { getLog, getLogs, logSearchTerm, type LogEntry, type LogFilters } from "@/lib/api/logs";
@@ -376,7 +382,10 @@ function LogWorkspace({
                       updateColumns(columns.filter((column) => column !== key))
                     }
                   />
-                  <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-t border-base-300 px-4 py-2" aria-label="日志分页">
+                  <div
+                    className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-t border-base-300 px-4 py-2"
+                    aria-label="日志分页"
+                  >
                     <span className="text-xs tabular-nums text-base-content/70">
                       {!contextMode && pageIndex >= 0
                         ? `${(pageIndex * (filters.limit ?? 50) + 1).toLocaleString()}–${(pageIndex * (filters.limit ?? 50) + data.items.length).toLocaleString()} 条`
@@ -403,7 +412,9 @@ function LogWorkspace({
                         </SelectTrigger>
                         <SelectContent>
                           {pageSizes.map((size) => (
-                            <SelectItem key={size} value={String(size)}>{size} 条 / 页</SelectItem>
+                            <SelectItem key={size} value={String(size)}>
+                              {size} 条 / 页
+                            </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>

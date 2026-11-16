@@ -16,11 +16,13 @@ describe("ChartSwitch", () => {
           ["users", "用户"],
         ]}
         value="events"
+        color="accent"
         onChange={onChange}
       />,
     );
     const group = screen.getByRole("radiogroup", { name: "切换趋势指标" });
     expect(group.querySelector('[data-slot="toggle-group-thumb"]')).not.toBeNull();
+    expect(group.style.getPropertyValue("--segmented-color")).toBe("var(--color-accent)");
     expect(screen.getByRole("radio", { name: "事件" }).getAttribute("aria-checked")).toBe("true");
     expect(screen.getByRole("radio", { name: "用户" }).getAttribute("aria-checked")).toBe("false");
     await userEvent.click(screen.getByRole("radio", { name: "用户" }));

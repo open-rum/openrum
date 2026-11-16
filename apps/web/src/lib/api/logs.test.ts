@@ -128,11 +128,13 @@ describe("logs", () => {
       anchorAt: "2026-11-11T13:21:31.184Z",
       cursor: "cursor",
       direction: "before",
+      limit: 100,
     });
     const url = new URL(fetchMock.mock.calls[0][0], "https://example.com");
     expect(url.searchParams.get("anchorAt")).toBe("2026-11-11T13:21:31.184Z");
     expect(url.searchParams.get("direction")).toBe("before");
     expect(url.searchParams.get("cursor")).toBe("cursor");
+    expect(url.searchParams.get("limit")).toBe("100");
     expect(result.previousCursor).toBe("earlier");
   });
 });

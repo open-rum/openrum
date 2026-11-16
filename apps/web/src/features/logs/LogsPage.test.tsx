@@ -178,25 +178,63 @@ describe("Logs investigation", () => {
       filters.cursor ? page([nextEntry]) : page([entry], "cursor-2"),
     );
     mount("&timePreset=24h");
-    fireEvent.click(await screen.findByRole("button", { name: "更早日志" }));
+    fireEvent.click(await screen.findByRole("button", { name: "下一页" }));
     await screen.findByRole("button", { name: "checkout started" });
     expect(new URLSearchParams(window.location.search).has("timePreset")).toBe(false);
-    fireEvent.click(screen.getByRole("button", { name: "上一批" }));
+    fireEvent.click(screen.getByRole("button", { name: "上一页" }));
     await screen.findByRole("button", { name: "payment failed" });
     expect(new URLSearchParams(window.location.search).has("cursor")).toBe(false);
-    fireEvent.click(screen.getByRole("button", { name: "更早日志" }));
+    fireEvent.click(screen.getByRole("button", { name: "下一页" }));
     await screen.findByRole("button", { name: "checkout started" });
     fireEvent.change(screen.getByRole("textbox", { name: "搜索日志" }), {
       target: { value: "no-match" },
     });
     expect(new URLSearchParams(window.location.search).has("cursor")).toBe(false);
   });
+  it("changes page size, resets pagination and preserves the search", async () => {
+    vi.mocked(getLogs).mockImplementation(async (filters) =>
+      filters.cursor ? page([nextEntry]) : page([entry], "cursor-2"),
+    );
+    const view = mount("&q=level:error");
+    fireEvent.click(await screen.findByRole("button", { name: "下一页" }));
+    await screen.findByRole("button", { name: "checkout started" });
+    fireEvent.keyDown(screen.getByRole("combobox", { name: "每页条数" }), { key: "Enter" });
+    expect(screen.getAllByRole("option").map((option) => option.textContent)).toEqual([
+      "50 条 / 页",
+      "100 条 / 页",
+    ]);
+    fireEvent.keyDown(screen.getByRole("option", { name: "100 条 / 页" }), { key: "Enter" });
+    await waitFor(() =>
+      expect(vi.mocked(getLogs).mock.calls.at(-1)?.[0]).toMatchObject({
+        limit: 100,
+        cursor: undefined,
+        q: "level:error",
+      }),
+    );
+    const params = new URLSearchParams(window.location.search);
+    expect(params.get("limit")).toBe("100");
+    expect(params.has("cursor")).toBe(false);
+    expect((await screen.findByRole("button", { name: "上一页" })).hasAttribute("disabled")).toBe(
+      true,
+    );
+    view.unmount();
+    client.clear();
+    mount(`&${params}`);
+    expect((await screen.findByRole("combobox", { name: "每页条数" })).textContent).toContain(
+      "100 条 / 页",
+    );
+  });
+  it.each(["20", "200", "bad"])("falls back to 50 rows for unsupported limit %s", async (limit) => {
+    mount(`&limit=${limit}`);
+    await screen.findByRole("button", { name: "payment failed" });
+    expect(vi.mocked(getLogs).mock.calls.at(-1)?.[0].limit).toBe(50);
+  });
   it("shows search recovery without SDK setup or empty pagination", async () => {
     vi.mocked(getLogs).mockResolvedValue(page([]));
     mount("&q=no-match");
     await screen.findByText("没有匹配当前条件的日志");
     expect(screen.queryByText("日志接入说明")).toBeNull();
-    expect(screen.queryByRole("button", { name: "更早日志" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "下一页" })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "清除搜索条件" }));
     await screen.findByText("当前时间范围没有日志");
     expect(screen.getByText("日志接入说明").closest("details")?.open).toBe(false);

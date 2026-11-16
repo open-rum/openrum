@@ -1,5 +1,14 @@
-import { ArrowDownIcon, ArrowUpIcon, CopyIcon, LinkIcon, XIcon } from "lucide-react";
+import {
+  ArrowDownIcon,
+  ArrowUpIcon,
+  ArrowUpRightIcon,
+  CopyIcon,
+  LinkIcon,
+  XIcon,
+} from "lucide-react";
+import { useState } from "react";
 import { toast } from "sonner";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -60,6 +69,8 @@ export function LogDetails({
   onRelated: (key: string, value: string) => void;
   onRetry: () => void;
 } & LogFieldCallbacks) {
+  const [attributeView, setAttributeView] = useState("fields");
+
   return (
     <Sheet
       open={open}
@@ -68,10 +79,10 @@ export function LogDetails({
       }}
     >
       <SheetContent className="logs-detail gap-0" showCloseButton={false}>
-        <SheetHeader className="shrink-0 border-b border-base-300 px-5 py-4">
+        <SheetHeader className="shrink-0 border-b border-base-300 px-4 py-4 sm:px-6">
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
-              <SheetTitle>日志详情</SheetTitle>
+              <SheetTitle className="text-base font-semibold">日志详情</SheetTitle>
               <SheetDescription className="mt-1 font-mono text-xs text-base-content/70">
                 {entry ? logTime(entry.timestamp, true) : "日志正文与关联上下文"}
               </SheetDescription>
@@ -108,7 +119,10 @@ export function LogDetails({
             </div>
           </div>
         </SheetHeader>
-        <div key={entry?.eventId ?? "pending"} className="min-h-0 flex-1 overflow-y-auto p-5">
+        <div
+          key={entry?.eventId ?? "pending"}
+          className="min-h-0 flex-1 overflow-y-auto px-4 py-6 sm:px-6"
+        >
           {loading && !entry ? (
             <div className="grid gap-4" aria-label="正在加载日志详情">
               <Skeleton className="h-24" />
@@ -135,60 +149,173 @@ export function LogDetails({
             </div>
           ) : null}
           {entry ? (
-            <div className="grid min-w-0 gap-5">
+            <div className="grid min-w-0 gap-7">
               <section className="grid gap-3" aria-label="日志正文">
                 <div className="flex flex-wrap items-center gap-2">
                   <LogLevelBadge level={entry.level} />
-                  <span className="text-xs text-base-content/70">{entry.logger || "应用日志"}</span>
+                  <span
+                    className="min-w-0 flex-1 truncate text-xs text-base-content/70"
+                    title={entry.logger || "应用日志"}
+                  >
+                    {entry.logger || "应用日志"}
+                  </span>
                   <div className="ml-auto flex gap-1">
-                    <Button variant="ghost" size="sm" onClick={() => void copyText(entry.message)}>
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      aria-label="复制正文"
+                      title="复制正文"
+                      className="text-base-content/70"
+                      onClick={() => void copyText(entry.message)}
+                    >
                       <CopyIcon />
-                      复制正文
                     </Button>
                     <Button
                       variant="ghost"
-                      size="sm"
+                      size="icon-sm"
+                      aria-label="复制链接"
+                      title="复制链接"
+                      className="text-base-content/70"
                       onClick={() => void copyText(logDetailLink(window.location.href, entry))}
                     >
                       <LinkIcon />
-                      复制链接
                     </Button>
                   </div>
                 </div>
-                <pre className="rounded-box bg-base-200 p-4 font-mono text-xs leading-6 whitespace-pre-wrap break-words">
+                <pre className="min-w-0 rounded-box bg-base-200/70 p-4 font-mono text-[13px] leading-6 whitespace-pre-wrap [overflow-wrap:anywhere]">
                   <LogMessage message={entry.message} query={query} />
                 </pre>
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-base-content/70">
-                  <span>{entry.environment || "未指定环境"}</span>
-                  <span>{entry.route || "未记录路由"}</span>
-                  {entry.release ? <span>{entry.release}</span> : null}
+                <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-xs sm:grid-cols-3">
+                  {[
+                    ["环境", entry.environment || "未指定"],
+                    ["路由", entry.route || "未记录"],
+                    ["版本", entry.release || "未记录"],
+                  ].map(([label, value]) => (
+                    <div key={label} className="min-w-0 space-y-1">
+                      <dt className="text-base-content/70">{label}</dt>
+                      <dd className="break-all leading-5">{value}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </section>
+              <section aria-label="结构化属性">
+                <div className="grid gap-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <h3 className="text-sm font-semibold">
+                      结构化属性{" "}
+                      <span className="ml-1 font-normal text-base-content/70">
+                        {Object.keys(entry.attributes).length}
+                      </span>
+                    </h3>
+                    <ToggleGroup
+                      type="single"
+                      variant="segmented"
+                      color="neutral"
+                      size="sm"
+                      aria-label="属性视图"
+                      value={attributeView}
+                      onValueChange={(value) => {
+                        if (value) setAttributeView(value);
+                      }}
+                    >
+                      <ToggleGroupItem value="fields">列表</ToggleGroupItem>
+                      <ToggleGroupItem value="json">JSON</ToggleGroupItem>
+                    </ToggleGroup>
+                  </div>
+                  {attributeView === "fields" ? (
+                    <div role="region" aria-label="属性列表">
+                      {Object.keys(entry.attributes).length ? (
+                        <div className="min-w-0">
+                          <table className="table table-sm w-full table-fixed">
+                            <colgroup>
+                              <col className="w-[40%]" />
+                              <col />
+                              <col className="w-9" />
+                            </colgroup>
+                            <thead className="sr-only">
+                              <tr>
+                                <th>属性</th>
+                                <th>值</th>
+                                <th>
+                                  <span className="sr-only">操作</span>
+                                </th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {Object.entries(entry.attributes).map(([key, value]) => (
+                                <tr key={key} className="hover:bg-base-200/50">
+                                  <td className="py-3 pl-0 font-mono text-xs leading-5 whitespace-normal break-all text-base-content/70">
+                                    {key}
+                                  </td>
+                                  <td className="py-3 font-mono text-xs leading-5 whitespace-pre-wrap break-all">
+                                    {value || "—"}
+                                  </td>
+                                  <td className="pr-0 text-right">
+                                    <LogFieldActions
+                                      field={`attributes.${key}`}
+                                      label={key}
+                                      value={value}
+                                      filterable={validLogAttribute(key)}
+                                      onFilter={onFilter}
+                                      onColumn={onColumn}
+                                      columns={columns}
+                                    />
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      ) : (
+                        <p className="text-xs text-base-content/70">此日志没有附加属性。</p>
+                      )}
+                    </div>
+                  ) : (
+                    <div role="region" aria-label="属性 JSON 视图">
+                      <div className="relative min-w-0 rounded-box bg-base-200/70">
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          className="absolute top-2 right-2 text-base-content/70"
+                          aria-label="复制属性 JSON"
+                          title="复制属性 JSON"
+                          onClick={() => void copyText(JSON.stringify(entry.attributes, null, 2))}
+                        >
+                          <CopyIcon />
+                        </Button>
+                        <pre
+                          aria-label="属性 JSON"
+                          className="p-4 pr-12 font-mono text-xs leading-6 whitespace-pre-wrap [overflow-wrap:anywhere]"
+                        >
+                          <code>{JSON.stringify(entry.attributes, null, 2)}</code>
+                        </pre>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </section>
-              <section className="rounded-box border border-base-300 p-3" aria-label="关联日志">
-                <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                  <h3 className="text-xs font-semibold">查看关联日志</h3>
-                  <span className="text-[11px] text-base-content/70">
-                    当前时间范围 · 按发生顺序查看
-                  </span>
-                </div>
-                <div className="flex flex-wrap gap-2">
+              <section className="grid gap-2" aria-label="关联日志">
+                <h3 className="text-sm font-semibold">关联日志</h3>
+                <div className="-ml-2 flex flex-wrap gap-x-3 gap-y-1">
                   <Button
                     size="sm"
-                    variant="outline"
+                    variant="ghost"
+                    className="px-2 text-xs"
                     onClick={() => onRelated("session_id", entry.sessionId)}
                   >
-                    同会话全部日志
+                    同会话全部日志 <ArrowUpRightIcon />
                   </Button>
                   {entry.traceId ? (
                     <Button
                       size="sm"
-                      variant="outline"
+                      variant="ghost"
+                      className="px-2 text-xs"
                       onClick={() => onRelated("trace_id", entry.traceId)}
                     >
-                      同 Trace 全部日志
+                      同 Trace 全部日志 <ArrowUpRightIcon />
                     </Button>
                   ) : null}
-                  <Button asChild variant="ghost" size="sm">
+                  <Button asChild variant="ghost" size="sm" className="px-2 text-xs">
                     <a
                       href={sessionEventHref(
                         projectId,
@@ -197,128 +324,83 @@ export function LogDetails({
                         entry.eventId,
                       )}
                     >
-                      查看关联会话
+                      查看关联会话 <ArrowUpRightIcon />
                     </a>
                   </Button>
                 </div>
               </section>
-              <section className="grid gap-3" aria-label="结构化属性">
-                <div className="flex items-center justify-between gap-2">
-                  <h3 className="text-sm font-semibold">
-                    结构化属性{" "}
-                    <span className="ml-1 font-normal text-base-content/70">
-                      {Object.keys(entry.attributes).length}
+              <div className="divide-y divide-base-300 border-y border-base-300">
+                <details className="collapse collapse-arrow rounded-none">
+                  <summary className="collapse-title min-h-0 py-4 pl-0 text-sm font-medium after:end-1">
+                    用户与访客{" "}
+                    <span className="mt-1 block break-all text-xs font-normal text-base-content/70">
+                      {entry.userId || "未设置用户 ID"}
                     </span>
-                  </h3>
-                  <span className="text-[11px] text-base-content/70">筛选会追加到当前查询</span>
-                </div>
-                {Object.keys(entry.attributes).length ? (
-                  <div className="overflow-x-auto rounded-box border border-base-300">
-                    <table className="table table-sm w-full table-fixed">
-                      <thead>
-                        <tr>
-                          <th className="w-[35%]">属性</th>
-                          <th>值</th>
-                          <th className="w-12">
-                            <span className="sr-only">操作</span>
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {Object.entries(entry.attributes).map(([key, value]) => (
-                          <tr key={key}>
-                            <td className="font-mono text-xs whitespace-normal break-all">{key}</td>
-                            <td className="font-mono text-xs whitespace-pre-wrap break-all">
-                              {value || "—"}
-                            </td>
-                            <td>
-                              <LogFieldActions
-                                field={`attributes.${key}`}
-                                label={key}
-                                value={value}
-                                filterable={validLogAttribute(key)}
-                                onFilter={onFilter}
-                                onColumn={onColumn}
-                                columns={columns}
-                              />
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : (
-                  <p className="text-xs text-base-content/70">此日志没有附加属性。</p>
-                )}
-              </section>
-              <details className="collapse collapse-arrow border border-base-300 rounded-box">
-                <summary className="collapse-title min-h-0 py-3 text-sm font-semibold">
-                  用户与访客{" "}
-                  <span className="ml-2 text-xs font-normal text-base-content/70">
-                    {entry.userId || "未设置用户 ID"}
-                  </span>
-                </summary>
-                <div className="collapse-content">
-                  <div className="grid gap-3 pt-1">
-                    <LogFacts
-                      values={{
-                        "用户 ID": entry.userId || "未设置",
-                        "匿名访客 ID": entry.anonymousUserId,
-                      }}
-                    />
-                    <p className="text-xs text-base-content/70">日志产生时记录的身份。</p>
-                    <div className="flex flex-wrap gap-2">
-                      {entry.userId ? (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => onRelated("user.id", entry.userId)}
-                        >
-                          同用户全部日志
-                        </Button>
-                      ) : null}
-                      {entry.anonymousUserId ? (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => onRelated("anonymous_user_id", entry.anonymousUserId)}
-                        >
-                          同访客全部日志
-                        </Button>
-                      ) : null}
+                  </summary>
+                  <div className="collapse-content px-0">
+                    <div className="grid gap-3 pt-1">
+                      <LogFacts
+                        values={{
+                          "用户 ID": entry.userId || "未设置",
+                          "匿名访客 ID": entry.anonymousUserId,
+                        }}
+                      />
+                      <div className="flex flex-wrap gap-2">
+                        {entry.userId ? (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="px-2 text-xs"
+                            onClick={() => onRelated("user.id", entry.userId)}
+                          >
+                            同用户全部日志
+                          </Button>
+                        ) : null}
+                        {entry.anonymousUserId ? (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="px-2 text-xs"
+                            onClick={() => onRelated("anonymous_user_id", entry.anonymousUserId)}
+                          >
+                            同访客全部日志
+                          </Button>
+                        ) : null}
+                      </div>
                     </div>
                   </div>
-                </div>
-              </details>
-              <details className="collapse collapse-arrow border border-base-300 rounded-box">
-                <summary className="collapse-title min-h-0 py-3 text-sm font-semibold">
-                  环境与追踪上下文
-                </summary>
-                <div className="collapse-content">
-                  <div className="pt-1">
-                    <LogFacts
-                      values={{
-                        "日志 ID": entry.eventId,
-                        环境: entry.environment,
-                        版本: entry.release,
-                        页面: entry.pageUrl,
-                        路由: entry.route,
-                        浏览器: entry.browser,
-                        设备: deviceLabel(entry.deviceType),
-                        "国家 / 地区": countryLabel(entry.country),
-                        "Session ID": entry.sessionId,
-                        "Trace ID": entry.traceId,
-                        "Span ID": entry.spanId,
-                        采样率: `${Math.round(entry.sampleRate * 100)}%`,
-                      }}
-                    />
+                </details>
+                <details className="collapse collapse-arrow rounded-none">
+                  <summary className="collapse-title min-h-0 py-4 pl-0 text-sm font-medium after:end-1">
+                    环境与追踪上下文
+                  </summary>
+                  <div className="collapse-content px-0">
+                    <div className="pt-1">
+                      <LogFacts
+                        values={{
+                          "日志 ID": entry.eventId,
+                          环境: entry.environment,
+                          版本: entry.release,
+                          页面: entry.pageUrl,
+                          路由: entry.route,
+                          浏览器: entry.browser,
+                          设备: deviceLabel(entry.deviceType),
+                          "国家 / 地区": countryLabel(entry.country),
+                          "Session ID": entry.sessionId,
+                          "Trace ID": entry.traceId,
+                          "Span ID": entry.spanId,
+                          采样率: `${Math.round(entry.sampleRate * 100)}%`,
+                        }}
+                      />
+                    </div>
                   </div>
-                </div>
-              </details>
-              <div>
+                </details>
+              </div>
+              <div className="-mt-3 -ml-2">
                 <Button
                   variant="ghost"
                   size="sm"
+                  className="px-2 text-xs text-base-content/70"
                   onClick={() => void copyText(JSON.stringify(entry, null, 2))}
                 >
                   <CopyIcon />
@@ -335,11 +417,11 @@ export function LogDetails({
 
 function LogFacts({ values }: { values: Record<string, string> }) {
   return (
-    <dl className="grid gap-2 text-xs">
+    <dl className="grid gap-1 text-xs">
       {Object.entries(values).map(([key, value]) => (
-        <div key={key} className="grid grid-cols-[88px_minmax(0,1fr)_28px] items-start gap-2">
+        <div key={key} className="grid grid-cols-[88px_minmax(0,1fr)_32px] items-start gap-3 py-1">
           <dt className="py-1 text-base-content/70">{key}</dt>
-          <dd className="py-1 break-all">{value || "—"}</dd>
+          <dd className="py-1 font-mono leading-5 break-all">{value || "—"}</dd>
           {value ? (
             <Button
               variant="ghost"

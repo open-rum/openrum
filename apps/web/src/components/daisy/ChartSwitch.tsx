@@ -1,9 +1,9 @@
 import type { ReactNode } from "react";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { ToggleGroup, ToggleGroupItem, type ToggleGroupColor } from "@/components/ui/toggle-group";
 
 /**
  * Switches what a chart card shows (its metric, dimension or chart type). It is the shared
- * segmented control in its small size: a `base-200` track with the `primary` thumb sliding to
+ * segmented control in its small size: a `base-200` track with a theme-coloured thumb sliding to
  * the chosen option, like every other single choice in the Console (user request, 2026-11-11).
  */
 export function ChartSwitch<Key extends string>({
@@ -12,18 +12,21 @@ export function ChartSwitch<Key extends string>({
   value,
   onChange,
   className,
+  color,
 }: {
   label: string;
   options: readonly (readonly [Key, ReactNode])[];
   value: Key;
   onChange: (value: Key) => void;
   className?: string;
+  color?: ToggleGroupColor;
 }) {
   return (
     <ToggleGroup
       type="single"
       variant="segmented"
       size="sm"
+      color={color}
       aria-label={label}
       value={value}
       // Radix reports an empty value when the chosen option is clicked again; a chart always
