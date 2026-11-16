@@ -896,7 +896,20 @@ html[data-landing-palette] body {
   letter-spacing: -0.04em;
 }
 .lp-make {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
   border-top: 1px solid var(--lp-line);
+}
+.lp-make-glitch {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.7;
+}
+.lp-make > .lp-wrap {
+  position: relative;
+  z-index: 1;
 }
 
 /* Footer */

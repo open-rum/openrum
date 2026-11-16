@@ -6,6 +6,7 @@ import GitHubMark from "../GitHubMark.astro";
 import PublicLayout from "../../layouts/PublicLayout.astro";
 import ProductMock from "./ProductMock.astro";
 import PaletteMenu from "../PaletteMenu.astro";
+import MakeItBetterBackground from "./MakeItBetterBackground";
 import KafkaIcon from "../../assets/tech/apachekafka.svg";
 import ClickHouseIcon from "../../assets/tech/clickhouse.svg";
 import GoIcon from "../../assets/tech/go.svg";
@@ -633,6 +634,7 @@ const footerGroups: [string, [string, string][]][] = [
       </section>
 
       <section class="lp-section lp-make" aria-labelledby="lp-make-title">
+        <MakeItBetterBackground client:visible={{ rootMargin: "200px" }} />
         <div class="lp-wrap">
           <h2 id="lp-make-title" lang="en">{copy.makeTitle}</h2>
           <p class="lp-sub">{copy.makeLead}</p>
