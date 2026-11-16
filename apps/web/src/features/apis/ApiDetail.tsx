@@ -23,6 +23,7 @@ import {
 import {
   apiFailureLevel,
   apiFailureRate,
+  formatAPIFailureRate,
   formatAPIBytes,
   formatAPIDuration,
   formatAPILatencyBucket,
@@ -65,12 +66,18 @@ export function ApiDetail({
               <MethodBadge method={detail.endpoint.method} />
               <Badge
                 variant={
-                  { danger: "destructive", warning: "warning", normal: "secondary" }[
-                    apiFailureLevel(failureRate)
-                  ] as "destructive" | "warning" | "secondary"
+                  {
+                    danger: "destructive",
+                    warning: "warning",
+                    normal: "secondary",
+                    unknown: "outline",
+                  }[apiFailureLevel(failureRate)] as
+                    "destructive" | "warning" | "secondary" | "outline"
                 }
               >
-                {failureRate.toFixed(1)}% 失败
+                {failureRate === null
+                  ? "暂无请求样本"
+                  : `${formatAPIFailureRate(detail.endpoint, 1)} 失败`}
               </Badge>
             </span>
             <DrawerTitle>{detail.endpoint.url}</DrawerTitle>
@@ -134,7 +141,7 @@ export function ApiDetail({
               />
             </section>
             <section className="api-detail-section">
-              <h3>请求、耗时与状态码</h3>
+              <h3>请求、耗时与异常响应</h3>
               <ApiCharts trend={detail.trend} range={range} scope="该 endpoint" />
             </section>
             {/* Two bar lists of similar height, paired so the wide panel is not
@@ -284,7 +291,7 @@ function DimensionBreakdown({
                 <TableCell>{facet.value}</TableCell>
                 <TableCell>{facet.requests.toLocaleString()}</TableCell>
                 <TableCell>
-                  <span data-level={apiFailureLevel(rate)}>{rate.toFixed(2)}%</span>
+                  <span data-level={apiFailureLevel(rate)}>{formatAPIFailureRate(facet)}</span>
                 </TableCell>
                 <TableCell>
                   <span data-slower={slower}>{formatAPIDuration(facet.p95)}</span>

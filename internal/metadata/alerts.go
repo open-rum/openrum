@@ -37,6 +37,9 @@ var creatableChannelKinds = map[ChannelKind]bool{ChannelWebhook: true, ChannelFe
 // maxRuleChannels bounds how many channels one rule may notify.
 const maxRuleChannels = 10
 
+// RecentEvaluationCount is how many past evaluations a listed rule reports.
+const RecentEvaluationCount = 24
+
 type AlertMetric string
 
 const (
@@ -74,9 +77,12 @@ type AlertRule struct {
 	// LastStatus is the most recent evaluation's status, or "" before the first one.
 	LastStatus      string     `json:"lastStatus"`
 	LastEvaluatedAt *time.Time `json:"lastEvaluatedAt,omitempty"`
-	CreatedBy       *uuid.UUID `json:"createdBy,omitempty"`
-	CreatedAt       time.Time  `json:"createdAt"`
-	UpdatedAt       time.Time  `json:"updatedAt"`
+	// RecentStatuses are the statuses of up to the last RecentEvaluationCount evaluations,
+	// oldest first, so the Console can draw how steadily a rule has been breaching.
+	RecentStatuses []string   `json:"recentStatuses"`
+	CreatedBy      *uuid.UUID `json:"createdBy,omitempty"`
+	CreatedAt      time.Time  `json:"createdAt"`
+	UpdatedAt      time.Time  `json:"updatedAt"`
 }
 
 // AlertNotification is a breached evaluation surfaced back to the console. It
@@ -157,11 +163,14 @@ func (repository *AlertRepository) ListRules(ctx context.Context, actorID, proje
 		r.window_minutes,r.cooldown_minutes,r.environment,r.enabled,r.created_by,r.created_at,r.updated_at,
 		coalesce((SELECT string_agg(rc.channel_id::text, ',' ORDER BY rc.created_at, rc.channel_id)
 		          FROM alert_rule_channels rc WHERE rc.rule_id=r.id), ''),
-		coalesce(last.status,''), last.evaluated_at
+		coalesce(last.status,''), last.evaluated_at,
+		coalesce((SELECT string_agg(recent.status, ',' ORDER BY recent.window_ended_at)
+		          FROM (SELECT status, window_ended_at FROM alert_evaluations
+		                WHERE rule_id=r.id ORDER BY window_ended_at DESC LIMIT $2) recent), '')
 		FROM alert_rules r
 		LEFT JOIN LATERAL (SELECT status, evaluated_at FROM alert_evaluations
 		                   WHERE rule_id=r.id ORDER BY window_ended_at DESC LIMIT 1) last ON true
-		WHERE r.project_id=$1 ORDER BY r.created_at, r.id`, projectID)
+		WHERE r.project_id=$1 ORDER BY r.created_at, r.id`, projectID, RecentEvaluationCount)
 	if err != nil {
 		return nil, "", err
 	}
@@ -171,12 +180,17 @@ func (repository *AlertRepository) ListRules(ctx context.Context, actorID, proje
 		var rule AlertRule
 		var channels string
 		var lastEvaluated sql.NullTime
+		var recent string
 		if err := rows.Scan(&rule.ID, &rule.ProjectID, &rule.Name, &rule.Metric, &rule.Comparator,
 			&rule.Threshold, &rule.WindowMinutes, &rule.CooldownMinutes, &rule.Environment, &rule.Enabled,
-			&rule.CreatedBy, &rule.CreatedAt, &rule.UpdatedAt, &channels, &rule.LastStatus, &lastEvaluated); err != nil {
+			&rule.CreatedBy, &rule.CreatedAt, &rule.UpdatedAt, &channels, &rule.LastStatus, &lastEvaluated, &recent); err != nil {
 			return nil, "", err
 		}
 		rule.ChannelIDs = parseUUIDList(channels)
+		rule.RecentStatuses = []string{}
+		if recent != "" {
+			rule.RecentStatuses = strings.Split(recent, ",")
+		}
 		if lastEvaluated.Valid {
 			at := lastEvaluated.Time.UTC()
 			rule.LastEvaluatedAt = &at

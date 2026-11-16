@@ -115,11 +115,10 @@ export function ProjectKeys({ projectId }: ProjectKeysProps) {
       description="每个项目自动拥有一个默认 DSN，浏览器 SDK 正常接入只需要复制这一项。"
     >
       <div className="flex flex-col gap-6">
-        <section className="border border-border bg-card p-6" aria-labelledby="default-dsn-title">
+        <section className="border border-base-300 bg-card p-6" aria-labelledby="default-dsn-title">
           <div className="flex flex-col gap-5">
             <div>
               <div className="flex items-center gap-2">
-                <Key className="size-5 text-primary" weight="fill" aria-hidden="true" />
                 <h2 id="default-dsn-title" className="text-base font-semibold text-foreground">
                   默认 DSN
                 </h2>
@@ -138,7 +137,7 @@ export function ProjectKeys({ projectId }: ProjectKeysProps) {
             ) : defaultKey ? (
               <>
                 {defaultKey.dsn ? (
-                  <code className="overflow-x-auto border border-border bg-muted/50 px-4 py-3 font-mono text-sm whitespace-nowrap text-foreground">
+                  <code className="overflow-x-auto border border-base-300 bg-muted/50 px-4 py-3 font-mono text-sm whitespace-nowrap text-foreground">
                     {defaultKey.dsn}
                   </code>
                 ) : (
@@ -186,7 +185,7 @@ export function ProjectKeys({ projectId }: ProjectKeysProps) {
           </p>
         ) : null}
 
-        <details className="group border border-border bg-card">
+        <details className="group border border-base-300 bg-card">
           <summary className="flex cursor-pointer list-none items-center justify-between px-5 py-4 text-sm font-medium text-foreground">
             高级 DSN 管理
             <span className="text-xs font-normal text-muted-foreground">
@@ -194,7 +193,7 @@ export function ProjectKeys({ projectId }: ProjectKeysProps) {
             </span>
           </summary>
 
-          <div className="border-t border-border p-5">
+          <div className="border-t border-base-300 p-5">
             <p className="mb-5 text-sm text-muted-foreground">
               仅在需要隔离多个客户端或独立轮换策略时创建额外 DSN。
             </p>
@@ -209,7 +208,7 @@ export function ProjectKeys({ projectId }: ProjectKeysProps) {
               <label className="min-w-0 flex-1 text-sm font-medium text-foreground">
                 额外 DSN 名称
                 <input
-                  className="mt-2 h-10 w-full border border-input bg-background px-3 text-sm outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/20"
+                  className="input mt-2 w-full"
                   value={name}
                   maxLength={120}
                   placeholder="例如：商城 H5 · Production"
@@ -223,7 +222,7 @@ export function ProjectKeys({ projectId }: ProjectKeysProps) {
             </form>
           </div>
 
-          <div className="overflow-x-auto border border-border bg-card">
+          <div className="overflow-x-auto border border-base-300 bg-card">
             <table className="w-full min-w-3xl border-collapse text-left text-sm">
               <thead className="bg-muted/60 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
                 <tr>

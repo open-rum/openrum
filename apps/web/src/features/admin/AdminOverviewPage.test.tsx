@@ -73,7 +73,7 @@ it("does not report the instance as fully healthy while a service is unmonitored
   expect(screen.queryByText("运行正常")).toBeNull();
   expect(
     screen.getByText("部分待确认").closest('[data-slot="badge"]')?.getAttribute("data-variant"),
-  ).toBe("outline");
+  ).toBe("secondary");
 });
 
 it("uses the success state when all monitored services are healthy", () => {

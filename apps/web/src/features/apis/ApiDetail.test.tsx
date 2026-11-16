@@ -130,7 +130,7 @@ describe("ApiDetail", () => {
     const drawer = within(screen.getByRole("dialog"));
     expect(drawer.getByRole("heading", { name: "请求数" })).toBeTruthy();
     expect(drawer.getByRole("heading", { name: "请求耗时" })).toBeTruthy();
-    expect(drawer.getByRole("heading", { name: "状态码" })).toBeTruthy();
+    expect(drawer.getByRole("heading", { name: "异常响应" })).toBeTruthy();
     expect(drawer.queryByText("当前范围暂无数据")).toBeNull();
   });
 

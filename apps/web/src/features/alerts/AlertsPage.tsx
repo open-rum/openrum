@@ -21,13 +21,23 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { deleteAlert, getAlerts, getChannels, updateAlert, type AlertRule } from "@/lib/api/alerts";
+import { Tabs, TabsContent, TabsCount, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  deleteAlert,
+  getAlerts,
+  getChannels,
+  updateAlert,
+  type AlertRule,
+  type DeliveryState,
+} from "@/lib/api/alerts";
 import { getProject, listOrganizations, listProjects, type Project } from "@/lib/api/projects";
 import { readRecentProjectId } from "@/lib/projects/currentProject";
+import { AlertOverview } from "./AlertOverview";
+import { alertOverview, ruleAttentions, type RuleFilter } from "./alertPresentation";
 import { DeliveryLog } from "./DeliveryLog";
 import { RuleEditor, type RuleEditorState } from "./RuleEditor";
 import { RulesTable } from "./RulesTable";
+import { RuleDetails } from "./RuleDetails";
 
 type AlertsTab = "rules" | "history";
 
@@ -55,7 +65,7 @@ export function AlertsPage() {
         />
       </ConsolePage>
     );
-  return <ProjectAlerts project={project.data} />;
+  return <ProjectAlerts key={project.data.id} project={project.data} />;
 }
 
 /** The old /alerts address opens the alerts of the most recently used project. */
@@ -98,12 +108,13 @@ function AlertsSkeleton() {
   );
 }
 
-function ProjectAlerts({ project }: { project: Project }) {
+export function ProjectAlerts({ project }: { project: Project }) {
   const queryClient = useQueryClient();
   const alertsKey = ["alerts", project.id] as const;
   const alerts = useQuery({
     queryKey: alertsKey,
     queryFn: ({ signal }) => getAlerts(project.id, signal),
+    refetchInterval: 30_000,
   });
   const channels = useQuery({
     queryKey: ["channels", project.organizationId],
@@ -114,6 +125,10 @@ function ProjectAlerts({ project }: { project: Project }) {
   const [editor, setEditor] = useState<RuleEditorState | null>(null);
   const [removing, setRemoving] = useState<AlertRule | null>(null);
   const [notice, setNotice] = useState("");
+  const [inspectingId, setInspectingId] = useState<string | null>(null);
+  const [historyRuleId, setHistoryRuleId] = useState("all");
+  const [historyDelivery, setHistoryDelivery] = useState<"all" | DeliveryState>("all");
+  const [ruleFilter, setRuleFilter] = useState<RuleFilter>("all");
   const canManage = alerts.data?.canManage ?? false;
   // Every project accepts the fixed environments, so new rules watch production.
   const defaultEnvironment = "production";
@@ -129,7 +144,10 @@ function ProjectAlerts({ project }: { project: Project }) {
 
   const toggle = useMutation({
     mutationFn: (rule: AlertRule) => updateAlert(project.id, rule.id, { enabled: !rule.enabled }),
-    onSuccess: () => void refresh(),
+    onSuccess: (_, rule) => {
+      setNotice(`已${rule.enabled ? "停用" : "启用"}规则「${rule.name}」。`);
+      void refresh();
+    },
   });
   const remove = useMutation({
     mutationFn: (rule: AlertRule) => deleteAlert(project.id, rule.id),
@@ -143,23 +161,41 @@ function ProjectAlerts({ project }: { project: Project }) {
   const rules = alerts.data?.rules ?? [];
   const notifications = alerts.data?.notifications ?? [];
   const channelList = channels.data?.channels ?? [];
-  const failure = alerts.error ?? toggle.error ?? remove.error;
+  const mutationFailure = toggle.error ?? remove.error;
+  const canEdit = canManage && channels.isSuccess;
+  const inspecting = rules.find((rule) => rule.id === inspectingId);
+  const attention = ruleAttentions(rules, notifications, channelList, channels.isSuccess);
+  const overview = alertOverview(rules, notifications, attention);
+  const noChannel = channels.isSuccess && !channelList.some((channel) => channel.enabled);
+  const firstRun = Boolean(alerts.data) && rules.length === 0;
+  const showRules = (filter: RuleFilter) => {
+    setRuleFilter(filter);
+    changeTab("rules");
+  };
+  const showHistory = (delivery: "all" | DeliveryState) => {
+    setHistoryRuleId("all");
+    setHistoryDelivery(delivery);
+    changeTab("history");
+  };
 
   return (
     <ConsolePage width="wide">
       <ConsolePageHeader
         title="告警"
-        description="规则按固定时间窗口评估，触发后通知到所选渠道，并带回对应的诊断页面。"
+        description="管理告警规则，查看触发记录与送达结果。"
         actions={
           <>
             <Button asChild variant="outline">
               <Link to="/settings/org/channels">
                 <BellRingIcon data-icon="inline-start" />
                 通知渠道
+                {noChannel ? (
+                  <span className="badge badge-sm badge-soft badge-warning">未配置</span>
+                ) : null}
               </Link>
             </Button>
             {canManage ? (
-              <Button onClick={() => setEditor({ mode: "create" })}>
+              <Button disabled={!canEdit} onClick={() => setEditor({ mode: "create" })}>
                 <PlusIcon data-icon="inline-start" />
                 新建规则
               </Button>
@@ -167,22 +203,43 @@ function ProjectAlerts({ project }: { project: Project }) {
           </>
         }
       />
-      <Tabs value={tab} onValueChange={changeTab}>
+      {alerts.data && rules.length ? (
+        <AlertOverview
+          overview={overview}
+          onShowBreached={() => showRules("breached")}
+          onShowTriggers={() => showHistory("all")}
+          onShowFailures={() =>
+            showHistory(
+              notifications.some((item) => item.delivery === "partial") ? "all" : "failed",
+            )
+          }
+          onShowAttention={() => showRules("attention")}
+        />
+      ) : null}
+      <Tabs value={tab} onValueChange={changeTab} className="gap-[var(--page-gap)]">
         <ConsolePageTabs>
           <TabsList variant="line">
-            <TabsTrigger value="rules">规则 {alerts.data ? `· ${rules.length}` : ""}</TabsTrigger>
+            <TabsTrigger value="rules">
+              告警规则
+              {alerts.data && !firstRun ? <TabsCount>{rules.length}</TabsCount> : null}
+            </TabsTrigger>
             <TabsTrigger value="history">
-              通知记录 {alerts.data ? `· ${notifications.length}` : ""}
+              触发记录
+              {alerts.data && !firstRun ? <TabsCount>{notifications.length}</TabsCount> : null}
             </TabsTrigger>
           </TabsList>
         </ConsolePageTabs>
         <ConsolePageContent className="flex flex-col gap-4">
-          {failure ? (
+          {mutationFailure ? (
             <AsyncError
-              error={failure}
+              error={mutationFailure}
               title="告警操作失败"
-              remediation="现有规则未改变，请稍后重试。"
-              onRetry={() => void refresh()}
+              remediation="操作结果尚未确认，请先重试读取规则，再决定是否重新操作。"
+              onRetry={() => {
+                toggle.reset();
+                remove.reset();
+                void refresh();
+              }}
             />
           ) : null}
           {notice ? (
@@ -190,15 +247,37 @@ function ProjectAlerts({ project }: { project: Project }) {
               {notice}
             </p>
           ) : null}
+          {channels.error ? (
+            <AsyncError
+              error={channels.error}
+              title="通知渠道读取失败"
+              remediation="仍可查看规则与触发记录；恢复渠道信息后可编辑规则。"
+              onRetry={() => void channels.refetch()}
+            />
+          ) : null}
+          {alerts.error ? (
+            <AsyncError
+              error={alerts.error}
+              title="告警数据加载失败"
+              remediation="无法确认当前规则和触发情况，请重试。"
+              onRetry={() => void alerts.refetch()}
+            />
+          ) : null}
           {alerts.isPending ? (
             <Skeleton className="h-64" />
-          ) : (
+          ) : alerts.data ? (
             <>
               <TabsContent value="rules">
                 <RulesTable
                   rules={rules}
                   channels={channelList}
+                  notifications={notifications}
+                  filter={ruleFilter}
+                  onFilterChange={setRuleFilter}
                   canManage={canManage}
+                  canCreate={canEdit}
+                  channelsAvailable={channels.isSuccess}
+                  onInspect={(rule) => setInspectingId(rule.id)}
                   defaultEnvironment={defaultEnvironment}
                   toggling={toggle.isPending}
                   onCreate={(initial) => setEditor({ mode: "create", initial })}
@@ -209,15 +288,43 @@ function ProjectAlerts({ project }: { project: Project }) {
                 />
               </TabsContent>
               <TabsContent value="history">
-                <DeliveryLog notifications={notifications} rules={rules} />
+                <DeliveryLog
+                  key={`${historyRuleId}-${historyDelivery}`}
+                  initialRuleId={historyRuleId}
+                  initialDelivery={historyDelivery}
+                  notifications={notifications}
+                  rules={rules}
+                  onShowRules={() => changeTab("rules")}
+                />
               </TabsContent>
             </>
-          )}
+          ) : null}
         </ConsolePageContent>
       </Tabs>
 
+      {inspecting ? (
+        <RuleDetails
+          rule={inspecting}
+          channels={channelList}
+          notifications={notifications}
+          canManage={canEdit}
+          channelsAvailable={channels.isSuccess}
+          onClose={() => setInspectingId(null)}
+          onEdit={() => {
+            setInspectingId(null);
+            setEditor({ mode: "edit", rule: inspecting });
+          }}
+          onHistory={() => {
+            setHistoryRuleId(inspecting.id);
+            setHistoryDelivery("all");
+            setInspectingId(null);
+            changeTab("history");
+          }}
+        />
+      ) : null}
       {editor ? (
         <RuleEditor
+          key={editor.mode === "create" ? "create" : `${editor.mode}-${editor.rule.id}`}
           project={project}
           state={editor}
           rules={rules}

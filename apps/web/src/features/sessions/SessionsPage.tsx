@@ -1,3 +1,4 @@
+import { analysisReturnHref } from "@/features/analytics/investigationLinks";
 import { useQuery } from "@tanstack/react-query";
 import { useParams } from "@tanstack/react-router";
 import {
@@ -5,7 +6,6 @@ import {
   ChevronLeftIcon,
   ChevronRightIcon,
   Clock3Icon,
-  RefreshCwIcon,
   ServerOffIcon,
   UsersIcon,
 } from "lucide-react";
@@ -17,7 +17,6 @@ import {
   ConsolePageContent,
   ConsolePageHeader,
 } from "@/components/layout/ConsolePage";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -58,6 +57,7 @@ import { SessionClientMeta } from "./SessionClientMeta";
 import { searchErrorFrom } from "@/lib/api/search";
 import { equalsTerm, foldIntoQuery, textTerm } from "@/lib/search/legacy";
 import { SessionFilterComposer } from "./SessionFilterComposer";
+import { SessionSignals } from "./SessionSignals";
 
 export function SessionsPage() {
   const { projectId } = useParams({ strict: false }) as { projectId?: string };
@@ -74,7 +74,7 @@ export function SessionsPage() {
   if (!project) {
     return (
       <ConsolePage width="narrow">
-        <Empty className="min-h-80 border border-border">
+        <Empty className="min-h-80 border border-base-300">
           <EmptyHeader>
             <EmptyMedia variant="icon">
               <UsersIcon />
@@ -162,17 +162,17 @@ function ProjectSessions({ project }: { project: Project }) {
     <ConsolePage width="fluid">
       <ConsolePageHeader
         title="会话"
-        description="从一次连续访问还原用户旅程，结合行为、错误、API 和性能信号快速定位问题。"
-        actions={
-          <Button
-            size="icon"
-            variant="outline"
-            aria-label="刷新会话"
-            onClick={() => void query.refetch()}
-            disabled={query.isFetching}
-          >
-            <RefreshCwIcon />
-          </Button>
+        description="按会话还原用户的访问过程，包括行为、错误、API 请求与性能数据。"
+        breadcrumbs={
+          analysisReturnHref(project.id, window.location.search)
+            ? [
+                {
+                  label: "返回分析",
+                  href: analysisReturnHref(project.id, window.location.search)!,
+                },
+                { label: "会话" },
+              ]
+            : undefined
         }
       />
 
@@ -248,7 +248,7 @@ function ProjectSessions({ project }: { project: Project }) {
           </div>
         ) : null}
         {query.data && query.data.sessions.length === 0 ? (
-          <Empty className="min-h-80 border border-border">
+          <Empty className="min-h-80 border border-base-300">
             <EmptyHeader>
               <EmptyMedia variant="icon">
                 <ServerOffIcon />
@@ -366,7 +366,7 @@ function SessionTable({
         <Table className="session-table">
           <TableHeader>
             <TableRow>
-              <TableHead>用户 / 会话</TableHead>
+              <TableHead>访客 / 会话 ID</TableHead>
               <TableHead>开始时间</TableHead>
               <TableHead>旅程</TableHead>
               <TableHead className="text-right">LCP</TableHead>
@@ -397,8 +397,12 @@ function SessionTable({
                       onSelect(session);
                     }}
                   >
-                    <strong>{session.visitorId || "匿名用户"}</strong>
-                    <span>{shortID(session.sessionId)}</span>
+                    <strong title={session.visitorId}>
+                      {session.userId
+                        ? `用户 ${shortID(session.userId)}`
+                        : `访客 ${shortID(session.visitorId || "未知")}`}
+                    </strong>
+                    <span>会话 {shortID(session.sessionId)}</span>
                   </Button>
                 </TableCell>
                 <TableCell>
@@ -420,17 +424,7 @@ function SessionTable({
                   />
                 </TableCell>
                 <TableCell>
-                  <div className="session-signals">
-                    {session.errors ? (
-                      <Badge variant="destructive">{session.errors} 错误</Badge>
-                    ) : null}
-                    {session.apiFailures ? (
-                      <Badge variant="secondary">{session.apiFailures} API 失败</Badge>
-                    ) : null}
-                    {session.errors === 0 && session.apiFailures === 0 ? (
-                      <Badge variant="outline">正常</Badge>
-                    ) : null}
-                  </div>
+                  <SessionSignals session={session} />
                 </TableCell>
                 <TableCell className="text-right tabular-nums">
                   {formatDuration(session.durationSeconds)}

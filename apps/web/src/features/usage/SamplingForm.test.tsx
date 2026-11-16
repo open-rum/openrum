@@ -69,9 +69,8 @@ it("saves without usage data, updates both caches and rolls back to the latest s
   const slider = screen.getByRole("slider", { name: "页面、性能与自定义事件采样率" });
   const save = screen.getByRole("button", { name: "保存采样配置" }) as HTMLButtonElement;
   expect(screen.getByText("预估不可用")).toBeTruthy();
-  // Each ArrowDown is one 10% step.
-  for (let step = 0; step < 6; step += 1) fireEvent.keyDown(slider, { key: "ArrowDown" });
-  expect(slider.getAttribute("aria-valuenow")).toBe("40");
+  fireEvent.change(slider, { target: { value: "40" } });
+  expect((slider as HTMLInputElement).value).toBe("40");
   fireEvent.click(save);
   await waitFor(() => expect(client.getQueryData(["project", project.id])).toEqual(saved));
   expect(client.getQueryData(["projects", project.organizationId])).toEqual({ projects: [saved] });
@@ -81,11 +80,11 @@ it("saves without usage data, updates both caches and rolls back to the latest s
     apiSampleRate: 0.2,
     errorSampleRate: 1,
   });
-  fireEvent.keyDown(slider, { key: "ArrowDown" });
+  fireEvent.change(slider, { target: { value: "30" } });
   expect(screen.queryByText("已保存并开始分发")).toBeNull();
   fireEvent.click(save);
   await waitFor(() => expect(screen.getByRole("alert").textContent).toContain("已回滚"));
-  expect(slider.getAttribute("aria-valuenow")).toBe("40");
+  expect((slider as HTMLInputElement).value).toBe("40");
   expect(save.disabled).toBe(true);
 });
 
@@ -95,8 +94,7 @@ it("keeps sampling read-only for members even when usage is unavailable", () => 
     true,
   );
   for (const slider of screen.getAllByRole("slider")) {
-    expect(slider.getAttribute("data-disabled")).toBe("");
-    expect(slider.getAttribute("tabindex")).toBeNull();
+    expect((slider as HTMLInputElement).disabled).toBe(true);
   }
   expect(updateProject).not.toHaveBeenCalled();
 });

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { StatRenderer } from "./ModuleRenderers";
 import { createWidget } from "./model";
@@ -16,6 +16,24 @@ const data: ScalarData = {
 };
 
 describe("stat card hierarchy", () => {
+  it("shows the current poor rating even when the metric improved over the previous period", () => {
+    const widget = createWidget("stat", { data: { source: "overview", metrics: ["lcp"] } });
+    const { container } = render(
+      <StatRenderer
+        widget={widget}
+        data={{
+          ...data,
+          value: 5000,
+          unit: "ms",
+          comparison: { change: -20, unit: "percent", previous: 6250 },
+        }}
+      />,
+    );
+    expect(screen.getByText("较差")).toBeTruthy();
+    expect(container.querySelector(".dashboard-comparison-corner")?.textContent).toBe("-20.0%");
+    expect(container.querySelector(".badge-error")).not.toBeNull();
+    expect(container.querySelector(".badge-success")).not.toBeNull();
+  });
   it.each(["area-right"] as const)(
     "does not fabricate %s when there is no trend data",
     (appearance) => {
@@ -37,20 +55,12 @@ describe("stat card hierarchy", () => {
     expect(container.textContent).not.toContain("页面浏览次数");
     expect(container.textContent).not.toContain("采集样本");
   });
-  it("explains the comparison and the previous value on hover or focus", async () => {
-    // Radix positions the tooltip with ResizeObserver, which jsdom lacks.
-    globalThis.ResizeObserver ??= class {
-      observe() {}
-      unobserve() {}
-      disconnect() {}
-    } as unknown as typeof ResizeObserver;
-    render(<StatRenderer widget={createWidget("stat")} data={data} />);
-    const badge = screen.getByLabelText("相比上一周期 +20.0%；上一周期 100");
-    act(() => {
-      fireEvent.focus(badge);
-    });
-    expect((await screen.findAllByText("较上一周期 +20.0%")).length).toBeGreaterThan(0);
-    expect(screen.getAllByText("上一周期 100").length).toBeGreaterThan(0);
+  it("explains the comparison and the previous value in its tooltip", () => {
+    const { container } = render(<StatRenderer widget={createWidget("stat")} data={data} />);
+    expect(screen.getByLabelText("相比上一周期 +20.0%；上一周期 100")).toBeTruthy();
+    expect(container.querySelector(".tooltip")?.getAttribute("data-tip")).toBe(
+      "较上一周期 +20.0% · 上一周期 100",
+    );
   });
   it("shows only the value when there is no previous-period comparison", () => {
     const widget = createWidget("stat", {

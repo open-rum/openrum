@@ -106,13 +106,13 @@ function FiltersForm({
       }}
     >
       {!canManage ? (
-        <p className="border border-border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
+        <p className="border border-base-300 bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
           当前角色为 {role ?? "未知"}，只有 Owner 或 Admin 可以修改过滤设置。
         </p>
       ) : null}
 
-      <section className="border border-border bg-card p-6">
-        <h2 className="text-lg font-semibold text-foreground">内置类别</h2>
+      <section className="border border-base-300 bg-card p-6">
+        <h2 className="card-title text-lg">内置类别</h2>
         <p className="mt-2 text-sm leading-6 text-muted-foreground">
           三种状态：<strong>关闭</strong>完全不看；<strong>仅统计</strong>
           照常入库但记录命中量，用来在动手之前先量清影响；
@@ -143,27 +143,26 @@ function FiltersForm({
         </ul>
       </section>
 
-      <section className="border border-border bg-card p-6">
+      <section className="border border-base-300 bg-card p-6">
         <div className="flex flex-wrap items-baseline justify-between gap-3">
-          <h2 className="text-lg font-semibold text-foreground">自定义规则</h2>
+          <h2 className="card-title text-lg">自定义规则</h2>
           <span className="text-xs text-muted-foreground">
             {draft.rules.length} / {maxRules}
           </span>
         </div>
         <p className="mt-2 text-sm leading-6 text-muted-foreground">
           匹配用通配符 <code>*</code>
-          ，不支持正则，且不区分大小写。同一条模式要在服务端和浏览器两个引擎上跑，
-          只有单一通配符能保证两边含义完全一致。
+          ，不支持正则，且不区分大小写。规则同时用于服务端与浏览器，请先用“仅统计”确认影响，再启用丢弃。
         </p>
 
         {draft.rules.length === 0 ? (
-          <p className="mt-5 border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">
+          <p className="mt-5 border border-dashed border-base-300 px-4 py-6 text-center text-sm text-muted-foreground">
             还没有自定义规则。内置类别覆盖不到的噪声可以在这里补。
           </p>
         ) : (
           <ul className="mt-5 flex flex-col gap-4">
             {draft.rules.map((rule, index) => (
-              <li key={rule.id} className="border border-border p-4">
+              <li key={rule.id} className="card card-border bg-base-100 p-4">
                 <div className="grid gap-3 sm:grid-cols-[10rem_minmax(0,1fr)_8rem_auto] sm:items-end">
                   <Field label="匹配字段">
                     <select
@@ -272,7 +271,7 @@ function FiltersForm({
         </p>
       ) : null}
 
-      <div className="flex items-center gap-3">
+      <div className="flex flex-row-reverse flex-wrap justify-start items-center gap-3">
         <Button type="submit" disabled={disabled}>
           {mutation.isPending ? "保存中…" : "保存"}
         </Button>
@@ -324,8 +323,8 @@ function Field({
   children: React.ReactNode;
 }) {
   return (
-    <label className="flex flex-col gap-1.5 text-sm">
-      <span className="font-medium text-foreground">{label}</span>
+    <label className="flex flex-col gap-1.5 text-sm [&_input:not([type=checkbox],[type=radio])]:input [&_input:not([type=checkbox],[type=radio])]:w-full [&_select]:select [&_select]:w-full [&_textarea]:textarea [&_textarea]:w-full">
+      <span className="font-medium text-base-content">{label}</span>
       {children}
       {hint ? <span className="text-xs text-muted-foreground">{hint}</span> : null}
     </label>

@@ -1,15 +1,17 @@
-import { HistoryIcon, SearchIcon, XIcon, type LucideIcon } from "lucide-react";
+import { CheckIcon, HistoryIcon, SearchIcon, XIcon, type LucideIcon } from "lucide-react";
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";
 import {
-  Popover,
-  PopoverAnchor,
-  PopoverContent,
-  PopoverDescription,
-  PopoverHeader,
-  PopoverTitle,
-} from "@/components/ui/popover";
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
+import { cn } from "@/lib/utils";
 import {
   caretContext,
   highlight,
@@ -21,7 +23,6 @@ import {
   type OperatorShape,
 } from "@/lib/search/query";
 import {
-  describeTerm,
   readRecentTerms,
   rememberTerm,
   splitQuery,
@@ -109,11 +110,13 @@ export function SearchQueryInput({
   if (value !== synced) {
     // The page's query changed from outside (a link, back/forward, a shortcut): show it.
     setSynced(value);
-    setDraft(value);
+    // The search a chosen value just ran comes back trimmed; keep the space typed after it.
+    if (draft.trim() !== value.trim()) setDraft(value);
   }
   const [caret, setCaret] = useState(value.length);
   const [open, setOpen] = useState(false);
   const [cursor, setCursor] = useState<number | null>(null);
+  const [hovered, setHovered] = useState<number | null>(null);
   const [pendingShape, setPendingShape] = useState<{ field: string; shape: OperatorShape }>();
   const [remote, setRemote] = useState<{ key: string; options: FilterSearchOption[] }>();
   const [recent, setRecent] = useState<string[]>(() =>
@@ -124,6 +127,15 @@ export function SearchQueryInput({
   const [listPicked, setListPicked] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const nextCaret = useRef<number | null>(null);
+  // A click places the caret itself; other ways in (Tab, /) start a new condition at the end.
+  const pointerFocus = useRef(false);
+  // Focus the code moves back to the box keeps the caret where it is.
+  const quietFocusing = useRef(false);
+  const quietFocus = () => {
+    quietFocusing.current = true;
+    inputRef.current?.focus();
+    quietFocusing.current = false;
+  };
   const baseId = useId();
   const listId = `${baseId}-list`;
 
@@ -160,14 +172,17 @@ export function SearchQueryInput({
         (option) => !known.some((item) => String(item.value) === String(option.value)),
       ),
     ];
-    const chosen = context.inList ? currentValues(context) : [];
     const wanted = listPicked ? "" : context.partial.toLocaleLowerCase();
-    return merged.filter(
-      (option) =>
-        !(listPicked && chosen.includes(String(option.value))) &&
-        `${option.label} ${option.value}`.toLocaleLowerCase().includes(wanted),
+    return merged.filter((option) =>
+      `${option.label} ${option.value}`.toLocaleLowerCase().includes(wanted),
     );
   })();
+  // A list condition shows its values as checkboxes; a half-typed value is not ticked yet.
+  const multiple = context.kind === "value" && chosenShape?.shape === "in";
+  const checkedValues =
+    multiple && context.kind === "value"
+      ? currentValues(context).filter((item) => item && (listPicked || item !== context.partial))
+      : [];
   const fieldOptions =
     context.kind === "field" ? rankFields(fields, context.prefix, attributes) : [];
   const showRecent = context.kind === "field" && !draft.trim() && recent.length > 0;
@@ -182,6 +197,12 @@ export function SearchQueryInput({
     ...valueOptions.map((option) => ({ kind: "value" as const, option })),
   ];
   const highlighted = cursor !== null && cursor < rows.length ? cursor : -1;
+  // Nothing typed yet: the whole list with a description column. Typing a name narrows it.
+  const wide = context.kind === "field" && !context.prefix;
+  const previewRow =
+    rows[hovered !== null && hovered < rows.length ? hovered : highlighted] ??
+    (wide ? rows.find((row) => row.kind === "field") : undefined);
+  const previewField = previewRow?.kind === "field" ? previewRow.field : undefined;
   const rowId = (index: number) => `${baseId}-row-${index}`;
 
   // Puts the caret where an edit left it, after React has written the new text. Scrolling the
@@ -190,7 +211,7 @@ export function SearchQueryInput({
     if (nextCaret.current === null || !inputRef.current) return;
     const position = nextCaret.current;
     nextCaret.current = null;
-    inputRef.current.focus();
+    quietFocus();
     inputRef.current.setSelectionRange(position, position);
   }, [draft, caret]);
 
@@ -246,7 +267,16 @@ export function SearchQueryInput({
     setDraft(query);
     setCaret(position);
     setCursor(null);
+    setHovered(null);
     nextCaret.current = position;
+  };
+  // A finished condition is followed by a space, with the caret after it, ready for the next.
+  const editThenSpace = (result: { query: string; caret: number }) => {
+    const spaced = /^\s/.test(result.query.slice(result.caret))
+      ? result.query
+      : `${result.query.slice(0, result.caret)} ${result.query.slice(result.caret)}`;
+    edit(spaced, result.caret + 1);
+    return spaced;
   };
   const submit = (query = draft) => {
     const cleaned = query.trim();
@@ -281,13 +311,17 @@ export function SearchQueryInput({
   }
   const chooseValue = (option: FilterSearchOption) => {
     if (context.kind !== "value") return;
-    const shape = chosenShape ?? { label: "是", negated: context.negated, shape: "eq" as const };
+    const shape = chosenShape ?? { label: "is", negated: context.negated, shape: "eq" as const };
     const value = String(option.value);
     if (shape.shape === "in") {
       // A half-typed value is replaced by the chosen one; one just picked from the list stays.
       const typed = listPicked ? "" : context.partial;
       const existing = currentValues(context).filter((item) => item && item !== typed);
-      const text = writeShape(context.field, shape, [...new Set([...existing, value])]);
+      // Choosing a ticked value unticks it.
+      const values = existing.includes(value)
+        ? existing.filter((item) => item !== value)
+        : [...existing, value];
+      const text = writeShape(context.field, shape, values);
       const result = replaceSpan(draft, context.start, context.end, text);
       // Stay inside the list so more values can be picked; Enter runs the search.
       edit(result.query, result.caret - 1);
@@ -295,9 +329,7 @@ export function SearchQueryInput({
       return;
     }
     const text = writeShape(context.field, shape, [value]);
-    const result = replaceSpan(draft, context.start, context.end, text);
-    edit(result.query, result.caret);
-    submit(result.query);
+    submit(editThenSpace(replaceSpan(draft, context.start, context.end, text)));
   };
   const chooseShape = (shape: OperatorShape) => {
     if (context.kind !== "value") return;
@@ -306,23 +338,20 @@ export function SearchQueryInput({
       const text = writeShape(context.field, shape, values);
       const result = replaceSpan(draft, context.start, context.end, text);
       setPendingShape(undefined);
-      edit(result.query, result.caret);
-      if (shape.shape === "has") submit(result.query);
+      if (shape.shape === "has") submit(editThenSpace(result));
+      else edit(result.query, result.caret);
       return;
     }
     // No value yet: remember the shape and apply it to the value chosen next.
     setPendingShape({ field: context.field, shape });
-    inputRef.current?.focus();
+    quietFocus();
   };
   const addShortcut = (term: string) => {
-    const result = replaceSpan(draft, draft.length, draft.length, term);
-    edit(result.query, result.caret);
-    submit(result.query);
+    submit(editThenSpace(replaceSpan(draft, draft.length, draft.length, term)));
   };
   const activate = (row: Row) => {
     if (row.kind === "recent") {
-      edit(row.query, row.query.length);
-      submit(row.query);
+      submit(editThenSpace({ query: row.query, caret: row.query.length }));
     } else if (row.kind === "field") chooseField(row.field, context);
     else chooseValue(row.option);
   };
@@ -332,10 +361,6 @@ export function SearchQueryInput({
       ? { start: error.position, end: error.position + Math.max(1, error.term?.length ?? 1) }
       : undefined;
   const parts = highlight(draft);
-  const describedTerm =
-    context.kind === "value" && context.term && activeField
-      ? describeTerm(context.term, (name) => fieldFor(name)?.label ?? name, freeTextLabel)
-      : undefined;
 
   return (
     <div className="search-query">
@@ -381,9 +406,19 @@ export function SearchQueryInput({
                 autoComplete="off"
                 placeholder={placeholder}
                 value={draft}
+                onPointerDown={(event) => {
+                  pointerFocus.current = document.activeElement !== event.currentTarget;
+                }}
                 onFocus={() => {
                   setOpen(true);
-                  readCaret();
+                  if (quietFocusing.current) return;
+                  const byPointer = pointerFocus.current;
+                  pointerFocus.current = false;
+                  if (draft.trim() && !/\s$/.test(draft)) {
+                    if (byPointer) setDraft(`${draft} `);
+                    else edit(`${draft} `, draft.length + 1);
+                  } else if (!byPointer) edit(draft, draft.length);
+                  if (byPointer) readCaret();
                 }}
                 onClick={() => {
                   setOpen(true);
@@ -404,6 +439,7 @@ export function SearchQueryInput({
                     if (!rows.length) return;
                     event.preventDefault();
                     setOpen(true);
+                    setHovered(null);
                     const step = event.key === "ArrowDown" ? 1 : -1;
                     setCursor(
                       highlighted < 0
@@ -453,16 +489,21 @@ export function SearchQueryInput({
             {/* There is no 查询 button: Enter, a chosen value or a has-condition runs the
                 search. An edit that has not run yet says so instead of the / hint. */}
             {draft.trim() !== value.trim() ? (
-              <span className="search-query__pending">按 Enter 搜索</span>
+              <span className="search-query__pending">
+                按 <kbd className="kbd kbd-sm">Enter</kbd> 搜索
+              </span>
             ) : (
-              <kbd>/</kbd>
+              <kbd className="kbd kbd-sm">/</kbd>
             )}
           </div>
         </PopoverAnchor>
         <PopoverContent
           align="start"
           sideOffset={8}
-          className="w-[min(720px,calc(100vw-2rem))] max-w-none gap-0 overflow-hidden p-0"
+          className={cn(
+            "max-w-none gap-0 overflow-visible p-0",
+            wide ? "w-[min(720px,calc(100vw-2rem))]" : "w-[min(440px,calc(100vw-2rem))]",
+          )}
           onOpenAutoFocus={(event) => event.preventDefault()}
           onCloseAutoFocus={(event) => event.preventDefault()}
           onInteractOutside={(event) => {
@@ -470,52 +511,45 @@ export function SearchQueryInput({
             if (event.target instanceof Node && box?.contains(event.target)) event.preventDefault();
           }}
         >
-          <PopoverHeader className="p-3">
-            {context.kind === "value" ? (
-              <>
-                <PopoverTitle>{activeField?.label ?? context.field}</PopoverTitle>
-                <PopoverDescription>
-                  {describedTerm
-                    ? `当前条件：${describedTerm}`
-                    : activeField?.hint || "选择条件和值，或直接输入。"}
-                </PopoverDescription>
-              </>
-            ) : (
-              <>
-                <PopoverTitle>{context.prefix ? "选择字段" : "添加条件"}</PopoverTitle>
-                <PopoverDescription>
-                  选中的字段会写进查询；条件之间用 AND 连接，全部满足才算匹配。
-                </PopoverDescription>
-              </>
-            )}
-          </PopoverHeader>
-          {shapes.length ? (
-            <div
-              role="group"
-              aria-label={`${activeField?.label}的条件`}
-              className="flex flex-wrap gap-1.5 px-3 pb-3"
-            >
-              {shapes.map((shape) => {
-                const pressed =
-                  chosenShape?.shape === shape.shape && chosenShape.negated === shape.negated;
-                return (
-                  <Button
-                    key={`${shape.shape}:${shape.negated}`}
-                    type="button"
-                    size="sm"
-                    variant={pressed ? "default" : "outline"}
-                    aria-pressed={pressed}
-                    onMouseDown={(event) => event.preventDefault()}
-                    onClick={() => chooseShape(shape)}
+          {context.kind === "value" ? (
+            <div className="flex items-center gap-2 border-b px-3 py-2">
+              <p className="min-w-0 flex-1 truncate text-sm font-medium">
+                {activeField?.label ?? context.field}{" "}
+                <code className="search-query__code">{context.field}</code>
+              </p>
+              {shapes.length && chosenShape ? (
+                <Select
+                  value={shapeKey(chosenShape)}
+                  onValueChange={(key) => {
+                    const shape = shapes.find((item) => shapeKey(item) === key);
+                    if (shape) chooseShape(shape);
+                  }}
+                >
+                  <SelectTrigger size="sm" aria-label={`${activeField?.label}的条件`}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent
+                    align="end"
+                    onCloseAutoFocus={(event) => {
+                      // Back to the query, with the caret where the chosen operator left it.
+                      event.preventDefault();
+                      quietFocus();
+                    }}
                   >
-                    {shape.label}
-                  </Button>
-                );
-              })}
+                    <SelectGroup>
+                      {shapes.map((shape) => (
+                        <SelectItem key={shapeKey(shape)} value={shapeKey(shape)}>
+                          {shape.label}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+              ) : null}
             </div>
           ) : null}
           {context.kind === "field" && !draft.trim() && shortcuts.length ? (
-            <div className="flex flex-wrap gap-2 px-3 pb-3">
+            <div className="flex flex-wrap gap-2 border-b px-3 py-2">
               {shortcuts.map((shortcut) => (
                 <Button
                   key={shortcut.term}
@@ -530,20 +564,20 @@ export function SearchQueryInput({
               ))}
             </div>
           ) : null}
-          <Separator />
-          <div
-            role="listbox"
-            id={listId}
-            aria-label={
-              context.kind === "value"
-                ? `${activeField?.label ?? context.field}的建议值`
-                : "查询建议"
-            }
-            className="max-h-80 overflow-y-auto p-2"
-          >
-            <div role="presentation" className="grid gap-1 sm:grid-cols-2">
+          <div className={cn("relative", wide && "grid grid-cols-[minmax(0,1fr)_240px]")}>
+            <div
+              role="listbox"
+              id={listId}
+              aria-label={
+                context.kind === "value"
+                  ? `${activeField?.label ?? context.field}的建议值`
+                  : "可添加的条件"
+              }
+              className="max-h-80 overflow-y-auto p-1.5"
+              onMouseLeave={() => setHovered(null)}
+            >
               {rows.map((row, index) => (
-                <Button
+                <button
                   key={
                     row.kind === "recent"
                       ? `recent:${row.query}`
@@ -555,73 +589,130 @@ export function SearchQueryInput({
                   type="button"
                   role="option"
                   tabIndex={-1}
-                  variant="ghost"
                   aria-selected={index === highlighted}
-                  data-highlighted={index === highlighted}
-                  className={`h-auto min-h-11 justify-start gap-3 rounded-xl px-3 py-2 text-left whitespace-normal data-[highlighted=true]:bg-accent ${row.kind === "recent" ? "sm:col-span-2" : ""}`}
+                  aria-checked={
+                    multiple && row.kind === "value"
+                      ? checkedValues.includes(String(row.option.value))
+                      : undefined
+                  }
+                  data-highlighted={index === highlighted || undefined}
+                  className="search-query__option"
                   onMouseDown={(event) => event.preventDefault()}
+                  onMouseEnter={() => setHovered(index)}
                   onClick={() => activate(row)}
                 >
                   {row.kind === "recent" ? (
                     <>
                       <HistoryIcon aria-hidden="true" />
-                      <span className="min-w-0 flex-1">
-                        <code className="search-query__code block">{row.query}</code>
-                        <small className="text-muted-foreground">最近搜索</small>
-                      </span>
+                      <code className="search-query__code min-w-0 flex-1 truncate">
+                        {row.query}
+                      </code>
+                      <span className="search-query__option-meta">最近搜索</span>
                     </>
                   ) : row.kind === "field" ? (
                     <>
-                      <row.field.icon aria-hidden="true" />
-                      <span className="min-w-0 flex-1">
-                        <strong className="block font-medium">
-                          {row.field.label}{" "}
-                          <code className="search-query__code">
-                            {row.field.term ?? row.field.key}
-                          </code>
-                        </strong>
-                        <small className="text-muted-foreground">{row.field.hint}</small>
+                      <code className="search-query__code">{row.field.term ?? row.field.key}</code>
+                      <span className="min-w-0 flex-1 truncate text-muted-foreground">
+                        {row.field.label}
+                      </span>
+                      <span className="search-query__option-meta">
+                        {fieldTypeLabel[row.field.type]}
                       </span>
                     </>
                   ) : (
-                    <span className="min-w-0 flex-1">
-                      <strong className="block font-medium">{row.option.label}</strong>
-                      {row.option.count !== undefined ? (
-                        <small className="text-muted-foreground">
-                          {row.option.count.toLocaleString()} {row.option.countLabel ?? "条"}
-                        </small>
+                    <>
+                      {multiple ? (
+                        <span
+                          className="search-query__check"
+                          data-checked={
+                            checkedValues.includes(String(row.option.value)) || undefined
+                          }
+                          aria-hidden="true"
+                        >
+                          <CheckIcon />
+                        </span>
                       ) : null}
-                    </span>
+                      <span className="min-w-0 flex-1 truncate">{row.option.label}</span>
+                      {row.option.count !== undefined ? (
+                        <span className="search-query__option-meta">
+                          {row.option.count.toLocaleString()} {row.option.countLabel ?? "条"}
+                        </span>
+                      ) : null}
+                    </>
                   )}
-                </Button>
+                </button>
               ))}
+              {!rows.length ? (
+                <p className="px-1 py-6 text-center text-sm text-muted-foreground">
+                  {context.kind === "value"
+                    ? chosenShape?.shape === "has"
+                      ? "按 Enter 搜索。"
+                      : "没有建议值，可直接输入后按 Enter 搜索。"
+                    : freeTextLabel
+                      ? `按 Enter 在「${freeTextLabel}」中搜索。`
+                      : "没有匹配的字段。"}
+                </p>
+              ) : null}
             </div>
-            {!rows.length ? (
-              <p className="px-1 py-6 text-center text-sm text-muted-foreground">
-                {context.kind === "value"
-                  ? chosenShape?.shape === "has"
-                    ? "按 Enter 搜索。"
-                    : "没有建议值，可直接输入后按 Enter 搜索。"
-                  : freeTextLabel
-                    ? `按 Enter 在「${freeTextLabel}」中搜索。`
-                    : "没有匹配的字段。"}
-              </p>
+            {/* The field under the pointer or the keyboard, described beside the list: a
+                column of the wide panel, or a card floating to its right while typing. */}
+            {previewField ? (
+              <FieldDetails
+                field={previewField}
+                className={
+                  wide
+                    ? "border-l"
+                    : "absolute top-0 left-full ml-2 hidden w-60 rounded-[var(--radius-surface)] border bg-popover shadow-md md:block"
+                }
+              />
             ) : null}
           </div>
-          <Separator />
-          <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 px-3 py-2 text-xs text-muted-foreground">
-            <span>
-              <code>!</code> 不是 · <code>[a,b]</code> 其中之一 · <code>*值*</code> 包含 ·{" "}
-              <code>has:字段</code> 有值 · <code>&gt;</code> 比较
-            </span>
-            <span>↑↓ 选择 · Enter 搜索 · Esc 关闭</span>
-          </div>
+          {wide ? (
+            <>
+              <Separator />
+              <p className="px-3 py-2 text-xs text-muted-foreground">
+                <code>!</code> 不是 · <code>[a,b]</code> 其中之一 · <code>*值*</code> 包含 ·{" "}
+                <code>has:字段</code> 有值 · <code>&gt;</code> 比较 · ↑↓ 选择 · Enter 搜索
+              </p>
+            </>
+          ) : null}
         </PopoverContent>
       </Popover>
       {error ? (
         <p className="search-query__error text-sm text-destructive" role="alert">
           {error.message}
         </p>
+      ) : null}
+    </div>
+  );
+}
+
+const shapeKey = (shape: OperatorShape) => `${shape.shape}:${shape.negated}`;
+
+const fieldTypeLabel: Record<SearchFieldType, string> = {
+  text: "文本",
+  enum: "枚举",
+  uuid: "ID",
+  number: "数字",
+  duration: "时长",
+};
+
+function FieldDetails({ field, className }: { field: FilterSearchField; className?: string }) {
+  const examples = field.options?.slice(0, 4).map((option) => option.label) ?? [];
+  return (
+    <div className={cn("flex flex-col gap-2 p-3 text-sm", className)} aria-hidden="true">
+      <div>
+        <p className="font-medium">{field.label}</p>
+        <code className="search-query__code text-xs text-muted-foreground">
+          {field.term ?? field.key} · {fieldTypeLabel[field.type]}
+        </code>
+      </div>
+      <p className="text-muted-foreground">{field.hint}</p>
+      {examples.length ? (
+        <p className="text-xs text-muted-foreground">例如 {examples.join("、")}</p>
+      ) : null}
+      {field.equalsOnly ? (
+        <p className="text-xs text-muted-foreground">只能写成 字段:值。</p>
       ) : null}
     </div>
   );

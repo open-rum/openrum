@@ -1,8 +1,7 @@
 import { useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { useParams } from "@tanstack/react-router";
 import {
-  ArrowLeftIcon,
   CheckIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
@@ -62,6 +61,8 @@ import {
   updateIssue,
   type EventDetail,
   type IssueDetailResponse,
+  type IssueEventPage,
+  type IssuesResponse,
   type StoredIssueStatus,
   type IssueFilters,
 } from "@/lib/api/issues";
@@ -182,8 +183,11 @@ function IssueInvestigation({
     queryKey: detailKey,
     queryFn: ({ signal }) => getIssueDetail(filters, fingerprint, signal),
   });
-  const [eventCursor, setEventCursor] = useState<string>();
-  const [cursorHistory, setCursorHistory] = useState<string[]>([]);
+  // Coming from the Issue list, its row already holds the header and counts, so the page can
+  // show them at once and only the trend waits for the detail response.
+  const [listed] = useState(() => listedIssue(queryClient, project.id, fingerprint));
+  // selectLast continues from the oldest event on a page reached by moving to older ones.
+  const [eventPage, setEventPage] = useState<IssueEventPage & { selectLast?: boolean }>({});
   const samples = useQuery({
     queryKey: [
       "issue-events",
@@ -197,19 +201,24 @@ function IssueInvestigation({
       filters.deviceType,
       filters.country,
       filters.route,
-      eventCursor,
+      eventPage.cursor,
+      eventPage.toward,
     ],
-    queryFn: ({ signal }) => getIssueEvents(filters, fingerprint, eventCursor, signal),
+    queryFn: ({ signal }) =>
+      getIssueEvents(
+        filters,
+        fingerprint,
+        { cursor: eventPage.cursor, toward: eventPage.toward },
+        signal,
+      ),
   });
   const [selectedEventId, setSelectedEventId] = useState<string | undefined>(
     () => new URLSearchParams(window.location.search).get("event") ?? undefined,
   );
-  // After paging back to newer events, continue from the oldest one on that page.
-  const [selectLastOnPage, setSelectLastOnPage] = useState(false);
   const pageEvents = samples.data?.events ?? [];
   const eventId =
     selectedEventId ??
-    (selectLastOnPage ? pageEvents[pageEvents.length - 1] : pageEvents[0])?.eventId;
+    (eventPage.selectLast ? pageEvents[pageEvents.length - 1] : pageEvents[0])?.eventId;
   const event = useQuery({
     queryKey: ["event", eventId],
     queryFn: ({ signal }) => getEvent(eventId!, signal),
@@ -249,9 +258,12 @@ function IssueInvestigation({
     },
   });
   const canChange = project.role !== "viewer";
+  // Changes wait for the stored Issue, so they never land on the list's copy.
+  const busy = mutation.isPending || !detail.data;
 
-  if (detail.isLoading) return <IssueDetailSkeleton />;
-  if (detail.error || !detail.data)
+  if (detail.isLoading && !listed) return <IssueDetailSkeleton />;
+  const issue = detail.data?.issue ?? listed;
+  if (detail.error || !issue)
     return (
       <IssueDetailError
         title="无法加载问题详情"
@@ -259,10 +271,9 @@ function IssueInvestigation({
         onRetry={() => void detail.refetch()}
       />
     );
-  const issue = detail.data.issue;
   const sampleIndex = pageEvents.findIndex((item) => item.eventId === eventId);
-  const hasNewerPage = cursorHistory.length > 0;
-  const hasOlderPage = Boolean(samples.data?.nextCursor);
+  const newerCursor = samples.data?.newerCursor;
+  const olderCursor = samples.data?.nextCursor;
   const isNew = isNewInRange(issue.firstSeenAt, filters.from);
   const culprit = event.data ? culpritFrame(event.data) : undefined;
   const assignee = members.data?.members.find((member) => member.userId === issue.assigneeUserId);
@@ -274,42 +285,35 @@ function IssueInvestigation({
       toast.error("复制失败，请手动复制");
     }
   };
-  const goToPage = (cursor: string | undefined, history: string[], selectLast: boolean) => {
-    setCursorHistory(history);
-    setEventCursor(cursor || undefined);
+  const goToPage = (page: IssueEventPage & { selectLast?: boolean }) => {
+    setEventPage(page);
     setSelectedEventId(undefined);
-    setSelectLastOnPage(selectLast);
   };
   const navigation = {
-    latest: () => goToPage(undefined, [], false),
+    latest: () => goToPage({}),
+    oldest: () => goToPage({ toward: "oldest", selectLast: true }),
     newer: () => {
       if (sampleIndex > 0) setSelectedEventId(pageEvents[sampleIndex - 1].eventId);
-      else if (hasNewerPage) {
-        const history = [...cursorHistory];
-        const previous = history.pop();
-        goToPage(previous, history, true);
-      }
+      else if (newerCursor) goToPage({ cursor: newerCursor, toward: "newer", selectLast: true });
     },
     older: () => {
       if (sampleIndex >= 0 && sampleIndex < pageEvents.length - 1)
         setSelectedEventId(pageEvents[sampleIndex + 1].eventId);
-      else if (samples.data?.nextCursor)
-        goToPage(samples.data.nextCursor, [...cursorHistory, eventCursor ?? ""], false);
+      else if (olderCursor) goToPage({ cursor: olderCursor });
     },
   };
-  const isLatest = !hasNewerPage && sampleIndex <= 0;
+  const isLatest = Boolean(samples.data) && !newerCursor && sampleIndex === 0;
+  const isOldest = Boolean(samples.data) && !olderCursor && sampleIndex === pageEvents.length - 1;
   return (
     <ConsolePage width="fluid" className="issue-investigation">
       <ConsolePageHeader
-        back={
-          <a
-            className="issue-back-link"
-            href={`/projects/${encodeURIComponent(project.id)}/issues?${withTimePreset(serializeIssueFilters(filters))}`}
-          >
-            <ArrowLeftIcon />
-            返回问题列表
-          </a>
-        }
+        breadcrumbs={[
+          {
+            label: "错误问题",
+            href: `/projects/${encodeURIComponent(project.id)}/issues?${withTimePreset(serializeIssueFilters(filters))}`,
+          },
+          { label: issue.errorType },
+        ]}
         title={
           <span className="issue-title-row">
             <span className="issue-title-type">{issue.errorType}</span>
@@ -345,7 +349,7 @@ function IssueInvestigation({
           {issue.status === "unresolved" || issue.status === "regressed" ? (
             <>
               <Button
-                disabled={!canChange || mutation.isPending}
+                disabled={!canChange || busy}
                 onClick={() => mutation.mutate({ status: "resolved" })}
               >
                 <CheckIcon />
@@ -353,7 +357,7 @@ function IssueInvestigation({
               </Button>
               <Button
                 variant="outline"
-                disabled={!canChange || mutation.isPending}
+                disabled={!canChange || busy}
                 onClick={() => mutation.mutate({ status: "ignored" })}
               >
                 <EyeOffIcon />
@@ -362,7 +366,7 @@ function IssueInvestigation({
             </>
           ) : (
             <Button
-              disabled={!canChange || mutation.isPending}
+              disabled={!canChange || busy}
               onClick={() => mutation.mutate({ status: "unresolved" })}
             >
               <RotateCcwIcon />
@@ -372,7 +376,7 @@ function IssueInvestigation({
           {canChange ? (
             <Select
               value={issue.assigneeUserId ?? "none"}
-              disabled={mutation.isPending || members.isLoading || Boolean(members.error)}
+              disabled={busy || members.isLoading || Boolean(members.error)}
               onValueChange={(value) =>
                 mutation.mutate({ assigneeUserId: value === "none" ? "" : value })
               }
@@ -428,19 +432,23 @@ function IssueInvestigation({
         <div className="issue-layout">
           <div className="issue-main">
             <ActiveTagFilters filters={filters} onFilter={onFilter} />
-            <IssueTrend
-              trend={detail.data.trend}
-              range={detail.data}
-              totals={{ events: issue.events, users: issue.users }}
-              tags={
-                <TagPreview
-                  facets={detail.data.facets}
-                  total={issue.events}
-                  filters={filters}
-                  onFilter={onFilter}
-                />
-              }
-            />
+            {detail.data ? (
+              <IssueTrend
+                trend={detail.data.trend}
+                range={detail.data}
+                totals={{ events: issue.events, users: issue.users }}
+                tags={
+                  <TagPreview
+                    facets={detail.data.facets}
+                    total={issue.events}
+                    filters={filters}
+                    onFilter={onFilter}
+                  />
+                }
+              />
+            ) : (
+              <Skeleton className="h-40" aria-label="正在加载趋势" />
+            )}
             <section className="issue-panel issue-events" aria-labelledby="issue-events-title">
               <EventNavigation
                 event={event.data}
@@ -448,9 +456,13 @@ function IssueInvestigation({
                 position={sampleIndex}
                 pageSize={pageEvents.length}
                 isLatest={isLatest}
-                canNewer={sampleIndex > 0 || hasNewerPage}
-                canOlder={(sampleIndex >= 0 && sampleIndex < pageEvents.length - 1) || hasOlderPage}
+                isOldest={isOldest}
+                canNewer={sampleIndex > 0 || Boolean(newerCursor)}
+                canOlder={
+                  (sampleIndex >= 0 && sampleIndex < pageEvents.length - 1) || Boolean(olderCursor)
+                }
                 onLatest={navigation.latest}
+                onOldest={navigation.oldest}
                 onNewer={navigation.newer}
                 onOlder={navigation.older}
                 onCopyId={(id) => void copy(id, "事件 ID 已复制")}
@@ -461,22 +473,12 @@ function IssueInvestigation({
                     issueTitle={issue.title}
                     selected={eventId}
                     onSelect={setSelectedEventId}
-                    hasPrevious={!samples.isFetching && hasNewerPage}
-                    hasNext={!samples.isFetching && hasOlderPage}
-                    onPrevious={() => {
-                      const history = [...cursorHistory];
-                      const previous = history.pop();
-                      goToPage(previous, history, false);
-                    }}
-                    onNext={() =>
-                      samples.data?.nextCursor
-                        ? goToPage(
-                            samples.data.nextCursor,
-                            [...cursorHistory, eventCursor ?? ""],
-                            false,
-                          )
-                        : undefined
+                    hasPrevious={!samples.isFetching && Boolean(newerCursor)}
+                    hasNext={!samples.isFetching && Boolean(olderCursor)}
+                    onPrevious={() =>
+                      newerCursor ? goToPage({ cursor: newerCursor, toward: "newer" }) : undefined
                     }
+                    onNext={() => (olderCursor ? goToPage({ cursor: olderCursor }) : undefined)}
                   />
                 }
               />
@@ -498,7 +500,19 @@ function IssueInvestigation({
                 />
               ) : null}
               {!samples.isLoading && !samples.error && !pageEvents.length ? (
-                <p className="issue-empty-copy">当前筛选下没有可查看的事件。</p>
+                <div className="p-4 text-sm text-base-content/70" role="status">
+                  <p className="font-medium text-base-content">
+                    {issue.events > 0
+                      ? "历史统计仍可用，原始事件现场不可用"
+                      : "当前筛选下没有可查看的原始事件"}
+                  </p>
+                  <p className="mt-2">
+                    {issue.events > 0
+                      ? `当前范围的历史聚合记录了 ${issue.events.toLocaleString()} 次错误。`
+                      : ""}
+                    原始事件与聚合统计的保留时间可能不同；也可能没有符合当前筛选的现场。请调整时间或筛选条件，历史统计并不保证原始现场仍在保留期内。
+                  </p>
+                </div>
               ) : null}
               {event.data ? <EventSections key={event.data.eventId} event={event.data} /> : null}
             </section>
@@ -588,9 +602,11 @@ function EventNavigation({
   position,
   pageSize,
   isLatest,
+  isOldest,
   canNewer,
   canOlder,
   onLatest,
+  onOldest,
   onNewer,
   onOlder,
   onCopyId,
@@ -601,9 +617,11 @@ function EventNavigation({
   position: number;
   pageSize: number;
   isLatest: boolean;
+  isOldest: boolean;
   canNewer: boolean;
   canOlder: boolean;
   onLatest: () => void;
+  onOldest: () => void;
   onNewer: () => void;
   onOlder: () => void;
   onCopyId: (eventId: string) => void;
@@ -632,19 +650,30 @@ function EventNavigation({
           >
             <ChevronRightIcon />
           </Button>
-          <Button
-            size="sm"
-            variant={isLatest ? "secondary" : "ghost"}
-            aria-pressed={isLatest}
+          {/* The end already shown reads as plain text rather than a pressed button. */}
+          <button
+            type="button"
+            className="issue-events__jump"
+            aria-current={isLatest ? true : undefined}
+            disabled={isLatest || (!pageSize && !canNewer)}
             onClick={onLatest}
           >
             最新
-          </Button>
+          </button>
+          <button
+            type="button"
+            className="issue-events__jump"
+            aria-current={isOldest ? true : undefined}
+            disabled={isOldest || (!pageSize && !canOlder)}
+            onClick={onOldest}
+          >
+            最早
+          </button>
           <Sheet>
             <SheetTrigger asChild>
-              <Button size="sm" variant="outline">
+              <button type="button" className="issue-events__jump" disabled={!pageSize}>
                 全部事件
-              </Button>
+              </button>
             </SheetTrigger>
             <SheetContent className="issue-events-sheet data-[side=right]:w-[min(1120px,94vw)] data-[side=right]:sm:max-w-none">
               <SheetHeader>
@@ -682,14 +711,16 @@ function EventNavigation({
             <span className="issue-event-bar__count">加载中…</span>
           ) : null}
         </div>
-        <div className="issue-event-bar__links">
-          <span>跳转到</span>
-          {eventSectionLinks.map(([id, label]) => (
-            <a key={id} href={`#${id}`}>
-              {label}
-            </a>
-          ))}
-        </div>
+        {event ? (
+          <div className="issue-event-bar__links">
+            <span>跳转到</span>
+            {eventSectionLinks.map(([id, label]) => (
+              <a key={id} href={`#${id}`}>
+                {label}
+              </a>
+            ))}
+          </div>
+        ) : null}
       </div>
     </>
   );
@@ -934,6 +965,21 @@ function SamplesPanel({
       </footer>
     </div>
   );
+}
+
+/** The Issue as the most recently loaded Issue list shows it, if that list holds it. */
+function listedIssue(queryClient: QueryClient, projectId: string, fingerprint: string) {
+  const lists = queryClient
+    .getQueryCache()
+    .findAll({ queryKey: ["issues", projectId] })
+    .sort((a, b) => b.state.dataUpdatedAt - a.state.dataUpdatedAt);
+  for (const list of lists) {
+    const issue = (list.state.data as IssuesResponse | undefined)?.issues.find(
+      (item) => item.fingerprint === fingerprint,
+    );
+    if (issue) return issue;
+  }
+  return undefined;
 }
 
 function IssueDetailSkeleton() {

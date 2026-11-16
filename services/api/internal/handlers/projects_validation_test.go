@@ -103,3 +103,17 @@ func TestValidateCreateProjectGeneratesSlugWhenOmitted(t *testing.T) {
 		t.Fatalf("generated slugs repeat: %q", first)
 	}
 }
+
+func TestValidateUpdateProjectRevenueCurrency(t *testing.T) {
+	for _, value := range []string{"USD", "CNY", ""} {
+		input, ok := validateUpdateProject(updateProjectRequest{RevenueCurrency: &value})
+		if !ok || input.RevenueCurrency == nil || *input.RevenueCurrency != value {
+			t.Fatalf("revenue currency %q was rejected or lost", value)
+		}
+	}
+	for _, value := range []string{"usd", "XYZ", "US$", "dollar"} {
+		if _, ok := validateUpdateProject(updateProjectRequest{RevenueCurrency: &value}); ok {
+			t.Fatalf("revenue currency %q was accepted", value)
+		}
+	}
+}

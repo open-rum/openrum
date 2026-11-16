@@ -346,7 +346,8 @@ func parseIssueFilters(request *http.Request, projectID, userID uuid.UUID) (quer
 		Title: values.Get("title"), ErrorType: values.Get("errorType"), Fingerprint: values.Get("fingerprint"), UserID: values.Get("userId"),
 		Query:  values.Get("q"),
 		Status: metadata.IssueStatus(values.Get("status")), Limit: limit, Cursor: values.Get("cursor"),
-		Sort: values.Get("sort"), Assignee: values.Get("assignee"), NewOnly: values.Get("new") == "1",
+		Toward: values.Get("toward"),
+		Sort:   values.Get("sort"), Assignee: values.Get("assignee"), NewOnly: values.Get("new") == "1",
 	}
 	// is:, assigned: in the search read Postgres state, so they become the same filters as
 	// the older status=, assignee= and new= parameters; a search condition wins.

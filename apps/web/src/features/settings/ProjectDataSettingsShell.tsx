@@ -16,7 +16,6 @@ export function ProjectDataSettingsShell({
   children: ReactNode;
 }) {
   const navigate = useNavigate();
-  const current = projectDataSettings.find((item) => item.key === section)!;
   return (
     <Tabs
       value={section}
@@ -39,10 +38,10 @@ export function ProjectDataSettingsShell({
           </Button>
         }
         tabs={
-          <div className="overflow-x-auto pb-2">
-            <TabsList variant="line" aria-label="数据管理分区" className="min-h-11">
+          <div className="overflow-x-auto">
+            <TabsList variant="line" aria-label="数据管理分区">
               {projectDataSettings.map((item) => (
-                <TabsTrigger key={item.key} value={item.key} className="min-h-10 px-4">
+                <TabsTrigger key={item.key} value={item.key} className="min-h-10">
                   {item.label}
                 </TabsTrigger>
               ))}
@@ -51,12 +50,6 @@ export function ProjectDataSettingsShell({
         }
       >
         <TabsContent value={section} className="flex flex-col gap-6">
-          <div className="max-w-3xl">
-            <h2 id={`project-${section}-title`} className="text-lg font-medium">
-              {current.label}
-            </h2>
-            <p className="mt-2 text-sm leading-6 text-muted-foreground">{current.description}</p>
-          </div>
           {children}
         </TabsContent>
       </SettingsShell>

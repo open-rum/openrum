@@ -109,7 +109,7 @@ export function SettingsNav({
                 params={{ projectId: project.id }}
                 icon={<ChartColumnIcon />}
               >
-                用量统计
+                项目用量
               </NavItem>
             </Scope>
           ) : null}

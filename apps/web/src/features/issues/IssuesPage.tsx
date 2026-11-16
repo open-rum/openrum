@@ -1,12 +1,14 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import {
   ArrowDownUpIcon,
   BugIcon,
+  CheckIcon,
+  ChevronDownIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
-  RefreshCwIcon,
 } from "lucide-react";
 import { AsyncError } from "@/components/ui/AsyncState";
 import {
@@ -15,23 +17,8 @@ import {
   ConsolePageContent,
   ConsolePageHeader,
 } from "@/components/layout/ConsolePage";
-import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Empty,
-  EmptyContent,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-} from "@/components/ui/empty";
-import { Skeleton } from "@/components/ui/skeleton";
+import { DaisyDropdown } from "@/components/daisy/DaisyDropdown";
+import { cn } from "@/lib/utils";
 import { getIssueOverview, getIssues, updateIssue } from "@/lib/api/issues";
 import { TIME_SERIES_MAX_POINTS } from "@/lib/charts/timeSeries";
 import { listMembers, listOrganizations, listProjects, type Project } from "@/lib/api/projects";
@@ -75,14 +62,10 @@ export function IssuesPage() {
   if (!project && projectId)
     return (
       <ConsolePage width="fluid">
-        <Empty>
-          <EmptyHeader>
-            <EmptyTitle>项目不可用</EmptyTitle>
-            <EmptyDescription>
-              项目不存在或当前账号没有权限，请从项目列表重新选择。
-            </EmptyDescription>
-          </EmptyHeader>
-        </Empty>
+        <EmptyCard
+          title="项目不可用"
+          description="项目不存在或当前账号没有权限，请从项目列表重新选择。"
+        />
       </ConsolePage>
     );
   if (!project) return <NoProjectIssues />;
@@ -152,6 +135,7 @@ function ProjectIssues({ project }: { project: Project }) {
     retry: false,
   });
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const assign = useMutation({
     mutationFn: ({
       fingerprint,
@@ -178,19 +162,7 @@ function ProjectIssues({ project }: { project: Project }) {
     <ConsolePage width="fluid">
       <ConsolePageHeader
         title="错误问题"
-        description="先判断影响，再定位原因。相同异常聚合为一个问题，点击查看堆栈与事件现场。"
-        actions={
-          <Button
-            type="button"
-            variant="outline"
-            aria-label="刷新问题"
-            onClick={() => void query.refetch()}
-            disabled={query.isFetching}
-          >
-            <RefreshCwIcon data-icon="inline-start" />
-            {query.isFetching ? "刷新中…" : "刷新"}
-          </Button>
-        }
+        description="相同异常聚合为一个问题，可查看影响范围、堆栈与事件现场。"
       />
       <ConsoleFilterBar
         primary={
@@ -203,30 +175,42 @@ function ProjectIssues({ project }: { project: Project }) {
               error={searchErrorFrom(query.error) ?? searchErrorFrom(overviewQuery.error)}
               onChange={(patch) => update({ ...patch, cursor: undefined })}
             />
-            <Select
-              value={filters.sort}
-              onValueChange={(sort) =>
-                update({ sort: sort as typeof filters.sort, cursor: undefined })
+            <DaisyDropdown
+              label="问题排序"
+              triggerClassName="btn"
+              menuClassName="w-64"
+              trigger={
+                <>
+                  <ArrowDownUpIcon className="size-4" aria-hidden="true" />
+                  {/* The trigger names the order; the hints belong to the menu. */}
+                  {issueSorts.find((item) => item.value === filters.sort)?.label}
+                  <ChevronDownIcon className="size-3 text-base-content/70" aria-hidden="true" />
+                </>
               }
             >
-              <SelectTrigger aria-label="问题排序" className="issue-sort-trigger">
-                <ArrowDownUpIcon data-icon="inline-start" />
-                {/* The trigger names the order; the hints belong to the menu. */}
-                <SelectValue>
-                  {issueSorts.find((item) => item.value === filters.sort)?.label}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent align="end">
-                {issueSorts.map((item) => (
-                  <SelectItem key={item.value} value={item.value} className="issue-sort-item">
-                    <span>
-                      <strong>{item.label}</strong>
-                      <small>{item.hint}</small>
-                    </span>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              {(close) =>
+                issueSorts.map((item) => (
+                  <li key={item.value}>
+                    <button
+                      type="button"
+                      className={cn(item.value === filters.sort && "menu-active")}
+                      onClick={() => {
+                        close();
+                        update({ sort: item.value, cursor: undefined });
+                      }}
+                    >
+                      <span className="flex grow flex-col items-start gap-0.5">
+                        <strong className="font-medium">{item.label}</strong>
+                        <small className="text-xs text-base-content/70">{item.hint}</small>
+                      </span>
+                      {item.value === filters.sort ? (
+                        <CheckIcon className="size-4" aria-hidden="true" />
+                      ) : null}
+                    </button>
+                  </li>
+                ))
+              }
+            </DaisyDropdown>
           </>
         }
       />
@@ -240,7 +224,12 @@ function ProjectIssues({ project }: { project: Project }) {
             onRetry={() => void overviewQuery.refetch()}
           />
         ) : null}
-        {overviewQuery.data ? <IssueOverview overview={overviewQuery.data} /> : null}
+        {overviewQuery.data ? (
+          <IssueOverview
+            overview={overviewQuery.data}
+            hasHistoricalIssues={issues.some((issue) => issue.events > 0)}
+          />
+        ) : null}
         {query.isLoading ? <IssueTableSkeleton /> : null}
         {query.error ? (
           <AsyncError
@@ -251,7 +240,10 @@ function ProjectIssues({ project }: { project: Project }) {
           />
         ) : null}
         {query.data && (issues.length > 0 || filters.cursor || query.data.nextCursor) ? (
-          <section className="issues-page__table" aria-label="错误问题列表">
+          <section
+            className="issues-page__table card card-border bg-base-100"
+            aria-label="错误问题列表"
+          >
             <div
               className="issue-list-heading"
               data-selecting={selectedIssues.length > 0 || undefined}
@@ -275,6 +267,7 @@ function ProjectIssues({ project }: { project: Project }) {
               <IssueTable
                 issues={issues}
                 filters={filters}
+                onOpen={(href) => void navigate({ href })}
                 assignment={{
                   members: members.data?.members,
                   onAssign: canChange
@@ -293,37 +286,39 @@ function ProjectIssues({ project }: { project: Project }) {
                 }
               />
             ) : (
-              <Empty>
-                <EmptyHeader>
-                  <EmptyTitle>
-                    {filters.q ? "没有匹配当前查询的问题" : "本页没有匹配状态的问题"}
-                  </EmptyTitle>
-                  <EmptyDescription>可以继续翻页，或调整筛选条件。</EmptyDescription>
-                </EmptyHeader>
+              <div className="flex min-h-48 flex-col items-center justify-center gap-1 p-6 text-center">
+                <p className="font-medium">
+                  {filters.q ? "没有匹配当前查询的问题" : "本页没有匹配状态的问题"}
+                </p>
+                <p className="text-sm text-base-content/70">可以继续翻页，或调整筛选条件。</p>
                 {filters.q ? (
-                  <EmptyContent>
-                    <Button variant="outline" onClick={() => update({ q: "" }, "replace")}>
-                      清除搜索
-                    </Button>
-                  </EmptyContent>
+                  <button
+                    type="button"
+                    className="btn btn-sm mt-3"
+                    onClick={() => update({ q: "" }, "replace")}
+                  >
+                    清除搜索
+                  </button>
                 ) : null}
-              </Empty>
+              </div>
             )}
             <footer className="issues-page__pagination">
               <span aria-live="polite">{`本页 ${issues.length} 个问题`}</span>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
+              <div className="join">
+                <button
+                  type="button"
+                  className="btn btn-sm join-item"
                   disabled={!filters.cursor || query.isFetching}
                   onClick={() =>
                     update({ cursor: filters.cursor ? previous[filters.cursor] : undefined })
                   }
                 >
-                  <ChevronLeftIcon data-icon="inline-start" />
+                  <ChevronLeftIcon className="size-4" aria-hidden="true" />
                   {filters.cursor && !(filters.cursor in previous) ? "返回首页" : "上一页"}
-                </Button>
-                <Button
-                  variant="outline"
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-sm join-item"
                   disabled={!query.data.nextCursor || query.isFetching}
                   onClick={() => {
                     const next = query.data?.nextCursor;
@@ -333,24 +328,18 @@ function ProjectIssues({ project }: { project: Project }) {
                   }}
                 >
                   下一页
-                  <ChevronRightIcon data-icon="inline-end" />
-                </Button>
+                  <ChevronRightIcon className="size-4" aria-hidden="true" />
+                </button>
               </div>
             </footer>
           </section>
         ) : null}
         {query.data && !issues.length && !filters.cursor && !query.data.nextCursor ? (
-          <Empty className="min-h-80 border border-border">
-            <EmptyHeader>
-              <EmptyMedia variant="icon">
-                <BugIcon />
-              </EmptyMedia>
-              <EmptyTitle>当前范围没有匹配的问题</EmptyTitle>
-              <EmptyDescription>
-                尝试扩大时间范围或清除状态、浏览器、设备与国家筛选。
-              </EmptyDescription>
-            </EmptyHeader>
-          </Empty>
+          <EmptyCard
+            icon={<BugIcon className="size-8 opacity-40" aria-hidden="true" />}
+            title="当前范围没有匹配的问题"
+            description="尝试扩大时间范围或清除状态、浏览器、设备与国家筛选。"
+          />
         ) : null}
       </ConsolePageContent>
     </ConsolePage>
@@ -360,34 +349,51 @@ function ProjectIssues({ project }: { project: Project }) {
 function IssuesLoading() {
   return (
     <ConsolePage width="fluid" aria-label="正在加载错误问题">
-      <Skeleton className="h-24" />
-      <Skeleton className="h-10" />
-      <Skeleton className="h-96" />
+      <div className="skeleton h-24" />
+      <div className="skeleton h-10" />
+      <div className="skeleton h-96" />
     </ConsolePage>
   );
 }
 function IssueTableSkeleton() {
   return (
     <div className="flex flex-col gap-2" aria-label="正在加载问题">
-      <Skeleton className="h-10" />
+      <div className="skeleton h-10" />
       {Array.from({ length: 7 }, (_, index) => (
-        <Skeleton className="h-14" key={index} />
+        <div className="skeleton h-14" key={index} />
       ))}
     </div>
   );
 }
 function IssueOverviewSkeleton() {
-  return <Skeleton className="h-40" aria-label="正在加载错误概览" />;
+  return <div className="skeleton h-40" aria-label="正在加载错误概览" />;
 }
 function NoProjectIssues() {
   return (
     <ConsolePage width="narrow">
-      <Empty className="min-h-80 border border-border">
-        <EmptyHeader>
-          <EmptyTitle>还没有监控项目</EmptyTitle>
-          <EmptyDescription>创建项目并收到首个错误事件后，问题聚合会显示在这里。</EmptyDescription>
-        </EmptyHeader>
-      </Empty>
+      <EmptyCard
+        title="还没有监控项目"
+        description="创建项目并收到首个错误事件后，问题聚合会显示在这里。"
+      />
     </ConsolePage>
+  );
+}
+function EmptyCard({
+  icon,
+  title,
+  description,
+}: {
+  icon?: React.ReactNode;
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className="card card-border min-h-80 bg-base-100">
+      <div className="card-body items-center justify-center text-center">
+        {icon}
+        <h2 className="card-title">{title}</h2>
+        <p className="text-base-content/70">{description}</p>
+      </div>
+    </div>
   );
 }

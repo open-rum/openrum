@@ -18,6 +18,7 @@ import { useMutation, useQuery, useQueryClient, useSuspenseQuery } from "@tansta
 import { Link, useParams, useRouterState } from "@tanstack/react-router";
 import { AccountMenu } from "@/components/account/AccountMenu";
 import { BrandMark } from "@/components/brand/BrandMark";
+import { environmentLabel } from "@/lib/projects/environments";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ProjectSwitcher } from "@/features/projects/ProjectSwitcher";
@@ -25,6 +26,7 @@ import { SettingsNav } from "@/features/settings/SettingsNav";
 import {
   AnalysisContextProvider,
   AnalysisTimeFilter,
+  AnalysisEnvironmentFilter,
   isAnalysisRoute,
   useAnalysisContextState,
 } from "@/features/filters/AnalysisContextBar";
@@ -57,9 +59,7 @@ function isSecondaryNavigationPath(pathname: string) {
 
 function formatEnvironmentLabel(value?: string) {
   if (!value) return "全部环境";
-  if (value === "production") return "Production";
-  if (value === "test") return "Test";
-  return value;
+  return environmentLabel(value);
 }
 
 const primaryNavigation = [
@@ -161,7 +161,7 @@ export function App() {
   }, [sidebarCollapsed]);
   useEffect(() => {
     const toggleSidebar = (event: KeyboardEvent) => {
-      if (event.key.toLowerCase() !== "b" || (!event.metaKey && !event.ctrlKey)) return;
+      if (event.key?.toLowerCase() !== "b" || (!event.metaKey && !event.ctrlKey)) return;
       event.preventDefault();
       setSidebarCollapsed((collapsed) => !collapsed);
     };
@@ -179,6 +179,7 @@ export function App() {
   return (
     <AnalysisContextProvider value={analysisContext}>
       <AppShell
+        contentKey={routeProjectId}
         sidebarCollapsed={sidebarCollapsed}
         banner={
           <StoragePressureBanner
@@ -197,7 +198,12 @@ export function App() {
           <AppStatusBar
             dataDelayed={isPipelineDelayed(connectionStatusQuery.data)}
             context={
-              analysisContext && isAnalysisRoute(pathname) ? <AnalysisTimeFilter /> : undefined
+              analysisContext && isAnalysisRoute(pathname) ? (
+                <>
+                  <AnalysisTimeFilter />
+                  <AnalysisEnvironmentFilter />
+                </>
+              ) : undefined
             }
             navigationToggle={
               <Button
@@ -220,31 +226,35 @@ export function App() {
           <TooltipProvider>
             <div className="sidebar__brand-row">
               {routeProjectId && project ? (
-                <ProjectSwitcher
-                  organization={organization}
-                  projects={projects}
-                  project={project}
-                  loading={organizationsQuery.isLoading || projectsQuery.isLoading}
-                  currentEnvironment={analysisContext?.environment}
-                  onEnvironmentChange={
-                    analysisContext
-                      ? (environment) => analysisContext.update({ environment })
-                      : undefined
-                  }
-                >
-                  <Link
-                    className="brand"
-                    to="/projects"
-                    aria-label={`切换项目，当前为 ${project.name}，环境 ${currentEnvironment}`}
-                  >
+                <>
+                  <Link to="/projects" className="shrink-0 pl-3" aria-label="OpenRUM 项目列表">
                     <BrandMark size="lockup" />
-                    <span className="brand__identity">
-                      <strong>{project.name}</strong>
-                      <small>{currentEnvironment}</small>
-                    </span>
-                    <CaretUpDown className="brand__switcher-icon" aria-hidden="true" />
                   </Link>
-                </ProjectSwitcher>
+                  <ProjectSwitcher
+                    organization={organization}
+                    projects={projects}
+                    project={project}
+                    loading={organizationsQuery.isLoading || projectsQuery.isLoading}
+                    currentEnvironment={analysisContext?.environment}
+                    onEnvironmentChange={
+                      analysisContext
+                        ? (environment) => analysisContext.update({ environment })
+                        : undefined
+                    }
+                  >
+                    <button
+                      type="button"
+                      className="brand btn btn-ghost justify-start text-left"
+                      aria-label={`切换项目，当前为 ${project.name}，环境 ${currentEnvironment}`}
+                    >
+                      <span className="brand__identity">
+                        <strong>{project.name}</strong>
+                        <small>{currentEnvironment}</small>
+                      </span>
+                      <CaretUpDown className="brand__switcher-icon" aria-hidden="true" />
+                    </button>
+                  </ProjectSwitcher>
+                </>
               ) : (
                 <Link className="brand" to="/projects" aria-label="OpenRUM 项目列表">
                   <BrandMark size="lockup" />
@@ -322,15 +332,15 @@ export function App() {
 
             <div className="sidebar__footer">
               <nav className="sidebar__utility-nav" aria-label="设置与快捷入口">
-                <SidebarTooltip label="用量统计" enabled={sidebarCollapsed}>
+                <SidebarTooltip label="组织用量" enabled={sidebarCollapsed}>
                   <Link
                     className="nav-item nav-item--utility"
                     to="/usage"
                     activeProps={{ className: "is-active" }}
-                    aria-label="用量统计"
+                    aria-label="组织用量"
                   >
                     <ChartColumnIcon size={17} />
-                    <span>用量统计</span>
+                    <span>组织用量</span>
                   </Link>
                 </SidebarTooltip>
                 <SidebarTooltip label="设置" enabled={sidebarCollapsed}>

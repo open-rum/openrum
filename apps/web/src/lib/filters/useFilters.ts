@@ -16,6 +16,7 @@ export function useFilters(projectId: string) {
 
   useEffect(() => {
     const canonical = serializeOverviewFilters(filters);
+    keepTimePreset(canonical, new URL(window.location.href).searchParams);
     replaceSearch(canonical);
   }, [filters]);
 
@@ -23,7 +24,12 @@ export function useFilters(projectId: string) {
     (patch: OverviewFilterPatch, mode: "push" | "replace" = "push") => {
       const next = overviewFiltersSchema.parse({ ...filters, ...patch, projectId });
       const url = new URL(window.location.href);
-      url.search = serializeOverviewFilters(next).toString();
+      const search = serializeOverviewFilters(next);
+      // A patch that moves the range makes it a fixed one; any other patch leaves the preset.
+      if (patch.from === undefined && patch.to === undefined) {
+        keepTimePreset(search, url.searchParams);
+      }
+      url.search = search.toString();
       window.history[mode === "replace" ? "replaceState" : "pushState"]({}, "", url);
       window.dispatchEvent(new Event("openrum:urlchange"));
     },
@@ -44,6 +50,16 @@ function subscribeToURL(onStoreChange: () => void) {
 
 function currentURL() {
   return window.location.href;
+}
+
+/**
+ * `timePreset` belongs to the shared analysis context (AnalysisContextBar), not to these
+ * filters. Rewriting the query string without it would turn a rolling "最近 24 小时" into a
+ * fixed range that is then saved as 自定义 and never rolls forward again.
+ */
+function keepTimePreset(target: URLSearchParams, current: URLSearchParams) {
+  const preset = current.get("timePreset");
+  if (preset) target.set("timePreset", preset);
 }
 
 function replaceSearch(search: URLSearchParams) {

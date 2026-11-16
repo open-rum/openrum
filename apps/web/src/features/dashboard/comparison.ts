@@ -38,3 +38,10 @@ export function describeComparison(data: ScalarData, widget: Widget) {
       : ("negative" as const),
   };
 }
+
+/** The tone picks the daisyUI badge colour; the arrow and signed text carry the direction too. */
+export const toneBadge: Record<string, string> = {
+  positive: "badge-success",
+  negative: "badge-error",
+  neutral: "badge-ghost",
+};

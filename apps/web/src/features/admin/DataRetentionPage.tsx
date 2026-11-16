@@ -4,7 +4,6 @@ import {
   ArchiveIcon,
   DatabaseZapIcon,
   HardDriveIcon,
-  HistoryIcon,
   LockKeyholeIcon,
   TriangleAlertIcon,
 } from "lucide-react";
@@ -199,7 +198,7 @@ export function DataRetentionPage() {
                         data-disabled={setting?.locked || undefined}
                       >
                         <div className="flex min-w-56 items-start gap-3">
-                          <span className="rounded-md border bg-muted p-2">
+                          <span className="rounded-field border bg-muted p-2">
                             <Icon className="size-4" />
                           </span>
                           <div>
@@ -364,7 +363,7 @@ function ProjectPolicy({
           "继承 Instance",
         ],
       ].map(([label, value, source]) => (
-        <div key={label} className="rounded-lg border bg-muted/20 p-4">
+        <div key={label} className="card bg-base-200 p-4">
           <p className="text-xs text-muted-foreground">{label}</p>
           <p className="mt-1 text-lg font-semibold tabular-nums">{value}</p>
           <p className="mt-1 text-xs text-muted-foreground">{source}</p>
@@ -386,10 +385,7 @@ function MaintenanceJobs({
   return (
     <Card className="h-fit">
       <CardHeader className="border-b">
-        <CardTitle className="flex items-center gap-2">
-          <HistoryIcon className="size-4" />
-          后台维护任务
-        </CardTitle>
+        <CardTitle>后台维护任务</CardTitle>
         <CardDescription>正在运行的任务每 3 秒刷新。</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4 pt-5">
@@ -409,7 +405,7 @@ function MaintenanceJobs({
             ? Math.round((job.completedSteps / job.totalSteps) * 100)
             : 0;
           return (
-            <div key={job.id} className="space-y-2 rounded-lg border p-4">
+            <div key={job.id} className="card card-border space-y-2 bg-base-100 p-4">
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <p className="text-sm font-medium">Project {job.projectId.slice(0, 8)}</p>

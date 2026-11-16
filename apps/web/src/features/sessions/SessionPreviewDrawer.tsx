@@ -18,6 +18,9 @@ import { BehaviorTimeline } from "@/features/events/BehaviorTimeline";
 import { getSessionTimelinePage, sessionRange, type SessionSummary } from "@/lib/api/sessions";
 import { SessionClientMeta } from "./SessionClientMeta";
 import { sessionDetailHrefFromList } from "./sessionNavigation";
+import { sessionPreviewEvents } from "./sessionPreviewEvents";
+
+const previewEventLimit = 50;
 
 export function SessionPreviewDrawer({
   projectId,
@@ -32,7 +35,14 @@ export function SessionPreviewDrawer({
 }) {
   const range = session ? sessionRange(session) : undefined;
   const timeline = useQuery({
-    queryKey: ["session-preview", projectId, session?.sessionId, range?.from, range?.to],
+    queryKey: [
+      "session-preview",
+      projectId,
+      session?.sessionId,
+      range?.from,
+      range?.to,
+      previewEventLimit,
+    ],
     queryFn: ({ signal }) =>
       getSessionTimelinePage(
         {
@@ -40,13 +50,18 @@ export function SessionPreviewDrawer({
           sessionId: session!.sessionId,
           from: range!.from,
           to: range!.to,
-          limit: 6,
+          limit: previewEventLimit,
         },
         signal,
       ),
     enabled: open && Boolean(session && range),
   });
   const summary = timeline.data?.session ?? session;
+  const scopeDiffers = Boolean(
+    session &&
+    summary &&
+    (session.events !== summary.events || session.durationSeconds !== summary.durationSeconds),
+  );
 
   return (
     <Drawer open={open} onOpenChange={onOpenChange} direction="right">
@@ -54,9 +69,11 @@ export function SessionPreviewDrawer({
         <DrawerHeader className="session-preview-drawer__header">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <DrawerTitle>{summary?.userId || summary?.visitorId || "匿名访客"}</DrawerTitle>
+              <DrawerTitle>
+                {summary?.entryRoute || "会话预览"} → {summary?.exitRoute || "未知退出"}
+              </DrawerTitle>
               <DrawerDescription className="truncate font-mono">
-                {summary?.sessionId ?? "正在读取会话"}
+                会话 ID：{summary?.sessionId ?? "正在读取会话"}
               </DrawerDescription>
             </div>
             <DrawerClose asChild>
@@ -78,7 +95,26 @@ export function SessionPreviewDrawer({
                   <Badge variant="secondary">{summary.apiFailures} API 失败</Badge>
                 ) : null}
               </div>
+              <p className="text-sm text-base-content/70">
+                预览按列表片段的起止时间查询已保留事件；列表与时间线可能因查询边界或数据可用性不同而有差异，完整详情也不保证包含已过期事件。
+              </p>
+              {scopeDiffers ? (
+                <p role="status" className="alert alert-soft alert-info text-sm">
+                  列表片段：{session?.events} 个事件 / {session?.durationSeconds} 秒；当前可查询：
+                  {summary.events} 个事件 / {summary.durationSeconds} 秒。
+                </p>
+              ) : null}
               <dl className="session-preview-facts">
+                <Fact
+                  label="访客 ID"
+                  value={
+                    <span className="break-all font-mono">{summary.visitorId || "未采集"}</span>
+                  }
+                />
+                <Fact
+                  label="用户 ID"
+                  value={<span className="break-all font-mono">{summary.userId || "未设置"}</span>}
+                />
                 <Fact
                   label="访问时间"
                   value={`${formatDateTime(summary.startedAt)} – ${formatTime(summary.endedAt)}`}
@@ -111,7 +147,11 @@ export function SessionPreviewDrawer({
             className="session-preview-timeline"
             aria-labelledby="session-preview-timeline-title"
           >
-            <h3 id="session-preview-timeline-title">最初 6 个行为</h3>
+            <h3 id="session-preview-timeline-title">行为与异常预览</h3>
+            <p className="text-xs text-base-content/70">
+              从最初加载的最多 50 个已保留事件中，优先展示行为与异常，最多 6
+              条。完整顺序与性能指标请查看详情。
+            </p>
             {timeline.isLoading ? (
               <div className="grid gap-2">
                 <Skeleton className="h-16" />
@@ -130,7 +170,11 @@ export function SessionPreviewDrawer({
             {timeline.data ? (
               <BehaviorTimeline
                 breadcrumbs={[]}
-                sessionTimeline={{ ...timeline.data, truncated: false }}
+                sessionTimeline={{
+                  ...timeline.data,
+                  events: sessionPreviewEvents(timeline.data.events),
+                  truncated: false,
+                }}
                 projectId={projectId}
                 from={timeline.data.from}
                 to={timeline.data.to}
@@ -154,7 +198,7 @@ export function SessionPreviewDrawer({
               onClick={() => void navigator.clipboard.writeText(summary.sessionId)}
             >
               <CopyIcon data-icon="inline-start" />
-              复制 Session ID
+              复制会话 ID
             </Button>
           ) : null}
         </DrawerFooter>

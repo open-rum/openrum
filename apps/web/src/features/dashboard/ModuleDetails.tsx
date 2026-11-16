@@ -116,7 +116,7 @@ export function ModuleDetailContent({
                 {freshness.stale ? "数据延迟" : "数据正常"}
               </Badge>
             ) : (
-              <Badge variant="outline">状态未知</Badge>
+              <Badge variant="secondary">状态未知</Badge>
             )}
           </div>
           <p className="text-xs leading-relaxed text-muted-foreground">

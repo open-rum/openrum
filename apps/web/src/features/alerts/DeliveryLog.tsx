@@ -1,14 +1,6 @@
 import { useState } from "react";
-import { CheckIcon, ExternalLinkIcon, XIcon } from "lucide-react";
+import { ArrowRightIcon, BellRingIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -19,6 +11,7 @@ import {
 } from "@/components/ui/table";
 import type { AlertNotification, AlertRule, DeliveryState } from "@/lib/api/alerts";
 import { ChannelKindIcon } from "@/features/settings/channels/ChannelKindIcon";
+import { environmentLabel } from "@/lib/projects/environments";
 import {
   comparatorLabels,
   deliveryErrorText,
@@ -28,81 +21,100 @@ import {
 } from "./alertRules";
 import { StatusBadge } from "./StatusBadge";
 
-const filters: Array<{ value: "all" | DeliveryState; label: string }> = [
-  { value: "all", label: "全部状态" },
-  { value: "delivered", label: "已送达" },
-  { value: "failed", label: "发送失败" },
-  { value: "partial", label: "部分失败" },
-  { value: "cooldown", label: "冷却中" },
-  { value: "no_channels", label: "未配置渠道" },
-];
-
 export function DeliveryLog({
   notifications,
   rules,
+  onShowRules,
+  initialRuleId = "all",
+  initialDelivery = "all",
+  compact = false,
 }: {
   notifications: AlertNotification[];
   rules: AlertRule[];
+  onShowRules?: () => void;
+  initialRuleId?: string;
+  initialDelivery?: "all" | DeliveryState;
+  compact?: boolean;
 }) {
-  const [filter, setFilter] = useState<"all" | DeliveryState>("all");
-  const [ruleFilter, setRuleFilter] = useState("all");
-  const visible = notifications.filter(
-    (item) =>
-      (filter === "all" || item.delivery === filter) &&
-      (ruleFilter === "all" || item.ruleId === ruleFilter),
-  );
+  const [filter, setFilter] = useState<"all" | DeliveryState>(initialDelivery);
+  const [ruleFilter, setRuleFilter] = useState(initialRuleId);
+  const visible = notifications
+    .filter(
+      (item) =>
+        (filter === "all" || item.delivery === filter) &&
+        (ruleFilter === "all" || item.ruleId === ruleFilter),
+    )
+    .sort((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt));
   if (!notifications.length)
     return (
-      <Empty className="border border-dashed">
-        <EmptyHeader>
-          <EmptyTitle>还没有通知</EmptyTitle>
-          <EmptyDescription>
-            规则触发后，每次通知和它在各个渠道的送达结果都会记录在这里。
-          </EmptyDescription>
-        </EmptyHeader>
-      </Empty>
+      <div className="card card-border bg-base-100">
+        <div className="card-body items-center py-12 text-center">
+          <BellRingIcon className="mb-2 size-7 text-base-content/70" aria-hidden="true" />
+          <h2 className="card-title">
+            {rules.length ? "尚未记录到规则触发" : "先创建一条告警规则"}
+          </h2>
+          <p className="max-w-lg text-sm text-base-content/70">
+            {rules.length
+              ? "启用规则后，达到阈值的窗口会记录在这里，包括冷却期跳过和仅在控制台记录的情况。"
+              : "规则达到阈值后，这里会显示观测值、通知去向和每个渠道的投递结果。"}
+          </p>
+          {onShowRules ? (
+            <Button variant="outline" className="mt-3" onClick={onShowRules}>
+              查看规则
+              <ArrowRightIcon />
+            </Button>
+          ) : null}
+        </div>
+      </div>
     );
   return (
-    <div className="flex flex-col gap-3">
-      <div className="flex flex-wrap gap-2">
-        <Select value={filter} onValueChange={(value) => setFilter(value as typeof filter)}>
-          <SelectTrigger className="w-36" aria-label="送达状态">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {filters.map((option) => (
-              <SelectItem key={option.value} value={option.value}>
-                {option.label}
-              </SelectItem>
+    <div className="flex flex-col gap-4">
+      {!compact ? (
+        <div className="flex flex-wrap items-center gap-3">
+          <select
+            className="select select-sm w-auto"
+            aria-label="送达状态"
+            value={filter}
+            onChange={(event) => setFilter(event.target.value as typeof filter)}
+          >
+            <option value="all">全部送达状态</option>
+            {Object.entries(deliveryStateLabels).map(([value, state]) => (
+              <option key={value} value={value}>
+                {state.label}
+              </option>
             ))}
-          </SelectContent>
-        </Select>
-        {rules.length > 1 ? (
-          <Select value={ruleFilter} onValueChange={setRuleFilter}>
-            <SelectTrigger className="w-48" aria-label="规则">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">全部规则</SelectItem>
-              {rules.map((rule) => (
-                <SelectItem key={rule.id} value={rule.id}>
-                  {rule.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        ) : null}
-      </div>
-      <div className="overflow-hidden rounded-2xl border">
+          </select>
+          <select
+            className="select select-sm max-w-full sm:w-60"
+            aria-label="记录所属规则"
+            value={ruleFilter}
+            onChange={(event) => setRuleFilter(event.target.value)}
+          >
+            <option value="all">全部规则</option>
+            {rules.map((rule) => (
+              <option key={rule.id} value={rule.id}>
+                {rule.name}
+              </option>
+            ))}
+          </select>
+          <span className="text-sm text-base-content/70" role="status">
+            {visible.length} 条记录
+          </span>
+          <p className="w-full text-xs text-base-content/70">
+            最近 {notifications.length} 条触发记录，最多加载 100
+            条；包含未发送通知的触发，不是全量历史。
+          </p>
+        </div>
+      ) : null}
+      <div className="card card-border overflow-hidden bg-base-100">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>时间</TableHead>
-              <TableHead>规则</TableHead>
-              <TableHead>送达</TableHead>
-              <TableHead>渠道结果</TableHead>
-              <TableHead className="w-28">
-                <span className="sr-only">诊断</span>
+              <TableHead>触发时间 / 规则</TableHead>
+              <TableHead>观测值</TableHead>
+              <TableHead>通知结果</TableHead>
+              <TableHead>
+                <span className="sr-only">诊断入口</span>
               </TableHead>
             </TableRow>
           </TableHeader>
@@ -111,72 +123,66 @@ export function DeliveryLog({
               const state = deliveryStateLabels[item.delivery];
               return (
                 <TableRow key={item.id}>
-                  <TableCell className="whitespace-nowrap text-muted-foreground tabular-nums">
-                    {new Date(item.occurredAt).toLocaleString("zh-CN", { hour12: false })}
+                  <TableCell className="min-w-48 max-w-80 whitespace-normal">
+                    <p className="font-medium">{item.title}</p>
+                    <p className="mt-1 text-xs text-base-content/70">
+                      {new Date(item.occurredAt).toLocaleString("zh-CN", { hour12: false })}
+                    </p>
+                    <p className="mt-1 text-xs text-base-content/70">
+                      {environmentLabel(item.environment) || "全部环境"}
+                    </p>
                   </TableCell>
-                  <TableCell>
-                    <div className="flex min-w-0 flex-col gap-0.5">
-                      <span className="truncate font-medium">{item.title}</span>
-                      <span className="text-xs text-muted-foreground">
-                        {metricDefinitions[item.metric].label}{" "}
-                        {formatMetricValue(item.metric, item.value)}
-                        ，阈值 {comparatorLabels[item.comparator]}{" "}
-                        {formatMetricValue(item.metric, item.threshold)}
-                        {item.environment ? ` · ${item.environment}` : ""}
-                      </span>
-                    </div>
+                  <TableCell className="min-w-36 whitespace-normal">
+                    <strong>{formatMetricValue(item.metric, item.value)}</strong>
+                    <p className="mt-1 text-xs text-base-content/70">
+                      {metricDefinitions[item.metric].label} {comparatorLabels[item.comparator]}{" "}
+                      {formatMetricValue(item.metric, item.threshold)}
+                    </p>
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="min-w-48 max-w-80 whitespace-normal">
                     <StatusBadge tone={state.tone} label={state.label} />
-                  </TableCell>
-                  <TableCell>
                     {item.deliveries.length ? (
-                      <ul className="flex flex-wrap gap-1.5" aria-label="渠道结果">
-                        {item.deliveries.map((delivery) => {
-                          const failed = delivery.status === "failed";
-                          const detail = failed
-                            ? deliveryErrorText(delivery.errorCode)
-                            : delivery.attempts > 1
-                              ? `第 ${delivery.attempts} 次尝试送达`
-                              : "已送达";
-                          return (
-                            <li
-                              key={delivery.channelId}
-                              title={detail}
-                              className="inline-flex items-center gap-1.5 rounded-full border px-1.5 py-0.5 text-xs"
-                            >
-                              <ChannelKindIcon kind={delivery.channelKind} size="sm" />
-                              <span>{delivery.channelName}</span>
-                              {failed ? (
-                                <XIcon
-                                  className="size-3 text-[var(--ds-danger)]"
-                                  aria-label={detail}
-                                />
-                              ) : (
-                                <CheckIcon
-                                  className="size-3 text-[var(--ds-success)]"
-                                  aria-label={detail}
-                                />
-                              )}
+                      <details className="mt-2">
+                        <summary className="cursor-pointer text-sm underline underline-offset-4">
+                          查看 {item.deliveries.length} 个渠道结果
+                        </summary>
+                        <ul className="mt-3 grid gap-3" aria-label={`${item.title} 的渠道结果`}>
+                          {item.deliveries.map((delivery) => (
+                            <li key={delivery.channelId} className="text-sm">
+                              <div className="flex items-center gap-2">
+                                <ChannelKindIcon kind={delivery.channelKind} size="sm" />
+                                <span className="font-medium">{delivery.channelName}</span>
+                              </div>
+                              <p
+                                className={`mt-1 ${delivery.status === "failed" ? "text-error" : "text-base-content/70"}`}
+                              >
+                                {delivery.status === "failed"
+                                  ? deliveryErrorText(delivery.errorCode)
+                                  : "渠道已接受通知"}
+                              </p>
+                              <p className="mt-1 text-xs text-base-content/70">
+                                已尝试 {delivery.attempts} 次 ·{" "}
+                                {new Date(delivery.at).toLocaleString("zh-CN")}
+                              </p>
                             </li>
-                          );
-                        })}
-                      </ul>
+                          ))}
+                        </ul>
+                      </details>
                     ) : (
-                      <span className="text-xs text-muted-foreground">
+                      <p className="mt-2 text-xs text-base-content/70">
                         {item.delivery === "cooldown"
-                          ? "冷却期内，不重复通知"
+                          ? "冷却期内不重复发送"
                           : item.delivery === "no_channels"
-                            ? "规则未配置渠道"
-                            : "等待发送"}
-                      </span>
+                            ? "本次没有向外部渠道发送"
+                            : "等待投递结果；失败时每个渠道最多尝试 3 次"}
+                      </p>
                     )}
                   </TableCell>
                   <TableCell>
                     <Button asChild size="sm" variant="ghost">
                       <a href={item.deepLink}>
-                        进入诊断
-                        <ExternalLinkIcon data-icon="inline-end" />
+                        诊断
+                        <ArrowRightIcon />
                       </a>
                     </Button>
                   </TableCell>
@@ -186,9 +192,18 @@ export function DeliveryLog({
           </TableBody>
         </Table>
         {!visible.length ? (
-          <p className="px-4 py-8 text-center text-sm text-muted-foreground">
-            没有符合筛选条件的通知。
-          </p>
+          <div className="flex flex-col items-center gap-3 p-8">
+            <p>没有符合条件的触发记录</p>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setFilter("all");
+                setRuleFilter("all");
+              }}
+            >
+              清除筛选
+            </Button>
+          </div>
         ) : null}
       </div>
     </div>

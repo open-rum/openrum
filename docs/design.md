@@ -1,5 +1,12 @@
 # OpenRUM frontend design system
 
+> **Scope (2026-11-03).** The Console (`apps/web`) no longer follows this document's
+> component, colour, radius, density or chart-colour rules: it runs on daisyUI, see
+> [`docs/agents/console-ui.md`](agents/console-ui.md) and
+> [ADR 0012](adr/0012-console-adopts-daisyui.md). Everything here still governs the public
+> site, the documentation and `packages/design-tokens`. Console sections below are kept as
+> history until they are rewritten.
+
 ## Source of truth
 
 The accepted overview concept is `output/imagegen/openrum-dashboard-stripe.png` at

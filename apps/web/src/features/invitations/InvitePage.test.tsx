@@ -40,7 +40,7 @@ vi.mock("@/lib/auth/session", async (original) => {
     }),
   };
 });
-vi.mock("@/components/theme/ThemeToggle", () => ({ ThemeToggle: () => null }));
+vi.mock("@/components/theme/ThemeController", () => ({ ThemeController: () => null }));
 
 function preview(overrides: Partial<InvitationPreview> = {}): InvitationPreview {
   return {

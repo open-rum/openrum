@@ -1,7 +1,9 @@
+import { UsageFilters } from "./UsageFilters";
+import { timeAxis, valueAxis, VALUE_AXIS_MARGIN_TOP } from "@/lib/charts/axes";
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useRouterState } from "@tanstack/react-router";
-import { RefreshCwIcon, ChartColumnIcon, FolderIcon } from "lucide-react";
+import { ChartColumnIcon, FolderIcon } from "lucide-react";
 import { Bar, BarChart, BarStack, CartesianGrid, XAxis, YAxis } from "recharts";
 import { ConsolePage, ConsolePageHeader, ConsoleFilterBar } from "@/components/layout/ConsolePage";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
@@ -14,7 +16,6 @@ import {
   TableCell,
 } from "@/components/ui/table";
 import {
-  BAR_RADIUS_TOP,
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
@@ -29,7 +30,6 @@ import {
   SelectGroup,
   SelectItem,
 } from "@/components/ui/select";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
@@ -45,8 +45,8 @@ import {
   projectUsageLink,
   readUsageRange,
   summarizeUsage,
-  usageTypes,
 } from "./organizationUsage";
+import { useBarRadiusTop } from "@/lib/charts/useBarRadius";
 
 const chartConfig = {
   accepted: { label: "已接收", color: "var(--ds-chart-1)" },
@@ -64,6 +64,7 @@ const date = new Intl.DateTimeFormat("zh-CN", {
 });
 
 export function OrganizationUsagePage() {
+  const barRadius = useBarRadiusTop();
   const navigate = useNavigate();
   const searchStr = useRouterState({ select: (state) => state.location.searchStr });
   const search = useMemo(() => new URLSearchParams(searchStr), [searchStr]);
@@ -105,23 +106,12 @@ export function OrganizationUsagePage() {
     Object.assign(next, { from: range.from.toISOString(), to: range.to.toISOString() }, patch);
     void navigate({ to: "/usage", search: next });
   };
-  const duration = (range.to.getTime() - range.from.getTime()) / 86400000;
 
   return (
     <ConsolePage width="fluid">
       <ConsolePageHeader
-        title="用量统计"
+        title="组织用量"
         description="从组织视角查看各项目的数据接收与处理情况，覆盖全部环境。"
-        actions={
-          <Button
-            variant="outline"
-            disabled={usage.isFetching}
-            onClick={() => void usage.refetch()}
-          >
-            <RefreshCwIcon data-icon="inline-start" />
-            刷新
-          </Button>
-        }
       />
       <ConsoleFilterBar
         primary={
@@ -140,48 +130,13 @@ export function OrganizationUsagePage() {
                 </SelectGroup>
               </SelectContent>
             </Select>
-            <Select
-              value={range.eventType ?? "all"}
-              onValueChange={(eventType) => update({ eventType })}
-            >
-              <SelectTrigger aria-label="事件类型" className="min-w-36">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  {usageTypes.map(([value, label]) => (
-                    <SelectItem key={value} value={value}>
-                      {label}
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-              </SelectContent>
-            </Select>
-            <ToggleGroup
-              type="single"
-              variant="selection"
-              aria-label="用量时间范围"
-              value={String(duration)}
-              className="flex-wrap"
-              onValueChange={(value) => {
-                if (value) {
-                  const next = usageRange(Number(value));
-                  update({ from: next.from.toISOString(), to: next.to.toISOString() });
-                }
-              }}
-            >
-              {[1, 7, 30, 90].map((days) => (
-                <ToggleGroupItem key={days} value={String(days)}>
-                  {days === 1 ? "最近 24 小时" : `最近 ${days} 天`}
-                </ToggleGroupItem>
-              ))}
-            </ToggleGroup>
+            <UsageFilters range={range} onChange={update} />
           </>
         }
       />
       <p className="text-xs text-muted-foreground">
         {date.format(range.from)} — {date.format(range.to)} · 本地时区；按 UTC 小时 /
-        天聚合。传输流量不是磁盘占用，接收量不是配额使用率。
+        天聚合。用量记录未单独区分 synthetic 测试数据；传输流量不是磁盘占用，接收量不是配额使用率。
       </p>
       {organizations.error || projects.error ? (
         <AsyncError
@@ -268,16 +223,18 @@ export function OrganizationUsagePage() {
                   initialDimension={{ width: 960, height: 256 }}
                   aria-label="事件处理结果趋势"
                 >
-                  <BarChart data={summary.series} accessibilityLayer>
+                  <BarChart
+                    data={summary.series}
+                    accessibilityLayer
+                    margin={{ top: VALUE_AXIS_MARGIN_TOP, right: 0, bottom: 0, left: 0 }}
+                  >
                     <CartesianGrid vertical={false} />
                     <XAxis
                       dataKey="bucket"
-                      tickFormatter={(value) => date.format(new Date(value))}
                       minTickGap={50}
-                      tickLine={false}
-                      axisLine={false}
+                      {...timeAxis((value) => date.format(new Date(String(value))))}
                     />
-                    <YAxis width={58} tickLine={false} axisLine={false} />
+                    <YAxis {...valueAxis({ unit: "条事件" })} />
                     <ChartTooltip
                       content={
                         <ChartTooltipContent
@@ -286,7 +243,7 @@ export function OrganizationUsagePage() {
                       }
                     />
                     <ChartLegend content={<ChartLegendContent />} />
-                    <BarStack stackId="outcomes" radius={BAR_RADIUS_TOP}>
+                    <BarStack stackId="outcomes" radius={barRadius}>
                       {Object.entries(chartConfig).map(([key]) => (
                         <Bar
                           key={key}

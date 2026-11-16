@@ -265,12 +265,27 @@ export function sampleCountLabel(requests: number): string | undefined {
   return requests > API_SAMPLE_LIMIT ? `${API_SAMPLE_LIMIT}+` : String(Math.round(requests));
 }
 
+/**
+ * How many events the estimate was scaled up from, or nothing when no scaling happened: with
+ * every request collected, the note would only repeat the figure above it.
+ */
+export function sampledNote(counts: { requests: number; estimated: number }) {
+  return Math.round(counts.estimated) === counts.requests
+    ? undefined
+    : `由 ${counts.requests.toLocaleString()} 个采样事件估算`;
+}
+
 export function formatAPIDuration(value: number | null) {
   return value === null ? "—" : `${Math.round(value)} ms`;
 }
 
 export function apiFailureRate(endpoint: { requests: number; failures: number }) {
-  return endpoint.requests ? (endpoint.failures / endpoint.requests) * 100 : 0;
+  return endpoint.requests > 0 ? (endpoint.failures / endpoint.requests) * 100 : null;
+}
+
+export function formatAPIFailureRate(endpoint: { requests: number; failures: number }, digits = 2) {
+  const rate = apiFailureRate(endpoint);
+  return rate === null ? "—" : `${rate.toFixed(digits)}%`;
 }
 
 /**
@@ -278,7 +293,8 @@ export function apiFailureRate(endpoint: { requests: number; failures: number })
  * request in a thousand must not earn it: below 1% reads as normal, 1% to 5% as a warning,
  * and above 5% as a problem. These are the same bounds the retired priority chart used.
  */
-export function apiFailureLevel(rate: number): "normal" | "warning" | "danger" {
+export function apiFailureLevel(rate: number | null): "unknown" | "normal" | "warning" | "danger" {
+  if (rate === null) return "unknown";
   if (rate > 5) return "danger";
   if (rate >= 1) return "warning";
   return "normal";

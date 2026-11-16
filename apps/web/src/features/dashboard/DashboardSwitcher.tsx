@@ -322,7 +322,7 @@ function CreateDashboardDialog({
                       ),
                     );
                   }}
-                  className="dashboard-template-option flex flex-col gap-0.5 rounded-xl border px-3 py-2 text-left"
+                  className="dashboard-template-option flex flex-col gap-0.5 rounded-box border px-3 py-2 text-left"
                 >
                   <span className="text-sm font-medium">{option.name}</span>
                   <span className="text-xs text-muted-foreground">{option.description}</span>
@@ -456,7 +456,10 @@ function ManageDashboardsDialog({
         </DialogHeader>
         <ol className="flex flex-col gap-2" aria-label="仪表盘顺序">
           {order.map((dashboard, index) => (
-            <li key={dashboard.id} className="flex items-center gap-2 rounded-md border px-3 py-2">
+            <li
+              key={dashboard.id}
+              className="flex items-center gap-2 rounded-field border px-3 py-2"
+            >
               <span className="w-5 text-sm text-muted-foreground tabular-nums">{index + 1}</span>
               <span className="min-w-0 flex-1 truncate text-sm">{dashboard.name}</span>
               <Button

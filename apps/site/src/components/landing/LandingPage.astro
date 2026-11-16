@@ -6,6 +6,13 @@ import GitHubMark from "../GitHubMark.astro";
 import PublicLayout from "../../layouts/PublicLayout.astro";
 import ProductMock from "./ProductMock.astro";
 import PaletteMenu from "../PaletteMenu.astro";
+import MakeItBetterBackground from "./MakeItBetterBackground";
+import KafkaIcon from "../../assets/tech/apachekafka.svg";
+import ClickHouseIcon from "../../assets/tech/clickhouse.svg";
+import GoIcon from "../../assets/tech/go.svg";
+import PostgresIcon from "../../assets/tech/postgresql.svg";
+import ReactIcon from "../../assets/tech/react.svg";
+import TypeScriptIcon from "../../assets/tech/typescript.svg";
 import { docsBase, equivalentPath } from "../../lib/site";
 import { MIN_STARS_SHOWN, formatStars, githubStars } from "../../lib/githubStars";
 import "../../styles/landing.css";
@@ -36,11 +43,39 @@ const copy = zh
       nav: { docs: "文档", start: "开始部署", language: "语言", github: "GitHub 仓库" },
       pill: "Alpha",
       shiny: "AI 即将支持",
-      heroTitle: "看清每一次真实访问",
+      heroTitle: ["看清每一次", "真实访问"],
       heroLead: "开源、可自托管的前端监控平台。",
       heroDocs: "阅读文档",
       heroShotAlt:
         "OpenRUM 控制台的默认仪表盘：会话、PV、UV、错误率、API 失败率与 Web Vitals 指标卡，以及会话趋势和访问量图表。",
+      heroFloats: {
+        vitals: ["LCP · P75", "1.9 s", "良好"],
+        error: ["TypeError", "checkout/cart.ts:118"],
+        alert: ["错误率 ≥ 2%", "已通知 飞书 · 前端值班群"],
+      },
+      ticker: [
+        [
+          ["view", "页面浏览", "/product/42"],
+          ["click", "点击", "加入购物车"],
+          ["api", "API", "GET /api/cart · 200"],
+          ["vital", "Web Vitals", "LCP 1.9 s"],
+          ["view", "页面浏览", "/checkout"],
+          ["api", "API", "POST /api/pay · 503"],
+          ["error", "错误", "TypeError"],
+          ["log", "日志", "payment request failed"],
+        ],
+        [
+          ["custom", "自定义事件", "demo_checkout"],
+          ["vital", "Web Vitals", "INP 164 ms"],
+          ["view", "页面浏览", "/search"],
+          ["click", "点击", "立即支付"],
+          ["log", "日志", "checkout started"],
+          ["api", "API", "GET /api/orders · 200"],
+          ["vital", "Web Vitals", "CLS 0.04"],
+          ["error", "错误", "ChunkLoadError"],
+        ],
+      ],
+      stackAria: "技术栈",
       tourTitle: "一个控制台，看全整个前端",
       tabs: [
         ["errors", "错误", "哪里坏了，影响了谁。"],
@@ -98,6 +133,16 @@ const copy = zh
       makeGithub: "在 GitHub 上参与",
       makeGuide: "贡献指南",
       license: "MIT 许可",
+      footerLead: "开源、可自托管的前端监控平台，帮助你理解用户行为，快速定位并修复线上问题。",
+      footer: {
+        product: "产品",
+        docs: "文档",
+        community: "社区",
+        alerts: "告警",
+        dashboards: "仪表盘",
+        intro: "快速开始",
+        selfHosting: "自部署",
+      },
     }
   : {
       title: "OpenRUM · Open-source, self-hostable frontend monitoring",
@@ -111,11 +156,39 @@ const copy = zh
       },
       pill: "Alpha",
       shiny: "AI-powered, coming soon",
-      heroTitle: "See every real visit.",
+      heroTitle: ["See every ", "real visit."],
       heroLead: "Open-source, self-hostable frontend monitoring.",
       heroDocs: "Read the docs",
       heroShotAlt:
         "The OpenRUM Console default dashboard: stat cards for sessions, page views, users, error rate, API failure rate and Web Vitals, above session and traffic trends.",
+      heroFloats: {
+        vitals: ["LCP · P75", "1.9 s", "Good"],
+        error: ["TypeError", "checkout/cart.ts:118"],
+        alert: ["Error rate ≥ 2%", "Sent to Feishu · Frontend on-call"],
+      },
+      ticker: [
+        [
+          ["view", "Page view", "/product/42"],
+          ["click", "Click", "Add to cart"],
+          ["api", "API", "GET /api/cart · 200"],
+          ["vital", "Web Vitals", "LCP 1.9 s"],
+          ["view", "Page view", "/checkout"],
+          ["api", "API", "POST /api/pay · 503"],
+          ["error", "Error", "TypeError"],
+          ["log", "Log", "payment request failed"],
+        ],
+        [
+          ["custom", "Custom event", "demo_checkout"],
+          ["vital", "Web Vitals", "INP 164 ms"],
+          ["view", "Page view", "/search"],
+          ["click", "Click", "Pay now"],
+          ["log", "Log", "checkout started"],
+          ["api", "API", "GET /api/orders · 200"],
+          ["vital", "Web Vitals", "CLS 0.04"],
+          ["error", "Error", "ChunkLoadError"],
+        ],
+      ],
+      stackAria: "Tech stack",
       tourTitle: "Your whole frontend, in one console.",
       tabs: [
         ["errors", "Errors", "What broke, and who it hit."],
@@ -188,7 +261,70 @@ const copy = zh
       makeGithub: "Contribute on GitHub",
       makeGuide: "Contributing guide",
       license: "MIT License",
+      footerLead:
+        "Open-source, self-hosted frontend monitoring for user behavior and production issues.",
+      footer: {
+        product: "Product",
+        docs: "Docs",
+        community: "Community",
+        alerts: "Alerts",
+        dashboards: "Dashboards",
+        intro: "Get started",
+        selfHosting: "Self-hosting",
+      },
     };
+
+// Ambient hero pixels: [left %, top px, animation delay s]. Decorative only.
+const heroPixels = [
+  [12, 96, 0],
+  [19, 256, 1.2],
+  [8, 384, 2.6],
+  [27, 160, 3.4],
+  [33, 64, 0.6],
+  [71, 96, 2],
+  [78, 224, 0.3],
+  [88, 128, 3],
+  [92, 352, 1.6],
+  [64, 32, 3.8],
+];
+
+// The stack is shown as marks only; each name appears as a hover and focus tooltip.
+const stack = [
+  { name: "ClickHouse", Icon: ClickHouseIcon, size: 24 },
+  { name: "Kafka", Icon: KafkaIcon, size: 24 },
+  { name: "PostgreSQL", Icon: PostgresIcon, size: 24 },
+  { name: "Go", Icon: GoIcon, size: 32 },
+  { name: "TypeScript", Icon: TypeScriptIcon, size: 22 },
+  { name: "React", Icon: ReactIcon, size: 24 },
+];
+
+const footerGroups: [string, [string, string][]][] = [
+  [
+    copy.footer.product,
+    [
+      [copy.whyTitle, "#architecture"],
+      [copy.footer.alerts, `${docs}/product/alerts/`],
+      [copy.footer.dashboards, `${docs}/product/dashboards/`],
+    ],
+  ],
+  [
+    copy.footer.docs,
+    [
+      [copy.footer.intro, `${docs}/introduction/`],
+      [copy.footer.selfHosting, quickstart],
+      ["Browser SDK", `${docs}/sdk/browser/`],
+    ],
+  ],
+  [
+    copy.footer.community,
+    [
+      ["GitHub", repository],
+      ["Issues", `${repository}/issues`],
+      [copy.makeGuide, contributing],
+      [copy.license, `${repository}/blob/main/LICENSE`],
+    ],
+  ],
+];
 ---
 
 <PublicLayout title={copy.title} description={copy.description} lang={lang} landing>
@@ -246,31 +382,84 @@ const copy = zh
 
     <main id="main-content">
       <section class="lp-hero" aria-labelledby="lp-hero-title">
+        <div class="lp-hero-grid" aria-hidden="true"></div>
+        <div class="lp-hero-pixels" aria-hidden="true">
+          {
+            heroPixels.map(([left, top, delay]) => (
+              <span style={`left:${left}%;top:${top}px;animation-delay:${delay}s`} />
+            ))
+          }
+        </div>
         <div class="lp-wrap lp-hero-inner">
-          <p class="lp-announce">
+          <p class="lp-announce lp-rise">
             <span class="lp-pill">{copy.pill}</span><span class="lp-shiny">{copy.shiny}</span>
           </p>
-          <h1 id="lp-hero-title">{copy.heroTitle}</h1>
-          <p class="lp-lead">{copy.heroLead}</p>
-          <div class="lp-actions">
+          <h1 id="lp-hero-title" class="lp-rise lp-rise-1">
+            {copy.heroTitle[0]}<span class="lp-hero-em">{copy.heroTitle[1]}</span>
+          </h1>
+          <p class="lp-lead lp-rise lp-rise-2">{copy.heroLead}</p>
+          <div class="lp-actions lp-rise lp-rise-3">
             <a class="lp-button lp-button-primary" href={quickstart}>{copy.nav.start}</a>
             <a class="lp-button lp-button-ghost" href={`${docs}/`}
               >{copy.heroDocs}<ArrowRight size={16} aria-hidden="true" /></a
             >
           </div>
+          <ul class="lp-stack lp-rise lp-rise-3" aria-label={copy.stackAria}>
+            {
+              stack.map(({ name, Icon, size }) => (
+                <li>
+                  <span class="lp-stack-item" role="img" aria-label={name} tabindex="0">
+                    <Icon width={size} height={size} />
+                    <span class="lp-tip" aria-hidden="true">
+                      {name}
+                    </span>
+                  </span>
+                </li>
+              ))
+            }
+          </ul>
         </div>
         <div class="lp-wrap lp-hero-shot lp-reveal">
+          <div class="lp-hero-float lp-hero-float-vitals" aria-hidden="true">
+            <small>{copy.heroFloats.vitals[0]}</small>
+            <p><b>{copy.heroFloats.vitals[1]}</b><span>{copy.heroFloats.vitals[2]}</span></p>
+          </div>
+          <div class="lp-hero-float lp-hero-float-error" aria-hidden="true">
+            <p><i></i>{copy.heroFloats.error[0]}</p>
+            <small>{copy.heroFloats.error[1]}</small>
+          </div>
+          <div class="lp-hero-float lp-hero-float-alert" aria-hidden="true">
+            <p>{copy.heroFloats.alert[0]}</p>
+            <small>{copy.heroFloats.alert[1]}</small>
+          </div>
           <img
             class="lp-hero-screenshot"
             src="/screenshots/dashboard-dark-1440.webp"
             srcset="/screenshots/dashboard-dark-1440.webp 1440w, /screenshots/dashboard-dark-2880.webp 2880w"
-            sizes="(min-width: 1212px) 1180px, calc(100vw - 32px)"
+            sizes="(min-width: 1312px) 1280px, calc(100vw - 32px)"
             width="1440"
             height="810"
             alt={copy.heroShotAlt}
             fetchpriority="high"
             decoding="async"
           />
+        </div>
+        <div class="lp-ticker" aria-hidden="true">
+          {
+            copy.ticker.map((row, index) => (
+              <div class="lp-ticker-row">
+                <div class={index ? "lp-ticker-track lp-ticker-track-reverse" : "lp-ticker-track"}>
+                  {[...row, ...row].map(([kind, label, detail]) => (
+                    <span class="lp-ticker-chip">
+                      <i class={`lp-ticker-${kind}`} />
+                      <b>{label}</b>
+                      {detail}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ))
+          }
         </div>
       </section>
 
@@ -445,6 +634,7 @@ const copy = zh
       </section>
 
       <section class="lp-section lp-make" aria-labelledby="lp-make-title">
+        <MakeItBetterBackground client:visible={{ rootMargin: "200px" }} />
         <div class="lp-wrap">
           <h2 id="lp-make-title" lang="en">{copy.makeTitle}</h2>
           <p class="lp-sub">{copy.makeLead}</p>
@@ -462,14 +652,28 @@ const copy = zh
 
     <footer class="lp-footer">
       <div class="lp-wrap lp-footer-inner">
-        <a class="lp-brand" href={home} aria-label="OpenRUM"><BrandMark /><BrandWordmark /></a>
-        <nav aria-label={zh ? "页脚导航" : "Footer navigation"}>
-          <a href={`${docs}/`}>{copy.nav.docs}</a>
-          <a href={repository}>GitHub</a>
-          <a href={`${repository}/blob/main/LICENSE`}>{copy.license}</a>
-          <a href={otherLanguage} lang={zh ? "en" : "zh-CN"}>{copy.nav.language}</a>
-        </nav>
-        <p data-openrum-build>Release {release} · commit {commit.slice(0, 8)}</p>
+        <div class="lp-footer-top">
+          <div class="lp-footer-brand">
+            <a class="lp-brand" href={home} aria-label="OpenRUM"><BrandMark /><BrandWordmark /></a>
+            <p>{copy.footerLead}</p>
+          </div>
+          {
+            footerGroups.map(([heading, links]) => (
+              <nav class="lp-footer-group" aria-label={heading}>
+                <p class="lp-footer-heading">{heading}</p>
+                {links.map(([label, href]) => (
+                  <a href={href}>{label}</a>
+                ))}
+              </nav>
+            ))
+          }
+        </div>
+        <div class="lp-footer-bottom">
+          <p data-openrum-build>Release {release} · commit {commit.slice(0, 8)}</p>
+          <a href={otherLanguage} lang={zh ? "en" : "zh-CN"} hreflang={zh ? "en" : "zh-CN"}
+            >{zh ? "English" : "简体中文"}</a
+          >
+        </div>
       </div>
     </footer>
   </div>

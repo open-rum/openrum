@@ -38,7 +38,8 @@ dashboards, create one, rename it, reorder the list or delete the current one.
   or as a copy of the current one. The e-commerce overview shows revenue, orders, average
   order value and the purchase funnel; it expects `view_item`, `add_to_cart`, `begin_checkout`
   and `purchase` Custom Events, with the order total in a `purchase` measurement named
-  `amount`.
+  `amount`. Revenue is restored by the sample rate, and amounts are shown as reported,
+  without currency conversion.
 - Each dashboard keeps its own draft and saves independently. Saving one that changed on
   another device is refused rather than overwritten; reload it and edit again.
 - The plain dashboard address opens the dashboard you last used on this device. Each

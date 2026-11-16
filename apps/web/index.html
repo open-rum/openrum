@@ -9,23 +9,61 @@
     <title>OpenRUM</title>
     <script>
       try {
-        // Palette and density come before first paint, so nothing flashes the defaults.
-        const palette = localStorage.getItem("openrum-palette");
-        document.documentElement.dataset.palette = ["amber", "lime", "magenta"].includes(palette)
-          ? palette
-          : "amber";
-        document.documentElement.dataset.density =
-          localStorage.getItem("openrum-density") === "compact" ? "compact" : "comfortable";
-        const saved = localStorage.getItem("openrum-theme") || "system";
-        const resolved =
-          saved === "system"
-            ? matchMedia("(prefers-color-scheme: dark)").matches
-              ? "dark"
-              : "light"
-            : saved;
-        document.documentElement.classList.toggle("dark", resolved === "dark");
-        document.documentElement.dataset.theme = resolved;
-        document.documentElement.style.colorScheme = resolved;
+        // Any daisyUI theme name. Nothing saved, or the retired "system", is light.
+        const saved = localStorage.getItem("openrum-theme");
+        let theme = !saved || saved === "system" ? "light" : saved;
+        // A custom theme is a rule this page writes itself. Keep in step with
+        // customThemesCss in src/components/theme/customThemes.ts; ThemeProvider validates
+        // and rewrites the same element once the app starts.
+        let custom = null;
+        if (theme.startsWith("custom-")) {
+          const list = JSON.parse(localStorage.getItem("openrum-custom-themes") || "[]");
+          custom = Array.isArray(list) ? list.find((item) => item && item.id === theme) : null;
+          if (custom && /^[a-z0-9-]+$/.test(custom.id)) {
+            const vars = Object.entries(custom.vars || {})
+              .filter(
+                ([key, value]) => /^--[a-z0-9-]+$/.test(key) && /^[a-z0-9.%() ]+$/i.test(value),
+              )
+              .map(([key, value]) => key + ":" + value)
+              .join(";");
+            const style = document.createElement("style");
+            style.id = "openrum-custom-themes";
+            style.textContent =
+              '[data-theme="' +
+              custom.id +
+              '"]{color-scheme:' +
+              (custom.colorScheme === "dark" ? "dark" : "light") +
+              ";" +
+              vars +
+              "}";
+            document.head.append(style);
+          } else {
+            custom = null;
+            theme = "light";
+          }
+        }
+        // Keep in step with DARK_DAISY_THEMES in src/components/daisy/daisyTheme.ts.
+        const dark = custom
+          ? custom.colorScheme === "dark"
+          : [
+              "dark",
+              "synthwave",
+              "halloween",
+              "forest",
+              "aqua",
+              "black",
+              "luxury",
+              "dracula",
+              "business",
+              "night",
+              "coffee",
+              "dim",
+              "sunset",
+              "abyss",
+            ].includes(theme);
+        document.documentElement.classList.toggle("dark", dark);
+        document.documentElement.dataset.theme = theme;
+        document.documentElement.style.colorScheme = dark ? "dark" : "light";
       } catch {}
     </script>
   </head>

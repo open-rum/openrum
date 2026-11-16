@@ -45,6 +45,7 @@ type UpdateProjectInput struct {
 	// pointer says whether the field was present, the inner one carries null.
 	IngestRateLimit   **int32
 	OverLimitBehavior *OverLimitBehavior
+	RevenueCurrency   *string
 	Status            *ProjectStatus
 }
 
@@ -61,7 +62,7 @@ func (repository *ProjectRepository) ListForOrganization(ctx context.Context, us
 		`SELECT projects.id, projects.organization_id, projects.name, projects.slug, projects.sdk_platform, to_json(projects.allowed_origins),
 		        projects.environment, `+projectEnvironmentsSQL+`, projects.retention_days, projects.event_sample_rate, projects.api_sample_rate,
 		        projects.error_sample_rate, projects.ingest_rate_limit, projects.over_limit_behavior,
-		        projects.status, projects.created_at, projects.updated_at
+		        projects.revenue_currency, projects.status, projects.created_at, projects.updated_at
 		 FROM projects
 		 JOIN organization_members ON organization_members.organization_id=projects.organization_id
 		 WHERE projects.organization_id=$1 AND organization_members.user_id=$2 AND projects.status!='deleting'
@@ -89,7 +90,7 @@ func (repository *ProjectRepository) GetForUser(ctx context.Context, userID, pro
 		`SELECT projects.id, projects.organization_id, projects.name, projects.slug, projects.sdk_platform, to_json(projects.allowed_origins),
 		        projects.environment, `+projectEnvironmentsSQL+`, projects.retention_days, projects.event_sample_rate, projects.api_sample_rate,
 		        projects.error_sample_rate, projects.ingest_rate_limit, projects.over_limit_behavior,
-		        projects.status, projects.created_at, projects.updated_at, organization_members.role
+		        projects.revenue_currency, projects.status, projects.created_at, projects.updated_at, organization_members.role
 		 FROM projects
 		 JOIN organization_members ON organization_members.organization_id=projects.organization_id
 		 WHERE projects.id=$1 AND organization_members.user_id=$2 AND projects.status!='deleting'`,
@@ -97,7 +98,7 @@ func (repository *ProjectRepository) GetForUser(ctx context.Context, userID, pro
 	).Scan(&access.Project.ID, &access.Project.OrganizationID, &access.Project.Name, &access.Project.Slug, &access.Project.SDKPlatform,
 		&allowedOriginsJSON, &access.Project.Environment, &environmentsJSON, &access.Project.RetentionDays,
 		&access.Project.EventSampleRate, &access.Project.APISampleRate, &access.Project.ErrorSampleRate,
-		&access.Project.IngestRateLimit, &access.Project.OverLimitBehavior, &access.Project.Status, &access.Project.CreatedAt, &access.Project.UpdatedAt, &access.Role)
+		&access.Project.IngestRateLimit, &access.Project.OverLimitBehavior, &access.Project.RevenueCurrency, &access.Project.Status, &access.Project.CreatedAt, &access.Project.UpdatedAt, &access.Role)
 	if errors.Is(err, sql.ErrNoRows) {
 		return ProjectAccess{}, ErrNotFound
 	}
@@ -199,12 +200,12 @@ func (repository *ProjectRepository) create(ctx context.Context, actorID uuid.UU
 		  error_sample_rate)
 		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
 		 RETURNING name, slug, sdk_platform, to_json(allowed_origins), environment, retention_days, event_sample_rate, api_sample_rate,
-		           error_sample_rate, ingest_rate_limit, over_limit_behavior, status, created_at, updated_at`,
+		           error_sample_rate, ingest_rate_limit, over_limit_behavior, revenue_currency, status, created_at, updated_at`,
 		project.ID, input.OrganizationID, input.Name, input.Slug, input.SDKPlatform, allowedOrigins, input.Environment,
 		input.RetentionDays, input.EventSampleRate, input.APISampleRate, input.ErrorSampleRate,
 	).Scan(&project.Name, &project.Slug, &project.SDKPlatform, &allowedOriginsJSON, &project.Environment, &project.RetentionDays,
 		&project.EventSampleRate, &project.APISampleRate, &project.ErrorSampleRate,
-		&project.IngestRateLimit, &project.OverLimitBehavior, &project.Status,
+		&project.IngestRateLimit, &project.OverLimitBehavior, &project.RevenueCurrency, &project.Status,
 		&project.CreatedAt, &project.UpdatedAt)
 	if err != nil {
 		return Project{}, nil, translateConstraintError(err)
@@ -317,16 +318,17 @@ func (repository *ProjectRepository) Update(ctx context.Context, actorID, projec
 		   error_sample_rate=COALESCE($9, error_sample_rate), status=COALESCE($10, status),
 		   ingest_rate_limit=CASE WHEN $11 THEN $12::integer ELSE ingest_rate_limit END,
 		   over_limit_behavior=COALESCE($13, over_limit_behavior),
+		   revenue_currency=COALESCE($16, revenue_currency),
 		   sdk_config_version=CASE WHEN $14 THEN sdk_config_version+1 ELSE sdk_config_version END,
 		   sdk_config_effective_at=CASE WHEN $14 THEN now() ELSE sdk_config_effective_at END,
 		   updated_at=now()
 		 WHERE id=$15
 		 RETURNING id, organization_id, name, slug, sdk_platform, to_json(allowed_origins), environment, json_build_array(environment), retention_days,
 		           event_sample_rate, api_sample_rate, error_sample_rate, ingest_rate_limit, over_limit_behavior,
-		           status, created_at, updated_at`,
+		           revenue_currency, status, created_at, updated_at`,
 		input.Name, input.Slug, input.SDKPlatform, allowedOrigins, input.Environment, input.RetentionDays, input.EventSampleRate,
 		input.APISampleRate, input.ErrorSampleRate, status, input.IngestRateLimit != nil, ingestRateLimit,
-		overLimitBehavior, samplingChanged, projectID)
+		overLimitBehavior, samplingChanged, projectID, input.RevenueCurrency)
 	project, err := scanProject(row)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Project{}, ErrNotFound
@@ -374,7 +376,8 @@ func scanProject(scanner rowScanner) (Project, error) {
 	var environmentsJSON []byte
 	err := scanner.Scan(&project.ID, &project.OrganizationID, &project.Name, &project.Slug, &project.SDKPlatform, &allowedOriginsJSON,
 		&project.Environment, &environmentsJSON, &project.RetentionDays, &project.EventSampleRate, &project.APISampleRate,
-		&project.ErrorSampleRate, &project.IngestRateLimit, &project.OverLimitBehavior, &project.Status, &project.CreatedAt, &project.UpdatedAt)
+		&project.ErrorSampleRate, &project.IngestRateLimit, &project.OverLimitBehavior, &project.RevenueCurrency, &project.Status,
+		&project.CreatedAt, &project.UpdatedAt)
 	if err != nil {
 		return Project{}, err
 	}

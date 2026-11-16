@@ -1,7 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { Slider } from "@/components/ui/slider";
 import { canManageProjects, updateProject, type Project } from "@/lib/api/projects";
 import type { UsageResponse } from "@/lib/api/usage";
 import { ImpactPreview } from "./ImpactPreview";
@@ -60,13 +59,13 @@ export function SamplingForm({
   return (
     <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
       <form
-        className="rounded-lg border border-border bg-card p-5"
+        className="card card-border bg-base-100 p-6"
         onSubmit={(event) => {
           event.preventDefault();
           mutation.mutate();
         }}
       >
-        <h3 className="text-base font-medium">事件保留比例</h3>
+        <h3 className="card-title text-base">事件保留比例</h3>
         <p className="mt-2 text-sm leading-6 text-muted-foreground">
           100% 表示全部保留，0% 表示不上报该类事件。配置将在 5 分钟内分发到启用远程配置的在线 SDK。
         </p>
@@ -88,7 +87,7 @@ export function SamplingForm({
           onChange={setErrorRate}
           disabled={!canManage || mutation.isPending}
         />
-        <div className="mt-5 flex items-center gap-3 border-t border-border pt-5">
+        <div className="mt-5 flex flex-row-reverse flex-wrap justify-start items-center gap-3 border-t border-base-300 pt-5">
           <Button type="submit" disabled={!canManage || mutation.isPending || !changed}>
             {mutation.isPending ? "保存中…" : "保存采样配置"}
           </Button>
@@ -112,14 +111,14 @@ export function SamplingForm({
           <ImpactPreview impact={impact} />
         ) : (
           <section
-            className="rounded-lg border border-border bg-muted/30 p-5 text-sm leading-6 text-muted-foreground"
+            className="card card-border bg-base-100 p-5 text-sm leading-6 text-base-content/70"
             aria-label="用量预估"
           >
-            <h3 className="mb-3 font-medium text-foreground">用量预估</h3>
+            <h3 className="card-title mb-2 text-base">用量预估</h3>
             {previewFallback}
           </section>
         )}
-        <p className="text-sm leading-6 text-muted-foreground">
+        <p className="text-xs leading-5 text-base-content/70">
           预估基于最近 7 天、全部环境和事件类型。建议保留 100% 错误事件，优先调整高频行为和 API
           事件。服务器过载时的处理方式请在「速率限制」中设置。
         </p>
@@ -146,20 +145,18 @@ function RateField({
         <span>{label}</span>
         <strong>{percentage}%</strong>
       </span>
-      <Slider
-        className="mt-3"
+      <input
+        type="range"
+        className="range range-primary range-xs mt-3 w-full"
         min={0}
         max={100}
         step={10}
-        value={[percentage]}
+        value={percentage}
         disabled={disabled}
         aria-label={`${label}采样率`}
-        onValueChange={([next]) => onChange(next / 100)}
+        aria-valuetext={`${percentage}%`}
+        onChange={(event) => onChange(Number(event.target.value) / 100)}
       />
-      <span className="mt-1 flex justify-between text-xs text-muted-foreground">
-        <span>0%</span>
-        <span>100%</span>
-      </span>
     </div>
   );
 }

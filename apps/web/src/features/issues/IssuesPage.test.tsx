@@ -79,6 +79,9 @@ describe("issues page states", () => {
     const view = renderPage();
     await waitFor(() => expect(view.getByText("TypeError: checkout failed")).toBeTruthy());
     expect(view.getByText("本页 1 个问题")).toBeTruthy();
+    await waitFor(() => expect(view.getByText(/历史聚合中有错误记录/)).toBeTruthy());
+    expect(view.getByText("原始错误事件")).toBeTruthy();
+    expect(view.queryByText("当前范围暂无错误数据")).toBeNull();
   });
 
   it("renders real overview charts and switches impact and distribution dimensions", async () => {
@@ -347,7 +350,7 @@ describe("issues page states", () => {
     // After a space, the caret starts a new condition and every field is offered.
     fireEvent.focus(box);
     fireEvent.change(box, { target: { value: "is:resolved AND browser:Safari " } });
-    expect(view.getByText("添加条件")).toBeTruthy();
+    expect(view.getByRole("listbox", { name: "可添加的条件" })).toBeTruthy();
     for (const label of ["问题状态", "错误标题", "Fingerprint", "用户 ID", "国家 / 地区"])
       expect(view.getAllByText(label, { exact: false }).length).toBeGreaterThan(0);
     fireEvent.click(view.getByLabelText("清空查询"));

@@ -3,7 +3,8 @@ import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { CheckIcon, PlusIcon, Rows3Icon, UserPlusIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { projectSwitchDestination } from "./projectSwitchDestination";
 import {
   Select,
   SelectContent,
@@ -49,12 +50,13 @@ export function ProjectSwitcher({
   children: ReactElement;
 }) {
   const navigate = useNavigate();
-  // Kept here, outside the hover card: the card unmounts when the pointer leaves it, which
-  // would close a dialog opened from inside.
+  // The invitation dialog stays mounted independently of the project picker.
   const [inviting, setInviting] = useState(false);
   // Mounted from the first click on, so closing it can still play its exit.
   const [inviteLoaded, setInviteLoaded] = useState(false);
   const canInvite = organization ? canManageMembers(organization.role) : false;
+  const [open, setOpen] = useState(false);
+  const [choosingEnvironment, setChoosingEnvironment] = useState(false);
   // Every project accepts the four fixed environments; offer the ones that have data.
   const reported = useQuery({
     queryKey: ["reported-environments", project?.id],
@@ -69,9 +71,14 @@ export function ProjectSwitcher({
 
   return (
     <>
-      <HoverCard openDelay={120} closeDelay={240}>
-        <HoverCardTrigger asChild>{children}</HoverCardTrigger>
-        <HoverCardContent className="project-hover-card" side="right" align="start" sideOffset={8}>
+      <Popover open={open || choosingEnvironment} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>{children}</PopoverTrigger>
+        <PopoverContent
+          className="project-hover-card max-h-[calc(100dvh-2rem)] overflow-y-auto"
+          side="bottom"
+          align="start"
+          sideOffset={8}
+        >
           <div className="project-hover-card__heading">
             <span>
               <small>当前组织</small>
@@ -91,10 +98,14 @@ export function ProjectSwitcher({
                 aria-current={item.id === project?.id ? "page" : undefined}
                 onClick={() => {
                   rememberProject(item);
-                  void navigate({
-                    to: "/projects/$projectId/overview",
-                    params: { projectId: item.id },
-                  });
+                  setOpen(false);
+                  void navigate(
+                    projectSwitchDestination(
+                      item.id,
+                      window.location.pathname,
+                      window.location.search,
+                    ),
+                  );
                 }}
               >
                 <ProjectPlatformIcon platform={item.sdkPlatform} data-icon="inline-start" />
@@ -117,6 +128,8 @@ export function ProjectSwitcher({
                   </small>
                 </div>
                 <Select
+                  open={choosingEnvironment}
+                  onOpenChange={setChoosingEnvironment}
                   value={currentEnvironment ?? "all"}
                   onValueChange={(value) => {
                     onEnvironmentChange(value === "all" ? undefined : value);
@@ -145,7 +158,10 @@ export function ProjectSwitcher({
               type="button"
               variant="ghost"
               size="sm"
-              onClick={() => void navigate({ to: "/projects" })}
+              onClick={() => {
+                setOpen(false);
+                void navigate({ to: "/projects" });
+              }}
             >
               <Rows3Icon data-icon="inline-start" />
               所有项目
@@ -154,7 +170,10 @@ export function ProjectSwitcher({
               type="button"
               variant="ghost"
               size="sm"
-              onClick={() => void navigate({ to: "/projects/new" })}
+              onClick={() => {
+                setOpen(false);
+                void navigate({ to: "/projects/new" });
+              }}
             >
               <PlusIcon data-icon="inline-start" />
               创建项目
@@ -174,8 +193,8 @@ export function ProjectSwitcher({
               </Button>
             ) : null}
           </div>
-        </HoverCardContent>
-      </HoverCard>
+        </PopoverContent>
+      </Popover>
       {organization && canInvite && inviteLoaded ? (
         <Suspense fallback={null}>
           <InviteDialog organization={organization} open={inviting} onOpenChange={setInviting} />

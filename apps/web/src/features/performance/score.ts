@@ -151,3 +151,11 @@ export function ratingLabel(rating: PerformanceRating) {
       return "暂无数据";
   }
 }
+
+/** The daisyUI badge colour for a rating; an unknown rating stays neutral. */
+export const ratingBadge: Record<PerformanceRating, string> = {
+  good: "badge-success",
+  "needs-improvement": "badge-warning",
+  poor: "badge-error",
+  unknown: "badge-ghost",
+};

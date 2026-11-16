@@ -67,6 +67,8 @@ type PerformanceTrendPoint struct {
 type PerformanceFacet struct {
 	Value  string            `json:"value"`
 	Metric PerformanceMetric `json:"metric"`
+	// FirstSeen is the earliest matching sample inside the window, set for releases only.
+	FirstSeen *time.Time `json:"firstSeen,omitempty"`
 }
 
 type PerformanceDistribution struct {
@@ -85,6 +87,7 @@ type PerformanceSample struct {
 	DeviceType string    `json:"deviceType,omitempty"`
 	Country    string    `json:"country,omitempty"`
 	Release    string    `json:"release,omitempty"`
+	SessionID  string    `json:"sessionId,omitempty"`
 }
 
 type PerformanceDetail struct {
@@ -94,6 +97,8 @@ type PerformanceDetail struct {
 	Distribution []PerformanceDistribution `json:"distribution"`
 	Browsers     []PerformanceFacet        `json:"browsers"`
 	DeviceTypes  []PerformanceFacet        `json:"deviceTypes"`
+	Countries    []PerformanceFacet        `json:"countries"`
+	Releases     []PerformanceFacet        `json:"releases"`
 	Samples      []PerformanceSample       `json:"samples"`
 }
 
@@ -233,7 +238,7 @@ func (repository *PerformanceRepository) routes(ctx context.Context, filters Per
 }
 
 func (repository *PerformanceRepository) detail(ctx context.Context, filters PerformanceFilters) (PerformanceDetail, error) {
-	detail := PerformanceDetail{Route: filters.Route, Metric: filters.Metric, Trend: []PerformancePoint{}, Distribution: []PerformanceDistribution{}, Browsers: []PerformanceFacet{}, DeviceTypes: []PerformanceFacet{}, Samples: []PerformanceSample{}}
+	detail := PerformanceDetail{Route: filters.Route, Metric: filters.Metric, Trend: []PerformancePoint{}, Distribution: []PerformanceDistribution{}, Browsers: []PerformanceFacet{}, DeviceTypes: []PerformanceFacet{}, Countries: []PerformanceFacet{}, Releases: []PerformanceFacet{}, Samples: []PerformanceSample{}}
 	var err error
 	if detail.Trend, err = repository.trend(ctx, filters); err != nil {
 		return detail, err
@@ -245,6 +250,12 @@ func (repository *PerformanceRepository) detail(ctx context.Context, filters Per
 		return detail, err
 	}
 	if detail.DeviceTypes, err = repository.facets(ctx, filters, "device_type"); err != nil {
+		return detail, err
+	}
+	if detail.Countries, err = repository.facets(ctx, filters, "country"); err != nil {
+		return detail, err
+	}
+	if detail.Releases, err = repository.facets(ctx, filters, "release"); err != nil {
 		return detail, err
 	}
 	detail.Samples, err = repository.samples(ctx, filters)
@@ -278,8 +289,8 @@ func (repository *PerformanceRepository) trend(ctx context.Context, filters Perf
 func (repository *PerformanceRepository) facets(ctx context.Context, filters PerformanceFilters, dimension string) ([]PerformanceFacet, error) {
 	where, arguments := performanceAggregateWhere(filters, true)
 	samples := performanceSampleColumn(filters.Metric)
-	rows, err := repository.database.QueryContext(ctx, `SELECT `+dimension+`,`+performanceMetricSelect(filters.Metric)+`
-		FROM rum_events WHERE `+where+` AND `+dimension+`!='' GROUP BY `+dimension+` ORDER BY `+samples+` DESC LIMIT 20`, arguments...)
+	rows, err := repository.database.QueryContext(ctx, `SELECT `+dimension+`,`+performanceMetricSelect(filters.Metric)+`,min(timestamp)
+		FROM rum_events WHERE `+where+` AND `+dimension+`!='' GROUP BY `+dimension+` HAVING `+samples+`>0 ORDER BY `+samples+` DESC LIMIT 20`, arguments...)
 	if err != nil {
 		return nil, fmt.Errorf("query performance %s facets: %w", dimension, err)
 	}
@@ -288,10 +299,15 @@ func (repository *PerformanceRepository) facets(ctx context.Context, filters Per
 	for rows.Next() {
 		var current PerformanceFacet
 		var value performanceMetricScan
-		if err := rows.Scan(append([]any{&current.Value}, performanceScanTargets(&value)...)...); err != nil {
+		var firstSeen time.Time
+		if err := rows.Scan(append(append([]any{&current.Value}, performanceScanTargets(&value)...), &firstSeen)...); err != nil {
 			return nil, err
 		}
 		current.Metric = value.metric()
+		if dimension == "release" {
+			firstSeen = firstSeen.UTC()
+			current.FirstSeen = &firstSeen
+		}
 		result = append(result, current)
 	}
 	return result, rows.Err()
@@ -323,7 +339,7 @@ func (repository *PerformanceRepository) distribution(ctx context.Context, filte
 
 func (repository *PerformanceRepository) samples(ctx context.Context, filters PerformanceFilters) ([]PerformanceSample, error) {
 	where, arguments := performanceRawWhere(filters)
-	rows, err := repository.database.QueryContext(ctx, `SELECT event_id,timestamp,metric_value,page_url_normalized,browser,device_type,country,release
+	rows, err := repository.database.QueryContext(ctx, `SELECT event_id,timestamp,metric_value,page_url_normalized,browser,device_type,country,release,session_id
 		FROM rum_events WHERE `+where+` ORDER BY metric_value DESC,timestamp DESC LIMIT 25`, arguments...)
 	if err != nil {
 		return nil, fmt.Errorf("query performance samples: %w", err)
@@ -332,8 +348,12 @@ func (repository *PerformanceRepository) samples(ctx context.Context, filters Pe
 	result := make([]PerformanceSample, 0)
 	for rows.Next() {
 		var current PerformanceSample
-		if err := rows.Scan(&current.EventID, &current.Timestamp, &current.Value, &current.PageURL, &current.Browser, &current.DeviceType, &current.Country, &current.Release); err != nil {
+		var sessionID uuid.UUID
+		if err := rows.Scan(&current.EventID, &current.Timestamp, &current.Value, &current.PageURL, &current.Browser, &current.DeviceType, &current.Country, &current.Release, &sessionID); err != nil {
 			return nil, err
+		}
+		if sessionID != uuid.Nil {
+			current.SessionID = sessionID.String()
 		}
 		current.Timestamp = current.Timestamp.UTC()
 		result = append(result, current)

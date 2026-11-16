@@ -167,3 +167,44 @@ func TestProjectQuotaOverrideCanBeSetAndCleared(t *testing.T) {
 }
 
 func pointerTo[T any](value T) *T { return &value }
+
+func TestProjectRevenueCurrencyRoundTrip(t *testing.T) {
+	database := openIntegrationDatabase(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	owner, project := seedProject(t, ctx)
+	repository := NewProjectRepository(database)
+
+	access, err := repository.GetForUser(ctx, owner, project)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if access.Project.RevenueCurrency != "" {
+		t.Fatalf("a fresh project has revenue currency %q, want none", access.Project.RevenueCurrency)
+	}
+	usd := "USD"
+	updated, err := repository.Update(ctx, owner, project, UpdateProjectInput{RevenueCurrency: &usd})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updated.RevenueCurrency != "USD" {
+		t.Fatalf("revenue currency = %q, want USD", updated.RevenueCurrency)
+	}
+	// An unrelated update leaves the label alone.
+	name := "Web shop"
+	updated, err = repository.Update(ctx, owner, project, UpdateProjectInput{Name: &name})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updated.RevenueCurrency != "USD" {
+		t.Fatalf("renaming cleared revenue currency: %q", updated.RevenueCurrency)
+	}
+	none := ""
+	updated, err = repository.Update(ctx, owner, project, UpdateProjectInput{RevenueCurrency: &none})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updated.RevenueCurrency != "" {
+		t.Fatalf("revenue currency = %q, want cleared", updated.RevenueCurrency)
+	}
+}

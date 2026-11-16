@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { APITrendPoint } from "@/lib/api/apis";
-import { apiLatencyPlot, apiRequestsPlot, apiStatusPlot } from "./plotData";
+import { apiErrorsPlot, apiLatencyPlot, apiRequestsPlot, hasApiErrors } from "./plotData";
 
 const point = (bucket: string, overrides: Partial<APITrendPoint> = {}): APITrendPoint => ({
   bucket,
@@ -19,23 +19,22 @@ const range = { from: "2026-10-11T10:00:00Z", to: "2026-10-11T11:00:00Z", interv
 const trend = [point("2026-10-11T10:00:00Z")];
 
 describe("apiRequestsPlot", () => {
-  it("reads success rate on its own right-hand axis", () => {
+  it("reads failure rate on its own right-hand axis", () => {
     const plot = apiRequestsPlot(trend, range);
     expect(plot.series.map((series) => [series.key, series.axis ?? "left"])).toEqual([
       ["requests", "left"],
-      ["failures", "left"],
-      ["successRate", "right"],
+      ["failureRate", "right"],
     ]);
-    expect(plot.rows[0]).toMatchObject({ requests: 100, failures: 6 });
-    expect(plot.rows[0].successRate).toBeCloseTo(94, 5);
+    expect(plot.rows[0]).toMatchObject({ requests: 100 });
+    expect(plot.rows[0].failureRate).toBeCloseTo(6, 5);
   });
 
-  it("leaves success rate empty for a bucket with no requests, not 100% or 0%", () => {
+  it("leaves failure rate empty for a bucket with no requests, not 0%", () => {
     const plot = apiRequestsPlot(
       [point("2026-10-11T10:00:00Z", { requests: 0, failures: 0 })],
       range,
     );
-    expect(plot.rows[0].successRate).toBeNull();
+    expect(plot.rows[0].failureRate).toBeNull();
   });
 
   it("flags an empty range", () => {
@@ -65,26 +64,32 @@ describe("apiLatencyPlot", () => {
   });
 });
 
-describe("apiStatusPlot", () => {
-  it("stacks response classes that add up to the request count", () => {
-    const plot = apiStatusPlot(trend, range);
+describe("apiErrorsPlot", () => {
+  it("stacks the responses that were not a success, and leaves successes out", () => {
+    const plot = apiErrorsPlot(trend, range);
     expect(plot.stacked).toBe(true);
-    const row = plot.rows[0];
-    expect(row).toMatchObject({ ok: 84, client: 10, server: 4, network: 2 });
-    expect(Number(row.ok) + Number(row.client) + Number(row.server) + Number(row.network)).toBe(
-      100,
-    );
-  });
-
-  it("never reports a negative success count when the classes overshoot", () => {
-    const plot = apiStatusPlot([point("2026-10-11T10:00:00Z", { requests: 5 })], range);
-    expect(plot.rows[0].ok).toBe(0);
+    expect(plot.series.map((series) => series.key)).toEqual(["client", "server", "network"]);
+    expect(plot.rows[0]).toMatchObject({ client: 10, server: 4, network: 2 });
+    expect(plot.rows[0].ok).toBeUndefined();
   });
 
   it("pads missing buckets with gaps when the interval is known", () => {
     const wide = { ...range, to: "2026-10-11T13:00:00Z" };
-    const plot = apiStatusPlot(trend, wide);
+    const plot = apiErrorsPlot(trend, wide);
     expect(plot.rows).toHaveLength(3);
-    expect(plot.rows[2].ok).toBeNull();
+    expect(plot.rows[2].server).toBeNull();
+  });
+});
+
+describe("hasApiErrors", () => {
+  it("is false when every request succeeded", () => {
+    const clean = point("2026-10-11T10:00:00Z", {
+      failures: 0,
+      clientErrors: 0,
+      serverErrors: 0,
+      networkErrors: 0,
+    });
+    expect(hasApiErrors([clean])).toBe(false);
+    expect(hasApiErrors(trend)).toBe(true);
   });
 });

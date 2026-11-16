@@ -24,7 +24,7 @@ vi.mock("@/lib/auth/providers", async (original) => ({
   getAuthMethods: vi.fn(),
   startOAuthLogin: vi.fn(),
 }));
-vi.mock("@/components/theme/ThemeToggle", () => ({ ThemeToggle: () => null }));
+vi.mock("@/components/theme/ThemeController", () => ({ ThemeController: () => null }));
 
 function status(overrides: Partial<RegistrationStatus> = {}): RegistrationStatus {
   return { open: true, email: true, ...overrides };

@@ -1,3 +1,9 @@
+import {
+  performanceRating,
+  ratingBadge,
+  ratingLabel,
+  type PerformanceRating,
+} from "@/features/performance/score";
 import { PlotChart, PlotTable } from "@/components/charts/PlotChart";
 import { TopIssuesContent } from "@/features/overview/TopIssues";
 import { formatMetric, type AdaptedData } from "./adapters";
@@ -19,11 +25,29 @@ export type ModuleRenderProps = {
 
 export function StatRenderer({ widget, data }: ModuleRenderProps) {
   if (data.kind !== "scalar") return null;
+  const metricKey = widget.data.metrics[0];
+  // The shared health thresholds describe P75; other quantiles remain ungraded.
+  const metric =
+    metricKey && !/P(?:50|95)$/.test(metricKey)
+      ? metricKey
+          .replace(/^vitals\./, "")
+          .replace(/P75$/, "")
+          .toUpperCase()
+      : undefined;
+  const rating: PerformanceRating | undefined =
+    metric && ["LCP", "INP", "CLS", "FCP", "TTFB"].includes(metric)
+      ? performanceRating(data.value, metric as "LCP" | "INP" | "CLS" | "FCP" | "TTFB")
+      : undefined;
   const summary = (
     <div className="relative z-10 flex min-w-0 flex-col gap-3">
       <strong className="text-3xl font-semibold tracking-tight tabular-nums">
         {formatMetric(data.value, data.unit)}
       </strong>
+      {rating ? (
+        <span className={`badge badge-sm badge-soft ${ratingBadge[rating]}`}>
+          {ratingLabel(rating)}
+        </span>
+      ) : null}
     </div>
   );
   const comparison = <ModuleComparison widget={widget} data={data} variant="corner" />;

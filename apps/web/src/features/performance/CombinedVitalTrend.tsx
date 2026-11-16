@@ -1,8 +1,12 @@
-import { useState } from "react";
-import { CartesianGrid, Line, LineChart, XAxis, YAxis } from "recharts";
+import { useId, useState } from "react";
+import { timeAxis, valueAxis, VALUE_AXIS_MARGIN_TOP } from "@/lib/charts/axes";
+import { ChartAreaIcon, ChartColumnIcon, ChartLineIcon } from "lucide-react";
+import { Area, Bar, CartesianGrid, ComposedChart, Line, XAxis, YAxis } from "recharts";
+import { ChartSwitch } from "@/components/daisy/ChartSwitch";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChartContainer, ChartTooltip, type ChartConfig } from "@/components/ui/chart";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { useBarRadiusTop } from "@/lib/charts/useBarRadius";
 import { useChartMotion } from "@/lib/charts/useChartMotion";
 import { smoothCurve } from "@/lib/charts/smoothCurve";
 import { isolatedDot } from "@/lib/charts/isolatedDot";
@@ -13,25 +17,53 @@ import {
   type PerformanceResponse,
 } from "@/lib/api/performance";
 import { combinedTrend, vitalSeries } from "./combinedTrend";
-import { PercentileSelect } from "./PerformanceControls";
 import { formatTrendDate } from "./trendTime";
 
 const config = Object.fromEntries(
   vitalSeries.map(({ key, name, color }) => [key, { label: name, color }]),
 ) satisfies ChartConfig;
 
+export type VitalTrendView = "line" | "area" | "bar";
+
+const viewNames = { line: "折线图", area: "面积图", bar: "柱状图" } as const;
+
+const views = [
+  [
+    "line",
+    <>
+      <ChartLineIcon className="size-3.5" aria-hidden="true" />
+      折线
+    </>,
+  ],
+  [
+    "area",
+    <>
+      <ChartAreaIcon className="size-3.5" aria-hidden="true" />
+      面积
+    </>,
+  ],
+  [
+    "bar",
+    <>
+      <ChartColumnIcon className="size-3.5" aria-hidden="true" />
+      柱状
+    </>,
+  ],
+] as const satisfies readonly (readonly [VitalTrendView, unknown])[];
+
 export function CombinedVitalTrend({
   trend,
   range,
   percentile,
-  onPercentileChange,
 }: {
   trend: PerformanceResponse["trend"];
   range?: { from?: string; to?: string; intervalSeconds?: number };
   percentile: PerformancePercentile;
-  onPercentileChange: (value: PerformancePercentile) => void;
 }) {
   const animate = useChartMotion();
+  const barRadius = useBarRadiusTop();
+  const gradientId = useId().replace(/:/g, "");
+  const [view, setView] = useState<VitalTrendView>("line");
   const [visible, setVisible] = useState<string[]>(() =>
     vitalSeries.filter(({ core }) => core).map(({ key }) => key),
   );
@@ -53,26 +85,39 @@ export function CombinedVitalTrend({
             {range?.intervalSeconds ? ` · 自动 · ${intervalLabel(range.intervalSeconds)}` : ""}
           </CardDescription>
         </div>
-        <PercentileSelect value={percentile} onChange={onPercentileChange} />
+        <div className="flex flex-wrap items-center gap-2">
+          <ChartSwitch label="图表类型" options={views} value={view} onChange={setView} />
+        </div>
       </CardHeader>
       <CardContent>
-        <div className="performance-axis-description">
-          <span>{hasTiming ? "左轴：耗时 (ms)" : ""}</span>
-          <span>{hasCLS ? "右轴：CLS（无单位）" : ""}</span>
-        </div>
+        {/* Units sit on the axes themselves ("3,400 ms", "0.1 CLS"), so no caption row. */}
         {hasData ? (
           <ChartContainer
             className="performance-combined-chart"
             config={config}
             initialDimension={{ width: 640, height: 240 }}
             role="img"
-            aria-label={`Web Vitals ${percentile.toUpperCase()} 真实值趋势`}
+            aria-label={`Web Vitals ${percentile.toUpperCase()} 真实值趋势 · ${viewNames[view]}`}
           >
-            <LineChart
+            <ComposedChart
               accessibilityLayer
               data={data}
-              margin={{ top: 8, right: 0, bottom: 4, left: 0 }}
+              margin={{ top: VALUE_AXIS_MARGIN_TOP, right: 0, bottom: 4, left: 0 }}
+              barCategoryGap="25%"
+              barGap={1}
             >
+              <defs>
+                {series.map(({ key, color }) => (
+                  <linearGradient key={key} id={`${gradientId}-${key}`} x1="0" y1="0" x2="0" y2="1">
+                    <stop
+                      offset="0%"
+                      stopColor={color}
+                      stopOpacity={series.length > 1 ? 0.3 : 0.55}
+                    />
+                    <stop offset="100%" stopColor={color} stopOpacity={0.04} />
+                  </linearGradient>
+                ))}
+              </defs>
               <CartesianGrid
                 vertical={false}
                 stroke="var(--ds-border-soft)"
@@ -80,33 +125,34 @@ export function CombinedVitalTrend({
               />
               <XAxis
                 dataKey="bucket"
-                tickLine={false}
-                axisLine={false}
                 minTickGap={40}
-                tickMargin={10}
-                tickFormatter={(value) => formatTrendDate(value, shortRange)}
+                {...timeAxis((value) => formatTrendDate(String(value), shortRange))}
               />
               <YAxis
                 yAxisId="time"
                 hide={!hasTiming}
-                tickLine={false}
-                axisLine={false}
-                width={52}
                 domain={[0, "auto"]}
-                tickFormatter={(value: number) => Math.round(value).toLocaleString()}
+                {...valueAxis({
+                  unit: "ms",
+                  format: (value) => Math.round(value).toLocaleString("zh-CN"),
+                })}
               />
               <YAxis
                 yAxisId="cls"
-                orientation="right"
                 hide={!hasCLS}
-                tickLine={false}
-                axisLine={false}
-                width={42}
                 domain={[0, "auto"]}
-                tickFormatter={(value: number) => Number(value.toFixed(3)).toString()}
+                {...valueAxis({
+                  side: "right",
+                  unit: "CLS",
+                  format: (value) => Number(value.toFixed(3)).toString(),
+                })}
               />
               <ChartTooltip
-                cursor={{ stroke: "var(--ds-border)" }}
+                cursor={
+                  view === "bar"
+                    ? { fill: "var(--color-base-200)" }
+                    : { stroke: "var(--ds-border)" }
+                }
                 content={({ active, payload }) => {
                   const point = payload?.[0]?.payload as (typeof data)[number] | undefined;
                   if (!active || !point) return null;
@@ -127,26 +173,56 @@ export function CombinedVitalTrend({
                   );
                 }}
               />
-              {series.map(({ key, dash }) => (
-                <Line
-                  key={key}
-                  yAxisId={key === "cls" ? "cls" : "time"}
-                  {...smoothCurve}
-                  dataKey={key}
-                  stroke={`var(--color-${key})`}
-                  strokeDasharray={dash}
-                  strokeWidth={2}
-                  dot={isolatedDot(
-                    { rows: data as unknown as TimeSeriesRow[] },
-                    key,
-                    `var(--color-${key})`,
-                  )}
-                  activeDot={{ r: 4 }}
-                  connectNulls={false}
-                  isAnimationActive={animate}
-                />
-              ))}
-            </LineChart>
+              {series.map(({ key, dash }) => {
+                const axis = key === "cls" ? "cls" : "time";
+                const color = `var(--color-${key})`;
+                const dot = isolatedDot({ rows: data as unknown as TimeSeriesRow[] }, key, color);
+                if (view === "bar")
+                  return (
+                    <Bar
+                      key={key}
+                      yAxisId={axis}
+                      dataKey={key}
+                      fill={color}
+                      radius={barRadius}
+                      maxBarSize={12}
+                      isAnimationActive={animate}
+                    />
+                  );
+                if (view === "area")
+                  return (
+                    <Area
+                      key={key}
+                      yAxisId={axis}
+                      {...smoothCurve}
+                      dataKey={key}
+                      stroke={color}
+                      strokeDasharray={dash}
+                      fill={`url(#${gradientId}-${key})`}
+                      strokeWidth={1.5}
+                      dot={dot}
+                      activeDot={{ r: 4 }}
+                      connectNulls={false}
+                      isAnimationActive={animate}
+                    />
+                  );
+                return (
+                  <Line
+                    key={key}
+                    yAxisId={axis}
+                    {...smoothCurve}
+                    dataKey={key}
+                    stroke={color}
+                    strokeDasharray={dash}
+                    strokeWidth={2}
+                    dot={dot}
+                    activeDot={{ r: 4 }}
+                    connectNulls={false}
+                    isAnimationActive={animate}
+                  />
+                );
+              })}
+            </ComposedChart>
           </ChartContainer>
         ) : (
           <div className="performance-metric-trend-empty">当前显示的指标暂无趋势数据</div>

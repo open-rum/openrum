@@ -7,11 +7,11 @@ import { Skeleton } from "@/components/ui/skeleton";
 import type { Release } from "@/lib/api/releases";
 
 export function ReleaseCountBadge({ release }: { release: Release }) {
-  if (!release.artifactCount) return <Badge variant="outline">无 Source Map</Badge>;
+  if (!release.artifactCount) return <Badge variant="secondary">无 Source Map</Badge>;
   const complete = release.readyCount === release.artifactCount;
   return (
     <Badge
-      variant={complete ? "success" : "outline"}
+      variant={complete ? "success" : "warning"}
       aria-label={`${release.readyCount} 个可用，共 ${release.artifactCount} 个文件`}
     >
       {release.readyCount}/{release.artifactCount} 可用

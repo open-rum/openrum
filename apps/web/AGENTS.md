@@ -58,6 +58,19 @@ When implementing from a selected generated mock, treat that image as the source
   Support explicit `user.id` query terms and show captured user/anonymous visitor
   IDs in log details, with same-user and same-visitor actions. Never infer a
   current user from a Session or fabricate profile fields not captured by the SDK.
+  Logs trends are compact and expanded by default (user decision, 2026-11-13),
+  with optional collapse. Keep log rows visible in the first desktop viewport.
+  Relative-time updates must not close an open log or reset its reading position.
+  Log detail selection is URL-backed; complete related-log actions replace the
+  search explicitly and offer a return to the original search, while attribute
+  filters append to it. Put structured attributes before collapsible context.
+  Keep one global time picker; chart clicks update that range, without a second
+  range control (user correction, 2026-11-13). Log rows support inline expansion,
+  message search highlighting and user-selected attribute columns remembered per
+  Project in this browser. Attribute actions include filtering, exclusion and
+  adding a column. Related logs open chronologically around the selected log,
+  mark that original log and allow paging in both directions (user-approved
+  Logs iteration, 2026-11-13).
   Issues keeps its high-frequency status as a Select immediately left of the
   shared search and its sort as a Select after it. Its fields start with Issue-specific title,
   error type and Fingerprint, followed by user.id, release, browser, device, country and Route. Issue-title
@@ -70,9 +83,21 @@ When implementing from a selected generated mock, treat that image as the source
   pasted and changed in place: `user.id:"c-1" AND !browser:Chrome`. A coloured copy sits
   under a transparent input (field, operator, value, keyword colours; a refused condition is
   underlined from the server's `error.search.position`). Suggestions follow the caret: field
-  names while a name is typed, then operator buttons (是、不是、属于其中之一、包含、有值…, by field
-  type) and values after the colon. Choosing writes text and puts ` AND ` before a new
-  condition; a value or has-condition runs the search, a list stays open until Enter. The
+  names while a name is typed, then, after the colon, one header line with the field and an operator
+  Select (is, is not, is one of, contains, has value…, by field type; operators are shown in
+  English like the query syntax, user request 2026-10-28; not a
+  wall of pill buttons) above the values. Under is one of / is not one of the values are
+  checkboxes: chosen ones stay listed and ticked, choosing a ticked one unticks it, and Enter
+  runs the search (user request, 2026-10-28). Choosing writes text and puts `AND` before a new
+  condition; a finished condition (a value or has-condition) is followed by a space with the
+  caret after it, and focusing by keyboard or `/` adds that space after the existing query
+  and puts the caret at the end (user request, 2026-10-28; a click keeps its own caret, and
+  the URL's `q` stays trimmed); a value or has-condition runs the search, a list stays open until Enter. Field
+  suggestions follow Sentry's compact list (user request, 2026-10-28): one 36px row per field
+  with the query name in monospace, the Chinese label beside it and the type (文本/枚举/ID/
+  数字/时长) on the right. With nothing typed the panel is wide with a description column for
+  the highlighted or hovered field; typing a name narrows it to the matches and the description
+  floats to its right. No category tabs until a page has many custom attributes. The
   input is a `combobox` with a `listbox` of `option`s. The page's URL holds only `q` (plus
   its own settings such as sort or status); old one-field parameters (release=, browser=,
   signal=, minimumEvents=, level=, methods=, …) are read once as conditions via
@@ -116,9 +141,13 @@ When implementing from a selected generated mock, treat that image as the source
   标记解决/忽略 (or 重新打开), assignee and a 更多 menu (copy link, copy Fingerprint).
   The main column shows removable 只看 tag tokens, then one compact trends strip:
   event/user totals that switch the series, a short column chart on the shared
-  time buckets, and a tag preview (top browser values with shares that filter on
-  click, plus 全部标签 opening every tag in a Sheet). Below it, one 本问题的事件 card:
-  a header with newer/older, 最新 and the 全部事件 Sheet; an event row with the
+  time buckets, and a tag preview (user request, 2026-10-28): the first three tags
+  with data (浏览器、版本、设备…), each a key, top value and share over a stacked bar of
+  its top values that opens every value on click, then a quiet button opening all tags
+  in a Sheet. Do not go back to one tag's value list beside a large 全部标签 tile. Below it, one 本问题的事件 card:
+  a header with newer/older arrows, then 最新, 最早 and 全部事件 as quiet link text
+  (user request, 2026-10-28; the end already shown is muted and disabled, never a filled
+  pill), paging by the server's `nextCursor`/`newerCursor`; an event row with the
   12-character event ID (click to copy), relative time and 跳转到 links; a client
   row of icon chips (visitor, browser, system, device, country, release, page);
   then sections separated by dividers, each folding from a right-hand chevron:
@@ -147,11 +176,36 @@ When implementing from a selected generated mock, treat that image as the source
   disclose query limits and overlapping user/session counts. Preserve all groups
   in enlarged details and support keyboard focus as well as pointer highlighting.
 
-- The world map view was removed at the user's request (2026-09-28). Do not
-  reintroduce map charts or geo dependencies. A saved `map` view reads as ranked
-  bars in the Console and is rejected by the backend on save; country data uses
+- Dashboard modules currently have no map view: a saved `map` view reads as ranked
+  bars in the Console and is rejected by the backend on save, and country data uses
   Bar, Table or donut like every other dimension.
-- Project overviews are personal, per-user/per-project dashboards. Keep normal
+- 用户行为分析 › 总览 (`/projects/:id/analytics`, user request 2026-11-09) is a
+  business overview for product and operations, led by a card with a world map of
+  country outlines (user request, 2026-11-09: shapes, not dots). The card follows the
+  theme (no forced dark surface in light themes); the map sits on an inset `base-200`
+  panel, countries without data fill `base-300` and the rest shade `primary` on a
+  square-root scale. Pointing at any country shows its figures beside the pointer; the
+  selected country keeps a label when nothing is pointed at. There is no 3D globe (tried
+  and removed at the user's request, 2026-11-09). The outlines are precomputed by
+  `scripts/build-world-map.mjs` into `features/analytics/overview/worldMap.json`
+  (Natural Earth 1:110m via world-atlas, Equal Earth projection, split at the
+  antimeridian, loaded as its own chunk), so it needs no runtime geo library. Positions are country level only; rings mark the six countries with
+  the most active users. The card shows "过去 30 分钟活跃用户" (users with any
+  behaviour event, `behavior.users`; never call it 在线 or 实时), refreshed every 10
+  seconds, with per-minute bars whose last bar is the unfinished minute. The map
+  metric switch offers 活跃用户, 会话, 收入 and 购买转化率; the side ranking is the
+  keyboard path to select a country. Below it: revenue numbers (收入, 订单, 客单价,
+  购买转化率, 每访客收入), the purchase funnel and 来源与收入. Everything reads the
+  metric catalog with the dashboard's e-commerce convention (Custom Events
+  view_item, add_to_cart, begin_checkout, purchase; revenue is purchase's `amount`,
+  labelled with the Project's 收入币种 symbol when one is set, never converted). Show values and previous-period comparisons
+  only, never verdicts or good/bad colouring. Conversion by country or source needs
+  at least 50 sessions. The former 总览 (event trends and breakdowns) is the 事件
+  tab at `/analytics/events`.
+- Project overviews are personal, per-user/per-project dashboards. Keep
+  viewing entirely module-driven (user decision, 2026-11-05): users choose what
+  to focus on by adding modules. Do not add a fixed priority/attention summary
+  outside the configurable module grid, including on the built-in default. Keep normal
   viewing uncluttered; reveal a settings menu on card hover/focus (always accessible
   on touch/narrow screens), without requiring edit mode first. Modules support
   adding, configuring, duplicating, removing, drag sorting and preset widths.
@@ -179,7 +233,7 @@ When implementing from a selected generated mock, treat that image as the source
 - Dashboards are fluid up to 1920px and then centred; from 1680px grid gaps and chart
   heights grow. Sizes are compact (stat only), third, half and full (3/4/6/12 of 12
   columns). Tabbed cards (user request, 2026-10-02) combine two or three adjacent
-  chart/table modules sharing a `groupId`: a sliding switch at the card's top-right,
+  chart/table modules sharing a `groupId`: a daisyUI `tabs-box` switch at the card's top-right,
   only the visible tab queried, one shared size, merge via the card menu's 合并到…,
   split with 移出为独立卡片. Stat cards never join; Go validates the same rules.
 - The e-commerce overview (收入、订单数、客单价、购买漏斗、来源、渠道收入) is a dashboard
@@ -251,10 +305,19 @@ When implementing from a selected generated mock, treat that image as the source
   configured Table views and edit-mode controls. Opening details must not save
   configuration or request the same module again.
 - The Alerts page (`/projects/:projectId/alerts`) has two URL-backed line tabs, 规则 and
-  通知记录. Rules are a table with a one-line condition, channel chips, last status,
-  an enable switch and a row menu (编辑/复制/删除); an empty project shows rule templates
-  that prefill the editor instead of creating rules. The rule editor is a right Sheet
-  (560px) that ends with a one-sentence summary of the rule. 通知记录 shows each breach's
+  通知记录. With rules, a four-cell overview (正在超阈值, 近 24 小时触发, 送达失败, 需要处理的规则)
+  sits above the tabs; each cell opens the matching rules or records. The rule table ranks
+  breaching rules, then delivery failures, evaluation failures and rules without a usable
+  channel, then healthy ones, then paused ones (`ruleAttentions` and `rankRules` in
+  `alertPresentation.ts`). Columns: rule and condition, current status with one bar per
+  recent evaluation (API `recentStatuses`, newest 24, oldest first), last trigger with its
+  delivery result, channel chips, an enable switch and a row menu (编辑/复制/删除). The whole
+  row opens the rule details. Status filters are a `join` of buttons with counts (全部,
+  超阈值, 需处理, 已停用), and templates live in a 从模板添加 menu. A project without rules
+  shows templates beside a three-step checklist driven by the real channel state; templates
+  prefill the editor instead of creating rules. The overview counts only the newest 100
+  loaded notifications and says so when they stop inside the 24-hour window. The rule
+  editor is a right Sheet (560px) that ends with a one-sentence summary of the rule. 通知记录 shows each breach's
   delivery state and per-channel result, with failure reasons in plain words. The
   Notification channels page lists channel kinds as cards (飞书 and Webhook available;
   钉钉、企业微信、Slack、邮件 disabled with 即将支持), then configured channels with enable,
@@ -263,23 +326,18 @@ When implementing from a selected generated mock, treat that image as the source
   `docs/agents/alerts.md`.
 - Authentication pages use a simple, centered single column: shared brand mark,
   concise copy, and a narrow form on a plain theme-aware background. Avoid split
-  screens, promotional side panels, and decorative glows. Login actions use
-  black/white contrast tokens and retain the compact theme toggle. A notice that
+  screens, promotional side panels, and decorative glows. The login action is the
+  page's one `btn-primary`, and the top-right keeps the theme switch. A notice that
   explains why the person is on the page (an expired session) uses the warning Alert with
   an icon and a single line; the default Alert is nearly invisible on the plain background.
 - The accepted layout target is `../../output/imagegen/openrum-dashboard-stripe.png`.
-- Use the shadcn theme on the shared four-color card: neutral white/graphite surfaces,
-  amber primary by default (lime and magenta are user-selectable palettes), lime, sky
-  and magenta accents, subtle radii and shadows. Keep red reserved for destructive and
-  error semantics. Read `--ds-primary*`, `--ds-accent-*` and `--ds-{hue}-*` tokens; never
-  hard-code a hue or assume which palette is active.
-- In light mode, keep canvas, cards, tables, text, and primary page actions neutral;
-  main actions stay black with white text. Use the primary only for compact badges,
-  icons, focus rings, progress, and selected/effective form states. Selected options
-  use the shared selection tokens (soft primary surface, stronger primary border);
-  ordinary hover remains neutral. Use the `amber`/`lime`/`sky`/`magenta` Badge variants
-  for categories and `brand` for the current primary. The Rate Limits page is the
-  settings-form reference. See `docs/design.md`, "Brand accent hierarchy".
+- The Console runs on daisyUI 5 (user decision, 2026-11-03); the public site and docs do
+  not. Before changing any component, page style, theme, colour, radius or spacing, read
+  `docs/agents/console-ui.md` and load the `daisyui` skill. Use daisyUI classes and colour
+  names (`base-*`, `primary`…`error`), never `dark:` with them and never fixed Tailwind
+  colours for text. The page is `base-200`, surfaces `base-100` with `base-300` borders;
+  `btn-primary` marks a view's one main action, and red stays reserved for destructive and
+  error states. The Rate Limits page is the settings-form reference.
 - The overview must treat country, device, browser, and custom dimensions/metrics as first-class analysis surfaces.
 - Use the typed Go query APIs for implemented product areas; keep deterministic frontend fixtures for unit tests and explicit demo states only.
 - Preserve the planned React + TypeScript + Vite stack and the `apps/web` project location.
@@ -288,29 +346,27 @@ When implementing from a selected generated mock, treat that image as the source
   controls are 40px high and table rows are at least 44px. Compact variants are
   opt-in for secondary inline actions, toolbars, and icon rails; never use them
   for a page's primary form or main action without a documented reason.
-- Users choose palette (amber/lime/magenta) and density (comfortable/compact) in the
-  account menu's Appearance group; `ThemeProvider` stores them and sets
-  `html[data-palette]` and `html[data-density]`, and `index.html` applies both before
-  first paint. Compact density only rewrites size tokens, so read heights, paddings
-  and gaps from tokens (`--control-*`, `--table-*`, `--nav-item-height`,
-  `--page-padding-*`, `--page-gap`) rather than fixed pixels. Pages never force compact.
-- The user selected Maia (`b1skV8ORc`, 2026-09-30) for the whole site. Buttons,
-  single-line inputs, Select triggers, badges and segmented controls use full pill
-  rounding at every size. Multiline fields use `--radius-field`, cards and menus
-  use `--radius-surface`, and dialogs use `--radius-overlay`. Shared tokens own the
-  radius scale. Keep the existing palette and density choices; wrapping filter
+- Themes are daisyUI's: `ThemeProvider` stores any built-in theme (default `light`; there is no follow-the-system option, user decision 2026-11-05), writes
+  `<html data-theme>`, and `index.html` applies it before first paint. Custom themes (user
+  request, 2026-11-09) are random daisyUI-generator themes: 随机 always previews, a hold
+  saves the preview as a new theme; see `docs/agents/console-ui.md`. The theme switch
+  sits top-right (daisyUI's swatch icon and theme menu); the account menu keeps the
+  light/dark quick buttons. Palettes and compact density were removed; do not bring
+  back `data-palette`, `data-density` or a density setting.
+- Radius follows the theme: `rounded-box` for cards, menus and dialogs, `rounded-field` for
+  buttons, inputs and options, `rounded-selector` for badges and chips. Wrapping filter
   composers cap their corner radius at half one control row. Preserve line-style
-  navigation tabs, contiguous group joins, focus rings and disabled states.
-- Maia-style Console chart columns use 6px top corners and a square baseline.
-  Round only the outer contour of stacked columns with Recharts `BarStack`;
-  compact Stat bars use 4px top corners and horizontal bars use 6px trailing
-  corners. Keep chart data, buckets, axes, legends and tooltips intact.
-- Segmented controls slide (user request, 2026-10-02): a horizontal single-select
-  `ToggleGroup` with `variant="outline"` (or `segmented`) and default-variant `Tabs`
-  render one pill track whose selection is the shared `SlidingIndicator`, moving
-  between options; reduced motion disables the slide. Do not hand-roll segmented
-  buttons. `selection` chips, multi-select legends and line tabs keep their own
-  styles. The public landing tour tabs use the same sliding pill.
+  navigation tabs, contiguous group joins (`join`), focus rings and disabled states.
+- Console chart columns take the theme's `--radius-selector` capped at 6px
+  (`useBarRadiusTop()`), with a square baseline, so square themes draw square columns.
+  Round only the outer contour of stacked columns with Recharts `BarStack`. Keep chart
+  data, buckets, axes, legends and tooltips intact.
+- Single-select segmented controls are a horizontal `ToggleGroup` with `variant="outline"`
+  (or `segmented`): the options sit on a `base-200` track and a `primary` thumb
+  slides to the selection (user request, 2026-11-09; theme colours only, reduced motion
+  turns the slide off, no animation library). Tabs keep their own styles; default-variant `Tabs` are `tabs-box`, line Tabs `tabs-border`. Do not
+  hand-roll segmented buttons. `selection` chips and multi-select legends keep their own
+  styles.
 - Shared Select menus open below the trigger with their left edges aligned.
   Preserve a usable scrollable list for long option sets and let collision
   handling reposition a menu at the viewport edge.
@@ -319,7 +375,7 @@ When implementing from a selected generated mock, treat that image as the source
   including after reload or returning to the tab; custom date ranges stay fixed.
   Carry the selected preset across analysis routes and never label an old fixed
   interval as a live relative range.
-- Settings navigation follows Maia's heading hierarchy: scope headings are
+- Settings navigation keeps a two-level heading hierarchy: scope headings are
   muted caption text, while destination labels use darker, medium-weight body
   text. Keep long organization or project names truncated so scope names stay
   on one line, and preserve the existing active background and route groups.
@@ -327,9 +383,9 @@ When implementing from a selected generated mock, treat that image as the source
   project) with `toast.success()` / `toast.error()` from `sonner`; the shadcn `<Toaster />`
   (`components/ui/sonner.tsx`, top centre) is mounted once in `main.tsx`. Keep inline status text for results the user is still looking at, and never
   use a toast as the only place an error appears.
-- Use shadcn/ui (Radix Maia + Tailwind CSS v4) for reusable UI primitives. Keep
-  component source local, use semantic tokens, and support light, dark, and
-  system appearance without component-level theme colors.
+- Reusable primitives live in `components/ui`: Radix keeps behaviour (dialogs, sheets,
+  selects, menus, popovers, tooltips) and their class strings are daisyUI's. Keep component
+  source local and never give a component its own light/dark colours.
 - Leave a small top gap between the Console project switcher and the first
   primary navigation item in both expanded and collapsed sidebars.
 - Show Google's standard full-color G for Google authentication in provider
@@ -347,6 +403,9 @@ When implementing from a selected generated mock, treat that image as the source
   read; a refused delete saves with a warning. Show probe failures from a rejected
   save, and keep the collapsible CORS help for Console direct uploads. RAM/IAM roles
   and deployment-managed Secrets remain the advanced production path.
+- Constrained Console content (`narrow` and `wide`) is horizontally centred in the
+  available workspace when there is no contextual rail (user decision, 2026-11-06).
+  Keep `fluid` pages full width and preserve rail/main-column alignment on pages with a rail.
 - Every authenticated Console route uses the shared Console page components.
   Choose only `fluid`, `wide`, or `narrow`; render the desktop `ContextRail`
   only when the page supplies contextual navigation, and compose header,
@@ -359,8 +418,8 @@ When implementing from a selected generated mock, treat that image as the source
   settings rail. 接入、发布、用量, data
   governance, quota, and development data generation live
   in that page's contextual navigation. Keep the account popover concise:
-  unchanged user identity, one Account entry, one horizontal three-icon
-  appearance switcher (system/light/dark), then sign out. Personal,
+  unchanged user identity, one Account entry, one horizontal two-icon
+  appearance switcher (light/dark), then sign out. Personal,
   Organization, and notification destinations live in the Account and Project
   settings rail.
 - Entering any settings route replaces the primary sidebar navigation with the
@@ -380,7 +439,7 @@ When implementing from a selected generated mock, treat that image as the source
   header open `InviteDialog`: a role Select, then default-variant Tabs 复制链接 / 发送邮件
   (disabled with its reason when the instance has no mail server). The dialog's open state
   lives in `ProjectSwitcher`, outside the hover card, or it unmounts when the pointer leaves.
-  A link only lets its holder *ask*: `/invite/:token` registers a new account (kept pending)
+  A link only lets its holder _ask_: `/invite/:token` registers a new account (kept pending)
   or signs an existing one in, files a join request, and an Owner or Admin approves it under
   成员与权限 → 加入申请 (line Tabs 成员 / 加入申请 / 邀请链接, with counts). Never let a link
   grant membership by itself, never offer Owner, and do not promise the person a
@@ -436,21 +495,13 @@ When implementing from a selected generated mock, treat that image as the source
   show predicted disk usage, require explicit phrase and Owner password
   confirmation, and track one global background job. Do not expose SQL or reuse
   ordinary retention mutations for this path.
-- Omit navigation breadcrumbs from Console page headers. The sidebar selection
-  and page title carry location; keep event breadcrumbs only where they represent
-  observed session or error context rather than navigation.
-- The layout reference is the user's dashboard9 screenshot (2026-09-12); colors come
-  from the amber four-color card (ADR 0010). Logos follow the palette primary
-  (`--ds-logo`, eyes are mask cut-outs); favicons are static amber. Headings,
-  KPI values, labels and navigation use neutral text; selected navigation uses
-  the neutral sidebar accent. Chart strokes and fills share chart-series tokens:
-  chart 1 the palette primary, charts 2–4 its accents, prior periods neutral gray
-  plus dashes.
-  Axes and annotations use muted text; grids and cursors use borders. Reserve
-  success/warning/danger for actual statuses and thresholds. Link ink (`--ds-brand`)
-  uses neutral text in both modes; underline prose links. Never use this token
-  for logos or chart outlines. See `docs/design.md`,
-  "Chart color contract", and the live `/design` workbench.
+- The layout reference is the user's dashboard9 screenshot (2026-09-12); colours come from
+  the active daisyUI theme. Logos follow the theme primary (`--ds-logo`, eyes are mask
+  cut-outs); favicons are static amber. Headings, KPI values, labels and navigation use
+  `base-content`. Chart series 1–8 are primary, secondary, accent, info, success, warning,
+  error and neutral; prior periods are neutral gray plus dashes. Axes and annotations use
+  muted text; grids and cursors use borders. Reserve success/warning/error for actual
+  statuses and thresholds; underline prose links.
 - Keep primary header brand lockups on the shared 36px mark / 18px wordmark / 9px
   gap ratio, including the collapsed sidebar. Console, public site and docs share
   the pixel signal scout in `@openrum/design-tokens/brand`. Use its tight 20-unit
@@ -462,22 +513,32 @@ When implementing from a selected generated mock, treat that image as the source
   `isAnimationActive={useChartMotion()}` rather than hard-coding `false`.
 - Keep the performance workspace full-width. The user explicitly wants LCP,
   INP, and CLS in one combined date-based chart and the performance score kept.
-  Its page header contains only the title, without a subtitle or refresh button;
+  Its page header contains the title and the percentile dropdown, without a subtitle or refresh button;
+  in development only, a soft warning "造性能数据" button sits beside the title (`titleAside`) and
+  opens the shared dev-data dialog with the web-vitals preset (user request, 2026-11-04);
   retain retry actions within error states.
-  Use one SVG segmented score ring with a centered total and metric names directly
-  outside their sectors, matching the user's ring reference (2026-09-13).
-  Size sectors by default score weight (LCP/INP 30%, CLS/FCP 15%, TTFB 10%),
-  using the same weight definition as the total. Center SVG score text with
-  `text-anchor="middle"` and `dominant-baseline="central"`, not the x-height-based
-  `middle` baseline. Use neutral unearned-score tracks,
-  and retain the shared series colors; use INP, not the reference's legacy FID.
-  Do not add concentric rings or a separate legend below the ring.
+  The score is one Lighthouse-style SVG ring (user reference, 2026-11-03): sectors sized by
+  default weight (LCP/INP 30%, CLS/FCP 15%, TTFB 10%, the same weights as the total), thin
+  with round caps, each filled along its length by the metric's score over a faint track of
+  the same colour. Colours follow the score, not the metric: 90+ success, 50–89 warning,
+  below 50 error; the centre total and the tinted inner disc use the total's colour. Labels
+  outside the ring carry only the metric name. Pointing at or focusing a sector thickens it,
+  dims the rest and replaces the total with that metric's contribution (`+N`, on the
+  renormalised weights) and a "名称 · 分 · 权重" caption. Missing metrics keep a neutral
+  track. There is no separate score list. Use INP, not legacy FID.
+  The score and trend cards share one row and height; the trend card wraps below once it
+  would drop under 560px.
   Place it beside one real-value trend chart, with five compact
-  metric cards (LCP, INP, CLS, FCP, TTFB) below. Do not normalize to threshold
+  metric stats (LCP, INP, CLS, FCP, TTFB) below, each with a good/needs/poor threshold
+  bar whose marker follows the page percentile, like the value above it. The score,
+  sector scores and each stat's rating badge stay on P75 and say so ("固定按 P75",
+  "P75 良好" when another percentile is shown). The trend card's `ChartSwitch` offers 折线/面积/柱状; it changes
+  presentation only, never the buckets. Do not normalize to threshold
   percentages or plot score contributions: timing metrics share a millisecond
   left axis and CLS uses a clearly labeled unitless right axis; cross-axis height
-  is not comparable. Put P50/P75/P95 in one compact dropdown at the chart's top
-  right. The combined trend follows the shared ~30-bucket policy with null gaps,
+  is not comparable. P50/P75/P95 is one page-wide dropdown at the right of the page
+  title row (user request, 2026-11-04; default P75), shared by the trend, vitals, route
+  table and route detail; cards carry no percentile control of their own. The combined trend follows the shared ~30-bucket policy with null gaps,
   shows LCP, INP and CLS by default (FCP/TTFB opt-in), and draws timing series solid
   with only the right-axis CLS dashed. Keep small, muted metric visibility toggles inside the card content
   below the plot, without a separate gray footer, divider or outlined pills.
@@ -492,12 +553,24 @@ When implementing from a selected generated mock, treat that image as the source
   as reference. It is separate
   from CWV status and unaffected by chart visibility or P50/P75/P95
   selection. Compute overall values from matching samples, never route averages.
+  The route detail (user request, 2026-11-04) shows facts and comparisons only, never an
+  inferred cause or "worse since release X": a summary line (value, P75 rating, previous
+  period value and change, poor share), a five-metric picker with each metric's change, the
+  trend with the previous window as a grey dashed line, the histogram coloured by rating
+  with good/needs/poor shares ("约" when a threshold splits a bucket), a
+  device/browser/region/release breakdown and the slowest samples with session links. The
+  route is the page title. The histogram marks P50/P75/P95 on their buckets; the trend draws
+  releases first seen inside the window; the summary shows the two newest releases' values
+  side by side. The previous window is the same-length range just before, fetched with the
+  same filters. Network breakdown, per-segment rating mix and attribution wait for data.
   The right-side `AnalysisFilterSidebar` dimension filter was retired and removed
   (user decision, 2026-10-02); do not reintroduce it. Performance narrows only by
   the shared time/environment and the route drill-down from the route table.
-- Treat each project card as an operational health summary. Lead with the last
-  24 hours of PV, UV, error events, a real PV trend, and reporting freshness;
-  keep sampling, retention, role, and other configuration details secondary.
+- The Project list is one table (user request, 2026-10-28: the heatmap card view and its
+  view switch were removed, along with the count/scope line above the table). Each row is
+  an operational health summary: the last 24 hours of PV, UV, error events, a real PV
+  trend, and reporting freshness; keep sampling, retention, role, and other configuration
+  details secondary. Do not bring back a second layout.
 - Source Map management (versions, files, match tester and upload tokens) is a
   project setting at `/settings/project/:projectId/sourcemaps`, not a main-navigation
   page (user request, 2026-10-14: it is setup, not something you observe, and the

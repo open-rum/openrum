@@ -41,6 +41,8 @@ export type PlotData = {
     nonAdditive: boolean;
     /** False for rates, percentiles and distinct counts: their groups are not parts of a whole. */
     shareable?: boolean;
+    /** Full matching event count, when known; displayed Top N is not its own denominator. */
+    total?: number;
   };
 };
 const counts = new Intl.NumberFormat("zh-CN", { notation: "compact", maximumFractionDigits: 2 });

@@ -143,7 +143,7 @@ function ProjectReleases({ project }: { project: Project }) {
   return (
     <SettingsShell
       title="Source Map"
-      description="将压缩代码还原到源码；Source Map 只保存在私有对象存储中，不进入公开构建。"
+      description="上传 Source Map，将错误堆栈还原到源码。文件仅保存在私有存储中。"
       width="wide"
       actions={
         <Button

@@ -1,6 +1,6 @@
 import { useId, type ComponentProps, type ReactNode } from "react";
 import { BrandMark } from "@/components/brand/BrandMark";
-import { ThemeToggle } from "@/components/theme/ThemeToggle";
+import { ThemeController } from "@/components/theme/ThemeController";
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -13,7 +13,7 @@ export function AuthFrame({ children }: { children: ReactNode }) {
           <BrandMark size="lockup" />
           <span>OpenRUM</span>
         </div>
-        <ThemeToggle compact />
+        <ThemeController />
       </header>
       <main className="auth-body">
         <div className="auth-content">{children}</div>

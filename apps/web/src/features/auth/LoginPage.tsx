@@ -133,7 +133,7 @@ export function LoginPage({ returnTo, expired, externalError }: LoginPageProps) 
           ))}
           {ldapMethod ? (
             <form
-              className="mt-4 space-y-3 rounded-2xl border border-border bg-card p-4"
+              className="mt-4 space-y-3 rounded-box border border-base-300 bg-card p-4"
               aria-label={`${ldapMethod.label} 登录`}
               onSubmit={(event) => {
                 event.preventDefault();

@@ -42,6 +42,10 @@ const AnalysisPage = lazyRouteComponent(
   () => import("@/features/analytics/AnalysisPage"),
   "AnalysisPage",
 );
+const BehaviorOverviewPage = lazyRouteComponent(
+  () => import("@/features/analytics/overview/BehaviorOverviewPage"),
+  "BehaviorOverviewPage",
+);
 const FunnelsPage = lazyRouteComponent(
   () => import("@/features/analytics/FunnelsPage"),
   "FunnelsPage",
@@ -330,6 +334,12 @@ const projectCreateRoute = createRoute({
 const projectAnalysisRoute = createRoute({
   getParentRoute: () => protectedRoute,
   path: "/projects/$projectId/analytics",
+  component: BehaviorOverviewPage,
+});
+
+const projectAnalysisEventsRoute = createRoute({
+  getParentRoute: () => protectedRoute,
+  path: "/projects/$projectId/analytics/events",
   component: AnalysisPage,
 });
 
@@ -874,6 +884,7 @@ const routeTree = rootRoute.addChildren([
     projectsRoute,
     projectCreateRoute,
     projectAnalysisRoute,
+    projectAnalysisEventsRoute,
     funnelsRoute,
     projectFunnelsRoute,
     pathsRoute,

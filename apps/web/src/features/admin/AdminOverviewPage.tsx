@@ -14,7 +14,6 @@ import {
 import { AsyncError, AsyncLoading } from "@/components/ui/AsyncState";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -46,11 +45,6 @@ export function AdminOverviewPage() {
     <AdminPageLayout
       title="实例运行概览"
       description="检查 OpenRUM 控制面、数据链路和依赖状态。页面不会显示连接串或凭证。"
-      actions={
-        <Button variant="outline" onClick={() => void query.refetch()} disabled={query.isFetching}>
-          <RefreshCwIcon data-icon="inline-start" /> {query.isFetching ? "刷新中…" : "刷新状态"}
-        </Button>
-      }
     >
       {query.isLoading ? <AdminOverviewSkeleton /> : null}
       {query.error ? (
@@ -116,7 +110,7 @@ function AdminOverviewContent({ overview }: { overview: AdminOverview }) {
             <CardTitle>依赖与服务</CardTitle>
             <CardDescription>状态检查失败不会暴露内部地址或认证信息。</CardDescription>
             <CardAction>
-              <Badge variant={unhealthy ? "destructive" : unknown ? "outline" : "success"}>
+              <Badge variant={unhealthy ? "destructive" : unknown ? "secondary" : "success"}>
                 {unhealthy ? "需要处理" : unknown ? "部分待确认" : "运行正常"}
               </Badge>
             </CardAction>
@@ -237,7 +231,7 @@ function StatusBadge({ status }: { status: AdminOverview["dependencies"][number]
       </Badge>
     );
   return (
-    <Badge variant="outline">
+    <Badge variant="secondary">
       <CircleHelpIcon />
       {status === "not_configured" ? "未配置" : "待确认"}
     </Badge>
@@ -255,7 +249,7 @@ function PipelineMetric({
 }) {
   return (
     <div className="flex items-start gap-3">
-      <div className="rounded-md bg-muted p-2">
+      <div className="rounded-field bg-muted p-2">
         <Icon className="size-4" />
       </div>
       <div>
@@ -265,6 +259,13 @@ function PipelineMetric({
     </div>
   );
 }
+
+const pressureVariant = {
+  normal: "success",
+  warning: "warning",
+  critical: "destructive",
+  unknown: "secondary",
+} as const;
 
 function Capacity({ capacity }: { capacity: AdminOverview["pipeline"]["capacity"] }) {
   const percent = capacity.usedPercent;
@@ -287,9 +288,7 @@ function Capacity({ capacity }: { capacity: AdminOverview["pipeline"]["capacity"
               : `可用 ${formatBytes(capacity.freeBytes!)} / 总量 ${formatBytes(capacity.capacityBytes!)}`
           }
         />
-        <Badge variant={capacity.pressure === "critical" ? "destructive" : "outline"}>
-          {pressureLabel}
-        </Badge>
+        <Badge variant={pressureVariant[capacity.pressure]}>{pressureLabel}</Badge>
       </div>
       {percent !== null ? (
         <>

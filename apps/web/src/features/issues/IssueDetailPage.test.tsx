@@ -73,10 +73,19 @@ function renderDetail() {
 }
 
 describe("issue investigation context", () => {
+  it("explains unavailable raw evidence separately from retained aggregate counts", async () => {
+    const view = renderDetail();
+    await waitFor(() => expect(view.getByText("历史统计仍可用，原始事件现场不可用")).toBeTruthy());
+    expect(view.getByText(/历史聚合记录了 42 次错误/)).toBeTruthy();
+    expect(view.queryByRole("link", { name: "堆栈追踪" })).toBeNull();
+    expect((view.getByRole("button", { name: "全部事件" }) as HTMLButtonElement).disabled).toBe(
+      true,
+    );
+  });
   it("retains project and filters in the return link", async () => {
     const view = renderDetail();
     await waitFor(() => expect(view.getByText("Checkout failed")).toBeTruthy());
-    const href = view.getByText("返回问题列表").getAttribute("href")!;
+    const href = view.getByRole("link", { name: "错误问题" }).getAttribute("href")!;
     expect(href).toContain("/projects/project-1/issues?");
     expect(href).toContain("cursor=second");
     expect(href).toContain("browser=Safari");
@@ -97,7 +106,9 @@ describe("issue investigation context", () => {
     await waitFor(() =>
       expect(vi.mocked(getIssueEvents).mock.lastCall?.[0].environment).toBe("canary"),
     );
-    expect(view.getByText("返回问题列表").getAttribute("href")).toContain("environment=canary");
+    expect(view.getByRole("link", { name: "错误问题" }).getAttribute("href")).toContain(
+      "environment=canary",
+    );
   });
 
   it("rolls back a failed status mutation and allows retry", async () => {
@@ -124,10 +135,10 @@ describe("issue investigation context", () => {
       `${window.location.pathname}${window.location.search}&timePreset=7d`,
     );
     const view = renderDetail();
-    const preview = await waitFor(() => view.getByRole("list", { name: "版本分布" }));
-    const value = within(preview).getByRole("button", { name: /web@1\.2\.0/ });
-    expect(value.textContent).toContain("71%");
-    fireEvent.click(value);
+    const tag = await waitFor(() => view.getByRole("button", { name: "版本：web@1.2.0 71%" }));
+    fireEvent.click(tag);
+    const values = await waitFor(() => view.getByRole("list", { name: "版本取值" }));
+    fireEvent.click(within(values).getByRole("button", { name: /web@1\.2\.0/ }));
     await waitFor(() =>
       expect(vi.mocked(getIssueDetail).mock.lastCall?.[0].release).toBe("web@1.2.0"),
     );

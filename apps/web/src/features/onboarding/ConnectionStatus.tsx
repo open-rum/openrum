@@ -28,21 +28,21 @@ export function ConnectionStatus({ status, loading, hasInstallDSN }: ConnectionS
     },
     {
       title: "2. SDK 配置",
-      description: "配置已复制到前端应用并准备发布",
+      description: "已识别浏览器 SDK 的上报请求",
       complete: Boolean(status?.lastSdkSeenAt),
       active: hasInstallDSN && !status?.lastSdkSeenAt,
       time: null,
     },
     {
       title: "3. SDK 已连接",
-      description: "Ingest 已识别 SDK 请求并收到事件",
+      description: "已成功接收到浏览器事件",
       complete: Boolean(status?.lastEventReceivedAt),
       active: Boolean(status?.lastSdkSeenAt) && !status?.lastEventReceivedAt,
-      time: status?.lastSdkSeenAt,
+      time: status?.lastEventReceivedAt,
     },
     {
       title: "4. 数据可查询",
-      description: "Consumer 已写入 ClickHouse，可进入仪表盘",
+      description: "已有事件可用于查询，可进入仪表盘",
       complete: Boolean(status?.lastEventQueryableAt),
       active: Boolean(status?.lastEventReceivedAt) && !status?.lastEventQueryableAt,
       time: status?.lastEventQueryableAt,
@@ -52,7 +52,7 @@ export function ConnectionStatus({ status, loading, hasInstallDSN }: ConnectionS
     <ol className="grid gap-3 sm:grid-cols-2" aria-label="四阶段接入进度">
       {stages.map((stage) => (
         <li
-          className="flex min-h-24 gap-3 rounded-lg border border-border bg-card p-4"
+          className="flex min-h-24 gap-3 rounded-box border border-base-300 bg-card p-4"
           key={stage.title}
         >
           <span className="mt-0.5 text-primary" aria-hidden="true">
@@ -67,8 +67,8 @@ export function ConnectionStatus({ status, loading, hasInstallDSN }: ConnectionS
           <div className="min-w-0 flex-1">
             <div className="flex items-center justify-between gap-2">
               <strong className="text-sm font-medium">{stage.title}</strong>
-              <Badge variant={stage.complete ? "secondary" : "outline"}>
-                {stage.complete ? "完成" : stage.active ? "检测中" : "等待"}
+              <Badge variant={stage.complete ? "success" : "outline"}>
+                {stage.complete ? "已验证" : stage.active ? "检测中" : "等待"}
               </Badge>
             </div>
             <p className="mt-2 text-sm leading-5 text-muted-foreground">{stage.description}</p>

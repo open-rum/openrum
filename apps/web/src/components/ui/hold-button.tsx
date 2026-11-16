@@ -38,7 +38,7 @@ export type HoldButtonProps = {
   textColor?: string;
   fillTextColor?: string;
   size?: "sm" | "md" | "lg";
-  /** Corner radius in pixels; the default matches the Console's pill buttons. */
+  /** Corner radius in pixels; leave it out to follow the theme's button radius. */
   radius?: number;
   fillDirection?: "right" | "up";
   holdTime?: number;
@@ -57,10 +57,11 @@ export type HoldButtonProps = {
 };
 
 const tones = {
+  // Rest state matches `btn btn-error btn-soft`: same tint, same ink.
   destructive: {
-    background: "var(--ds-danger-soft)",
+    background: "color-mix(in oklab, var(--ds-danger) 8%, var(--ds-surface))",
     fill: "var(--ds-danger)",
-    text: "var(--ds-danger)",
+    text: "var(--ds-danger-ink)",
     fillText: "var(--ds-danger-foreground)",
   },
   primary: {
@@ -82,7 +83,7 @@ export function HoldButton({
   textColor,
   fillTextColor,
   size = "md",
-  radius = 999,
+  radius,
   fillDirection = "right",
   holdTime = 2000,
   releaseTime = 200,
@@ -303,7 +304,8 @@ export function HoldButton({
       aria-describedby={hintId}
       style={
         {
-          "--hb-radius": `${radius}px`,
+          // Unset, the radius follows the theme (`--radius-field` in hold-button.css).
+          ...(radius === undefined ? {} : { "--hb-radius": `${radius}px` }),
           "--hb-bg": backgroundColor ?? colors.background,
           "--hb-fill": fillColor ?? colors.fill,
           "--hb-text": textColor ?? colors.text,

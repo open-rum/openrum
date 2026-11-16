@@ -80,6 +80,10 @@ type IssueFilters struct {
 	Sort    string
 	Limit   int
 	Cursor  string
+	// Toward says which way an Issue's events page from Cursor: "" reads older events
+	// (the newest page without a Cursor), "newer" reads newer than Cursor, and "oldest"
+	// reads the oldest page. Every page still lists newest first.
+	Toward string
 	// RowDetails adds each listed Issue's trend and culprit, which the list view draws but
 	// a single Issue's detail page does not need.
 	RowDetails bool

@@ -54,6 +54,8 @@ type alertRuleResponse struct {
 	ChannelIDs      []string             `json:"channelIds"`
 	LastStatus      string               `json:"lastStatus"`
 	LastEvaluatedAt *string              `json:"lastEvaluatedAt,omitempty"`
+	// RecentStatuses holds the newest evaluations' statuses, oldest first.
+	RecentStatuses []string `json:"recentStatuses"`
 }
 
 type alertNotificationResponse struct {
@@ -209,7 +211,7 @@ func alertRuleDTO(rule metadata.AlertRule) alertRuleResponse {
 		ID: rule.ID.String(), ProjectID: rule.ProjectID.String(), Name: rule.Name, Metric: rule.Metric,
 		Comparator: rule.Comparator, Threshold: rule.Threshold, WindowMinutes: rule.WindowMinutes,
 		CooldownMinutes: rule.CooldownMinutes, Environment: rule.Environment, Enabled: rule.Enabled,
-		ChannelIDs: channels, LastStatus: rule.LastStatus,
+		ChannelIDs: channels, LastStatus: rule.LastStatus, RecentStatuses: append([]string{}, rule.RecentStatuses...),
 	}
 	if rule.LastEvaluatedAt != nil {
 		at := rule.LastEvaluatedAt.UTC().Format(timeFormat)

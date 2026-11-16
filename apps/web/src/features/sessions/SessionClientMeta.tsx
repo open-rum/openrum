@@ -42,6 +42,7 @@ export function SessionClientMeta({
   return (
     <TooltipProvider delayDuration={150}>
       <span
+        role="group"
         className={cn("inline-flex flex-wrap items-center gap-2.5", className)}
         aria-label={[country, deviceType, browser, os].filter(Boolean).join("，")}
       >

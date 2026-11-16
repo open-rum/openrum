@@ -14,7 +14,7 @@ describe("alert rule helpers", () => {
   it("describes a rule in one line with its unit", () => {
     expect(
       conditionText({ metric: "error_rate", comparator: "gte", threshold: 2, windowMinutes: 5 }),
-    ).toBe("错误率 ≥ 2% · 最近 5 分钟");
+    ).toBe("错误率 ≥ 2% · 5 分钟固定窗口");
     expect(formatMetricValue("lcp_p75", 2500)).toBe("2,500 ms");
     expect(formatMetricValue("error_count", 12)).toBe("12");
     expect(formatMetricValue("api_failure_rate", 3.456)).toBe("3.46%");
@@ -23,12 +23,14 @@ describe("alert rule helpers", () => {
   it("summarizes scope, condition, channels and cooldown", () => {
     const rule = { ...blankRule("production"), channelIds: ["a"] };
     expect(ruleSummary(rule, ["飞书·前端值班群"])).toBe(
-      "当production 环境最近 5 分钟错误率 ≥ 2%时，通知 飞书·前端值班群。同一规则 30 分钟内最多通知一次。",
+      "当生产环境最近完成的 5 分钟固定窗口内，错误率 ≥ 2%时，通知 飞书·前端值班群。通知成功后，30 分钟内不重复通知。",
     );
     expect(ruleSummary({ ...rule, environment: "", cooldownMinutes: 60 }, [])).toContain(
       "所有环境",
     );
     expect(ruleSummary({ ...rule, channelIds: [] }, [])).toContain("只在控制台记录");
+    expect(ruleSummary(rule, [], true)).toContain("暂无可用通知渠道");
+    expect(ruleSummary(rule, [], true)).not.toContain("只在控制台记录");
   });
 
   it("validates like the backend", () => {

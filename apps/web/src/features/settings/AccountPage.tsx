@@ -1,6 +1,5 @@
 import { useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
-import { KeyRoundIcon, Link2Icon, UserRoundIcon } from "lucide-react";
 
 import { ConsolePage, ConsolePageHeader } from "@/components/layout/ConsolePage";
 import { Button } from "@/components/ui/button";
@@ -74,22 +73,15 @@ export function AccountPage() {
 
   return (
     <ConsolePage width="narrow">
-      <ConsolePageHeader title="Account" description="查看个人信息并管理登录安全。" />
+      <ConsolePageHeader title="个人资料与登录安全" description="查看个人信息并管理登录安全。" />
 
-      <section
-        className="rounded-2xl border border-border bg-card p-6"
-        aria-labelledby="profile-title"
-      >
+      <section className="card card-border bg-base-100 p-6" aria-labelledby="profile-title">
         <div className="flex items-center gap-2">
-          <UserRoundIcon className="size-5 text-primary" aria-hidden="true" />
-          <h2 id="profile-title" className="text-base font-semibold">
+          <h2 id="profile-title" className="card-title text-base">
             用户信息
           </h2>
         </div>
-        <div className="mt-5">
-          <AvatarPicker user={user} />
-        </div>
-        <dl className="mt-6 grid gap-5 border-t border-border pt-6 sm:grid-cols-2">
+        <dl className="mt-6 grid gap-5 border-t border-base-300 pt-6 sm:grid-cols-2">
           <div>
             <dt className="text-sm font-medium text-muted-foreground">用户名</dt>
             <dd className="mt-1 text-sm text-foreground">{user.displayName}</dd>
@@ -99,15 +91,19 @@ export function AccountPage() {
             <dd className="mt-1 text-sm text-foreground">{user.email}</dd>
           </div>
         </dl>
+        <details className="collapse collapse-arrow mt-4 border border-base-300">
+          <summary className="collapse-title text-sm font-medium">更换头像</summary>
+          <div className="collapse-content">
+            <div className="mt-5">
+              <AvatarPicker user={user} />
+            </div>
+          </div>
+        </details>
       </section>
 
-      <section
-        className="rounded-2xl border border-border bg-card p-6"
-        aria-labelledby="linked-methods-title"
-      >
+      <section className="card card-border bg-base-100 p-6" aria-labelledby="linked-methods-title">
         <div className="flex items-center gap-2">
-          <Link2Icon className="size-5 text-primary" aria-hidden="true" />
-          <h2 id="linked-methods-title" className="text-base font-semibold">
+          <h2 id="linked-methods-title" className="card-title text-base">
             已连接的登录方式
           </h2>
         </div>
@@ -141,7 +137,7 @@ export function AccountPage() {
         ) : null}
         <div className="mt-4 space-y-2">
           {hasPassword ? (
-            <div className="flex items-center justify-between rounded-xl border border-border px-3 py-2 text-sm">
+            <div className="flex items-center justify-between rounded-field border border-base-300 px-3 py-2 text-sm">
               <span>邮箱与 OpenRUM 密码</span>
               <span className="text-muted-foreground">已启用</span>
             </div>
@@ -149,7 +145,7 @@ export function AccountPage() {
           {linked.data?.identities.map((identity) => (
             <div
               key={identity.id}
-              className="flex items-center justify-between gap-3 rounded-xl border border-border px-3 py-2 text-sm"
+              className="flex items-center justify-between gap-3 rounded-field border border-base-300 px-3 py-2 text-sm"
             >
               <span>{identity.label}</span>
               <Button
@@ -206,7 +202,7 @@ export function AccountPage() {
         ) : null}
         {ldapMethod ? (
           <form
-            className="mt-4 grid gap-3 rounded-xl border border-border p-4"
+            className="card card-border mt-4 grid gap-3 bg-base-100 p-4"
             aria-label={`连接 ${ldapMethod.label}`}
             onSubmit={(event) => {
               event.preventDefault();
@@ -240,7 +236,7 @@ export function AccountPage() {
 
       <form
         ref={formRef}
-        className="rounded-2xl border border-border bg-card p-6"
+        className="card card-border bg-base-100 p-6"
         onSubmit={(event) => {
           event.preventDefault();
           setMessage(null);
@@ -264,8 +260,7 @@ export function AccountPage() {
         aria-labelledby="password-title"
       >
         <div className="flex items-center gap-2">
-          <KeyRoundIcon className="size-5 text-primary" aria-hidden="true" />
-          <h2 id="password-title" className="text-base font-semibold">
+          <h2 id="password-title" className="card-title text-base">
             {hasPassword ? "修改密码" : "设置 OpenRUM 密码"}
           </h2>
         </div>
@@ -314,7 +309,7 @@ export function AccountPage() {
           </p>
         ) : null}
         <Button
-          className="mt-5"
+          className="mt-5 self-end"
           type="submit"
           disabled={password.isPending || initialPassword.isPending}
         >

@@ -43,7 +43,7 @@ export function LogFilterComposer({
   return (
     <SearchQueryInput
       ariaLabel="搜索日志"
-      placeholder='搜索日志正文，或输入条件，例如 level:error AND user.id:"customer-123"'
+      placeholder="搜索日志正文或属性"
       value={filters.q ?? ""}
       onSubmit={(q) => onChange({ q })}
       fields={logFields(items)}
@@ -69,6 +69,7 @@ function logFields(items?: LogEntry[]): SearchQueryField[] {
       label: value,
     }));
   return [
+    { key: "event_id", type: "uuid", label: "日志 ID", hint: "定位一条日志", icon: HashIcon },
     {
       key: "level",
       type: "enum",

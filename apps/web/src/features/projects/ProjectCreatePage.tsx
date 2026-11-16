@@ -64,7 +64,7 @@ export function ProjectCreatePage() {
     <ConsolePage width="wide">
       <ConsolePageHeader
         title="创建监控项目"
-        description="选择开发平台并配置站点 Origin、环境、数据保留与采样率，创建后继续完成对应 SDK 接入。"
+        description="填写项目名称、开发平台和站点地址，创建后继续完成 SDK 接入。"
       />
 
       {createdProject?.dsn ? (
@@ -81,7 +81,7 @@ export function ProjectCreatePage() {
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
         <form
-          className="rounded-2xl border border-border bg-card p-6"
+          className="card card-border bg-base-100 p-6"
           onSubmit={(event) => {
             event.preventDefault();
             const form = new FormData(event.currentTarget);
@@ -115,50 +115,58 @@ export function ProjectCreatePage() {
               />
             </FormField>
           </div>
-          <div className="mt-5 grid gap-5 sm:grid-cols-2">
-            <SliderField
-              name="retentionDays"
-              label="原始数据保留天数"
-              min={1}
-              max={90}
-              defaultValue={14}
-              format={(value) => `${value} 天`}
-            />
-            <SliderField
-              name="eventSampleRate"
-              label="事件采样率"
-              min={0}
-              max={1}
-              scale={100}
-              step={10}
-              defaultValue={1}
-              format={(value) => `${Math.round(value * 100)}%`}
-            />
-            <SliderField
-              name="apiSampleRate"
-              label="API 采样率"
-              min={0}
-              max={1}
-              scale={100}
-              step={10}
-              defaultValue={0.2}
-              format={(value) => `${Math.round(value * 100)}%`}
-            />
-            <SliderField
-              name="errorSampleRate"
-              label="错误采样率"
-              hint="建议保持 100%"
-              min={0}
-              max={1}
-              scale={100}
-              step={10}
-              defaultValue={1}
-              format={(value) => `${Math.round(value * 100)}%`}
-            />
-          </div>
+          <details className="collapse collapse-arrow mt-5 border border-base-300">
+            <summary className="collapse-title text-sm font-medium">采样与保留设置 · 可选</summary>
+            <div className="collapse-content">
+              <p className="text-sm text-base-content/70">
+                默认保留 14 天；事件与错误采样 100%，API 采样 20%。创建后可在数据管理中调整。
+              </p>
+              <div className="mt-5 grid gap-5 sm:grid-cols-2">
+                <SliderField
+                  name="retentionDays"
+                  label="原始数据保留天数"
+                  min={1}
+                  max={90}
+                  defaultValue={14}
+                  format={(value) => `${value} 天`}
+                />
+                <SliderField
+                  name="eventSampleRate"
+                  label="事件采样率"
+                  min={0}
+                  max={1}
+                  scale={100}
+                  step={10}
+                  defaultValue={1}
+                  format={(value) => `${Math.round(value * 100)}%`}
+                />
+                <SliderField
+                  name="apiSampleRate"
+                  label="API 采样率"
+                  min={0}
+                  max={1}
+                  scale={100}
+                  step={10}
+                  defaultValue={0.2}
+                  format={(value) => `${Math.round(value * 100)}%`}
+                />
+                <SliderField
+                  name="errorSampleRate"
+                  label="错误采样率"
+                  hint="建议保持 100%"
+                  min={0}
+                  max={1}
+                  scale={100}
+                  step={10}
+                  defaultValue={1}
+                  format={(value) => `${Math.round(value * 100)}%`}
+                />
+              </div>
+            </div>
+          </details>
 
           {!canCreate && organization ? (
-            <p className="mt-5 rounded-xl border border-(--ds-warning)/30 bg-(--ds-warning-soft) px-3 py-2.5 text-sm text-(--ds-warning) dark:text-(--ds-warning)">
+            <p role="status" className="alert alert-warning alert-soft mt-5 text-sm">
               当前角色为 {organization.role}，只有 Owner 或 Admin 可以创建项目。
             </p>
           ) : null}
@@ -181,9 +189,9 @@ export function ProjectCreatePage() {
         </form>
 
         <aside className="space-y-4">
-          <div className="rounded-2xl border border-border bg-card p-5">
+          <div className="card card-border bg-base-100 p-6">
             <div className="flex items-center justify-between gap-3">
-              <h2 className="text-base font-semibold">所属组织</h2>
+              <h2 className="card-title text-base">所属组织</h2>
               <Button
                 type="button"
                 size="sm"
@@ -201,7 +209,7 @@ export function ProjectCreatePage() {
               </p>
             ) : (
               <select
-                className="mt-4 h-10 w-full rounded-full border border-input bg-background px-3 text-sm"
+                className="select mt-4 w-full"
                 aria-label="所属组织"
                 value={activeOrganizationId}
                 onChange={(event) => setOrganizationId(event.target.value)}
@@ -217,7 +225,7 @@ export function ProjectCreatePage() {
 
           {showOrganizationForm || organizations.length === 0 ? (
             <form
-              className="rounded-2xl border border-border bg-card p-5"
+              className="card card-border bg-base-100 p-6"
               onSubmit={(event) => {
                 event.preventDefault();
                 const form = new FormData(event.currentTarget);
@@ -227,7 +235,7 @@ export function ProjectCreatePage() {
                 });
               }}
             >
-              <h2 className="text-base font-semibold">创建组织</h2>
+              <h2 className="card-title text-base">创建组织</h2>
               <div className="mt-4 space-y-4">
                 <FormField label="组织名称">
                   <input name="organizationName" required maxLength={120} />
@@ -271,7 +279,7 @@ function FormField({
   children: React.ReactNode;
 }) {
   return (
-    <label className="block text-sm font-medium text-foreground [&_input]:mt-2 [&_input]:h-[var(--control-height)] [&_input]:w-full [&_input]:rounded-full [&_input]:border [&_input]:border-input [&_input]:bg-background [&_input]:px-4 [&_input]:text-sm [&_input]:outline-none [&_input]:focus:border-ring [&_input]:focus:ring-2 [&_input]:focus:ring-ring/15 [&_textarea]:mt-2 [&_textarea]:w-full [&_textarea]:rounded-xl [&_textarea]:border [&_textarea]:border-input [&_textarea]:bg-background [&_textarea]:p-3 [&_textarea]:font-mono [&_textarea]:text-sm [&_textarea]:outline-none [&_textarea]:focus:border-ring [&_textarea]:focus:ring-2 [&_textarea]:focus:ring-ring/15">
+    <label className="block text-sm font-medium text-base-content [&_input]:input [&_input]:mt-2 [&_input]:w-full [&_textarea]:textarea [&_textarea]:mt-2 [&_textarea]:w-full [&_textarea]:font-mono">
       <span className="flex items-baseline justify-between gap-3">
         {label}
         {hint ? <small className="text-xs font-normal text-muted-foreground">{hint}</small> : null}
@@ -296,7 +304,7 @@ function OneTimeProjectKey({
   const snippet = `import { init } from "@openrum/browser";\n\ninit({\n  dsn: "${dsn}"\n});`;
   return (
     <section
-      className="mt-6 rounded-2xl border border-(--ds-warning)/30 bg-(--ds-warning-soft) p-5 text-(--ds-warning) dark:text-(--ds-warning)"
+      className="mt-6 rounded-box border border-warning/40 bg-warning/10 p-6 text-base-content"
       aria-labelledby="dsn-created"
     >
       <div className="flex items-start gap-3">
@@ -308,10 +316,10 @@ function OneTimeProjectKey({
           <p className="mt-1 text-sm leading-6 opacity-80">
             DSN 是浏览器公开的只写连接串，之后也可以在项目设置中查看和复制。
           </p>
-          <code className="mt-4 block overflow-x-auto border border-(--ds-warning)/30 bg-white px-3 py-2.5 font-mono text-sm whitespace-nowrap text-slate-950 dark:bg-black/30 dark:text-white">
+          <code className="mt-4 block overflow-x-auto rounded-field border border-warning/30 bg-base-100 px-3 py-2.5 font-mono text-sm whitespace-nowrap text-base-content">
             {dsn}
           </code>
-          <pre className="mt-3 overflow-x-auto border border-(--ds-warning)/30/70 bg-white/70 p-3 font-mono text-xs leading-5 text-slate-800 dark:bg-black/20 dark:text-slate-200">
+          <pre className="mt-3 overflow-x-auto rounded-field border border-warning/30 bg-base-100 p-3 font-mono text-xs leading-5 text-base-content/85">
             {snippet}
           </pre>
           <div className="mt-4 flex flex-wrap gap-2">

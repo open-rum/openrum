@@ -28,30 +28,8 @@ import {
   SplitIcon,
   Trash2Icon,
 } from "lucide-react";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Button } from "@/components/ui/button";
+import { DaisyDropdown } from "@/components/daisy/DaisyDropdown";
 import { catalogFilterLabels } from "./catalogRules";
-import {
-  Card,
-  CardAction,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import type { OverviewFilters } from "@/lib/filters/schema";
 import {
@@ -169,176 +147,225 @@ export function DashboardGrid({
                     headerAction={editing ? handle : undefined}
                     tabs={
                       grouped ? (
-                        <ToggleGroup
-                          type="single"
-                          variant="outline"
-                          size="sm"
-                          value={record.id}
-                          onValueChange={(value) => value && onActiveTabChange(block.key, value)}
+                        <div
+                          role="tablist"
                           aria-label="切换卡片内容"
-                          className="dashboard-module-tabs"
+                          className="dashboard-module-tabs tabs tabs-box tabs-xs"
                         >
                           {block.records.map((item) => (
-                            <ToggleGroupItem
+                            <button
                               key={item.id}
-                              value={item.id}
+                              type="button"
+                              role="tab"
+                              aria-selected={item.id === record.id}
+                              className={cn("tab", item.id === record.id && "tab-active")}
                               title={recordTitle(item)}
+                              onClick={() => onActiveTabChange(block.key, item.id)}
                             >
                               <span className="dashboard-module-tab-label">
                                 {recordTitle(item)}
                               </span>
-                            </ToggleGroupItem>
+                            </button>
                           ))}
-                        </ToggleGroup>
+                        </div>
                       ) : undefined
                     }
                     actions={(openDetails) => (
                       <>
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
+                        <button
+                          type="button"
+                          className="btn btn-ghost btn-xs btn-circle"
                           aria-label={`放大 ${recordTitle(record)}`}
                           title="放大查看"
                           disabled={!widget}
                           onClick={openDetails}
                         >
-                          <Maximize2Icon />
-                        </Button>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon-sm"
-                              className="dashboard-settings-trigger"
-                              aria-label={`${recordTitle(record)} 操作`}
-                              disabled={disabled}
-                            >
-                              <Settings2Icon />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="min-w-44">
-                            <DropdownMenuGroup>
-                              <DropdownMenuItem
-                                disabled={!widget}
-                                onSelect={() => widget && onConfigure(widget)}
-                              >
-                                <Settings2Icon />
-                                {grouped ? "配置当前标签页" : "配置模块"}
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                disabled={widgets.length >= MAX_WIDGETS || !widget}
-                                onSelect={() => {
-                                  const at =
-                                    widgets.indexOf(block.records[block.records.length - 1]) + 1;
-                                  const copy = withoutGroup(record);
-                                  onChange([
-                                    ...widgets.slice(0, at),
-                                    {
-                                      ...copy,
-                                      id: crypto.randomUUID(),
-                                      title: `${recordTitle(record)} 副本`.slice(0, 80),
-                                    },
-                                    ...widgets.slice(at),
-                                  ]);
-                                }}
-                              >
-                                <CopyIcon />
-                                复制为新卡片
-                              </DropdownMenuItem>
-                            </DropdownMenuGroup>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuGroup>
-                              <DropdownMenuSub>
-                                <DropdownMenuSubTrigger disabled={!targets.length}>
-                                  <CombineIcon />
-                                  合并到…
-                                </DropdownMenuSubTrigger>
-                                <DropdownMenuSubContent className="min-w-48 max-w-72">
-                                  {targets.map((target) => (
-                                    <DropdownMenuItem
-                                      key={target.key}
-                                      onSelect={() =>
-                                        onChange(mergeBlocks(widgets, block.key, target.key))
-                                      }
-                                    >
-                                      {target.records.map(recordTitle).join(" / ")}
-                                    </DropdownMenuItem>
-                                  ))}
-                                </DropdownMenuSubContent>
-                              </DropdownMenuSub>
-                              {grouped ? (
-                                <DropdownMenuItem
-                                  onSelect={() => onChange(splitFromGroup(widgets, record.id))}
+                          <Maximize2Icon className="size-3.5" aria-hidden="true" />
+                        </button>
+                        <DaisyDropdown
+                          label={`${recordTitle(record)} 操作`}
+                          placement="top-end"
+                          triggerClassName="dashboard-settings-trigger btn btn-ghost btn-xs btn-circle"
+                          menuClassName="w-56"
+                          disabled={disabled}
+                          trigger={<Settings2Icon className="size-3.5" aria-hidden="true" />}
+                        >
+                          {(close) => {
+                            const run = (action: () => void) => () => {
+                              close();
+                              action();
+                            };
+                            return (
+                              <>
+                                <li className={cn(!widget && "menu-disabled")}>
+                                  <button
+                                    type="button"
+                                    disabled={!widget}
+                                    onClick={run(() => widget && onConfigure(widget))}
+                                  >
+                                    <Settings2Icon className="size-4" aria-hidden="true" />
+                                    {grouped ? "配置当前标签页" : "配置模块"}
+                                  </button>
+                                </li>
+                                <li
+                                  className={cn(
+                                    (widgets.length >= MAX_WIDGETS || !widget) && "menu-disabled",
+                                  )}
                                 >
-                                  <SplitIcon />
-                                  移出为独立卡片
-                                </DropdownMenuItem>
-                              ) : null}
-                            </DropdownMenuGroup>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuGroup>
-                              <DropdownMenuLabel>尺寸</DropdownMenuLabel>
-                              {widget
-                                ? moduleRegistry[widget.type].sizes.map((size) => (
-                                    <DropdownMenuItem
-                                      key={size}
-                                      onSelect={() =>
-                                        onChange(resizeBlock(widgets, block.key, size))
-                                      }
+                                  <button
+                                    type="button"
+                                    disabled={widgets.length >= MAX_WIDGETS || !widget}
+                                    onClick={run(() => {
+                                      const at =
+                                        widgets.indexOf(block.records[block.records.length - 1]) +
+                                        1;
+                                      const copy = withoutGroup(record);
+                                      onChange([
+                                        ...widgets.slice(0, at),
+                                        {
+                                          ...copy,
+                                          id: crypto.randomUUID(),
+                                          title: `${recordTitle(record)} 副本`.slice(0, 80),
+                                        },
+                                        ...widgets.slice(at),
+                                      ]);
+                                    })}
+                                  >
+                                    <CopyIcon className="size-4" aria-hidden="true" />
+                                    复制为新卡片
+                                  </button>
+                                </li>
+                                <div className="divider my-0" />
+                                {targets.length ? (
+                                  <li>
+                                    <details>
+                                      <summary>
+                                        <CombineIcon className="size-4" aria-hidden="true" />
+                                        合并到…
+                                      </summary>
+                                      <ul>
+                                        {targets.map((target) => (
+                                          <li key={target.key}>
+                                            <button
+                                              type="button"
+                                              onClick={run(() =>
+                                                onChange(
+                                                  mergeBlocks(widgets, block.key, target.key),
+                                                ),
+                                              )}
+                                            >
+                                              <span className="truncate">
+                                                {target.records.map(recordTitle).join(" / ")}
+                                              </span>
+                                            </button>
+                                          </li>
+                                        ))}
+                                      </ul>
+                                    </details>
+                                  </li>
+                                ) : (
+                                  <li className="menu-disabled">
+                                    <span>
+                                      <CombineIcon className="size-4" aria-hidden="true" />
+                                      合并到…
+                                    </span>
+                                  </li>
+                                )}
+                                {grouped ? (
+                                  <li>
+                                    <button
+                                      type="button"
+                                      onClick={run(() =>
+                                        onChange(splitFromGroup(widgets, record.id)),
+                                      )}
                                     >
-                                      {sizeLabels[size]}
-                                      {record.size === size ? " ✓" : ""}
-                                    </DropdownMenuItem>
-                                  ))
-                                : null}
-                            </DropdownMenuGroup>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuGroup>
-                              <DropdownMenuItem
-                                disabled={index === 0}
-                                onSelect={() =>
-                                  onChange(moveBlock(widgets, block.key, blocks[index - 1].key))
-                                }
-                              >
-                                <ArrowUpIcon />
-                                上移
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                disabled={index === blocks.length - 1}
-                                onSelect={() =>
-                                  onChange(moveBlock(widgets, block.key, blocks[index + 1].key))
-                                }
-                              >
-                                <ArrowDownIcon />
-                                下移
-                              </DropdownMenuItem>
-                              {grouped ? (
-                                <DropdownMenuItem
-                                  variant="destructive"
-                                  onSelect={() =>
-                                    onChange(
-                                      normalizeGroups(
-                                        widgets.filter((item) => item.id !== record.id),
+                                      <SplitIcon className="size-4" aria-hidden="true" />
+                                      移出为独立卡片
+                                    </button>
+                                  </li>
+                                ) : null}
+                                <div className="divider my-0" />
+                                <li className="menu-title">尺寸</li>
+                                {widget
+                                  ? moduleRegistry[widget.type].sizes.map((size) => (
+                                      <li key={size}>
+                                        <button
+                                          type="button"
+                                          className={cn(record.size === size && "menu-active")}
+                                          onClick={run(() =>
+                                            onChange(resizeBlock(widgets, block.key, size)),
+                                          )}
+                                        >
+                                          {sizeLabels[size]}
+                                        </button>
+                                      </li>
+                                    ))
+                                  : null}
+                                <div className="divider my-0" />
+                                <li className={cn(index === 0 && "menu-disabled")}>
+                                  <button
+                                    type="button"
+                                    disabled={index === 0}
+                                    onClick={run(() =>
+                                      onChange(
+                                        moveBlock(widgets, block.key, blocks[index - 1].key),
                                       ),
-                                    )
-                                  }
-                                >
-                                  <Trash2Icon />
-                                  移除当前标签页
-                                </DropdownMenuItem>
-                              ) : null}
-                              <DropdownMenuItem
-                                variant="destructive"
-                                onSelect={() =>
-                                  onChange(widgets.filter((item) => !block.records.includes(item)))
-                                }
-                              >
-                                <Trash2Icon />
-                                {grouped ? "移除整张卡片" : "移除模块"}
-                              </DropdownMenuItem>
-                            </DropdownMenuGroup>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                                    )}
+                                  >
+                                    <ArrowUpIcon className="size-4" aria-hidden="true" />
+                                    上移
+                                  </button>
+                                </li>
+                                <li className={cn(index === blocks.length - 1 && "menu-disabled")}>
+                                  <button
+                                    type="button"
+                                    disabled={index === blocks.length - 1}
+                                    onClick={run(() =>
+                                      onChange(
+                                        moveBlock(widgets, block.key, blocks[index + 1].key),
+                                      ),
+                                    )}
+                                  >
+                                    <ArrowDownIcon className="size-4" aria-hidden="true" />
+                                    下移
+                                  </button>
+                                </li>
+                                {grouped ? (
+                                  <li>
+                                    <button
+                                      type="button"
+                                      className="text-error"
+                                      onClick={run(() =>
+                                        onChange(
+                                          normalizeGroups(
+                                            widgets.filter((item) => item.id !== record.id),
+                                          ),
+                                        ),
+                                      )}
+                                    >
+                                      <Trash2Icon className="size-4" aria-hidden="true" />
+                                      移除当前标签页
+                                    </button>
+                                  </li>
+                                ) : null}
+                                <li>
+                                  <button
+                                    type="button"
+                                    className="text-error"
+                                    onClick={run(() =>
+                                      onChange(
+                                        widgets.filter((item) => !block.records.includes(item)),
+                                      ),
+                                    )}
+                                  >
+                                    <Trash2Icon className="size-4" aria-hidden="true" />
+                                    {grouped ? "移除整张卡片" : "移除模块"}
+                                  </button>
+                                </li>
+                              </>
+                            );
+                          }}
+                        </DaisyDropdown>
                       </>
                     )}
                   />
@@ -350,12 +377,12 @@ export function DashboardGrid({
       </SortableContext>
       <DragOverlay dropAnimation={null}>
         {dragged ? (
-          <Card className="dashboard-drag-preview">
-            <CardHeader>
-              <CardTitle>{dragged.records.map(recordTitle).join(" / ")}</CardTitle>
-              <CardDescription>拖到新位置后放下</CardDescription>
-            </CardHeader>
-          </Card>
+          <div className="dashboard-drag-preview card card-border bg-base-100 shadow-xl">
+            <div className="card-body">
+              <h3 className="card-title">{dragged.records.map(recordTitle).join(" / ")}</h3>
+              <p className="text-base-content/70">拖到新位置后放下</p>
+            </div>
+          </div>
         ) : null}
       </DragOverlay>
     </DndContext>
@@ -396,18 +423,17 @@ function SortableModule({
       style={{ transform: CSS.Translate.toString(transform), transition }}
     >
       {children(
-        <Button
+        <button
+          type="button"
           ref={setActivatorNodeRef}
-          variant="ghost"
-          size="icon-sm"
-          className="dashboard-drag-handle"
+          className="dashboard-drag-handle btn btn-ghost btn-sm btn-square"
           disabled={!enabled}
           {...attributes}
           {...listeners}
           aria-label={`移动 ${label}`}
         >
-          <GripVerticalIcon />
-        </Button>,
+          <GripVerticalIcon className="size-4" aria-hidden="true" />
+        </button>,
       )}
     </div>
   );
@@ -440,48 +466,59 @@ export function ModuleCard({
   const title = typeof record.title === "string" ? record.title : "暂不可用的模块";
   return (
     <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
-      <Card
+      <div
         ref={cardRef}
-        className={cn("dashboard-module h-full", widget?.type === "stat" && "relative isolate")}
+        className={cn(
+          "dashboard-module card card-border h-full bg-base-100",
+          widget?.type === "stat" ? "card-sm relative isolate" : "card-md",
+        )}
         data-module-title={title}
-        size={widget?.type === "stat" ? "sm" : "default"}
       >
-        <CardHeader className="dashboard-module-header relative z-10">
-          <div className="min-w-0">
-            <CardTitle className="flex items-center gap-2">
-              <span className="truncate" title={title}>
-                {title}
-              </span>
-              <ModuleFilterHint widget={widget} filters={filters} />
-              {freshness?.stale ? (
+        <div className="card-body min-w-0">
+          <div className="dashboard-module-header relative z-10">
+            <div className="min-w-0">
+              <h3 className="card-title min-w-0">
                 <span
-                  className="dashboard-status-dot"
-                  role="img"
-                  aria-label="数据延迟，详情中查看接收时间"
-                  title="数据延迟"
-                />
+                  className={
+                    widget?.type === "stat"
+                      ? "whitespace-normal [overflow-wrap:anywhere]"
+                      : "truncate"
+                  }
+                  title={title}
+                >
+                  {title}
+                </span>
+                <ModuleFilterHint widget={widget} filters={filters} />
+                {freshness?.stale ? (
+                  <span
+                    className="status status-warning"
+                    role="img"
+                    aria-label="数据延迟，详情中查看接收时间"
+                    title="数据延迟"
+                  />
+                ) : null}
+              </h3>
+              {showDescription || !widget ? (
+                <p className="text-xs text-base-content/70">
+                  {widget ? widgetDescription(widget) : `${record.type} · v${record.version}`}
+                </p>
               ) : null}
-            </CardTitle>
-            {showDescription || !widget ? (
-              <CardDescription>
-                {widget ? widgetDescription(widget) : `${record.type} · v${record.version}`}
-              </CardDescription>
+            </div>
+            {headerAction || tabs ? (
+              <div className="flex min-w-0 shrink-0 items-center gap-2">
+                {tabs}
+                {headerAction}
+              </div>
             ) : null}
           </div>
-          {headerAction || tabs ? (
-            <CardAction className="flex min-w-0 items-center gap-2">
-              {tabs}
-              {headerAction}
-            </CardAction>
-          ) : null}
-        </CardHeader>
-        <CardContent className="min-w-0 flex-1">
-          <ModuleContent record={record} query={query} filters={filters} />
-        </CardContent>
+          <div className="min-w-0 flex-1">
+            <ModuleContent record={record} query={query} filters={filters} />
+          </div>
+        </div>
         <div className="dashboard-module-actions" role="toolbar" aria-label={`${title} 操作`}>
           {actions(() => setDetailsOpen(true))}
         </div>
-      </Card>
+      </div>
       <ModuleDetailsDialog record={record} query={query} filters={filters} sourceRef={cardRef} />
     </Dialog>
   );
@@ -512,21 +549,10 @@ function ModuleFilterHint({ widget, filters }: { widget?: Widget; filters: Overv
   if (!conditions.length) return null;
   const label = `筛选条件：${conditions.join("；")}`;
   return (
-    <TooltipProvider delayDuration={150}>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <span className="dashboard-filter-hint" role="img" aria-label={label} tabIndex={0}>
-            <FilterIcon aria-hidden="true" />
-          </span>
-        </TooltipTrigger>
-        <TooltipContent side="bottom" align="start">
-          <span className="grid gap-0.5">
-            {conditions.map((condition) => (
-              <span key={condition}>{condition}</span>
-            ))}
-          </span>
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
+    <span className="tooltip tooltip-bottom" data-tip={conditions.join("；")}>
+      <span className="dashboard-filter-hint" role="img" aria-label={label} tabIndex={0}>
+        <FilterIcon aria-hidden="true" />
+      </span>
+    </span>
   );
 }

@@ -117,6 +117,15 @@ func TestAlertRulesChannelsAndDeliveries(t *testing.T) {
 	if err != nil || rules[0].LastStatus != "breached" || rules[0].LastEvaluatedAt == nil {
 		t.Fatalf("rules=%+v err=%v", rules, err)
 	}
+	// Recent statuses run oldest first and stop at the newest RecentEvaluationCount.
+	mustExec(`INSERT INTO alert_evaluations (rule_id,window_started_at,window_ended_at,value,status)
+		SELECT $1, $2::timestamptz - n*interval '5 minutes' - interval '5 minutes', $2::timestamptz - n*interval '5 minutes', 0, 'ok'
+		FROM generate_series(1, 30) n`, rule.ID, end)
+	rules, _, err = alerts.ListRules(ctx, owner, project)
+	recent := rules[0].RecentStatuses
+	if err != nil || len(recent) != RecentEvaluationCount || recent[len(recent)-1] != "breached" || recent[0] != "ok" {
+		t.Fatalf("recent statuses=%v err=%v", recent, err)
+	}
 
 	// Editing a channel keeps its secret when none is sent, and members cannot open it.
 	if _, _, err := alerts.OpenManagedChannel(ctx, member, orgA, feishu.ID); !errors.Is(err, ErrForbidden) {

@@ -51,13 +51,23 @@ func (handler *LogHandler) List(writer http.ResponseWriter, request *http.Reques
 			limitErr = query.ErrInvalidLogFilters
 		}
 	}
+	maxPoints := 0
+	var pointsErr error
+	if values.Has("maxPoints") {
+		maxPoints, pointsErr = strconv.Atoi(values.Get("maxPoints"))
+		if maxPoints == 0 {
+			pointsErr = query.ErrInvalidLogFilters
+		}
+	}
 	filters, err := query.NormalizeLogFilters(query.LogFilters{ProjectID: projectID, From: from, To: to, Limit: limit,
+		MaxPoints: maxPoints,
+		Anchor:    values.Get("anchor"), AnchorAt: values.Get("anchorAt"), Direction: values.Get("direction"),
 		Environment: values.Get("environment"), Release: values.Get("release"), Route: values.Get("route"), Browser: values.Get("browser"),
 		DeviceType: values.Get("deviceType"), Country: values.Get("country"), Level: values.Get("level"), Query: values.Get("q"), Cursor: values.Get("cursor")})
 	if err != nil && writeSearchError(writer, request, err) {
 		return
 	}
-	if fromErr != nil || toErr != nil || limitErr != nil || err != nil {
+	if fromErr != nil || toErr != nil || limitErr != nil || pointsErr != nil || err != nil {
 		httpx.WriteError(writer, request, http.StatusBadRequest, "VALIDATION_ERROR", "Use a range up to 30 days and a valid search.")
 		return
 	}

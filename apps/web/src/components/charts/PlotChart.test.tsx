@@ -81,4 +81,25 @@ describe("PlotChart", () => {
     const { container } = render(<PlotChart data={withRate} view="line" title="双轴" />);
     await waitFor(() => expect(container.querySelectorAll(".recharts-yAxis").length).toBe(2));
   });
+
+  // Every series in an area chart gets its own wash, matched to its own gradient even when a
+  // previous-period series comes first.
+  it("fills every current series of an area chart with its own gradient", async () => {
+    const compared: PlotData = {
+      ...stacked,
+      stacked: false,
+      series: [
+        { key: "before", label: "上一周期", unit: "count", color: "x", ink: "x", role: "previous" },
+        ...stacked.series,
+      ],
+      rows: stacked.rows.map((row) => ({ ...row, before: 5 })),
+    };
+    const { container } = render(<PlotChart data={compared} view="area" title="面积" />);
+    await waitFor(() => expect(container.querySelectorAll(".recharts-area-area").length).toBe(2));
+    const fills = [...container.querySelectorAll(".recharts-area-area")].map((area) =>
+      area.getAttribute("fill"),
+    );
+    const gradients = [...container.querySelectorAll("linearGradient")].map((g) => g.id);
+    expect(fills).toEqual([`url(#${gradients[1]})`, `url(#${gradients[2]})`]);
+  });
 });

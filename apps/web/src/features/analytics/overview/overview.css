@@ -1,0 +1,66 @@
+/* Behaviour overview: the map card's markers and callout. Colours are daisyUI tokens, so
+   the card follows the theme. */
+
+.overview-live-dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  flex: none;
+  border-radius: 9999px;
+  background: var(--color-success);
+  animation: overview-live-dot 2s ease-out infinite;
+}
+
+@keyframes overview-live-dot {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in oklab, var(--color-success) 70%, transparent);
+  }
+  80%,
+  100% {
+    box-shadow: 0 0 0 9px transparent;
+  }
+}
+
+.overview-map-pulse {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: overview-map-pulse 2.8s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+@keyframes overview-map-pulse {
+  0% {
+    transform: scale(0.45);
+    opacity: 0.9;
+  }
+  100% {
+    transform: scale(2.3);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .overview-live-dot,
+  .overview-map-pulse {
+    animation: none;
+  }
+}
+
+/* A label beside the selected country, flipped to the left near the right edge. */
+.overview-map-callout {
+  position: absolute;
+  z-index: 1;
+  translate: 1.25rem -50%;
+  pointer-events: none;
+  white-space: nowrap;
+  border-radius: var(--radius-box);
+  border: 1px solid var(--color-base-300);
+  background: var(--color-base-100);
+  color: var(--color-base-content);
+  padding: 0.5rem 0.75rem;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  box-shadow: 0 6px 20px color-mix(in oklab, var(--color-base-content) 12%, transparent);
+}
+
+.overview-map-callout[data-side="left"] {
+  translate: calc(-100% - 1.25rem) -50%;
+}

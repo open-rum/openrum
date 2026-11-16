@@ -31,7 +31,7 @@
 .devdata-env {
   padding: 2px var(--space-2);
   border: 1px solid var(--ds-border);
-  border-radius: 999px;
+  border-radius: var(--radius-selector);
   color: var(--ds-text-muted);
   font-size: var(--text-caption);
 }
@@ -44,7 +44,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
-  padding: var(--space-3);
+  padding: var(--card-padding-sm);
   border: 1px solid var(--ds-border);
   border-radius: var(--radius-surface);
   background: var(--ds-surface);
@@ -127,7 +127,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
-  padding: var(--space-3);
+  padding: var(--card-padding-sm);
   border: 1px solid var(--ds-border);
   border-radius: var(--radius-surface);
   background: var(--ds-surface);
@@ -166,7 +166,7 @@
   gap: var(--space-2);
   padding: 3px var(--space-2);
   border: 1px solid var(--ds-border);
-  border-radius: 999px;
+  border-radius: var(--radius-selector);
   font-size: var(--text-caption);
 }
 .devdata-breakdown span {

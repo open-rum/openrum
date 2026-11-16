@@ -1,19 +1,19 @@
+import { UsageFilters } from "./UsageFilters";
 import { useMemo } from "react";
-import { Link, useRouterState } from "@tanstack/react-router";
+import { Link, useRouterState, useNavigate, useParams } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { DownloadIcon, GaugeIcon, SlidersHorizontalIcon } from "lucide-react";
-import { ConsolePage, ConsolePageHeader } from "@/components/layout/ConsolePage";
+import { DownloadIcon, SlidersHorizontalIcon } from "lucide-react";
+import { ConsolePage, ConsolePageHeader, ConsoleFilterBar } from "@/components/layout/ConsolePage";
 import { AsyncError } from "@/components/ui/AsyncState";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getProject, type Project } from "@/lib/api/projects";
-import { projectIdFromPathname } from "@/lib/projects/currentProject";
 import { getUsage, usageRange, usageURL } from "@/lib/api/usage";
 import { readUsageRange, usageTypes } from "./organizationUsage";
 
 export function UsagePage() {
-  const projectId = projectIdFromPathname(window.location.pathname);
+  const { projectId } = useParams({ strict: false }) as { projectId?: string };
   const projectQuery = useQuery({
     queryKey: ["project", projectId],
     queryFn: ({ signal }) => getProject(projectId!, signal),
@@ -23,7 +23,7 @@ export function UsagePage() {
   if (projectQuery.error)
     return (
       <ConsolePage width="wide">
-        <ConsolePageHeader title="用量统计" />
+        <ConsolePageHeader title="项目用量" />
         <AsyncError
           title="项目加载失败"
           error={projectQuery.error}
@@ -36,13 +36,14 @@ export function UsagePage() {
   if (!project)
     return (
       <ConsolePage width="wide">
-        <ConsolePageHeader title="用量统计" description="请先创建并接入项目。" />
+        <ConsolePageHeader title="项目用量" description="请先创建并接入项目。" />
       </ConsolePage>
     );
-  return <ProjectUsage project={project} />;
+  return <ProjectUsage key={project.id} project={project} />;
 }
 
 function ProjectUsage({ project }: { project: Project }) {
+  const navigate = useNavigate();
   const fallback = useMemo(() => usageRange(7), []);
   const search = useRouterState({ select: (state) => state.location.searchStr });
   const range = useMemo(
@@ -62,7 +63,7 @@ function ProjectUsage({ project }: { project: Project }) {
   return (
     <ConsolePage width="wide">
       <ConsolePageHeader
-        title="用量统计"
+        title="项目用量"
         description={`${project.name} · ${range.from.toLocaleString("zh-CN")} — ${range.to.toLocaleString("zh-CN")} · ${usageTypes.find(([type]) => type === range.eventType)?.[1] ?? "全部事件"}`}
         actions={
           <>
@@ -81,6 +82,30 @@ function ProjectUsage({ project }: { project: Project }) {
           </>
         }
       />
+      <ConsoleFilterBar
+        primary={
+          <UsageFilters
+            range={range}
+            onChange={(patch) => {
+              const current = Object.fromEntries(new URLSearchParams(search));
+              void navigate({
+                to: "/settings/project/$projectId/usage",
+                params: { projectId: project.id },
+                search: {
+                  ...current,
+                  from: range.from.toISOString(),
+                  to: range.to.toISOString(),
+                  ...patch,
+                },
+              });
+            }}
+          />
+        }
+      />
+      <p className="text-sm text-base-content/70">
+        当前项目全部环境 · 用量记录未单独区分 synthetic 测试数据 ·
+        传输字节不是磁盘占用，接收量不是配额使用率。
+      </p>
       {usage.isLoading ? <UsageSkeleton compact /> : null}
       {usage.error ? (
         <div className="mt-6">
@@ -115,9 +140,8 @@ function ProjectUsage({ project }: { project: Project }) {
               </Card>
             ))}
           </section>
-          <section className="mt-8 overflow-hidden rounded-lg border border-border bg-card">
-            <div className="flex items-center gap-2 border-b border-border px-5 py-4">
-              <GaugeIcon className="size-4" />
+          <section className="card card-border mt-8 overflow-hidden bg-base-100">
+            <div className="flex items-center gap-2 border-b border-base-300 px-5 py-4">
               <h2 className="font-semibold">原因明细</h2>
             </div>
             <div className="overflow-x-auto">
@@ -133,6 +157,13 @@ function ProjectUsage({ project }: { project: Project }) {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
+                  {usage.data.breakdown.length === 0 ? (
+                    <tr>
+                      <td className="px-5 py-10 text-center text-muted-foreground" colSpan={6}>
+                        当前范围没有用量记录。
+                      </td>
+                    </tr>
+                  ) : null}
                   {usage.data.breakdown
                     .slice(-20)
                     .reverse()

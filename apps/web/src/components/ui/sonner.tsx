@@ -29,15 +29,15 @@ export function Toaster(props: ToasterProps) {
       }}
       toastOptions={{
         classNames: {
-          toast: "!rounded-2xl !shadow-lg",
-          description: "!text-muted-foreground",
+          toast: "!rounded-box !shadow-lg",
+          description: "!text-base-content/70",
         },
       }}
       style={
         {
           "--normal-bg": "var(--popover)",
           "--normal-text": "var(--popover-foreground)",
-          "--normal-border": "var(--border)",
+          "--normal-border": "var(--ds-border)",
           "--border-radius": "var(--radius)",
         } as CSSProperties
       }

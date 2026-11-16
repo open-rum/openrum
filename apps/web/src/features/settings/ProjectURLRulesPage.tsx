@@ -108,14 +108,14 @@ function URLRulesForm({
       }}
     >
       {!canManage ? (
-        <p className="border border-border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
+        <p className="border border-base-300 bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
           当前角色为 {role ?? "未知"}，只有 Owner 或 Admin 可以修改归一化规则。
         </p>
       ) : null}
 
-      <section className="border border-border bg-card p-6">
+      <section className="border border-base-300 bg-card p-6">
         <div className="flex flex-wrap items-baseline justify-between gap-3">
-          <h2 className="text-lg font-semibold text-foreground">路径模板</h2>
+          <h2 className="card-title text-lg">路径模板</h2>
           <span className="text-xs text-muted-foreground">
             {draft.rules.length} / {maxURLRules}
           </span>
@@ -127,18 +127,18 @@ function URLRulesForm({
           吃掉剩下所有段（但不包含父级本身）。 段数必须对得上，字面段不区分大小写。
         </p>
         <p className="mt-2 text-sm leading-6 text-muted-foreground">
-          规则<strong>自上而下</strong>取第一条命中的，所以具体的要放在宽泛的上面。规则只在 Consumer
-          执行，改动约 30 秒内生效，且<strong>只影响之后写入的数据</strong>，不会重写历史。
+          规则<strong>自上而下</strong>取第一条命中的，请把具体规则放在宽泛规则前面。保存后约 30
+          秒内生效，且<strong>只影响之后写入的数据</strong>，不会重写历史。
         </p>
 
         {draft.rules.length === 0 ? (
-          <p className="mt-5 border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">
+          <p className="mt-5 border border-dashed border-base-300 px-4 py-6 text-center text-sm text-muted-foreground">
             还没有规则。先去页面或 API 列表看看哪些行明显是同一个路由被拆开了。
           </p>
         ) : (
           <ul className="mt-5 flex flex-col gap-4">
             {draft.rules.map((rule, index) => (
-              <li key={rule.id} className="border border-border p-4">
+              <li key={rule.id} className="card card-border bg-base-100 p-4">
                 <div className="grid gap-3 sm:grid-cols-[8rem_minmax(0,1fr)_auto] sm:items-end">
                   <Field label="应用于">
                     <select
@@ -244,7 +244,7 @@ function URLRulesForm({
         </p>
       ) : null}
 
-      <div className="flex items-center gap-3">
+      <div className="flex flex-row-reverse flex-wrap justify-start items-center gap-3">
         <Button type="submit" disabled={disabled}>
           {mutation.isPending ? "保存中…" : "保存"}
         </Button>
@@ -268,8 +268,8 @@ function Field({
   children: React.ReactNode;
 }) {
   return (
-    <label className="flex flex-col gap-1.5 text-sm">
-      <span className="font-medium text-foreground">{label}</span>
+    <label className="flex flex-col gap-1.5 text-sm [&_input:not([type=checkbox],[type=radio])]:input [&_input:not([type=checkbox],[type=radio])]:w-full [&_select]:select [&_select]:w-full [&_textarea]:textarea [&_textarea]:w-full">
+      <span className="font-medium text-base-content">{label}</span>
       {children}
       {hint ? <span className="text-xs text-muted-foreground">{hint}</span> : null}
     </label>

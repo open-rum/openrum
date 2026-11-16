@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState } from "react";
+import { timeAxis, valueAxis, VALUE_AXIS_MARGIN_TOP } from "@/lib/charts/axes";
 import {
   Area,
   Bar,
@@ -11,7 +12,6 @@ import {
   YAxis,
 } from "recharts";
 import {
-  BAR_RADIUS_TOP,
   ChartContainer,
   ChartLegend,
   ChartLegendContent,
@@ -36,6 +36,7 @@ import {
   formatMetric,
   PARTIAL_SUFFIX,
   type PlotData,
+  type Unit,
 } from "@/lib/charts/plotData";
 import { smoothCurve } from "@/lib/charts/smoothCurve";
 import { chartTicks, intervalLabel, timeTickLabel } from "@/lib/charts/timeSeries";
@@ -43,6 +44,7 @@ import { useChartMotion } from "@/lib/charts/useChartMotion";
 import { observeElementWidth } from "@/lib/charts/useChartWidth";
 import { CategoryRanking } from "./CategoryRanking";
 import { DonutDistribution } from "./DonutDistribution";
+import { useBarRadiusTop } from "@/lib/charts/useBarRadius";
 
 export type PlotView = "area" | "line" | "bar" | "table" | "donut" | "stacked-area" | "stacked-bar";
 
@@ -77,6 +79,7 @@ export function PlotChart({
   compact = false,
   legend = true,
 }: PlotChartProps) {
+  const barRadius = useBarRadiusTop();
   const gradientId = `module-${useId().replace(/:/g, "")}`;
   // Recharts names a stack's clip paths after its stackId, and ids are document-wide. A fixed
   // id lets a second stacked chart on the page (a drawer over its page) borrow the first one's
@@ -160,7 +163,11 @@ export function PlotChart({
             <ComposedChart
               data={data.rows}
               layout={categories ? "vertical" : "horizontal"}
-              margin={{ top: 12, right: 12, left: 0, bottom: 0 }}
+              margin={
+                categories
+                  ? { top: 12, right: 12, left: 0, bottom: 0 }
+                  : { top: VALUE_AXIS_MARGIN_TOP, right: 0, left: 0, bottom: 0 }
+              }
               barCategoryGap="25%"
               barGap={2}
               accessibilityLayer
@@ -175,7 +182,11 @@ export function PlotChart({
                     x2="0"
                     y2="1"
                   >
-                    <stop offset="0%" stopColor={series.color} stopOpacity={0.55} />
+                    <stop
+                      offset="0%"
+                      stopColor={series.color}
+                      stopOpacity={currentSeries.length > 1 ? 0.3 : 0.55}
+                    />
                     <stop offset="100%" stopColor={series.color} stopOpacity={0.04} />
                   </linearGradient>
                 ))}
@@ -186,49 +197,55 @@ export function PlotChart({
                 stroke="var(--ds-border-soft)"
                 strokeDasharray="2 3"
               />
-              <XAxis
-                type={categories ? "number" : "category"}
-                dataKey={categories ? undefined : "label"}
-                axisLine={false}
-                tickLine={false}
-                minTickGap={40}
-                ticks={categories ? undefined : chartTicks(data.rows, width)}
-                interval={categories ? undefined : "preserveStartEnd"}
-                tickMargin={8}
-                tickFormatter={
-                  categories
-                    ? (value: number) => formatMetric(value, unit)
-                    : (value: string) => timeTickLabel(value, data.rangeMs ?? 0)
-                }
-              />
-              <YAxis
-                yAxisId={rightSeries ? "left" : undefined}
-                type={categories ? "category" : "number"}
-                dataKey={categories ? "label" : undefined}
-                width={categories ? 94 : 60}
-                axisLine={false}
-                tickLine={false}
-                tickCount={5}
-                tickFormatter={
-                  categories
-                    ? (value: string) => (value.length > 12 ? `${value.slice(0, 12)}…` : value)
-                    : (value: number) => formatMetric(value, unit)
-                }
-              />
+              {categories ? (
+                <XAxis
+                  type="number"
+                  axisLine={false}
+                  tickLine={false}
+                  minTickGap={40}
+                  tickMargin={8}
+                  tickFormatter={(value: number) => formatMetric(value, unit)}
+                />
+              ) : (
+                <XAxis
+                  type="category"
+                  dataKey="label"
+                  minTickGap={40}
+                  ticks={chartTicks(data.rows, width)}
+                  interval="preserveStartEnd"
+                  {...timeAxis((value) => timeTickLabel(String(value), data.rangeMs ?? 0))}
+                />
+              )}
+              {categories ? (
+                <YAxis
+                  type="category"
+                  dataKey="label"
+                  width={94}
+                  axisLine={false}
+                  tickLine={false}
+                  tickFormatter={(value: string) =>
+                    value.length > 12 ? `${value.slice(0, 12)}…` : value
+                  }
+                />
+              ) : (
+                <YAxis
+                  yAxisId={rightSeries ? "left" : undefined}
+                  type="number"
+                  tickCount={5}
+                  {...valueAxis({ format: (value) => axisLabel(value, unit) })}
+                />
+              )}
               {rightSeries ? (
                 <YAxis
                   yAxisId="right"
-                  orientation="right"
-                  width={48}
-                  axisLine={false}
-                  tickLine={false}
                   tickCount={5}
-                  domain={rightSeries.unit === "percent" ? [0, 100] : undefined}
-                  tickFormatter={(value: number) =>
-                    rightSeries.unit === "percent"
-                      ? `${Math.round(value)}%`
-                      : formatMetric(value, rightSeries.unit)
-                  }
+                  // A rate starts at zero and ends where the data does: pinned to 100%, a
+                  // failure rate of 1% is a flat line along the baseline.
+                  domain={rightSeries.unit === "percent" ? [0, percentAxisTop] : undefined}
+                  {...valueAxis({
+                    side: "right",
+                    format: (value) => axisLabel(value, rightSeries.unit),
+                  })}
                 />
               ) : null}
               <ChartTooltip
@@ -315,7 +332,7 @@ export function PlotChart({
                   />
                 ))}
               {data.stacked && view === "stacked-bar" ? (
-                <BarStack stackId={stackId} radius={BAR_RADIUS_TOP}>
+                <BarStack stackId={stackId} radius={barRadius}>
                   {currentSeries.map((series) => (
                     <Bar
                       key={series.key}
@@ -328,7 +345,7 @@ export function PlotChart({
                   ))}
                 </BarStack>
               ) : (
-                currentSeries.map((series, index) =>
+                currentSeries.map((series) =>
                   data.stacked ? (
                     <Area
                       key={series.key}
@@ -350,11 +367,11 @@ export function PlotChart({
                       dataKey={series.key}
                       yAxisId={axisId(series)}
                       fill={series.color}
-                      radius={BAR_RADIUS_TOP}
+                      radius={barRadius}
                       maxBarSize={categories ? 16 : 32}
                       isAnimationActive={animate}
                     />
-                  ) : view === "line" || index > 0 ? (
+                  ) : view === "line" ? (
                     <Line
                       key={series.key}
                       dataKey={series.key}
@@ -373,7 +390,7 @@ export function PlotChart({
                       yAxisId={axisId(series)}
                       {...smoothCurve}
                       stroke={series.ink}
-                      fill={`url(#${gradientId}-${index})`}
+                      fill={`url(#${gradientId}-${data.series.indexOf(series)})`}
                       strokeWidth={1.5}
                       dot={isolatedDot(data, series.key, series.ink)}
                       connectNulls={false}
@@ -459,6 +476,23 @@ export function PlotTable({
       </Table>
     </div>
   );
+}
+
+/**
+ * A value on an axis. Percentages drop the trailing zeroes they carry elsewhere ("16%", not
+ * "16.00%"): on an axis the steps are round, and the shorter label keeps the column narrow.
+ */
+function axisLabel(value: number, unit: Unit) {
+  return unit === "percent" ? `${Number(value.toFixed(2))}%` : formatMetric(value, unit);
+}
+
+/**
+ * The top of a percent axis: the smallest of these round values that holds the data, so four
+ * even steps land on readable labels (0.5%, 1%, 1.5%, 2%).
+ */
+function percentAxisTop(dataMax: number) {
+  if (!Number.isFinite(dataMax) || dataMax <= 0) return 1;
+  return [0.2, 0.4, 1, 2, 4, 10, 20, 40, 100].find((top) => dataMax <= top) ?? 100;
 }
 
 /**

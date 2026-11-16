@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactElement } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { DatabaseIcon, FlaskConicalIcon, PlayIcon } from "lucide-react";
 import { ConsolePage, ConsolePageHeader } from "@/components/layout/ConsolePage";
@@ -110,9 +110,15 @@ function Choice({
 export function DevDataQuickEntry({
   projects,
   project,
+  trigger,
+  preset,
 }: {
   projects: Project[];
   project?: Project;
+  /** Replaces the floating button, e.g. a page-level button next to a title. */
+  trigger?: ReactElement;
+  /** Preset selected when the dialog opens; defaults to the storefront journey. */
+  preset?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [selectedId, setSelectedId] = useState("");
@@ -128,15 +134,17 @@ export function DevDataQuickEntry({
       }}
     >
       <DialogTrigger asChild>
-        <Button
-          variant="outline"
-          size="icon-lg"
-          className="fixed right-[max(1.5rem,env(safe-area-inset-right))] bottom-[max(1.5rem,env(safe-area-inset-bottom))] z-40 rounded-full shadow-lg"
-          aria-label="造数据"
-          title="本地开发 · 快速造数据"
-        >
-          <FlaskConicalIcon aria-hidden="true" />
-        </Button>
+        {trigger ?? (
+          <Button
+            variant="outline"
+            size="icon-lg"
+            className="fixed right-[max(1.5rem,env(safe-area-inset-right))] bottom-[max(1.5rem,env(safe-area-inset-bottom))] z-40 rounded-full shadow-lg"
+            aria-label="造数据"
+            title="本地开发 · 快速造数据"
+          >
+            <FlaskConicalIcon aria-hidden="true" />
+          </Button>
+        )}
       </DialogTrigger>
       <DialogContent
         className="sm:max-w-2xl max-h-[90dvh] overflow-y-auto"
@@ -158,20 +166,27 @@ export function DevDataQuickEntry({
         </DialogHeader>
         {selected ? (
           <>
-            <Field>
-              <FieldLabel htmlFor="dev-project">目标项目</FieldLabel>
-              <Choice
-                id="dev-project"
-                value={selected.id}
-                onChange={setSelectedId}
-                disabled={busy}
-                items={projects.map((item) => ({
-                  value: item.id,
-                  label: `${item.name}${item.status !== "active" ? "（已停止）" : ""}`,
-                }))}
-              />
-            </Field>
-            <DevDataForm key={selected.id} project={selected} onBusyChange={setBusy} />
+            {projects.length > 1 ? (
+              <Field>
+                <FieldLabel htmlFor="dev-project">目标项目</FieldLabel>
+                <Choice
+                  id="dev-project"
+                  value={selected.id}
+                  onChange={setSelectedId}
+                  disabled={busy}
+                  items={projects.map((item) => ({
+                    value: item.id,
+                    label: `${item.name}${item.status !== "active" ? "（已停止）" : ""}`,
+                  }))}
+                />
+              </Field>
+            ) : null}
+            <DevDataForm
+              key={selected.id}
+              project={selected}
+              initialPreset={preset}
+              onBusyChange={setBusy}
+            />
           </>
         ) : (
           <EmptyState
@@ -220,9 +235,11 @@ export function DevDataPage() {
 
 export function DevDataForm({
   project,
+  initialPreset = "storefront",
   onBusyChange,
 }: {
   project: Project;
+  initialPreset?: string;
   onBusyChange?: (busy: boolean) => void;
 }) {
   const context = useAnalysisContext();
@@ -230,7 +247,7 @@ export function DevDataForm({
   const current = context?.projectId === project.id ? context : null;
   const [environment, setEnvironment] = useState(current?.environment || project.environment);
   const [windowValue, setWindowValue] = useState(current ? "current" : "60");
-  const [preset, setPreset] = useState("storefront");
+  const [preset, setPreset] = useState(initialPreset);
   const [sessions, setSessions] = useState(300);
   const [userIds, setUserIds] = useState("");
   const [signedIn, setSignedIn] = useState("0.45");

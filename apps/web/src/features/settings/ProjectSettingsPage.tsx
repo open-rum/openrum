@@ -17,6 +17,7 @@ import {
   type SDKPlatform,
 } from "@/lib/api/projects";
 import { ProjectPlatformSelector } from "@/features/projects/ProjectPlatformSelector";
+import { REVENUE_CURRENCIES } from "@/lib/currency";
 import { SettingsShell } from "./SettingsShell";
 
 export function ProjectSettingsRoute() {
@@ -52,7 +53,7 @@ function ProjectSettingsForms({ project }: { project: Project }) {
   return (
     <div className="grid gap-6">
       {!canManage ? (
-        <p className="rounded-2xl border border-border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
+        <p className="rounded-box border border-base-300 bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
           当前角色为 {project.role}，只有 Owner 或 Admin 可以修改项目设置。
         </p>
       ) : null}
@@ -82,7 +83,7 @@ function GeneralForm({ project, canManage }: { project: Project; canManage: bool
   const disabled = !canManage || mutation.isPending;
   return (
     <form
-      className="rounded-2xl border border-border bg-card p-6"
+      className="card card-border bg-base-100 p-6"
       onSubmit={(event) => {
         event.preventDefault();
         setSaved(false);
@@ -92,10 +93,11 @@ function GeneralForm({ project, canManage }: { project: Project; canManage: bool
           sdkPlatform,
           allowedOrigins: parseOrigins(String(form.get("allowedOrigins") ?? "")),
           retentionDays: Number(form.get("retentionDays") ?? project.retentionDays),
+          revenueCurrency: String(form.get("revenueCurrency") ?? ""),
         });
       }}
     >
-      <h2 className="text-lg font-semibold text-foreground">常规</h2>
+      <h2 className="card-title text-lg">常规</h2>
       <div className="mt-5 grid items-start gap-5 sm:grid-cols-2">
         <Field label="项目名称">
           <input name="name" required maxLength={120} defaultValue={project.name} />
@@ -106,8 +108,25 @@ function GeneralForm({ project, canManage }: { project: Project; canManage: bool
           disabled={disabled}
         />
       </div>
+      <div className="mt-5 grid items-start gap-5 sm:grid-cols-2">
+        <Field label="收入币种" hint="仅用于标注金额，不进行汇率换算">
+          <select
+            name="revenueCurrency"
+            className="select mt-2 w-full font-normal"
+            defaultValue={project.revenueCurrency ?? ""}
+            disabled={disabled}
+          >
+            <option value="">不标注币种</option>
+            {REVENUE_CURRENCIES.map((currency) => (
+              <option key={currency.code} value={currency.code}>
+                {currency.name}（{currency.code}）
+              </option>
+            ))}
+          </select>
+        </Field>
+      </div>
       <div className="mt-5">
-        <Field label="允许的 Origin" hint="每行一个，不包含路径或结尾斜杠">
+        <Field label="允许的 Origin" hint="每行一个，不含路径；移除后该站点的上报立即被拒绝">
           <textarea
             name="allowedOrigins"
             required
@@ -115,15 +134,12 @@ function GeneralForm({ project, canManage }: { project: Project; canManage: bool
             defaultValue={project.allowedOrigins.join("\n")}
           />
         </Field>
-        <p className="mt-2 text-xs leading-5 text-muted-foreground">
-          Ingest 会按 <code>Origin</code> 请求头逐条比对。移除某个 Origin
-          后，来自该站点的上报会立刻被拒绝。
-        </p>
       </div>
-      <div className="mt-5 grid gap-5 sm:grid-cols-2">
+      <div className="mt-5">
         <SliderField
           name="retentionDays"
           label="原始数据保留天数"
+          hint="受实例级保留策略约束，以更短的上限为准。"
           min={1}
           max={90}
           defaultValue={project.retentionDays}
@@ -131,23 +147,30 @@ function GeneralForm({ project, canManage }: { project: Project; canManage: bool
           disabled={disabled}
         />
       </div>
-      <p className="mt-3 text-xs leading-5 text-muted-foreground">
-        项目自动接收开发 <code>development</code>、测试 <code>test</code>、灰度 <code>staging</code>
-        、生产 <code>production</code> 四个环境的上报，SDK <code>init()</code> 的{" "}
-        <code>environment</code> 取其一即可，其他值会被拒绝。
-      </p>
-      <p className="mt-3 text-xs leading-5 text-muted-foreground">
-        保留天数受实例级策略约束，以更短的上限为准。采样率请前往
-        <Link
-          to="/settings/project/$projectId/sampling"
-          params={{ projectId: project.id }}
-          className="underline underline-offset-4"
-        >
-          数据管理 · 采样配置
-        </Link>
-        调整，并查看用量预估。
-      </p>
-      <div className="mt-5 flex flex-wrap items-center gap-3 border-t border-border pt-5">
+      <details className="collapse collapse-arrow mt-5 border border-base-300">
+        <summary className="collapse-title text-sm font-medium">了解更多：环境与采样</summary>
+        <div className="collapse-content text-xs leading-5 text-base-content/70">
+          <div className="grid gap-2">
+            <p>
+              项目自动接收开发 <code>development</code>、测试 <code>test</code>、灰度{" "}
+              <code>staging</code>、生产 <code>production</code> 四个环境的上报，SDK{" "}
+              <code>init()</code> 的 <code>environment</code> 取其一即可，其他值会被拒绝。
+            </p>
+            <p>
+              Ingest 会按 <code>Origin</code> 请求头逐条比对允许的 Origin。采样率请前往
+              <Link
+                to="/settings/project/$projectId/sampling"
+                params={{ projectId: project.id }}
+                className="link"
+              >
+                数据管理 · 采样配置
+              </Link>
+              调整，并查看用量预估。
+            </p>
+          </div>
+        </div>
+      </details>
+      <div className="mt-5 flex flex-row-reverse flex-wrap justify-start items-center gap-3 border-t border-base-300 pt-5">
         <Button type="submit" disabled={disabled}>
           {mutation.isPending ? "保存中…" : "保存设置"}
         </Button>
@@ -184,10 +207,10 @@ function DangerZone({ project, canManage }: { project: Project; canManage: boole
   const canDelete = project.role === "owner";
   return (
     <section
-      className="rounded-2xl border border-destructive/40 bg-card p-6"
+      className="card card-border border-error/40 bg-base-100 p-6"
       aria-labelledby="project-danger-zone"
     >
-      <h2 id="project-danger-zone" className="text-lg font-semibold text-foreground">
+      <h2 id="project-danger-zone" className="card-title text-lg">
         危险区域
       </h2>
       <div className="mt-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -280,7 +303,7 @@ function Field({
   children: React.ReactNode;
 }) {
   return (
-    <label className="block text-sm font-medium text-foreground [&_input]:mt-2 [&_input]:h-[var(--control-height)] [&_input]:w-full [&_input]:rounded-full [&_input]:border [&_input]:border-input [&_input]:bg-background [&_input]:px-4 [&_input]:text-sm [&_input]:outline-none [&_input]:focus:border-ring [&_input]:focus:ring-2 [&_input]:focus:ring-ring/15 [&_textarea]:mt-2 [&_textarea]:w-full [&_textarea]:rounded-xl [&_textarea]:border [&_textarea]:border-input [&_textarea]:bg-background [&_textarea]:p-3 [&_textarea]:font-mono [&_textarea]:text-sm [&_textarea]:outline-none [&_textarea]:focus:border-ring [&_textarea]:focus:ring-2 [&_textarea]:focus:ring-ring/15">
+    <label className="block text-sm font-medium text-base-content [&_input]:input [&_input]:mt-2 [&_input]:w-full [&_textarea]:textarea [&_textarea]:mt-2 [&_textarea]:w-full [&_textarea]:font-mono">
       <span className="flex items-baseline justify-between gap-3">
         {label}
         {hint ? <small className="text-xs font-normal text-muted-foreground">{hint}</small> : null}

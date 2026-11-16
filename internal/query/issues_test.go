@@ -208,6 +208,25 @@ func TestIssuesRepositoryJoinsStateFiltersFacetsTrendAndCursor(t *testing.T) {
 	if err != nil || len(samples.Events) != 2 {
 		t.Fatalf("production Chrome checkout samples=%+v err=%v", samples, err)
 	}
+	// One event a page: the oldest page can walk back up to the newest.
+	eventFilters.Limit = 1
+	newest, err := events.ListIssueEvents(ctx, eventFilters, "v1:checkout")
+	if err != nil || len(newest.Events) != 1 || newest.NextCursor == "" || newest.NewerCursor != "" {
+		t.Fatalf("newest page=%+v err=%v", newest, err)
+	}
+	eventFilters.Toward = "oldest"
+	oldestPage, err := events.ListIssueEvents(ctx, eventFilters, "v1:checkout")
+	if err != nil || len(oldestPage.Events) != 1 || oldestPage.NextCursor != "" || oldestPage.NewerCursor == "" ||
+		oldestPage.Events[0].EventID == newest.Events[0].EventID {
+		t.Fatalf("oldest page=%+v err=%v", oldestPage, err)
+	}
+	eventFilters.Toward, eventFilters.Cursor = "newer", oldestPage.NewerCursor
+	newerPage, err := events.ListIssueEvents(ctx, eventFilters, "v1:checkout")
+	if err != nil || len(newerPage.Events) != 1 || newerPage.Events[0].EventID != newest.Events[0].EventID ||
+		newerPage.NewerCursor != "" || newerPage.NextCursor == "" {
+		t.Fatalf("newer page=%+v err=%v", newerPage, err)
+	}
+	eventFilters.Toward, eventFilters.Cursor = "", ""
 	if _, err := clickhouse.ExecContext(ctx,
 		`INSERT INTO event_stack_mappings (project_id,event_id,status,failure_code,mapped_stack,mapped_at) VALUES (?,?,?,?,?,?)`,
 		projectID, eventID, "mapped", "", `{"raw":"original","status":"mapped","frames":[]}`, from.Add(30*time.Minute)); err != nil {

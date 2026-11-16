@@ -48,7 +48,7 @@ describe("session filter composer", () => {
     fireEvent.keyDown(window, { key: "/" });
 
     await waitFor(() => expect(document.activeElement).toBe(search));
-    expect(screen.getByText("添加条件")).toBeTruthy();
+    expect(screen.getByRole("listbox", { name: "可添加的条件" })).toBeTruthy();
   });
 
   it("does not steal focus when / is typed in another input", () => {
@@ -64,7 +64,7 @@ describe("session filter composer", () => {
     fireEvent.keyDown(otherInput, { key: "/" });
 
     expect(document.activeElement).toBe(otherInput);
-    expect(screen.queryByText("添加条件")).toBeNull();
+    expect(screen.queryByRole("listbox", { name: "可添加的条件" })).toBeNull();
   });
 
   it("writes a chosen field and value into the query text", async () => {
@@ -77,7 +77,7 @@ describe("session filter composer", () => {
     expect(box.value).toBe("country:");
     await user.click(screen.getByRole("option", { name: /JP/ }));
 
-    expect(box.value).toBe("country:JP");
+    expect(box.value).toBe("country:JP ");
     expect(screen.getByRole("status", { name: "q" }).textContent).toBe("country:JP");
   });
 

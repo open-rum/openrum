@@ -2,7 +2,9 @@ import { MinusIcon, TrendingDownIcon, TrendingUpIcon } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   apiFailureRate,
+  formatAPIFailureRate,
   formatAPIDuration,
+  sampledNote,
   type APISummary,
   type APITrendPoint,
 } from "@/lib/api/apis";
@@ -31,14 +33,18 @@ export function ApiOverview({
         <SummaryCard
           label="请求量"
           value={Math.round(summary.estimated).toLocaleString()}
-          note={`${summary.requests.toLocaleString()} 个采样事件`}
+          note={summary.requests ? (sampledNote(summary) ?? "按全部请求计数") : "暂无请求样本"}
           change={relativeChange(summary.estimated, previous?.estimated)}
           direction="neutral"
         />
         <SummaryCard
           label="失败率"
-          value={`${failureRate.toFixed(2)}%`}
-          note={`${summary.failures.toLocaleString()} 次失败 · 不含 4xx`}
+          value={formatAPIFailureRate(summary)}
+          note={
+            failureRate === null
+              ? "暂无请求样本，无法计算失败率"
+              : `5xx 与网络错误 · 不含 ${summary.clientErrors.toLocaleString()} 次 4xx`
+          }
           change={pointChange(failureRate, previousFailureRate)}
           direction="inverse"
         />
@@ -46,18 +52,24 @@ export function ApiOverview({
           label="P95 延迟"
           value={formatAPIDuration(summary.p95)}
           note={`P50 ${formatAPIDuration(summary.p50)} · P75 ${formatAPIDuration(summary.p75)}`}
-          change={relativeChange(summary.p95, previous?.p95)}
+          change={
+            summary.requests > 0 && previous && previous.requests > 0
+              ? relativeChange(summary.p95, previous.p95)
+              : undefined
+          }
           direction="inverse"
         />
         <SummaryCard
-          label="网络错误"
-          value={summary.networkErrors.toLocaleString()}
-          note={`${summary.serverErrors.toLocaleString()} 次 5xx · ${summary.clientErrors.toLocaleString()} 次 4xx`}
-          change={relativeChange(summary.networkErrors, previous?.networkErrors)}
+          label="失败请求"
+          value={summary.failures.toLocaleString()}
+          note={`${summary.serverErrors.toLocaleString()} 次 5xx · ${summary.networkErrors.toLocaleString()} 次网络错误`}
+          change={relativeChange(summary.failures, previous?.failures)}
           direction="inverse"
         />
       </div>
-      <ApiCharts trend={trend} range={range} scope="全部 endpoint" />
+      {summary.requests > 0 ? (
+        <ApiCharts trend={trend} range={range} scope="全部 endpoint" />
+      ) : null}
     </section>
   );
 }
@@ -115,8 +127,8 @@ function relativeChange(current: number | null, previous: number | null | undefi
   return { text: `${ratio > 0 ? "+" : ""}${ratio.toFixed(1)}%`, sign: sign(ratio) };
 }
 
-function pointChange(current: number, previous: number | undefined): Change {
-  if (previous === undefined) return undefined;
+function pointChange(current: number | null, previous: number | null | undefined): Change {
+  if (current === null || previous === null || previous === undefined) return undefined;
   const difference = current - previous;
   return { text: `${difference > 0 ? "+" : ""}${difference.toFixed(2)}pp`, sign: sign(difference) };
 }

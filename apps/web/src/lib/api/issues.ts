@@ -174,6 +174,7 @@ export const eventDetailSchema = z.object({
 export const issueEventsResponseSchema = z.object({
   events: z.array(eventDetailSchema),
   nextCursor: z.string().optional(),
+  newerCursor: z.string().optional(),
 });
 
 export type IssueDetailResponse = z.infer<typeof issueDetailResponseSchema>;
@@ -242,13 +243,20 @@ export function getIssueDetail(filters: IssueFilters, fingerprint: string, signa
   );
 }
 
+/**
+ * Which page of an Issue's events to read: older than `cursor` (the newest page without one),
+ * newer than `cursor`, or the oldest page. Every page lists newest first.
+ */
+export type IssueEventPage = { cursor?: string; toward?: "newer" | "oldest" };
+
 export function getIssueEvents(
   filters: IssueFilters,
   fingerprint: string,
-  cursor?: string,
+  page: IssueEventPage = {},
   signal?: AbortSignal,
 ) {
-  const parameters = serializeIssueFilters({ ...filters, cursor });
+  const parameters = serializeIssueFilters({ ...filters, cursor: page.cursor });
+  if (page.toward) parameters.set("toward", page.toward);
   parameters.set("limit", "25");
   return requestJSON(
     issueEventsResponseSchema,

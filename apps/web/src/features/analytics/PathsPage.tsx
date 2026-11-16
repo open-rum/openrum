@@ -1,7 +1,8 @@
+import { analysisSessionsHref, pathNodeQuery } from "./investigationLinks";
 import { useQuery } from "@tanstack/react-query";
 import { useParams } from "@tanstack/react-router";
-import { ArrowRightIcon, GitBranchIcon, RefreshCwIcon } from "lucide-react";
-import { useMemo, useState } from "react";
+import { ArrowRightIcon, GitBranchIcon } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ConsoleFilterBar,
   ConsolePage,
@@ -9,7 +10,6 @@ import {
   ConsolePageTabs,
 } from "@/components/layout/ConsolePage";
 import { AsyncError } from "@/components/ui/AsyncState";
-import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { useAnalysisContext } from "@/features/filters/AnalysisContextBar";
 import {
@@ -51,12 +51,28 @@ export function PathsPage() {
       />
     );
   }
-  return <ProjectPaths project={project} />;
+  return <ProjectPaths key={project.id} project={project} />;
 }
 
 function ProjectPaths({ project }: { project: Project }) {
   const analysisContext = useAnalysisContext();
-  const [controls, setControls] = useState<PathControls>({ depth: 5, topN: 20 });
+  const [controls, setControls] = useState<PathControls>(() => {
+    try {
+      const saved = JSON.parse(sessionStorage.getItem(`openrum:paths:${project.id}`) ?? "null");
+      if (saved && [2, 3, 4, 5].includes(saved.depth) && [5, 10, 20].includes(saved.topN))
+        return saved;
+    } catch {
+      /* Use the default controls. */
+    }
+    return { depth: 5, topN: 20 };
+  });
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(`openrum:paths:${project.id}`, JSON.stringify(controls));
+    } catch {
+      /* Current controls remain usable. */
+    }
+  }, [project.id, controls]);
   const to = useMemo(() => roundedMinute(new Date()), []);
   const input = {
     projectId: project.id,
@@ -74,18 +90,7 @@ function ProjectPaths({ project }: { project: Project }) {
     <ConsolePage width="fluid">
       <ConsolePageHeader
         title="用户路径"
-        description="查看会话中最常见的有限事件序列，快速发现用户实际如何到达关键动作。"
-        actions={
-          <Button
-            size="icon"
-            variant="outline"
-            aria-label="刷新用户路径"
-            onClick={() => void query.refetch()}
-            disabled={query.isFetching}
-          >
-            <RefreshCwIcon />
-          </Button>
-        }
+        description="查看会话中最常见的事件序列，了解用户到达关键行为的路径。"
       />
       <ConsolePageTabs>
         <AnalysisTabs projectId={project.id} active="paths" />
@@ -144,12 +149,22 @@ function ProjectPaths({ project }: { project: Project }) {
           onRetry={() => void query.refetch()}
         />
       ) : null}
-      {query.data ? <PathResults data={query.data} /> : null}
+      {query.data ? (
+        <PathResults projectId={project.id} environment={input.environment} data={query.data} />
+      ) : null}
     </ConsolePage>
   );
 }
 
-function PathResults({ data }: { data: Awaited<ReturnType<typeof getPaths>> }) {
+function PathResults({
+  data,
+  projectId,
+  environment,
+}: {
+  data: Awaited<ReturnType<typeof getPaths>>;
+  projectId: string;
+  environment?: string;
+}) {
   if (data.paths.length === 0) {
     return (
       <div className="behavior-panel">
@@ -166,7 +181,7 @@ function PathResults({ data }: { data: Awaited<ReturnType<typeof getPaths>> }) {
       <div className="behavior-panel__header">
         <div>
           <h2 id="path-results-title">常见路径</h2>
-          <p>每个会话最多展示 {data.depth} 步；重复率为近似统计。</p>
+          <p>每个会话最多展示 {data.depth} 步；点击节点查看经过该节点的会话，不限定完整路径。</p>
         </div>
         <span>{data.totalSessions.toLocaleString()} 个会话</span>
       </div>
@@ -177,9 +192,24 @@ function PathResults({ data }: { data: Awaited<ReturnType<typeof getPaths>> }) {
             <div className="path-sequence">
               {path.events.map((event, eventIndex) => (
                 <span className="path-event-group" key={`${event}:${eventIndex}`}>
-                  <span className="path-event" title={event}>
-                    {formatPathEvent(event)}
-                  </span>
+                  {pathNodeQuery(event) ? (
+                    <a
+                      className="path-event link link-hover"
+                      title={`查看经过此节点的会话：${formatPathEvent(event)}`}
+                      href={analysisSessionsHref(
+                        projectId,
+                        { ...data, environment },
+                        pathNodeQuery(event)!,
+                        `${window.location.pathname}${window.location.search}`,
+                      )}
+                    >
+                      {formatPathEvent(event)}
+                    </a>
+                  ) : (
+                    <span className="path-event" title={event}>
+                      {formatPathEvent(event)}
+                    </span>
+                  )}
                   {eventIndex < path.events.length - 1 ? <ArrowRightIcon /> : null}
                 </span>
               ))}

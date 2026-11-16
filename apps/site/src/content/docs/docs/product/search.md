@@ -6,7 +6,7 @@ appliesTo: Alpha
 
 Logs, Issues, Sessions, Events and API share one search box and one search language. The search is plain text, such as `user.id:"customer-123" AND !browser:Chrome`, so you can copy it, paste it and change a value in place. All conditions must match.
 
-You can type the query, or let the box write it. Suggestions follow the caret: while you type a name it suggests fields, and after the colon it offers conditions such as **is not**, **one of** or **contains**, with the field's common values. Choosing a suggestion writes it into the text and puts `AND` between conditions. Field names, operators and values are shown in different colours. Press Enter to run the search (choosing a value runs it straight away, and an edit that has not run yet says 按 Enter 搜索 in the box); the address bar keeps it as `q`, so a copied link opens the same search.
+You can type the query, or let the box write it. Suggestions follow the caret: while you type a name it suggests fields, and after the colon an operator menu at the top offers conditions such as **is not**, **is one of** or **contains**, above the field's common values. Choosing a suggestion writes it into the text and puts `AND` between conditions. Field names, operators and values are shown in different colours. Press Enter to run the search (choosing a value runs it straight away, and an edit that has not run yet says 按 Enter 搜索 in the box); the address bar keeps it as `q`, so a copied link opens the same search.
 
 ## Conditions
 

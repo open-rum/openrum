@@ -1,0 +1,47 @@
+import type { LogEntry } from "@/lib/api/logs";
+
+/** Synthetic data for component tests and local visual previews only. */
+export const logWithTwentyAttributes: LogEntry = {
+  eventId: "13af3016-0096-4e8f-a51b-5a0a6facd321",
+  timestamp: "2026-11-13T05:53:34.343Z",
+  level: "error",
+  message: "payment failed: upstream timeout",
+  logger: "payment",
+  environment: "preview",
+  release: "web@2026.11.13",
+  route: "/checkout",
+  pageUrl: "https://shop.example.com/checkout",
+  browser: "Chrome",
+  deviceType: "desktop",
+  country: "CN",
+  sessionId: "a25753a5-0714-4555-9c99-cd8c20a90722",
+  userId: "preview-customer-1",
+  anonymousUserId: "preview-visitor-1",
+  traceId: "c166203f41292952a96330ebb13b359e",
+  spanId: "8d870b34ffa00e72",
+  sampleRate: 1,
+  attributes: {
+    "error.code": "UPSTREAM_TIMEOUT",
+    "error.message": 'Payment provider returned "timeout" after 30 seconds',
+    "error.stack":
+      "TimeoutError: payment request timed out\n  at submitPayment (checkout.ts:128:9)\n  at handleSubmit (checkout.ts:84:5)",
+    "http.method": "POST",
+    "http.status_code": "504",
+    "http.url":
+      "https://api.example.com/v1/payments/confirm?order_id=preview-order-20261113-001&region=ap-southeast-1",
+    "request.id": "req_preview_8f3b9c20e14a4d7b9e162840f03a65cd",
+    "request.duration_ms": "30012",
+    "payment.provider": "example-pay",
+    "payment.method": "card",
+    "payment.currency": "CNY",
+    "payment.amount": "299.00",
+    "order.id": "preview-order-20261113-001",
+    "order.items_count": "3",
+    "checkout.step": "confirm_payment",
+    "checkout.retry_count": "2",
+    "feature.payment_retry.enabled": "true",
+    "customer.membership": "标准会员",
+    "tag.devdata.journey": "purchase",
+    "debug.note": "<script>preview only</script>\nNo real payment was made.",
+  },
+};

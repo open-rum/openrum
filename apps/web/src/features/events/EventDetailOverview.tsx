@@ -100,7 +100,10 @@ export function EventDetailOverview({
         <div className="behavior-panel__header">
           <div>
             <h2 id="detail-distribution-title">{dimensionLabel(data.dimension)}分布</h2>
-            <p>按次数排序的前 {Math.min(12, data.breakdown.length)} 个值</p>
+            <p>
+              该事件按次数排序的前 {Math.min(12, data.breakdown.length)}{" "}
+              个值，占比以该事件全部匹配次数为分母
+            </p>
           </div>
           <DimensionSelect
             value={dimension}

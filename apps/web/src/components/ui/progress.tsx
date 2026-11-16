@@ -1,27 +1,21 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
-import { Progress as ProgressPrimitive } from "radix-ui";
 
+/** daisyUI's `progress` on a native progress bar; a missing value shows it indeterminate. */
 function Progress({
   className,
   value,
+  max = 100,
   ...props
-}: React.ComponentProps<typeof ProgressPrimitive.Root>) {
+}: Omit<React.ComponentProps<"progress">, "value"> & { value?: number | null }) {
   return (
-    <ProgressPrimitive.Root
+    <progress
       data-slot="progress"
-      className={cn(
-        "relative flex h-1 w-full items-center overflow-x-hidden rounded-full bg-muted",
-        className,
-      )}
+      className={cn("progress progress-primary w-full", className)}
+      value={value ?? undefined}
+      max={max}
       {...props}
-    >
-      <ProgressPrimitive.Indicator
-        data-slot="progress-indicator"
-        className="size-full flex-1 bg-primary transition-all"
-        style={{ transform: `translateX(-${100 - (value || 0)}%)` }}
-      />
-    </ProgressPrimitive.Root>
+    />
   );
 }
 

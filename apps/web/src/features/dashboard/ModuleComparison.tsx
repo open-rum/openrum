@@ -1,8 +1,7 @@
 import { TrendingDownIcon, TrendingUpIcon } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
 import { formatMetric, type ScalarData } from "./adapters";
-import { describeComparison } from "./comparison";
+import { describeComparison, toneBadge } from "./comparison";
 import type { Widget } from "./model";
 
 /**
@@ -26,40 +25,33 @@ export function ModuleComparison({
     ? "样本不足，暂不判定周期变化"
     : `相比上一周期 ${comparison.label}；上一周期 ${previous}`;
   const badge = (
-    <Badge
-      variant="outline"
-      className="dashboard-comparison"
-      data-tone={comparison.tone}
+    <span
+      className={cn("dashboard-comparison badge badge-sm badge-soft", toneBadge[comparison.tone])}
       aria-label={description}
       tabIndex={variant === "corner" ? 0 : undefined}
     >
       {comparison.direction === "up" ? (
-        <TrendingUpIcon aria-hidden="true" />
+        <TrendingUpIcon className="size-3" aria-hidden="true" />
       ) : comparison.direction === "down" ? (
-        <TrendingDownIcon aria-hidden="true" />
+        <TrendingDownIcon className="size-3" aria-hidden="true" />
       ) : null}
       {comparison.label}
-    </Badge>
+    </span>
   );
 
   if (variant === "corner") {
     return (
       <div className="dashboard-comparison-corner">
-        <TooltipProvider delayDuration={150}>
-          <Tooltip>
-            <TooltipTrigger asChild>{badge}</TooltipTrigger>
-            <TooltipContent side="bottom" align="end">
-              {scalar.insufficient ? (
-                "样本不足，暂不判定周期变化"
-              ) : (
-                <span className="grid gap-0.5">
-                  <span>较上一周期 {comparison.label}</span>
-                  <span className="tabular-nums opacity-80">上一周期 {previous}</span>
-                </span>
-              )}
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
+        <div
+          className="tooltip tooltip-bottom tooltip-left"
+          data-tip={
+            scalar.insufficient
+              ? "样本不足，暂不判定周期变化"
+              : `较上一周期 ${comparison.label} · 上一周期 ${previous}`
+          }
+        >
+          {badge}
+        </div>
       </div>
     );
   }
@@ -68,7 +60,7 @@ export function ModuleComparison({
     <div className="dashboard-comparison-row flex flex-wrap items-center gap-2">
       <span title={description}>{badge}</span>
       {comparison.label !== "无对比" ? (
-        <span className="text-xs text-muted-foreground">
+        <span className="text-xs text-base-content/70">
           {scalar.insufficient ? "仅供参考" : "较上一周期"}
         </span>
       ) : null}

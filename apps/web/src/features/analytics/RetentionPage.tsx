@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useParams } from "@tanstack/react-router";
-import { RefreshCwIcon, UsersRoundIcon } from "lucide-react";
+import { UsersRoundIcon } from "lucide-react";
 import { useMemo } from "react";
 import {
   ConsoleFilterBar,
@@ -16,6 +16,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { getRetention } from "@/lib/api/analytics";
 import { listOrganizations, listProjects, type Project } from "@/lib/api/projects";
 import { AnalysisTabs } from "./AnalysisTabs";
+import { retentionCell } from "./retentionCell";
 
 export function RetentionPage() {
   const { projectId } = useParams({ strict: false }) as { projectId?: string };
@@ -48,7 +49,10 @@ function ProjectRetention({ project }: { project: Project }) {
     from: analysisContext?.from ?? new Date(to.getTime() - 28 * 24 * 3_600_000),
     to: analysisContext?.to ?? to,
     environment: analysisContext?.environment,
-    weeks: 4 as const,
+    weeks: (analysisContext &&
+    analysisContext.to.getTime() - analysisContext.from.getTime() > 28 * 24 * 3_600_000
+      ? 8
+      : 4) as 4 | 8,
   };
   const query = useQuery({
     queryKey: ["retention", input],
@@ -59,17 +63,6 @@ function ProjectRetention({ project }: { project: Project }) {
       <ConsolePageHeader
         title="周留存"
         description="按用户首次出现在所选范围的自然周分组，观察后续每周是否再次活跃。"
-        actions={
-          <Button
-            size="icon"
-            variant="outline"
-            aria-label="刷新周留存"
-            onClick={() => void query.refetch()}
-            disabled={query.isFetching}
-          >
-            <RefreshCwIcon />
-          </Button>
-        }
       />
       <ConsolePageTabs>
         <AnalysisTabs projectId={project.id} active="retention" />
@@ -77,10 +70,33 @@ function ProjectRetention({ project }: { project: Project }) {
       <ConsoleFilterBar
         primary={
           <span className="behavior-toolbar__note">
-            展示 4 个自然周 · 首次出现基于全局范围 · 不进行跨设备合并
+            展示 {input.weeks} 个自然周 · 首次出现基于全局范围 · 自然周按 UTC 周一划分 ·
+            不进行跨设备合并
           </span>
         }
       />
+      {analysisContext && input.to.getTime() - input.from.getTime() < 28 * 24 * 3_600_000 ? (
+        <div
+          className="alert alert-soft alert-info alert-vertical items-start text-left sm:alert-horizontal sm:items-center"
+          role="status"
+        >
+          <span>
+            当前范围不足 28 天，可能无法观察后续周留存。扩大范围不会改变所选环境与截止时间。
+          </span>
+          <Button
+            variant="outline"
+            className="w-full sm:w-auto"
+            onClick={() =>
+              analysisContext.update({
+                from: new Date(input.to.getTime() - 28 * 24 * 3_600_000),
+                to: input.to,
+              })
+            }
+          >
+            查看截至所选时间的 28 天
+          </Button>
+        </div>
+      ) : null}
       {query.isLoading ? <RetentionSkeleton compact /> : null}
       {query.error ? (
         <AsyncError
@@ -102,7 +118,7 @@ function RetentionMatrix({ data }: { data: Awaited<ReturnType<typeof getRetentio
         <EmptyState
           icon={UsersRoundIcon}
           title="当前范围没有留存数据"
-          description="至少需要两个自然周的匿名用户行为数据。"
+          description="当前时间与环境下没有可用于分组的匿名用户行为，请调整范围或检查接入。后续留存还需要覆盖对应观察周。"
         />
       </div>
     );
@@ -111,7 +127,7 @@ function RetentionMatrix({ data }: { data: Awaited<ReturnType<typeof getRetentio
       <div className="behavior-panel__header">
         <div>
           <h2 id="retention-title">留存矩阵</h2>
-          <p>W0 为 cohort 用户数；后续单元格显示回访比例。</p>
+          <p>用户列为分组人数，W0 为起始比例；后续单元格显示回访比例。部分周并非最终结果。</p>
         </div>
         <span>近似统计</span>
       </div>
@@ -128,31 +144,31 @@ function RetentionMatrix({ data }: { data: Awaited<ReturnType<typeof getRetentio
           </thead>
           <tbody>
             {data.cohorts.map((cohort) => {
-              const points = new Map(cohort.retention.map((point) => [point.weekIndex, point]));
               return (
                 <tr key={cohort.cohortWeek}>
                   <th>{formatWeek(cohort.cohortWeek)}</th>
                   <td>{cohort.users.toLocaleString()}</td>
                   {Array.from({ length: data.weeks }, (_, weekIndex) => {
-                    const point = points.get(weekIndex);
+                    const cell = retentionCell(data, cohort, weekIndex);
                     return (
                       <td key={weekIndex}>
-                        {point ? (
+                        {cell.rate !== undefined ? (
                           <span
                             className="retention-cell"
                             style={{
-                              // --ds-primary rather than --ds-brand: the cell is
-                              // a filled mark, and brand is darkened for text
-                              // contrast in light mode, which tints the whole
-                              // grid olive. See docs/design.md.
-                              backgroundColor: `color-mix(in srgb, var(--ds-primary) ${Math.max(point.rate * 82, 10)}%, var(--ds-surface))`,
+                              backgroundColor: `color-mix(in srgb, var(--color-primary) ${Math.max(cell.rate * 82, 10)}%, var(--color-base-100))`,
                             }}
-                            title={`${point.users} 位用户`}
+                            title={cell.description}
                           >
-                            {(point.rate * 100).toFixed(0)}%
+                            {cell.label}
                           </span>
                         ) : (
-                          <span className="retention-cell retention-cell--empty">—</span>
+                          <span
+                            className="retention-cell retention-cell--empty"
+                            title={cell.description}
+                          >
+                            {cell.label}
+                          </span>
                         )}
                       </td>
                     );
@@ -164,8 +180,8 @@ function RetentionMatrix({ data }: { data: Awaited<ReturnType<typeof getRetentio
         </table>
       </div>
       <p className="retention-footnote">
-        口径：所选范围内第一次行为所在周为
-        cohort；后续自然周再次出现即记为留存。浏览器清理标识会被视为新用户。
+        口径：所选范围内第一次行为所在周为 cohort；后续自然周再次出现即记为留存。完整观察周未回访为
+        0%；待观察表示自然周未开始，范围外表示当前查询未覆盖，部分周仅展示已覆盖时段。浏览器清理标识会被视为新用户。
       </p>
     </section>
   );

@@ -83,8 +83,8 @@ describe("issues list", () => {
         selection={{ selected: new Set(["v1:issue-1"]), onChange }}
       />,
     );
-    const header = view.getByRole("checkbox", { name: "选择本页全部问题" });
-    expect(header.getAttribute("aria-checked")).toBe("mixed");
+    const header = view.getByRole("checkbox", { name: "选择本页全部问题" }) as HTMLInputElement;
+    expect(header.indeterminate).toBe(true);
     fireEvent.click(view.getByRole("checkbox", { name: "选择问题：TypeError: fixture 0" }));
     expect([...(onChange.mock.calls[0][0] as Set<string>)].sort()).toEqual([
       "v1:issue-0",

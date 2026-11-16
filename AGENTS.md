@@ -22,6 +22,12 @@ in the same change. Chinese internal links use `/zh/docs/`; English links use
 never internal branch names such as `main`. The site content tests enforce path
 parity, localized links, and this public-version boundary.
 
+### Console UI
+
+The Console (`apps/web`) uses daisyUI 5. Before changing any Console component, page style,
+theme, colour, radius or spacing, read `docs/agents/console-ui.md` and load the `daisyui`
+skill. The public site and docs keep `docs/design.md` and `packages/design-tokens`.
+
 ### Time-series charts
 
 Before changing Console trend charts, aggregation intervals, point budgets,

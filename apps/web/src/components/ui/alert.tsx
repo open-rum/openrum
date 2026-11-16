@@ -3,16 +3,16 @@ import { cva, type VariantProps } from "class-variance-authority";
 
 import { cn } from "@/lib/utils";
 
+// daisyUI's `alert`, stacked so a title sits above its description beside the icon.
 const alertVariants = cva(
-  "group/alert relative grid w-full gap-0.5 rounded-2xl border px-4 py-3 text-left text-sm has-data-[slot=alert-action]:relative has-data-[slot=alert-action]:pr-18 has-[>svg]:grid-cols-[auto_1fr] has-[>svg]:gap-x-2 *:[svg]:row-span-2 *:[svg]:translate-y-0.5 *:[svg]:text-current *:[svg:not([class*='size-'])]:size-4",
+  "alert group/alert relative w-full grid-flow-row justify-items-start gap-0.5 text-left text-sm has-data-[slot=alert-action]:pr-18 has-[>svg]:grid-cols-[auto_1fr] has-[>svg]:gap-x-2 *:[svg]:row-span-2 *:[svg]:translate-y-0.5 *:[svg:not([class*='size-'])]:size-4",
   {
     variants: {
       variant: {
-        default: "bg-card text-card-foreground",
-        warning:
-          "border-[color-mix(in_srgb,var(--ds-warning)_45%,var(--ds-border))] bg-[var(--ds-warning-soft)] text-foreground *:data-[slot=alert-description]:text-foreground/75 *:[svg]:text-[var(--ds-warning)]",
-        destructive:
-          "bg-card text-destructive *:data-[slot=alert-description]:text-destructive/90 *:[svg]:text-current",
+        default: "",
+        info: "alert-info alert-soft",
+        warning: "alert-warning alert-soft",
+        destructive: "alert-error alert-soft",
       },
     },
     defaultVariants: {
@@ -40,10 +40,7 @@ function AlertTitle({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="alert-title"
-      className={cn(
-        "font-medium group-has-[>svg]/alert:col-start-2 [&_a]:underline [&_a]:underline-offset-3 [&_a]:hover:text-foreground",
-        className,
-      )}
+      className={cn("font-semibold group-has-[>svg]/alert:col-start-2 [&_a]:link", className)}
       {...props}
     />
   );
@@ -54,7 +51,7 @@ function AlertDescription({ className, ...props }: React.ComponentProps<"div">) 
     <div
       data-slot="alert-description"
       className={cn(
-        "text-sm text-balance text-muted-foreground md:text-pretty [&_a]:underline [&_a]:underline-offset-3 [&_a]:hover:text-foreground [&_p:not(:last-child)]:mb-4",
+        "text-sm text-balance opacity-80 group-has-[>svg]/alert:col-start-2 md:text-pretty [&_a]:link [&_p:not(:last-child)]:mb-4",
         className,
       )}
       {...props}

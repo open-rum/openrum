@@ -1,18 +1,19 @@
 import { useId, useState } from "react";
-import { useMutation } from "@tanstack/react-query";
-import { Link } from "@tanstack/react-router";
-import { LoaderCircleIcon } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { LoaderCircleIcon, XIcon } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   Sheet,
   SheetContent,
@@ -22,7 +23,6 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Switch } from "@/components/ui/switch";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
   alertMetrics,
   createAlert,
@@ -34,8 +34,11 @@ import {
   type NotificationChannel,
 } from "@/lib/api/alerts";
 import type { Project } from "@/lib/api/projects";
+import { notificationTargets } from "./alertPresentation";
 import { HTTPError } from "@/lib/auth/session";
 import { ChannelKindIcon } from "@/features/settings/channels/ChannelKindIcon";
+import { ChannelDialog, type ChannelDialogState } from "@/features/settings/channels/ChannelDialog";
+import { channelKinds } from "@/features/settings/channels/channelKinds";
 import {
   blankRule,
   comparatorLabels,
@@ -47,7 +50,7 @@ import {
   validateRule,
   windowOptions,
 } from "./alertRules";
-import { projectEnvironments } from "@/lib/projects/environments";
+import { environmentLabel, projectEnvironments } from "@/lib/projects/environments";
 
 export type RuleEditorState =
   | { mode: "create"; initial?: AlertRuleInput }
@@ -105,23 +108,21 @@ export function RuleEditor({
   onSaved: (message: string) => void;
 }) {
   const id = useId();
-  const editing = state.mode === "edit";
-  const [input, setInput] = useState(() => initialInput(state, rules, defaultEnvironment));
-  const [thresholdText, setThresholdText] = useState(() => String(input.threshold));
+  const queryClient = useQueryClient();
+  const [channelEditor, setChannelEditor] = useState<ChannelDialogState | null>(null);
+  const [channelNotice, setChannelNotice] = useState("");
+  const [discarding, setDiscarding] = useState(false);
+  const [initial] = useState(() => initialInput(state, rules, defaultEnvironment));
+  const [input, setInput] = useState(initial);
+  const [thresholdText, setThresholdText] = useState(() => String(initial.threshold));
   const [touched, setTouched] = useState(false);
+  const editing = state.mode === "edit";
   const errors = validateRule(input);
-  const valid = Object.keys(errors).length === 0;
   const definition = metricDefinitions[input.metric];
   const selectedChannels = channels.filter((channel) => input.channelIds.includes(channel.id));
-  const environments = Array.from(
-    new Set([
-      ...projectEnvironments.map((item) => item.id),
-      ...(input.environment ? [input.environment] : []),
-    ]),
-  );
+  const targets = notificationTargets(input, channels);
   const update = (patch: Partial<AlertRuleInput>) =>
     setInput((current) => ({ ...current, ...patch }));
-
   const save = useMutation({
     mutationFn: () =>
       editing
@@ -130,252 +131,373 @@ export function RuleEditor({
     onSuccess: (rule) =>
       onSaved(editing ? `已保存规则「${rule.name}」。` : `已创建规则「${rule.name}」。`),
   });
+  const requestClose = () => {
+    if (save.isPending) return;
+    if (JSON.stringify(input) !== JSON.stringify(initial)) setDiscarding(true);
+    else onClose();
+  };
   const serverMessage =
     save.error instanceof HTTPError && save.error.status === 409
       ? "这个项目里已有同名规则，请换一个名称。"
-      : save.error instanceof HTTPError && save.error.status === 400
-        ? "规则设置无效，请检查各项取值。"
-        : save.error
-          ? "保存失败，请稍后重试。"
-          : "";
-
+      : save.error
+        ? "保存失败，草稿已保留，请检查后重试。"
+        : "";
+  const environments = Array.from(
+    new Set([
+      ...projectEnvironments.map((item) => item.id),
+      ...(input.environment ? [input.environment] : []),
+    ]),
+  );
   return (
-    <Sheet open onOpenChange={(open) => !open && onClose()}>
+    <Sheet open onOpenChange={(open) => !open && requestClose()}>
       <SheetContent
-        style={{ width: "min(100vw, 560px)", maxWidth: "none" }}
-        className="flex flex-col"
+        style={{ width: "min(100vw, 920px)", maxWidth: "none" }}
+        showCloseButton={false}
       >
-        <SheetHeader>
-          <SheetTitle>{editing ? "编辑告警规则" : "新建告警规则"}</SheetTitle>
-          <SheetDescription>
-            {project.name} · 规则每分钟评估一次，按固定时间窗口统计。
-          </SheetDescription>
+        <SheetHeader className="border-b border-base-300 pr-14">
+          <SheetTitle>
+            {editing
+              ? "编辑告警规则"
+              : state.mode === "duplicate"
+                ? "复制告警规则"
+                : "新建告警规则"}
+          </SheetTitle>
+          <SheetDescription>{project.name} · 配置监控条件与通知去向</SheetDescription>
         </SheetHeader>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          className="absolute top-4 right-4"
+          onClick={requestClose}
+          aria-label="关闭规则编辑器"
+        >
+          <XIcon />
+        </Button>
         <form
           id={`${id}-form`}
           noValidate
-          className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto px-4 pb-4"
+          className="grid min-h-0 flex-1 gap-6 overflow-y-auto px-4 pb-6 md:grid-cols-[minmax(0,1fr)_240px]"
           onSubmit={(event) => {
             event.preventDefault();
             setTouched(true);
-            if (valid) save.mutate();
+            if (!Object.keys(errors).length) save.mutate();
+            else document.getElementById(`${id}-${errors.name ? "name" : "threshold"}`)?.focus();
           }}
         >
-          <Field data-invalid={touched && Boolean(errors.name)}>
-            <FieldLabel htmlFor={`${id}-name`}>规则名称</FieldLabel>
-            <Input
-              id={`${id}-name`}
-              value={input.name}
-              maxLength={120}
-              placeholder="如：结账页错误率突增"
-              aria-invalid={touched && Boolean(errors.name)}
-              onChange={(event) => update({ name: event.target.value })}
-            />
-            {touched && errors.name ? <FieldError>{errors.name}</FieldError> : null}
-          </Field>
-
-          <Field>
-            <FieldLabel htmlFor={`${id}-metric`}>指标</FieldLabel>
-            <Select
-              value={input.metric}
-              onValueChange={(value) => update({ metric: value as AlertMetric })}
-            >
-              <SelectTrigger id={`${id}-metric`} className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {alertMetrics.map((metric) => (
-                  <SelectItem key={metric} value={metric}>
-                    {metricDefinitions[metric].label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <FieldDescription>{definition.description}</FieldDescription>
-          </Field>
-
-          <Field data-invalid={touched && Boolean(errors.threshold)}>
-            <FieldLabel htmlFor={`${id}-threshold`}>触发条件</FieldLabel>
-            <div className="flex gap-2">
-              <Select
-                value={input.comparator}
-                onValueChange={(value) => update({ comparator: value as AlertComparator })}
-              >
-                <SelectTrigger className="w-24" aria-label="比较方式">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="gte">{comparatorLabels.gte} 达到</SelectItem>
-                  <SelectItem value="gt">{comparatorLabels.gt} 超过</SelectItem>
-                </SelectContent>
-              </Select>
-              <div className="relative flex-1">
+          <div className="flex min-w-0 flex-col gap-6">
+            <fieldset className="fieldset gap-4">
+              <legend className="fieldset-legend text-base">1. 监控对象</legend>
+              <Field>
+                <FieldLabel htmlFor={`${id}-name`}>规则名称</FieldLabel>
                 <Input
-                  id={`${id}-threshold`}
-                  inputMode="decimal"
-                  value={thresholdText}
-                  aria-invalid={touched && Boolean(errors.threshold)}
-                  className="pr-10"
-                  onChange={(event) => {
-                    setThresholdText(event.target.value);
-                    const parsed = Number(event.target.value);
-                    update({ threshold: event.target.value.trim() === "" ? Number.NaN : parsed });
-                  }}
+                  id={`${id}-name`}
+                  value={input.name}
+                  maxLength={120}
+                  placeholder="例如：生产环境错误率超标"
+                  aria-invalid={touched && Boolean(errors.name)}
+                  onChange={(event) => update({ name: event.target.value })}
                 />
-                <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm text-muted-foreground">
-                  {definition.unitLabel}
-                </span>
+                {touched && errors.name ? <FieldError>{errors.name}</FieldError> : null}
+              </Field>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field>
+                  <FieldLabel htmlFor={`${id}-metric`}>指标</FieldLabel>
+                  <select
+                    id={`${id}-metric`}
+                    className="select w-full"
+                    value={input.metric}
+                    onChange={(event) => {
+                      const metric = event.target.value as AlertMetric;
+                      const threshold =
+                        metric === "lcp_p75"
+                          ? 2500
+                          : metric === "error_count"
+                            ? 10
+                            : metric === "api_failure_rate"
+                              ? 5
+                              : 2;
+                      update({ metric, threshold });
+                      setThresholdText(String(threshold));
+                    }}
+                  >
+                    {alertMetrics.map((metric) => (
+                      <option key={metric} value={metric}>
+                        {metricDefinitions[metric].label}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor={`${id}-environment`}>环境</FieldLabel>
+                  <select
+                    id={`${id}-environment`}
+                    className="select w-full"
+                    value={input.environment || allEnvironments}
+                    onChange={(event) =>
+                      update({
+                        environment:
+                          event.target.value === allEnvironments ? "" : event.target.value,
+                      })
+                    }
+                  >
+                    <option value={allEnvironments}>全部环境（合并评估）</option>
+                    {environments.map((environment) => (
+                      <option key={environment} value={environment}>
+                        {environmentLabel(environment)} · {environment}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
               </div>
-            </div>
-            {touched && errors.threshold ? <FieldError>{errors.threshold}</FieldError> : null}
-          </Field>
-
-          <Field>
-            <FieldLabel id={`${id}-window`}>统计窗口</FieldLabel>
-            <ToggleGroup
-              type="single"
-              variant="outline"
-              aria-labelledby={`${id}-window`}
-              value={String(input.windowMinutes)}
-              onValueChange={(value) => value && update({ windowMinutes: Number(value) })}
-            >
-              {windowOptions.map((minutes) => (
-                <ToggleGroupItem key={minutes} value={String(minutes)}>
-                  {formatDuration(minutes)}
-                </ToggleGroupItem>
-              ))}
-            </ToggleGroup>
-            <FieldDescription>
-              每个窗口结束后统计一次，窗口越短越灵敏，也越容易误报。
-            </FieldDescription>
-          </Field>
-
-          <div className="grid gap-6 sm:grid-cols-2">
-            <Field>
-              <FieldLabel htmlFor={`${id}-environment`}>环境</FieldLabel>
-              <Select
-                value={input.environment || allEnvironments}
-                onValueChange={(value) =>
-                  update({ environment: value === allEnvironments ? "" : value })
-                }
-              >
-                <SelectTrigger id={`${id}-environment`} className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={allEnvironments}>全部环境</SelectItem>
-                  {environments.map((environment) => (
-                    <SelectItem key={environment} value={environment}>
-                      {environment}
-                    </SelectItem>
+              <p className="text-sm text-base-content/70">{definition.description}</p>
+            </fieldset>
+            <fieldset className="fieldset gap-4 border-t border-base-300">
+              <legend className="fieldset-legend text-base">2. 触发条件</legend>
+              <Field>
+                <FieldLabel htmlFor={`${id}-threshold`}>触发条件</FieldLabel>
+                <div className="flex gap-2">
+                  <select
+                    className="select w-28"
+                    aria-label="比较方式"
+                    value={input.comparator}
+                    onChange={(event) =>
+                      update({ comparator: event.target.value as AlertComparator })
+                    }
+                  >
+                    <option value="gte">{comparatorLabels.gte} 达到</option>
+                    <option value="gt">{comparatorLabels.gt} 超过</option>
+                  </select>
+                  <label className="input min-w-0 flex-1">
+                    <input
+                      id={`${id}-threshold`}
+                      inputMode="decimal"
+                      className="min-w-0 w-full"
+                      value={thresholdText}
+                      aria-invalid={touched && Boolean(errors.threshold)}
+                      onChange={(event) => {
+                        setThresholdText(event.target.value);
+                        update({
+                          threshold:
+                            event.target.value.trim() === ""
+                              ? Number.NaN
+                              : Number(event.target.value),
+                        });
+                      }}
+                    />
+                    <span className="text-base-content/70">{definition.unitLabel}</span>
+                  </label>
+                </div>
+                {touched && errors.threshold ? <FieldError>{errors.threshold}</FieldError> : null}
+              </Field>
+              <Field>
+                <FieldLabel htmlFor={`${id}-window`}>统计窗口</FieldLabel>
+                <select
+                  id={`${id}-window`}
+                  className="select w-full"
+                  value={input.windowMinutes}
+                  onChange={(event) => update({ windowMinutes: Number(event.target.value) })}
+                >
+                  {windowOptions.map((minutes) => (
+                    <option key={minutes} value={minutes}>
+                      {formatDuration(minutes)}
+                    </option>
                   ))}
-                </SelectContent>
-              </Select>
-            </Field>
-            <Field>
-              <FieldLabel htmlFor={`${id}-cooldown`}>冷却时间</FieldLabel>
-              <Select
-                value={String(input.cooldownMinutes)}
-                onValueChange={(value) => update({ cooldownMinutes: Number(value) })}
-              >
-                <SelectTrigger id={`${id}-cooldown`} className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
+                </select>
+                <FieldDescription>
+                  每分钟检查最近已完成的固定窗口，不是滑动窗口。短窗口响应更快，也更容易受到偶发波动影响。
+                </FieldDescription>
+              </Field>
+            </fieldset>
+            <fieldset className="fieldset gap-4 border-t border-base-300">
+              <legend className="fieldset-legend text-base">3. 通知设置</legend>
+              <Field>
+                <FieldLabel id={`${id}-channels`}>通知渠道</FieldLabel>
+                {channels.length ? (
+                  <ul className="grid gap-2" aria-labelledby={`${id}-channels`}>
+                    {channels.map((channel) => (
+                      <li key={channel.id}>
+                        <label className="flex cursor-pointer items-center gap-3 rounded-field border border-base-300 p-3">
+                          <input
+                            type="checkbox"
+                            className="checkbox checkbox-sm"
+                            checked={input.channelIds.includes(channel.id)}
+                            disabled={!channel.enabled && !input.channelIds.includes(channel.id)}
+                            onChange={(event) =>
+                              update({
+                                channelIds: event.target.checked
+                                  ? [...input.channelIds, channel.id]
+                                  : input.channelIds.filter((value) => value !== channel.id),
+                              })
+                            }
+                          />
+                          <ChannelKindIcon kind={channel.kind} size="sm" />
+                          <span className="min-w-0 flex-1 break-words">
+                            {channel.name}
+                            {!channel.enabled ? (
+                              <span className="ml-2 text-base-content/70">（已停用）</span>
+                            ) : null}
+                          </span>
+                        </label>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-sm text-base-content/70">
+                    还没有渠道。可以先创建仅在控制台记录的规则，之后再添加通知。
+                  </p>
+                )}
+                {canManageChannels ? (
+                  <div className="flex flex-wrap gap-2">
+                    {channelKinds
+                      .filter((kind) => kind.status === "available")
+                      .map((kind) => (
+                        <Button
+                          key={kind.id}
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setChannelEditor({ mode: "create", kind })}
+                        >
+                          添加{kind.name}渠道
+                        </Button>
+                      ))}
+                  </div>
+                ) : (
+                  <FieldDescription>通知渠道由组织的 Owner 或 Admin 配置。</FieldDescription>
+                )}
+                {channelNotice ? (
+                  <p role="status" className="text-sm text-base-content/70">
+                    {channelNotice} 请勾选要通知的渠道。
+                  </p>
+                ) : null}
+                {errors.channelIds ? <FieldError>{errors.channelIds}</FieldError> : null}
+              </Field>
+              <Field>
+                <FieldLabel htmlFor={`${id}-cooldown`}>重复通知间隔</FieldLabel>
+                <select
+                  id={`${id}-cooldown`}
+                  className="select w-full"
+                  value={input.cooldownMinutes}
+                  onChange={(event) => update({ cooldownMinutes: Number(event.target.value) })}
+                >
                   {Array.from(new Set([...cooldownOptions, input.cooldownMinutes]))
                     .sort((a, b) => a - b)
                     .map((minutes) => (
-                      <SelectItem key={minutes} value={String(minutes)}>
+                      <option key={minutes} value={minutes}>
                         {formatDuration(minutes)}
-                      </SelectItem>
+                      </option>
                     ))}
-                </SelectContent>
-              </Select>
-            </Field>
-          </div>
-
-          <Field data-invalid={Boolean(errors.channelIds)}>
-            <FieldLabel id={`${id}-channels`}>通知渠道</FieldLabel>
-            {channels.length ? (
-              <ul className="grid gap-2 sm:grid-cols-2" aria-labelledby={`${id}-channels`}>
-                {channels.map((channel) => {
-                  const selected = input.channelIds.includes(channel.id);
-                  return (
-                    <li key={channel.id}>
-                      <button
-                        type="button"
-                        aria-pressed={selected}
-                        onClick={() =>
-                          update({
-                            channelIds: selected
-                              ? input.channelIds.filter((item) => item !== channel.id)
-                              : [...input.channelIds, channel.id],
-                          })
-                        }
-                        className="alert-channel-option flex w-full items-center gap-2 rounded-xl border px-3 py-2 text-left text-sm"
-                      >
-                        <ChannelKindIcon kind={channel.kind} size="sm" />
-                        <span className="min-w-0 flex-1 truncate">{channel.name}</span>
-                        {!channel.enabled ? <Badge variant="secondary">已停用</Badge> : null}
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                组织里还没有通知渠道，规则触发时只在控制台记录。
+                </select>
+                <FieldDescription>
+                  通知成功后，在此间隔内继续命中阈值只记录，不重复发送。
+                </FieldDescription>
+              </Field>
+              <Field orientation="horizontal">
+                <Switch
+                  id={`${id}-enabled`}
+                  checked={input.enabled}
+                  onCheckedChange={(enabled) => update({ enabled })}
+                />
+                <FieldLabel htmlFor={`${id}-enabled`} className="font-normal">
+                  {editing ? "启用这条规则" : "保存后立即启用"}
+                </FieldLabel>
+              </Field>
+            </fieldset>
+            {serverMessage ? (
+              <p role="alert" className="alert alert-soft alert-error">
+                {serverMessage}
               </p>
-            )}
-            <FieldDescription>
-              {canManageChannels ? (
-                <Link to="/settings/org/channels" className="underline underline-offset-4">
-                  {channels.length ? "管理通知渠道" : "去添加通知渠道，比如飞书群机器人"}
-                </Link>
-              ) : (
-                "通知渠道由组织的 Owner 或 Admin 配置。"
-              )}
-            </FieldDescription>
-            {errors.channelIds ? <FieldError>{errors.channelIds}</FieldError> : null}
-          </Field>
-
-          <Field orientation="horizontal">
-            <Switch
-              id={`${id}-enabled`}
-              checked={input.enabled}
-              onCheckedChange={(enabled) => update({ enabled })}
-            />
-            <FieldLabel htmlFor={`${id}-enabled`} className="font-normal">
-              保存后立即启用
-            </FieldLabel>
-          </Field>
-
-          <p className="rounded-md bg-muted px-3 py-2.5 text-sm" aria-live="polite">
-            {Number.isFinite(input.threshold)
-              ? ruleSummary(
-                  input,
-                  selectedChannels.map((channel) => channel.name),
-                )
-              : "填写阈值后，这里会用一句话概括这条规则。"}
-          </p>
-          {serverMessage ? (
-            <p role="alert" className="text-sm text-destructive">
-              {serverMessage}
-            </p>
-          ) : null}
-        </form>
-        <SheetFooter className="flex-row justify-end border-t">
-          <Button type="button" variant="outline" onClick={onClose}>
-            取消
-          </Button>
-          <Button type="submit" form={`${id}-form`} disabled={save.isPending}>
-            {save.isPending ? (
-              <LoaderCircleIcon className="animate-spin" data-icon="inline-start" />
             ) : null}
-            {editing ? "保存修改" : "创建规则"}
-          </Button>
+          </div>
+          <aside className="self-start md:sticky md:top-0">
+            <div className="card card-border bg-base-200">
+              <div className="card-body gap-4">
+                <h2 className="font-semibold">规则预览</h2>
+                <p className="text-sm" aria-live="polite">
+                  {Number.isFinite(input.threshold)
+                    ? ruleSummary(
+                        input,
+                        selectedChannels
+                          .filter((channel) => channel.enabled)
+                          .map((channel) => channel.name),
+                        targets.warning,
+                      )
+                    : "填写阈值后查看触发条件。"}
+                </p>
+                <dl className="grid gap-4 border-t border-base-300 pt-4 text-sm">
+                  <div>
+                    <dt className="text-base-content/70">保存后的状态</dt>
+                    <dd className="mt-1">
+                      {input.enabled ? "启用，等待窗口评估" : "停用，暂不评估"}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-base-content/70">通知去向</dt>
+                    <dd className="mt-1 break-words">{targets.label}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-base-content/70">发生异常后</dt>
+                    <dd className="mt-1">查看触发记录 → 检查渠道结果 → 进入诊断</dd>
+                  </div>
+                </dl>
+              </div>
+            </div>
+            {targets.warning ? (
+              <p role="status" className="alert alert-soft alert-warning mt-3 text-sm">
+                选中的部分渠道不可用，请检查后保存。
+              </p>
+            ) : null}
+          </aside>
+        </form>
+        <SheetFooter className="flex-row items-center justify-between border-t border-base-300">
+          <p className="text-xs text-base-content/70">
+            {input.enabled ? "保存后生效" : "保存为停用规则"}
+          </p>
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={requestClose}
+              disabled={save.isPending}
+            >
+              取消
+            </Button>
+            <Button type="submit" form={`${id}-form`} disabled={save.isPending}>
+              {save.isPending ? <LoaderCircleIcon className="animate-spin" /> : null}
+              {editing ? "保存修改" : "创建规则"}
+            </Button>
+          </div>
         </SheetFooter>
       </SheetContent>
+      {channelEditor ? (
+        <ChannelDialog
+          organizationId={project.organizationId}
+          state={channelEditor}
+          onClose={() => setChannelEditor(null)}
+          onSaved={(message) => {
+            setChannelEditor(null);
+            setChannelNotice(message);
+            void queryClient.invalidateQueries({ queryKey: ["channels", project.organizationId] });
+          }}
+        />
+      ) : null}
+      <AlertDialog open={discarding} onOpenChange={setDiscarding}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>放弃未保存的修改？</AlertDialogTitle>
+            <AlertDialogDescription>
+              这条规则尚未保存。可以继续编辑，或放弃本次修改。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>继续编辑</AlertDialogCancel>
+            <AlertDialogAction variant="destructive" onClick={onClose}>
+              放弃修改
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Sheet>
   );
 }

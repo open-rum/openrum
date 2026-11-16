@@ -98,7 +98,7 @@ function ProjectInsights({ project }: { project: Project }) {
     <ConsolePage width="wide">
       <ConsolePageHeader
         title="洞察"
-        description="用明确指标说明为什么值得关注，并保留时间与分群上下文直达原始证据。"
+        description="基于明确指标列出值得关注的变化，并可跳转到对应时间与分群的原始数据。"
       />
       <ConsolePageContent className="grid gap-6">
         <div className="insights-summary">

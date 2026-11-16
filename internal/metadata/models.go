@@ -122,9 +122,12 @@ type Project struct {
 	// while the limit was a constant shared by all of them.
 	IngestRateLimit   *int32
 	OverLimitBehavior OverLimitBehavior
-	Status            ProjectStatus
-	CreatedAt         time.Time
-	UpdatedAt         time.Time
+	// RevenueCurrency is the ISO 4217 code the Console labels revenue with, or empty
+	// for none. It is a label only: amounts are never converted.
+	RevenueCurrency string
+	Status          ProjectStatus
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
 }
 
 // FixedEnvironments is the whole set a project can report under: 开发, 测试, 灰度 and

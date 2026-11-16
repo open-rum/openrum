@@ -36,6 +36,8 @@ export type Project = {
   overLimitBehavior: OverLimitBehavior;
   /** What "default" currently means, so the Console does not hard-code it. */
   defaultIngestRateLimit: number;
+  /** ISO 4217 code revenue is labelled with, or empty when none was chosen. Never converts. */
+  revenueCurrency?: string;
   status: ProjectStatus;
   role: OrganizationRole;
   createdAt: string;
@@ -154,6 +156,8 @@ export type ProjectUpdate = {
    */
   ingestRateLimit?: number | null;
   overLimitBehavior?: OverLimitBehavior;
+  /** An ISO 4217 code from `REVENUE_CURRENCIES`, or an empty string to clear it. */
+  revenueCurrency?: string;
   status?: Exclude<ProjectStatus, "deleting">;
 };
 

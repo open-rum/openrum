@@ -1,16 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CheckIcon, EyeOffIcon, RotateCcwIcon, UserRoundIcon } from "lucide-react";
+import { CheckIcon, ChevronDownIcon, EyeOffIcon, RotateCcwIcon, UserRoundIcon } from "lucide-react";
 import { toast } from "sonner";
 import { MemberLabel } from "@/components/account/MemberLabel";
-import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { DaisyDropdown } from "@/components/daisy/DaisyDropdown";
 import { batchUpdateIssues, type IssuesResponse, type StoredIssueStatus } from "@/lib/api/issues";
 import { listMembers, type Project } from "@/lib/api/projects";
 
@@ -47,58 +39,80 @@ export function IssueBulkBar({
   return (
     <div className="issue-bulk-bar" role="toolbar" aria-label="批量操作">
       <strong aria-live="polite">已选 {selected.length} 个问题</strong>
-      <Button size="sm" disabled={busy} onClick={() => mutation.mutate({ status: "resolved" })}>
-        <CheckIcon data-icon="inline-start" />
+      <button
+        type="button"
+        className="btn btn-sm btn-primary"
+        disabled={busy}
+        onClick={() => mutation.mutate({ status: "resolved" })}
+      >
+        <CheckIcon className="size-4" aria-hidden="true" />
         标记解决
-      </Button>
-      <Button
-        size="sm"
-        variant="outline"
+      </button>
+      <button
+        type="button"
+        className="btn btn-sm"
         disabled={busy}
         onClick={() => mutation.mutate({ status: "ignored" })}
       >
-        <EyeOffIcon data-icon="inline-start" />
+        <EyeOffIcon className="size-4" aria-hidden="true" />
         忽略
-      </Button>
-      <Button
-        size="sm"
-        variant="outline"
+      </button>
+      <button
+        type="button"
+        className="btn btn-sm"
         disabled={busy}
         onClick={() => mutation.mutate({ status: "unresolved" })}
       >
-        <RotateCcwIcon data-icon="inline-start" />
+        <RotateCcwIcon className="size-4" aria-hidden="true" />
         重新打开
-      </Button>
-      {/* Controlled and always empty, so the control keeps reading 「分配给…」 after a pick. */}
-      <Select
-        value=""
+      </button>
+      <DaisyDropdown
+        label="批量分配负责人"
+        title={members.error ? "成员列表加载失败，暂不可分配" : "分配给…"}
+        triggerClassName="btn btn-sm"
+        menuClassName="max-h-80 w-56 flex-nowrap overflow-y-auto"
+        placement="start"
         disabled={busy || members.isLoading || Boolean(members.error)}
-        onValueChange={(value) =>
-          mutation.mutate({ assigneeUserId: value === "none" ? "" : value })
+        trigger={
+          <>
+            <UserRoundIcon className="size-4" aria-hidden="true" />
+            分配给…
+            <ChevronDownIcon className="size-3 opacity-60" aria-hidden="true" />
+          </>
         }
       >
-        <SelectTrigger
-          size="sm"
-          aria-label="批量分配负责人"
-          title={members.error ? "成员列表加载失败，暂不可分配" : "分配给…"}
-        >
-          <UserRoundIcon data-icon="inline-start" />
-          <SelectValue placeholder="分配给…" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectGroup>
-            <SelectItem value="none">未分配</SelectItem>
+        {(close) => (
+          <>
+            <li>
+              <button
+                type="button"
+                onClick={() => {
+                  close();
+                  mutation.mutate({ assigneeUserId: "" });
+                }}
+              >
+                未分配
+              </button>
+            </li>
             {members.data?.members.map((member) => (
-              <SelectItem key={member.userId} value={member.userId}>
-                <MemberLabel member={member} />
-              </SelectItem>
+              <li key={member.userId}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    close();
+                    mutation.mutate({ assigneeUserId: member.userId });
+                  }}
+                >
+                  <MemberLabel member={member} />
+                </button>
+              </li>
             ))}
-          </SelectGroup>
-        </SelectContent>
-      </Select>
-      <Button size="sm" variant="ghost" disabled={busy} onClick={onClear}>
+          </>
+        )}
+      </DaisyDropdown>
+      <button type="button" className="btn btn-sm btn-ghost" disabled={busy} onClick={onClear}>
         取消选择
-      </Button>
+      </button>
     </div>
   );
 }

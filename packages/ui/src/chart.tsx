@@ -66,6 +66,8 @@ function ChartContainer({
   return (
     <ChartContext.Provider value={{ config }}>
       <div
+        // An aria-label on a role-less div is prohibited and ignored; a labelled chart is an image.
+        role={props["aria-label"] ? "img" : undefined}
         data-slot="chart"
         data-chart={chartId}
         className={cn(
