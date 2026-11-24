@@ -118,7 +118,7 @@ func TestConnectionStatusTracksSDKHistoryIndependentlyOfRecentEvents(t *testing.
 		t.Run(test.name, func(t *testing.T) {
 			handler := NewConnectionStatusHandler(fakeConnectionKeys{keys: test.keys}, fakeConnectionReader{status: test.status}, zerolog.Nop())
 			router := connectionStatusTestRouter(handler, uuid.New())
-			request := httptest.NewRequest(http.MethodGet, "/api/v1/projects/"+uuid.NewString()+"/connection-status", nil)
+			request := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/api/v1/projects/"+uuid.NewString()+"/connection-status", nil)
 			request.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "valid"})
 			response := httptest.NewRecorder()
 			router.ServeHTTP(response, request)

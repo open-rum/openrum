@@ -19,12 +19,14 @@ import (
 
 // Every expected number below is worked out from the raw Events this test inserts, not
 // read back from the aggregates: the point is to prove the catalog's merge expressions
-// reproduce what the raw data says.
+// reproduce what the raw data says. Anchored to yesterday at 10:00 UTC so 10-day and
+// 40-day lookback rows never age past ClickHouse's 90-day aggregate TTL.
 var (
-	metricsFrom = time.Date(2026, 9, 2, 10, 0, 0, 0, time.UTC)
-	metricsEnd  = time.Date(2026, 9, 2, 11, 0, 0, 0, time.UTC)
-	early       = time.Date(2026, 9, 2, 10, 12, 30, 0, time.UTC)
-	late        = time.Date(2026, 9, 2, 10, 47, 30, 0, time.UTC)
+	metricsDay  = time.Now().UTC().AddDate(0, 0, -1)
+	metricsFrom = time.Date(metricsDay.Year(), metricsDay.Month(), metricsDay.Day(), 10, 0, 0, 0, time.UTC)
+	metricsEnd  = metricsFrom.Add(time.Hour)
+	early       = metricsFrom.Add(12*time.Minute + 30*time.Second)
+	late        = metricsFrom.Add(47*time.Minute + 30*time.Second)
 )
 
 func TestCatalogMetricsReconcileWithRawEvents(t *testing.T) {
@@ -333,7 +335,7 @@ func insertMetricsFixture(t *testing.T, ctx context.Context, database *sql.DB, p
 	event := func(eventType string, at time.Time, fields map[string]any) map[string]any {
 		return metricsEvent(projectID, eventType, at, fields)
 	}
-	previous := time.Date(2026, 9, 2, 9, 20, 10, 0, time.UTC)
+	previous := metricsFrom.Add(-39*time.Minute - 50*time.Second)
 	rows := []map[string]any{
 		// Page views: 5 weighted, 3 Sessions (s3 twice), 3 users. One falls in the previous period.
 		event("page_view", early, map[string]any{"session_id": "s1", "anonymous_user_id": "u1", "route": "/home"}),
