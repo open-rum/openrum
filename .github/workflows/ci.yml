@@ -230,11 +230,11 @@ jobs:
       - name: Lint packages and examples
         run: pnpm --filter './packages/*' --filter './examples/*' --if-present lint
 
-      - name: Type-check packages and examples
-        run: pnpm --filter './packages/*' --filter './examples/*' --if-present typecheck
-
       - name: Build packages and examples
         run: pnpm --filter './packages/*' --filter './examples/*' --if-present build
+
+      - name: Type-check packages and examples
+        run: pnpm --filter './packages/*' --filter './examples/*' --if-present typecheck
 
       - name: Test packages and examples
         run: pnpm --filter './packages/*' --filter './examples/*' --if-present test
