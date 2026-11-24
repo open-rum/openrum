@@ -52,6 +52,10 @@ Before changing ClickHouse capacity thresholds, emergency sampling, hard-stop be
 
 Before changing which HTTP headers an API Request may carry, the capture rules or their Console page, the SDK's header reading, or how long stored headers live, read `docs/agents/api-capture.md`.
 
+### Releases and commits
+
+Before bumping versions, preparing a release, pushing release tags, or writing PR titles and release notes, read `docs/agents/releases.md`. Never bump package or Chart versions in ordinary feature/fix PRs; use `pnpm release:status` and `pnpm release:bump` in a dedicated release-preparation PR, release only changed targets by default, and push annotated tags from `main` in order (`browser-v*`, `sourcemap-v*`, `cli-v*`, `v*`).
+
 ### Tests
 
 Do not add Playwright end-to-end tests (`tests/e2e`) unless the user explicitly asks for them. Cover new behavior with unit, component and integration tests instead. Existing e2e specs stay as they are unless the user asks to change them.

@@ -1,0 +1,106 @@
+---
+title: 参与贡献
+description: 如何提出、验证、评审和交付 OpenRUM 的改动。
+---
+
+import { Aside, CardGrid, LinkCard, Steps } from "@astrojs/starlight/components";
+
+你可以通过报告问题、完善文档、补充测试或编写代码参与贡献。最好的起点是一个具体问题和一项可验证的小改动。
+
+<CardGrid>
+  <LinkCard
+    title="本地开发"
+    description="环境准备、启动本地全套服务以及日常开发命令。"
+    href="/zh/docs/getting-started/local-development/"
+  />
+  <LinkCard
+    title="术语与核心概念"
+    description="修改公开 API、事件 Schema 或架构前先对齐共享术语。"
+    href="/zh/docs/reference/glossary/"
+  />
+  <LinkCard
+    title="漏洞报告指南"
+    description="疑似安全漏洞的私下披露流程。"
+    href="/zh/docs/self-hosting/security/vulnerability-reporting/"
+  />
+</CardGrid>
+
+<Aside type="caution" title="安全问题请私下报告">
+  不要在公开 Issue 或 Pull Request 中附上可利用细节、凭据或生产遥测数据。疑似安全漏洞请按[漏洞报告指南](/zh/docs/self-hosting/security/vulnerability-reporting/)私下反馈。
+</Aside>
+
+## 贡献流程
+
+<Steps>
+  1. **先在 Issue 中检索并对齐方案**
+
+     先搜索已有的 GitHub Issue 和未合并的 Pull Request，避免重复工作。简单的错别字或失效链接修复可以直接提 Pull Request；行为变更、公开 API 或 SDK 契约、事件 Schema、存储行为和部署方式改动，请先在 Issue 中讨论。
+
+     修改共享术语或架构前，先阅读[术语与核心概念](/zh/docs/reference/glossary/)、仓库根目录的 `CONTEXT.md` 以及相关的 `docs/adr/` 决策记录。
+
+     - **报告 Bug**：附上受影响版本或 Commit、运行环境、最小复现步骤、预期与实际结果、脱敏日志或截图，以及可用的 Request ID。
+     - **提出新功能**：说明用户场景、验收标准以及兼容或上线风险，不要只给出 UI 草图或实现思路。
+
+  2. **保持改动聚焦且完整**
+
+     - 一个 Pull Request 解决一个问题。避免夹带无关重构或生成文件抖动，**普通功能或修复 PR 不要修改发布版本号**。
+     - 同步更新完整契约：生产端与消费端、Schema 或类型、聚焦测试、用户可见文案与文档。不要做出没有后端或 SDK 支撑的控制台入口。
+     - 数据库 Migration 必须向前演进且遵守 Expand First（兼容存量数据，不修改已应用的 Migration）。
+     - 守住隐私与查询边界：不采集表单原值、密码、Authorization Header 或 Cookie，始终使用合成或脱敏数据测试。具体采集边界见[安全与隐私](/zh/docs/self-hosting/security/privacy/)。
+     - 控制台 UI 改动需检查键盘操作、可见焦点、窄屏以及明暗主题，外观变化请附前后截图。
+     - 公开文档改动必须在同一 Pull Request 中同步更新英文（`/docs/`）和简体中文（`/zh/docs/`）对应路径页面。
+
+  3. **请求评审前完成本地验证**
+
+     按改动范围执行对应检查，并在 Pull Request 中写明**实际运行的命令与结果**（若跳过相关检查请说明原因）：
+
+     ```sh
+     # 仓库格式、Lint、类型检查、单元测试、构建与体积预算
+     pnpm run check
+
+     # 公开文档与站点检查（参考文档、拼写、Astro 构建、死链与性能预算）
+     pnpm run site:check
+
+     # 针对本地依赖栈的 Go 集成测试（涉及查询、Ingest 或 Migration 时）
+     pnpm run test:integration
+     ```
+
+     | 改动范围                      | 需要的证据                                                                              |
+     | ----------------------------- | --------------------------------------------------------------------------------------- |
+     | 控制台或 SDK                  | 聚焦的单元测试与类型检查；浏览器或示例应用验证受影响行为；视觉改动附截图。              |
+     | API、Ingest、数据或 Migration | 聚焦的 Go 测试；涉及外部依赖时运行集成测试；修改 Schema 时验证全新数据库迁移。          |
+     | 官网或文档                    | 中英文双语页面、通过 `pnpm run site:check`、直达链接有效，以及桌面和窄屏下可读性良好。  |
+     | Helm、发布或 CI               | 对应的模板渲染、Lint 或工作流校验；说明上线与回滚方式，不拿生产环境做测试。             |
+
+     GitHub CI 默认不运行浏览器 E2E。跨页面流程改动可能仍需本地验证；未运行的测试不能标注为“已通过”。
+
+  4. **按规范提交 Pull Request**
+
+     使用清晰的分支名、仓库 Pull Request 模板，以及符合 [Conventional Commits](https://www.conventionalcommits.org/) 的标题（`<type>(<scope>): <简短摘要>`），例如 `feat(console): ...`、`fix(browser): ...`、`docs(site): ...` 或 `chore(ci): ...`。破坏性变更请使用 `!` 或在正文中附上 `BREAKING CHANGE:`。
+
+     | Scope                                            | 受影响的发布物                                                 |
+     | ------------------------------------------------ | -------------------------------------------------------------- |
+     | `api`, `ingest`, `console`, `helm`, `migrations` | 产品容器镜像与 Helm Chart（`vX.Y.Z`）                          |
+     | `browser`, `protocol`                            | `@openrum/browser`（`browser-vX.Y.Z`）                         |
+     | `sourcemap`                                      | `@openrum/sourcemap`（`sourcemap-vX.Y.Z`）                     |
+     | `cli`                                            | `@openrum/cli`（`cli-vX.Y.Z`）                                 |
+     | `site`, `docs`                                   | 仅公开文档站点（不触发发包，优先使用 `docs:` 或 `chore:`）     |
+
+     开发分支内可自由提交中间记录，合入 `main` 时优先使用 **Squash and merge**，使每个 Pull Request 以一条规范 Commit 进入主干。在 PR 模板中一并勾选**受影响的发布物**与**升级/破坏性影响级别**：
+
+     - **仅无状态 / 纯 UI 改动**：可直接安全 `helm rollback`。
+     - **增量数据库 Migration**：遵循 Expand First，兼容 N-1 应用版本回滚。
+     - **破坏性变更**：需标明 `!` / `BREAKING CHANGE:`，并在发布说明中写清升级与回滚步骤。
+</Steps>
+
+请保持 Pull Request 易于评审，并用具体修改或理由回应意见。构建通过本身不代表一定会合并。
+
+## 合并之后会发生什么
+
+合并到 `main` 会触发仓库 CI。涉及公开站点的改动还会运行独立的站点检查，并由 Netlify 在站点相关文件发生变化时触发构建与部署；修改与站点无关的代码时，Netlify 会自动跳过构建。
+
+<Aside type="note" title="合并代码不会自动发版">
+  将 Pull Request 合入 `main` **不会**自动发布容器镜像、Helm Chart 或 npm 包，也不会升级任何正在运行的 OpenRUM 实例。
+</Aside>
+
+OpenRUM 对产品（`vX.Y.Z`）、`@openrum/browser`（`browser-vX.Y.Z`）、`@openrum/sourcemap`（`sourcemap-vX.Y.Z`）和 `@openrum/cli`（`cli-vX.Y.Z`）实行独立版本管理。维护者仅针对有实际改动的包，通过专门的发版准备 PR（`pnpm release:status` 与 `pnpm release:bump`）及带版本标签的发布工作流执行发版；运维人员在确认备份和[升级兼容性](/zh/docs/self-hosting/upgrades/)后，自行决定何时安装或升级 Chart。
