@@ -1,0 +1,109 @@
+---
+title: Contributing
+description: How to propose, validate, review and ship changes to OpenRUM.
+---
+
+import { Aside, CardGrid, LinkCard, Steps } from "@astrojs/starlight/components";
+
+Contributions can be bug reports, documentation, tests or code. The best starting point is a specific problem and a small, verifiable change.
+
+<CardGrid>
+  <LinkCard
+    title="Local development"
+    description="Tooling setup, running the local stack and the full command list."
+    href="/docs/getting-started/local-development/"
+  />
+  <LinkCard
+    title="Glossary"
+    description="Shared OpenRUM terminology before changing APIs, schemas or architecture."
+    href="/docs/reference/glossary/"
+  />
+  <LinkCard
+    title="Vulnerability reporting"
+    description="Private disclosure process for suspected security issues."
+    href="/docs/self-hosting/security/vulnerability-reporting/"
+  />
+</CardGrid>
+
+<Aside type="caution" title="Security issues">
+  Never open a public Issue or pull request containing exploitable details, credentials or
+  production telemetry. Report suspected vulnerabilities privately through the [vulnerability
+  reporting guide](/docs/self-hosting/security/vulnerability-reporting/).
+</Aside>
+
+## Contribution workflow
+
+<Steps>
+  1. **Search and align in an Issue first**
+
+     Search existing GitHub Issues and open pull requests to avoid duplicate work. Small typos or broken-link fixes can go straight to a pull request; behavior changes, public API or SDK contracts, event schemas, storage behavior and deployment changes should be discussed in an Issue first.
+
+     Before changing shared terminology or architecture, check the [glossary](/docs/reference/glossary/), root `CONTEXT.md` and relevant `docs/adr/` decisions.
+
+     - **Bug reports**: include affected version or commit, environment, minimal reproduction, expected vs. actual behavior, sanitized logs/screenshots and Request ID when available.
+     - **Feature requests**: describe the user problem, acceptance criteria and rollout or compatibility concerns rather than only a UI sketch.
+
+  2. **Make a focused, complete change**
+
+     - Keep one pull request to one problem. Avoid unrelated refactors, generated-file churn and **never bump release versions** in an ordinary feature or fix pull request.
+     - Update the complete contract together: producer and consumer, schemas/types, focused tests, user-facing copy and docs. Do not add a Console control without its backing API or SDK behavior.
+     - Keep database migrations forward-only and Expand First (safe against existing data; never edit an applied migration in place).
+     - Respect privacy and query bounds: never collect raw form values, passwords, authorization headers or cookies, and always test with synthetic or redacted data. See [Security and privacy](/docs/self-hosting/security/privacy/) for the exact capture boundaries.
+     - For Console UI changes, verify keyboard access, visible focus, narrow viewports and both light/dark themes, and attach before/after screenshots.
+     - For public docs, update both English (`/docs/`) and Simplified Chinese (`/zh/docs/`) pages at matching paths in the same pull request.
+
+  3. **Validate locally before requesting review**
+
+     Run the checks matching your change and include the exact commands and observed results in the pull request (if a relevant check was skipped, explain why):
+
+     ```sh
+     # Repository format, lint, typecheck, unit tests, builds and budgets
+     pnpm run check
+
+     # Public site & docs (generated docs, spelling, Astro build, links and budgets)
+     pnpm run site:check
+
+     # Go integration tests against the local stack (for queries, ingest or migrations)
+     pnpm run test:integration
+     ```
+
+     | Change                          | Expected evidence                                                                                                                      |
+     | ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+     | Console or SDK                  | Focused unit/type checks, a browser or example-app check for affected behavior, and screenshots for visual changes.                    |
+     | API, ingest, data or migrations | Focused Go tests; integration tests for dependency behavior; fresh-database migration checks when schema changes.                      |
+     | Public site or docs             | Both language pages, a passing `pnpm run site:check`, working links and readable rendering on desktop and narrow screens.              |
+     | Helm, release or CI             | Render/lint or workflow checks appropriate to the edit; explain rollout and rollback without using a production environment as a test. |
+
+     Browser E2E is opt-in in GitHub CI. Cross-page journeys may still need it; never mark a suite as passing if you did not run it.
+
+  4. **Open a pull request**
+
+     Use a descriptive branch, the repository pull request template and a [Conventional Commits](https://www.conventionalcommits.org/) title (`<type>(<scope>): <short summary>`), such as `feat(console): ...`, `fix(browser): ...`, `docs(site): ...` or `chore(ci): ...`. Mark breaking changes with `!` or a `BREAKING CHANGE:` footer.
+
+     | Scope                                            | Affected release target                                                     |
+     | ------------------------------------------------ | --------------------------------------------------------------------------- |
+     | `api`, `ingest`, `console`, `helm`, `migrations` | Product container image and Helm Chart (`vX.Y.Z`)                           |
+     | `browser`, `protocol`                            | `@openrum/browser` (`browser-vX.Y.Z`)                                       |
+     | `sourcemap`                                      | `@openrum/sourcemap` (`sourcemap-vX.Y.Z`)                                   |
+     | `cli`                                            | `@openrum/cli` (`cli-vX.Y.Z`)                                               |
+     | `site`, `docs`                                   | Public documentation site only (no package release; prefer `docs:`/`chore:`) |
+
+     Work-in-progress commits on a branch are fine; maintainers prefer **Squash and merge** so each pull request lands on `main` as one clean commit. In the pull request template, check both the **affected release targets** and the **upgrade/breaking impact**:
+
+     - **Stateless / UI only**: direct `helm rollback` is safe.
+     - **Additive database migration**: Expand First schema compatible with N-1 application rollback.
+     - **Breaking change**: requires `!` / `BREAKING CHANGE:` and explicit upgrade and rollback steps in the Release Notes.
+</Steps>
+
+Keep the pull request reviewable and respond to feedback with concrete changes or reasoning. A green build does not by itself guarantee merge.
+
+## What happens after merge
+
+Merging into `main` runs repository CI checks. Public-site changes also run the dedicated site checks and trigger a Netlify deploy when site inputs change; unrelated repository edits skip Netlify builds automatically.
+
+<Aside type="note" title="Merging code does not publish a release">
+  Merging a pull request into `main` does **not** publish a container image, Helm Chart or npm
+  package, and does not upgrade any running OpenRUM instance.
+</Aside>
+
+OpenRUM versions the product (`vX.Y.Z`), `@openrum/browser` (`browser-vX.Y.Z`), `@openrum/sourcemap` (`sourcemap-vX.Y.Z`) and `@openrum/cli` (`cli-vX.Y.Z`) independently. Maintainers prepare versioned releases only for targets with actual changes through a dedicated release-preparation pull request (`pnpm release:status` and `pnpm release:bump`) and tagged release workflows. Operators choose when to install or upgrade a released Chart after checking backups and [upgrade compatibility](/docs/self-hosting/upgrades/).
