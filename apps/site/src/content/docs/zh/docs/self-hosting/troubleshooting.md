@@ -16,27 +16,27 @@ docker compose -f deploy/compose/docker-compose.yml logs --tail=100 api ingest c
 ```
 
 3. 在 `deploy/compose/.env` 覆盖冲突端口。
-4. 只有明确要清空本地演示数据时才执行 `docker compose -f deploy/compose/docker-compose.yml down -v`。
+4. 只有明确要清空本地数据时才执行 `docker compose -f deploy/compose/docker-compose.yml down -v`。
 
 ## Console 可以打开但登录失败
 
 - 使用与 `PUBLIC_BASE_URL` 一致的 `http://127.0.0.1:4173`。
 - 运行 `curl --fail http://127.0.0.1:4173/health/ready` 检查 API Readiness。
-- 本地演示账号为 `demo@openrum.local` / `OpenRUM-demo-2026!`，仅用于本地开发，且只有执行 `pnpm openrum seed` 之后才存在。
+- 确认已完成首次访问的 `/setup` 初始化注册；本地不会预置默认账号。
 
 ## 事件没有出现
 
 1. 检查 Browser SDK `dsn` 与项目允许的 Origin。
 2. 检查 Ingest 日志和项目 Key 的 Origin Allowlist。
-3. 确认 Kafka、Consumer 和 ClickHouse 健康；如果使用演示数据，等待 `pnpm openrum seed` 执行完成。
+3. 确认 Kafka、Consumer 和 ClickHouse 健康。
 4. 在较宽时间范围查看“事件”，再用相同 `session_id` 查看“会话”。
 
 ## 调查路径不完整
 
 | 现象 | 可能原因 | 下一步 |
 | --- | --- | --- |
-| 行为图表为空 | 未加载演示数据，或 ClickHouse 异常 | 执行 `pnpm openrum seed`，并检查 Consumer/ClickHouse |
-| 会话没有错误 | 该会话确实无错误事件 | 在演示项目筛选带错误的会话 |
+| 行为图表为空 | 尚未收到事件，或 ClickHouse 异常 | 通过示例应用或本地“造数据”发送测试事件，并检查 Consumer/ClickHouse |
+| 会话没有错误 | 该会话确实无错误事件 | 在会话列表中筛选包含错误的会话 |
 | Issue 无源码栈 | 未配置对象存储，或没有与栈帧匹配的 Artifact | 参见 [Source Map 上传失败](#source-map-上传失败) |
 | API 面板为空 | 未捕获 fetch/XHR 或采样关闭 | 从示例应用触发请求 |
 

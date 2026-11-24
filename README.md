@@ -11,7 +11,7 @@
 
 <p align="center">
   <a href="https://openrum.netlify.app/">Website</a> ·
-  <a href="https://openrum.netlify.app/docs/introduction/">Documentation</a> ·
+  <a href="https://openrum.netlify.app/docs/">Documentation</a> ·
   <a href="#quickstart">Quickstart</a> ·
   <a href="https://github.com/open-rum/openrum/issues">Report an issue</a>
 </p>
@@ -53,27 +53,14 @@ docker compose --env-file deploy/compose/.env.example \
   -f deploy/compose/docker-compose.yml up -d --build
 ```
 
-The first start builds the services and applies database migrations. Wait for the long-running services to become healthy:
+Wait until the long-running services become healthy:
 
 ```sh
 docker compose --env-file deploy/compose/.env.example \
   -f deploy/compose/docker-compose.yml ps
 ```
 
-Then load the demo, a repeatable ecommerce dataset with approximately **30,000 Sessions across 14 days**. It is optional and safe to run again:
-
-```sh
-docker compose --profile seed --env-file deploy/compose/.env.example \
-  -f deploy/compose/docker-compose.yml run --rm --no-deps demo-seed
-```
-
-If you work from a clone with Go installed, `pnpm openrum up` followed by `pnpm openrum seed` does the same. Open **[http://127.0.0.1:4173](http://127.0.0.1:4173)** and sign in:
-
-| Email                | Password             |
-| -------------------- | -------------------- |
-| `demo@openrum.local` | `OpenRUM-demo-2026!` |
-
-Explore the dashboards, errors, performance and Sessions using the demo data. Skip the seed step to start from an empty Instance and create your own owner on the first visit. Object storage is optional; enable it when you need to upload Source Map artifacts.
+If you work from a clone with Go installed, `pnpm openrum up` does the same and waits for readiness. Open **[http://127.0.0.1:4173](http://127.0.0.1:4173)** to complete first-time setup, create your owner account, and sign in. Object storage is optional; enable it when you need to upload Source Map artifacts.
 
 To stop the stack while keeping its data:
 
@@ -89,7 +76,7 @@ This stack uses example credentials and single-node dependencies for local evalu
 Create a Project in the Console, add your application's origin to its allowed origins, and copy the client DSN. For a local test page, the running Instance serves the Browser SDK directly:
 
 ```html
-<script src="http://127.0.0.1:4173/api/v1/sdk/browser/0.1.2/openrum.min.js"></script>
+<script src="http://127.0.0.1:4173/api/v1/sdk/browser/0.1.3/openrum.min.js"></script>
 <script>
   OpenRUM.init({
     dsn: "PASTE_YOUR_PROJECT_DSN",
@@ -98,13 +85,13 @@ Create a Project in the Console, add your application's origin to its allowed or
 </script>
 ```
 
-Replace the DSN with the value from your Project. For a deployed website, use your Instance's HTTPS SDK URL. See [Create your first project](https://openrum.netlify.app/docs/getting-started/create-first-project/) and the [Browser SDK guide](https://openrum.netlify.app/docs/sdk/browser/) for asynchronous loading, framework integration and verification. A runnable React + Vite example is available in [examples/react-vite](examples/react-vite).
+Replace the DSN with the value from your Project. For a deployed website, use your Instance's HTTPS SDK URL. See the [Browser SDK guide](https://openrum.netlify.app/docs/sdk/browser/) for asynchronous loading, framework integration and verification. A runnable React + Vite example is available in [examples/react-vite](examples/react-vite).
 
 ## Documentation
 
 | Task                               | Guide                                                                                                                                                                         |
 | ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Choose an installation path        | [Getting started](https://openrum.netlify.app/docs/introduction/)                                                                                               |
+| Choose an installation path        | [Getting started](https://openrum.netlify.app/docs/)                                                                                               |
 | Connect your frontend              | [Browser SDK](https://openrum.netlify.app/docs/sdk/browser/) · [Next.js](https://openrum.netlify.app/docs/sdk/browser/nextjs/) · [Astro](https://openrum.netlify.app/docs/sdk/browser/astro/) |
 | Configure login                    | [Email, Google, GitHub, LDAP and OIDC (repository guide)](apps/site/src/content/docs/docs/getting-started/sign-in/index.mdx)                                                  |
 | Deploy and operate an Instance     | [Self-hosting](https://openrum.netlify.app/docs/self-hosting/overview/) · [Backup and restore](https://openrum.netlify.app/docs/self-hosting/backup-restore/)                 |

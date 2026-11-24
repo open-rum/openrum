@@ -7,24 +7,16 @@ and [operations guide](../../apps/site/src/content/docs/docs/self-hosting/docker
 Do not use this Demo stack for production. Kubernetes/Helm remains the recommended
 production path when you need a cluster.
 
-This Compose file starts the full core product: console, API, ingest, consumer, worker, PostgreSQL, ClickHouse, Kafka and Redis. Object storage is intentionally optional and is not bundled. The stack also runs migrations. An idempotent demo seeder is available on demand.
+This Compose file starts the full core product: console, API, ingest, consumer, worker, PostgreSQL, ClickHouse, Kafka and Redis. Object storage is intentionally optional and is not bundled. The stack also runs migrations on startup.
 
 ```sh
 docker compose --env-file deploy/compose/.env.example -f deploy/compose/docker-compose.yml up -d --build
 docker compose --env-file deploy/compose/.env.example -f deploy/compose/docker-compose.yml ps
 ```
 
-To load the demo account and dataset, run the seeder once the services are healthy (or `pnpm openrum seed`):
-
-```sh
-docker compose --profile seed --env-file deploy/compose/.env.example \
-  -f deploy/compose/docker-compose.yml run --rm --no-deps demo-seed
-```
-
 Console: `http://127.0.0.1:4173`
-Login after seeding: `demo@openrum.local` / `OpenRUM-demo-2026!`. Without seeding, the first visit opens the setup page.
 
-The seeder initializes the demo owner and project, then loads a deterministic 14-day ecommerce dataset with approximately 30,000 sessions and 301,000 events. If an owner other than the demo owner already exists, it exits without changing that instance. Running the seeder again preserves and does not duplicate demo events. See the [demo data guide](../../docs/demo-data.md) for explicit rerun and reset commands.
+The first visit opens the setup page, where you register the initial owner account and sign in.
 
 Default host ports are console `4173`, PostgreSQL `5433`, ClickHouse HTTP/native `8123`/`9000`, Kafka `9092`, and Redis `6379`. Override them by copying `.env.example` to an untracked `.env`.
 

@@ -25,7 +25,7 @@ OpenRUM follows a "one image, several processes" layout: the five application se
 | Consumer | `/app/consumer` | `8082` | Reads Kafka, normalizes and scrubs, filters, fingerprints, and writes Events to ClickHouse |
 | Worker | `/app/worker` | `8083` | Background jobs: stack-frame mapping, alert evaluation, data lifecycle, emergency cleanup, Project deletion |
 
-Every Go service also answers `GET /health/live`, `GET /health/ready` and `GET /metrics` on its own port. The Console web server answers the two health paths as well. Two more commands ship in the same image and run to completion rather than serving traffic: `/app/migrate` applies database migrations, and `/app/demo` seeds the demo dataset when you ask for it with `openrum seed`.
+Every Go service also answers `GET /health/live`, `GET /health/ready` and `GET /metrics` on its own port. The Console web server answers the two health paths as well. One more command ships in the same image and runs to completion rather than serving traffic: `/app/migrate` applies database migrations.
 
 <Aside type="note" title="Schema changes are never applied at startup">
   Application services only check that the schema version is compatible. Migrations run once, as a
@@ -48,7 +48,7 @@ Kafka is the only dependency in that table whose failure is lossy, which is why 
 
 | Shape | Where it lives | Notes |
 | --- | --- | --- |
-| Local development | `deploy/compose/docker-compose.yml` | The whole stack on one machine, used by the `openrum` command; the demo dataset is optional. Not for production |
+| Local development | `deploy/compose/docker-compose.yml` | The whole stack on one machine, used by the `openrum` command. Not for production |
 | Single-host production | `deploy/compose/production.compose.yml` | The same services behind a Caddy edge that terminates TLS and routes `/api/*`, `/ingest/*` and everything else |
 | Kubernetes | `deploy/helm/openrum` | A Helm chart with Deployments, Services, Ingress, autoscaling, disruption budgets, a migration Job and Prometheus rules |
 
@@ -118,7 +118,7 @@ A `202` therefore means *accepted*, not *queryable*. An Instance can absorb a tr
 
 | Directory | Contents |
 | --- | --- |
-| `services/api`, `services/ingest`, `services/consumer`, `services/worker` | The four Go services. `services/api` also holds the `migrate` and `demo` commands |
+| `services/api`, `services/ingest`, `services/consumer`, `services/worker` | The four Go services. `services/api` also holds the `migrate` command |
 | `internal/` | Shared Go packages: `auth`, `metadata` (PostgreSQL), `query` (ClickHouse), `ingest`, `event`, `fingerprint`, `privacy`, `processing`, `filter`, `sourcemap`, `notify`, `storagepressure`, `observability`, `config` and more |
 | `migrations/` | PostgreSQL and ClickHouse schema migrations, embedded into the `migrate` command |
 | `apps/web` | The Console (React) |

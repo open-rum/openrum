@@ -30,6 +30,12 @@ describe("ThemeController", () => {
     expect(screen.getByRole("button", { name: "切换主题，当前为 light" })).toBeTruthy();
     expect(document.documentElement.dataset.theme).toBe("light");
 
+    await user.click(screen.getByRole("button", { name: "Amber Dark", hidden: true }));
+    expect(document.documentElement.dataset.theme).toBe("amber-dark");
+    expect(document.documentElement.classList.contains("dark")).toBe(true);
+    expect(window.localStorage.getItem("openrum-theme")).toBe("amber-dark");
+    expect(screen.getByRole("button", { name: "切换主题，当前为 Amber Dark" })).toBeTruthy();
+
     await user.click(screen.getByRole("button", { name: "dracula", hidden: true }));
     expect(document.documentElement.dataset.theme).toBe("dracula");
     expect(document.documentElement.classList.contains("dark")).toBe(true);

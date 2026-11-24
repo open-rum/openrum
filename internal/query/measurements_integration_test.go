@@ -39,7 +39,7 @@ func TestMeasurementAggregateSumsAndSplits(t *testing.T) {
 	})
 
 	project := uuid.New()
-	at := time.Date(2026, 9, 10, 10, 0, 0, 0, time.UTC)
+	at := time.Now().UTC().Truncate(time.Hour).Add(-time.Hour)
 	rows := []string{
 		// Full sampling, two measurements, paid by card.
 		measurementFixture(project, "custom", "checkout_completed", at, 1.0,

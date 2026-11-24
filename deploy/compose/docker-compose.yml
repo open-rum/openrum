@@ -129,18 +129,6 @@ services:
       clickhouse:
         condition: service_healthy
 
-  # Not part of a plain `up`: run it on demand with `openrum seed`, or
-  # `docker compose --profile seed run --rm --no-deps demo-seed`.
-  demo-seed:
-    image: openrum-local:dev
-    profiles: ["seed"]
-    restart: "no"
-    command: ["/app/demo"]
-    environment: *database-environment
-    depends_on:
-      migrate:
-        condition: service_completed_successfully
-
   api:
     image: openrum-local:dev
     restart: unless-stopped

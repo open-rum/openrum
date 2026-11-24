@@ -469,15 +469,22 @@ export function ModuleCard({
       <div
         ref={cardRef}
         className={cn(
-          "dashboard-module card card-border h-full bg-base-100",
+          "dashboard-module card card-border h-full bg-base-100 [&_table_th]:px-3 [&_table_th]:py-2.5 [&_table_th]:text-xs [&_table_th]:font-medium [&_table_th]:text-base-content/70 [&_table_td]:px-3 [&_table_td]:py-2.5 [&_table_td]:text-[13px] [&_table_td]:leading-5",
           widget?.type === "stat" ? "card-sm relative isolate" : "card-md",
         )}
         data-module-title={title}
       >
-        <div className="card-body min-w-0">
+        <div className="card-body min-w-0 gap-4">
           <div className="dashboard-module-header relative z-10">
             <div className="min-w-0">
-              <h3 className="card-title min-w-0">
+              <h3
+                className={cn(
+                  "card-title min-w-0 text-base-content/85",
+                  widget?.type === "stat"
+                    ? "text-sm leading-5 font-medium"
+                    : "text-[15px] leading-6 font-semibold",
+                )}
+              >
                 <span
                   className={
                     widget?.type === "stat"
@@ -491,7 +498,7 @@ export function ModuleCard({
                 <ModuleFilterHint widget={widget} filters={filters} />
                 {freshness?.stale ? (
                   <span
-                    className="status status-warning"
+                    className="status status-warning size-1.5 shrink-0"
                     role="img"
                     aria-label="数据延迟，详情中查看接收时间"
                     title="数据延迟"
@@ -511,7 +518,7 @@ export function ModuleCard({
               </div>
             ) : null}
           </div>
-          <div className="min-w-0 flex-1">
+          <div className="dashboard-module-content flex min-w-0 flex-1 flex-col">
             <ModuleContent record={record} query={query} filters={filters} />
           </div>
         </div>

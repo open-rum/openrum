@@ -42,8 +42,8 @@ func ComposeStop(environmentPath string, names []string) []string {
 	return append(append(composeBase(environmentPath), "stop"), names...)
 }
 
-// ComposeDown removes the containers. Volumes survive, so every table, and the
-// demo dataset if it was seeded, is still there afterwards.
+// ComposeDown removes the containers. Volumes survive, so every table and its
+// stored data remain intact afterwards.
 func ComposeDown(environmentPath string) []string {
 	return append(composeBase(environmentPath), "down")
 }
@@ -70,14 +70,4 @@ func ComposeRestart(environmentPath string, name string) []string {
 // container the other mode left behind.
 func ComposeStatus(environmentPath string) []string {
 	return append(composeBase(environmentPath), "ps", "--all", "--format", "json")
-}
-
-// ComposeSeed runs the demo generator once against the running stack. The job
-// sits behind the `seed` profile so a plain `up` never starts it, and
-// `--no-deps` keeps the databases the developer already has from being
-// restarted to satisfy its dependency on the migration job. `--build` keeps the
-// generator in step with the source, the same reason `up` builds.
-func ComposeSeed(environmentPath string) []string {
-	arguments := append([]string{"compose", "--profile", "seed"}, composeBase(environmentPath)[1:]...)
-	return append(arguments, "run", "--rm", "--no-deps", "--build", "demo-seed")
 }

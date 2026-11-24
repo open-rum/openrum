@@ -3,7 +3,6 @@
 import { cleanup, render, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
-import { ConnectionStatus } from "./ConnectionStatus";
 import { rejectGuidance } from "./guidance";
 import { InstallSnippet } from "./InstallSnippet";
 import { ConnectionHealth } from "./ConnectionHealth";
@@ -44,26 +43,6 @@ describe("onboarding states", () => {
     expect(view.getByText("最近检测到事件拒收")).toBeTruthy();
     expect(view.queryByText("历史拒收记录 · 此后已成功接收事件")).toBeNull();
   });
-  it("renders all four waiting stages for a first-time project", () => {
-    const view = render(
-      <ConnectionStatus
-        loading={false}
-        hasInstallDSN={false}
-        status={{
-          keyConfigured: false,
-          lastSdkSeenAt: null,
-          lastEventReceivedAt: null,
-          lastEventQueryableAt: null,
-          lastRejectReason: null,
-          lastRejectAt: null,
-        }}
-      />,
-    );
-    expect(view.container.textContent).toContain("1. 客户端 DSN");
-    expect(view.container.textContent).toContain("4. 数据可查询");
-    expect(view.container.textContent?.match(/等待/g)).toHaveLength(4);
-  });
-
   it("provides an exact invalid-Origin remediation", () => {
     expect(rejectGuidance.ORIGIN_REJECTED.title).toBe("上报 Origin 未被允许");
     expect(rejectGuidance.ORIGIN_REJECTED.action).toContain("Allowed Origins");
@@ -83,7 +62,7 @@ describe("onboarding states", () => {
     );
     expect(view.container.textContent).not.toContain("writeKey:");
     expect(view.container.textContent).not.toContain("endpoint:");
-    expect(view.container.textContent).toContain("安装并初始化 React SDK");
+    expect(view.container.textContent).toContain("2. 初始化 SDK");
     expect(view.container.textContent).toContain("src/main.tsx");
   });
 
@@ -100,15 +79,34 @@ describe("onboarding states", () => {
     await user.click(current.getByRole("tab", { name: "CDN 脚本" }));
     const cdnPanel = current.getByRole("tabpanel", { name: "CDN 脚本" });
     expect(cdnPanel.textContent).toContain(
-      'script.src = "https://rum.example.com/sdk/browser/0.1.2/openrum.min.js"',
+      'script.src = "https://rum.example.com/sdk/browser/0.1.3/openrum.min.js"',
     );
     expect(cdnPanel.textContent).toContain("OpenRUM.init");
     expect(cdnPanel.textContent).toContain("script.onload");
 
     await user.click(current.getByRole("tab", { name: "同步加载" }));
     expect(cdnPanel.textContent).toContain(
-      'src="https://rum.example.com/sdk/browser/0.1.2/openrum.min.js"',
+      'src="https://rum.example.com/sdk/browser/0.1.3/openrum.min.js"',
     );
     expect(cdnPanel.textContent).not.toContain("script.onload");
+  });
+
+  it("copies the install command separately from the project configuration", async () => {
+    const user = userEvent.setup();
+    const view = render(
+      <InstallSnippet
+        dsn="https://orr_pk_test@rum.example.com/ingest/v1/envelope"
+        environment="production"
+        platform="react"
+      />,
+    );
+    await user.click(view.getByRole("button", { name: "复制命令" }));
+    expect(await navigator.clipboard.readText()).toBe("pnpm add @openrum/browser");
+    await user.click(view.getByRole("button", { name: "复制配置" }));
+    const configuration = await navigator.clipboard.readText();
+    expect(configuration).toContain(
+      'dsn: "https://orr_pk_test@rum.example.com/ingest/v1/envelope"',
+    );
+    expect(configuration).not.toContain("pnpm add");
   });
 });

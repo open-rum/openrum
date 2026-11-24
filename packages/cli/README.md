@@ -36,7 +36,7 @@ Prefer the environment variable for the token so it does not appear in process l
 
 ## Local development stack
 
-`openrum dev`, `up`, `status`, `logs`, `restart`, `seed`, `stop`, `down` and `reset` manage the local development stack. They are implemented by the Go tool in `cmd/openrum` of the OpenRUM repository, so they only work inside a checkout of it, with Go, Docker and pnpm installed. From inside the checkout, `openrum <command>` finds the repository root and runs `go run ./cmd/openrum <command>` there; anywhere else it says so and exits with status `1`. Contributors can keep using `pnpm openrum <command>` from the repository root, which runs the same Go tool directly.
+`openrum dev`, `up`, `status`, `logs`, `restart`, `stop`, `down` and `reset` manage the local development stack. They are implemented by the Go tool in `cmd/openrum` of the OpenRUM repository, so they only work inside a checkout of it, with Go, Docker and pnpm installed. From inside the checkout, `openrum <command>` finds the repository root and runs `go run ./cmd/openrum <command>` there; anywhere else it says so and exits with status `1`. Contributors can keep using `pnpm openrum <command>` from the repository root, which runs the same Go tool directly.
 
 ## Development
 

@@ -57,6 +57,10 @@ func NewBootstrapper(database *sql.DB, bootstrapToken string) *Bootstrapper {
 	}
 }
 
+func (bootstrapper *Bootstrapper) RequiresBootstrapToken() bool {
+	return bootstrapper.bootstrapToken != ""
+}
+
 func (bootstrapper *Bootstrapper) Status(ctx context.Context) (bool, error) {
 	var initialized bool
 	err := bootstrapper.database.QueryRowContext(ctx, "SELECT EXISTS (SELECT 1 FROM users)").Scan(&initialized)

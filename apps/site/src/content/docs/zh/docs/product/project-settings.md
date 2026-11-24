@@ -80,4 +80,4 @@ URL 规则和自定义脱敏由 Consumer 执行，约 30 秒缓存到期后生�
 - 只有需要上传 Source Map 时才配置对象存储。
 - 每条 CI 流水线使用独立的 Source Map 上传令牌，并吊销不再使用的令牌。
 
-相关文档：[创建第一个项目](/zh/docs/getting-started/create-first-project/)、[数据生命周期](/zh/docs/self-hosting/data-lifecycle/)、[隐私](/zh/docs/self-hosting/security/privacy/)。
+相关文档：[Browser SDK](/zh/docs/sdk/browser/)、[数据生命周期](/zh/docs/self-hosting/data-lifecycle/)、[隐私](/zh/docs/self-hosting/security/privacy/)。

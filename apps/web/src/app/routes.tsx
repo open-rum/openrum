@@ -8,16 +8,30 @@ import {
   lazyRouteComponent,
   redirect,
 } from "@tanstack/react-router";
-import { HTTPError, getSetupStatus, safeReturnTo, sessionQueryOptions } from "@/lib/auth/session";
+import {
+  HTTPError,
+  safeReturnTo,
+  sessionQueryOptions,
+  setupStatusQueryOptions,
+} from "@/lib/auth/session";
 import { listOrganizations, listProjects } from "@/lib/api/projects";
 import { LoginRoutePage } from "@/features/auth/LoginPage";
 import { AwaitingAccessPage } from "@/features/auth/AwaitingAccessPage";
-import { SetupPage } from "@/features/auth/SetupPage";
+import { AuthFrame } from "@/features/auth/AuthFrame";
+import type { OptionalSetupStep } from "@/features/auth/SetupOptionalPage";
+import { Button } from "@/components/ui/button";
+
+const optionalStepIds = new Set<string>(["storage", "email", "auth", "retention"]);
 import { App } from "./App";
 import { PlannedPage } from "./PlannedPage";
 import { RouteLoading } from "./RouteLoading";
 import { queryClient } from "./queryClient";
 
+const SetupPage = lazyRouteComponent(() => import("@/features/auth/SetupPage"), "SetupPage");
+const SetupOptionalPage = lazyRouteComponent(
+  () => import("@/features/auth/SetupOptionalPage"),
+  "SetupOptionalPage",
+);
 const RegisterPage = lazyRouteComponent(
   () => import("@/features/auth/RegisterPage"),
   "RegisterPage",
@@ -186,7 +200,7 @@ const setupRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/setup",
   beforeLoad: async ({ context }) => {
-    const status = await getSetupStatus();
+    const status = await context.queryClient.fetchQuery(setupStatusQueryOptions());
     if (!status.initialized) return;
     try {
       const user = await context.queryClient.fetchQuery(sessionQueryOptions());
@@ -200,6 +214,48 @@ const setupRoute = createRoute({
     }
   },
   component: SetupPage,
+  errorComponent: () => (
+    <AuthFrame>
+      <div className="auth-heading">
+        <h1>无法读取实例状态</h1>
+        <p>控制台暂时无法连接到后端服务。请确认 API 与数据库已就绪后重试。</p>
+      </div>
+      <Button
+        type="button"
+        size="lg"
+        className="h-11 w-full"
+        onClick={() => void router.invalidate()}
+      >
+        重新检查
+      </Button>
+    </AuthFrame>
+  ),
+});
+
+const setupOptionalRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/setup/optional",
+  validateSearch: (search: Record<string, unknown>): { step?: OptionalSetupStep } => ({
+    step:
+      typeof search.step === "string" && optionalStepIds.has(search.step)
+        ? (search.step as OptionalSetupStep)
+        : undefined,
+  }),
+  beforeLoad: async ({ context }) => {
+    const status = await context.queryClient.fetchQuery(setupStatusQueryOptions());
+    if (!status.initialized) throw redirect({ to: "/setup" });
+    try {
+      const user = await context.queryClient.ensureQueryData(sessionQueryOptions());
+      if (user.accessStatus === "pending") throw redirect({ to: "/awaiting-access" });
+      if (user.instanceRole !== "instance_owner") throw redirect({ to: "/" });
+    } catch (error) {
+      if (error instanceof HTTPError && error.status === 401) {
+        throw redirect({ to: "/login", search: { returnTo: undefined, expired: undefined } });
+      }
+      throw error;
+    }
+  },
+  component: SetupOptionalPage,
 });
 
 const loginRoute = createRoute({
@@ -216,7 +272,7 @@ const loginRoute = createRoute({
         : undefined,
   }),
   beforeLoad: async ({ context, search }) => {
-    const status = await getSetupStatus();
+    const status = await context.queryClient.fetchQuery(setupStatusQueryOptions());
     if (!status.initialized) throw redirect({ to: "/setup" });
     try {
       const user = await context.queryClient.fetchQuery(sessionQueryOptions());
@@ -248,7 +304,7 @@ const registerRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/register",
   beforeLoad: async ({ context }) => {
-    const status = await getSetupStatus();
+    const status = await context.queryClient.fetchQuery(setupStatusQueryOptions());
     if (!status.initialized) throw redirect({ to: "/setup" });
     await leaveWhenSignedIn(context);
   },
@@ -302,6 +358,12 @@ const protectedRoute = createRoute({
         throw redirect({ to: "/awaiting-access", search: { returnTo: location.href } });
     } catch (error) {
       if (error instanceof HTTPError && error.status === 401) {
+        const status = await context.queryClient
+          .fetchQuery(setupStatusQueryOptions())
+          .catch(() => null);
+        if (status && !status.initialized) {
+          throw redirect({ to: "/setup" });
+        }
         throw redirect({
           to: "/login",
           search: { returnTo: location.href, expired: true },
@@ -873,6 +935,7 @@ const protectedChildren = plannedRoutes.map(({ path, title, description, icon })
 
 const routeTree = rootRoute.addChildren([
   setupRoute,
+  setupOptionalRoute,
   loginRoute,
   registerRoute,
   completeRegistrationRoute,

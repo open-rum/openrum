@@ -10,9 +10,9 @@ import (
 )
 
 const (
-	BrowserSDKVersion          = "0.1.2"
-	BrowserSDKPublicPath       = "/sdk/browser/0.1.2/openrum.min.js"
-	BrowserSDKLegacyPublicPath = "/api/v1/sdk/browser/0.1.2/openrum.min.js"
+	BrowserSDKVersion          = "0.1.3"
+	BrowserSDKPublicPath       = "/sdk/browser/0.1.3/openrum.min.js"
+	BrowserSDKLegacyPublicPath = "/api/v1/sdk/browser/0.1.3/openrum.min.js"
 )
 
 type BrowserSDKHandler struct {

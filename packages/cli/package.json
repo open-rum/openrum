@@ -1,6 +1,6 @@
 {
   "name": "@openrum/cli",
-  "version": "0.1.0",
+  "version": "0.1.3",
   "description": "The openrum command: upload Source Maps to an OpenRUM Release and drive the local development stack.",
   "license": "MIT",
   "repository": {

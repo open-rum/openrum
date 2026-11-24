@@ -15,7 +15,7 @@ docker compose -f deploy/compose/docker-compose.yml logs --tail=100 api ingest c
 ```
 
 3. Override conflicting ports in `deploy/compose/.env`.
-4. Recreate named volumes only when you intend to wipe local Demo data:
+4. Recreate named volumes only when you intend to wipe local data:
 
 ```sh
 docker compose -f deploy/compose/docker-compose.yml down -v
@@ -25,21 +25,21 @@ docker compose -f deploy/compose/docker-compose.yml down -v
 
 - Use exactly `http://127.0.0.1:4173`, matching `PUBLIC_BASE_URL`.
 - Confirm API readiness: `curl --fail http://127.0.0.1:4173/health/ready`.
-- Demo credentials are `demo@openrum.local` / `OpenRUM-demo-2026!` for local development only, and exist only after `pnpm openrum seed`.
+- Confirm you completed first-time owner registration on `/setup`; OpenRUM does not pre-seed default credentials.
 
 ## Events do not appear
 
 1. Confirm the Browser SDK `dsn` and the Project's allowed Origin.
 2. Check ingest logs and Origin allowlist for the Project key.
-3. Confirm Kafka, Consumer and ClickHouse are healthy; if you use the demo dataset, wait for `pnpm openrum seed` to finish.
+3. Confirm Kafka, Consumer and ClickHouse are healthy.
 4. Open **Events** with a wide time range, then inspect **Sessions** for the same `session_id`.
 
 ## Investigation path incomplete
 
 | Symptom                         | Likely cause                                                    | Next step                                               |
 | ------------------------------- | --------------------------------------------------------------- | ------------------------------------------------------- |
-| Behavior charts empty           | Demo not seeded, or ClickHouse unhealthy                        | Run `pnpm openrum seed`, then check Consumer/ClickHouse |
-| Session without errors          | Selected Session has no error Events                            | Filter Sessions with errors on `/checkout` in Demo      |
+| Behavior charts empty           | No events ingested yet, or ClickHouse unhealthy                 | Send traffic from the example app or local test-data generator, then check Consumer/ClickHouse |
+| Session without errors          | Selected Session has no error Events                            | Filter Sessions that contain errors                     |
 | Issue missing Source Map frames | Object storage not configured, or no Artifact matches the frame | See [Source Map upload fails](#source-map-upload-fails) |
 | API panel empty                 | No fetch/XHR captured or sampling disabled                      | Trigger traffic from the React example                  |
 

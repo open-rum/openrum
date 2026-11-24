@@ -112,6 +112,32 @@ function overviewHandler(requests: string[]) {
 }
 
 describe("project list", () => {
+  it("offers one create action when the organization has no projects", async () => {
+    server.use(
+      http.get("/api/v1/organizations", () =>
+        HttpResponse.json({ organizations: [{ id: "org", name: "团队", role: "owner" }] }),
+      ),
+      http.get("/api/v1/organizations/org/projects", () => HttpResponse.json({ projects: [] })),
+    );
+    const view = renderPage();
+    await view.findByRole("heading", { name: "创建你的第一个项目" });
+    const links = view.getAllByRole("link", { name: "创建项目" });
+    expect(links).toHaveLength(1);
+    expect(links[0].getAttribute("href")).toBe("/projects/new");
+  });
+
+  it("keeps the permission explanation without an actionable create link for members", async () => {
+    server.use(
+      http.get("/api/v1/organizations", () =>
+        HttpResponse.json({ organizations: [{ id: "org", name: "团队", role: "member" }] }),
+      ),
+      http.get("/api/v1/organizations/org/projects", () => HttpResponse.json({ projects: [] })),
+    );
+    const view = renderPage();
+    await view.findByText("当前角色不能创建项目，请联系组织 Owner 或 Admin。");
+    expect(view.queryByRole("link", { name: "创建项目" })).toBeNull();
+  });
+
   it("shows every project in the 24-hour table", async () => {
     projectHandlers();
     const requests: string[] = [];

@@ -1,9 +1,11 @@
 // @vitest-environment jsdom
 
 import { useState } from "react";
-import { describe, expect, it } from "vitest";
-import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import { afterEach, describe, expect, it } from "vitest";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { ToggleGroup, ToggleGroupItem, type ToggleGroupColor } from "./toggle-group";
+
+afterEach(cleanup);
 
 function Segmented({ initial = "a", color }: { initial?: string; color?: ToggleGroupColor }) {
   const [value, setValue] = useState(initial);

@@ -34,8 +34,7 @@ RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache
     go build -trimpath -ldflags="-s -w" -o /out/ingest ./services/ingest/cmd/ingest && \
     go build -trimpath -ldflags="-s -w" -o /out/consumer ./services/consumer/cmd/consumer && \
     go build -trimpath -ldflags="-s -w" -o /out/worker ./services/worker/cmd/worker && \
-    go build -trimpath -ldflags="-s -w" -o /out/migrate ./services/api/cmd/migrate && \
-    go build -trimpath -ldflags="-s -w" -o /out/demo ./services/api/cmd/demo
+    go build -trimpath -ldflags="-s -w" -o /out/migrate ./services/api/cmd/migrate
 
 FROM alpine:3.24
 LABEL org.opencontainers.image.title="OpenRUM" \

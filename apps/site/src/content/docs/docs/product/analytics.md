@@ -31,8 +31,8 @@ funnels, paths and retention. Analyse them through [Performance](/docs/product/p
 [API monitoring](/docs/product/api-monitoring/) and Issues instead.
 :::
 
-Events flagged `synthetic` — the Demo seed and test Events — are excluded from every behavior
-query, so a seeded Instance never reports Demo traffic as real.
+Events flagged `synthetic` — such as test Events or generated development data — are excluded from
+every behavior query so synthetic traffic is never reported as real user activity.
 
 ## Dimensions
 

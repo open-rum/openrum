@@ -1,6 +1,6 @@
 {
   "name": "@openrum/sourcemap",
-  "version": "0.1.0",
+  "version": "0.1.3",
   "description": "Upload private Source Maps from a build to an OpenRUM Release, as a library or a Vite plugin.",
   "license": "MIT",
   "repository": {

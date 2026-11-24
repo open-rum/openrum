@@ -1,81 +1,45 @@
 ---
-title: OpenRUM 文档
-description: 部署一套 OpenRUM 实例，或者从应用里发出第一个 Event。
-template: splash
+title: 介绍
+description: 了解 OpenRUM 是什么、覆盖哪些核心能力，以及如何部署和接入前端应用。
 appliesTo: Alpha
 ---
 
-import { CardGrid, LinkCard } from "@astrojs/starlight/components";
+import { Aside, CardGrid, LinkCard } from "@astrojs/starlight/components";
 
-OpenRUM 是开源、可自托管的前端监控平台。选择本地开发或生产部署，按步骤启动实例、登录控制台，再接入自己的应用。
+OpenRUM 是一款开源、可自部署的高性能前端监控平台，专为生产环境下的高吞吐与稳定运行设计。部署实例并接入 Browser SDK 后，即可在控制台统一观测错误、性能、API 请求、日志与用户行为。
 
 ## 从哪里开始
 
-<div class="docs-entry-grid">
-  <CardGrid>
-    <LinkCard
-      title="本地开发"
-      description="在电脑上准备环境、启动服务、修改代码，并用示例应用和造数据工具验证。"
-      href="/zh/docs/getting-started/local-development/"
-    />
-    <LinkCard
-      title="生产部署"
-      description="准备数据服务、镜像和 HTTPS，通过 Helm 部署，创建管理员并接入真实项目。"
-      href="/zh/docs/getting-started/production-deployment/"
-    />
-  </CardGrid>
-</div>
-
-不确定选哪条路径？先看[介绍](/zh/docs/introduction/)。已有运行中的实例，可直接[创建第一个项目](/zh/docs/getting-started/create-first-project/)。
-
-## 按任务查
-
 <CardGrid>
   <LinkCard
-    title="部署到生产"
-    description="拓扑、外部依赖，以及那些事后很难改回来的决定。"
+    title="Kubernetes / Helm 部署（推荐）"
+    description="适合已有 K8s 集群与数据服务的团队，拉取已发布 Chart 与镜像部署高可用生产实例。"
     href="/zh/docs/getting-started/production-deployment/"
   />
   <LinkCard
-    title="接入服务端渲染应用"
-    description="Next.js 与 Astro：初始化位置放错会静默丢弃事件，不会报错。"
-    href="/zh/docs/sdk/browser/nextjs/"
-  />
-  <LinkCard
-    title="排查一次线上问题"
-    description="从一个 Session 里的错误追到它的 Issue、受影响用户和那次失败的请求。"
-    href="/zh/docs/product/investigation/"
-  />
-  <LinkCard
-    title="看懂性能数据"
-    description="每个 Core Web Vital 的判定阈值，以及分位数样本少到什么程度就不该采信。"
-    href="/zh/docs/product/performance/"
-  />
-  <LinkCard
-    title="拿到可读堆栈"
-    description="按 Release 上传 Source Map，以及为什么映射后的帧是可选能力。"
-    href="/zh/docs/sdk/source-maps/"
-  />
-  <LinkCard
-    title="查一个配置项"
-    description="全部环境变量、Event schema 和 HTTP API。"
-    href="/zh/docs/reference/configuration/"
-  />
-  <LinkCard
-    title="备份与恢复"
-    description="把控制面、事件存储和可选的 Artifact 当成同一套恢复集合。"
-    href="/zh/docs/self-hosting/backup-restore/"
-  />
-  <LinkCard
-    title="确认采集了什么"
-    description="采集边界、保留期，以及 OpenRUM 明确拒收的字段。"
-    href="/zh/docs/self-hosting/security/privacy/"
+    title="Docker 单机部署"
+    description="在一台 Linux 服务器上使用 Docker Compose 运行完整服务，内置自动 HTTPS 与备份方案。"
+    href="/zh/docs/self-hosting/docker-production/"
   />
 </CardGrid>
 
-## 对外暴露实例之前
+不确定选哪种方案？查看[部署方式对比](/zh/docs/self-hosting/overview/)；已部署好实例可直接[接入 Browser SDK](/zh/docs/sdk/browser/)；如需本地试用或参与贡献，请查看[本地开发指南](/zh/docs/getting-started/local-development/)。
 
-OpenRUM 处于 Alpha。先读[威胁模型](/zh/docs/self-hosting/security/threat-model/)和
-[容量规划](/zh/docs/self-hosting/capacity/)，使用自己的实际负载验证容量。已发布的本地单机基准不代表生产容量保证。
+## 核心能力
 
-文档同时提供中文和英文，页头可切换语言。
+| 能力         | 你能得到什么                                                                         | 阅读                                            |
+| ------------ | ------------------------------------------------------------------------------------ | ----------------------------------------------- |
+| 错误与排查   | 按 Issue 聚合 JavaScript 错误，支持 Source Map 堆栈还原，以及错误前后的会话时间线。  | [排查线上问题](/zh/docs/product/investigation/) |
+| 性能与 API   | Core Web Vitals、路由性能、接口请求延迟与失败监控。                                  | [性能](/zh/docs/product/performance/)           |
+| 行为分析     | 页面浏览、访客、自定义事件、漏斗、路径与留存分析。                                   | [行为分析](/zh/docs/product/analytics/)         |
+| 日志         | 可按级别、用户和会话检索的结构化浏览器日志。                                         | [日志](/zh/docs/product/logs/)                  |
+| 仪表盘与告警 | 项目仪表盘，以及发送到飞书/Lark 或 Webhook 的指标告警。                              | [告警](/zh/docs/product/alerts/)                |
+| 默认保护隐私 | 自动采集不含原始输入值、请求头和请求/响应体；头和内容仅在项目为指定 API 开启后记录。 | [隐私](/zh/docs/self-hosting/security/privacy/) |
+
+## 运行时架构
+
+一套实例包含五个应用服务：控制台 Web 服务、API、Ingest、Consumer 和 Worker；底层使用四个必需依赖：PostgreSQL 保存账号、项目和设置，ClickHouse 保存事件并提供分析查询，Kafka 作为接收缓冲，Redis 提供缓存和限流。对象存储为可选项，仅在上传 Source Map 时需要。完整的事件流转见[架构](/zh/docs/self-hosting/architecture/)。
+
+<Aside type="caution" title="Alpha 阶段">
+  OpenRUM 目前处于 Alpha 阶段，第一个稳定版本发布前，schema 和 API 都可能变化。对外暴露生产实例前，请先阅读[威胁模型](/zh/docs/self-hosting/security/threat-model/)与[容量规划](/zh/docs/self-hosting/capacity/)，并完成备份与访问检查。已发布的单机基准数据不代表生产容量保证。
+</Aside>

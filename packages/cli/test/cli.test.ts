@@ -139,8 +139,8 @@ test("sourcemaps help lists every option and exits 0", async () => {
 test("local stack commands run from inside a repository checkout", async () => {
   const root = fakeRepository();
   const run = harness({ cwd: join(root, "apps", "web") });
-  assert.equal(await main(["seed", "--yes"], run.context), 0);
-  assert.deepEqual(run.forwards, [{ root, args: ["seed", "--yes"] }]);
+  assert.equal(await main(["reset", "--yes"], run.context), 0);
+  assert.deepEqual(run.forwards, [{ root, args: ["reset", "--yes"] }]);
 });
 
 test("local stack commands explain themselves outside a checkout", async () => {

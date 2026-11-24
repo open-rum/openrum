@@ -156,14 +156,22 @@ const providerOptions: Record<StorageProviderPreset, StorageProviderOption> = {
 };
 
 export function ObjectStoragePage() {
-  const queryClient = useQueryClient();
-  const statusQuery = useQuery(objectStorageStatusQueryOptions());
-
   return (
     <AdminPageLayout
       title="对象存储"
       description="存放 Source Map 等构建产物。所有项目共用这一个存储，不配置也不影响核心监控。"
     >
+      <ObjectStorageSection />
+    </AdminPageLayout>
+  );
+}
+
+export function ObjectStorageSection() {
+  const queryClient = useQueryClient();
+  const statusQuery = useQuery(objectStorageStatusQueryOptions());
+
+  return (
+    <>
       {statusQuery.isLoading ? <AsyncLoading /> : null}
       {statusQuery.error ? (
         <AsyncError
@@ -181,7 +189,7 @@ export function ObjectStoragePage() {
           }
         />
       ) : null}
-    </AdminPageLayout>
+    </>
   );
 }
 

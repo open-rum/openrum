@@ -10,7 +10,6 @@ export const devStackCommands = [
   "status",
   "logs",
   "restart",
-  "seed",
   "stop",
   "down",
   "reset",
@@ -29,7 +28,7 @@ export function findRepositoryRoot(start: string): string | undefined {
   }
 }
 
-/** Hands a command to the Go tool, which owns Docker, the host processes and the demo seed. */
+/** Hands a command to the Go tool, which owns Docker and the host processes. */
 export function forwardToGo(root: string, args: string[]): Promise<number> {
   return new Promise((resolve) => {
     const child = spawn("go", ["run", "./cmd/openrum", ...args], { cwd: root, stdio: "inherit" });

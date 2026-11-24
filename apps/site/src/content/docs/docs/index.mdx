@@ -1,81 +1,49 @@
 ---
-title: OpenRUM documentation
-description: Run an OpenRUM Instance, or send your first Event from an application.
-template: splash
+title: Introduction
+description: What OpenRUM is, what it covers, and how to deploy an Instance and instrument your web applications.
 appliesTo: Alpha
 ---
 
-import { CardGrid, LinkCard } from "@astrojs/starlight/components";
+import { Aside, CardGrid, LinkCard } from "@astrojs/starlight/components";
 
-OpenRUM is open-source, self-hosted frontend monitoring. Choose local development or production deployment, follow the steps to start an Instance and sign in, then connect your applications.
+OpenRUM is an open-source, self-hosted frontend monitoring platform built for high throughput and reliable production operation. Deploy an Instance and add the Browser SDK to monitor errors, performance, API requests, logs, and user behavior from a single Console.
 
 ## Where to start
 
-<div class="docs-entry-grid">
-  <CardGrid>
-    <LinkCard
-      title="Local development"
-      description="Prepare your computer, start services, change code and verify with the example app and test data generator."
-      href="/docs/getting-started/local-development/"
-    />
-    <LinkCard
-      title="Production deployment"
-      description="Prepare data services, an image and HTTPS, deploy with Helm, create an administrator and connect a real Project."
-      href="/docs/getting-started/production-deployment/"
-    />
-  </CardGrid>
-</div>
-
-Unsure which path to choose? Read the [introduction](/docs/introduction/). If an Instance is already running, [create your first project](/docs/getting-started/create-first-project/).
-
-## By task
-
 <CardGrid>
   <LinkCard
-    title="Deploy to production"
-    description="Topology, dependencies and the decisions that are hard to reverse later."
+    title="Kubernetes / Helm (recommended)"
+    description="Deploy a shared production Instance on your Kubernetes cluster using the published Helm chart and container images."
     href="/docs/getting-started/production-deployment/"
   />
   <LinkCard
-    title="Instrument a server-rendered app"
-    description="Next.js and Astro, where initializing in the wrong place drops Events with no error."
-    href="/docs/sdk/browser/nextjs/"
-  />
-  <LinkCard
-    title="Investigate a production issue"
-    description="Follow one error from a Session to its Issue, affected users and the failed Request."
-    href="/docs/product/investigation/"
-  />
-  <LinkCard
-    title="Read the performance data"
-    description="What each Core Web Vital is measured against, and when a percentile has too few samples to trust."
-    href="/docs/product/performance/"
-  />
-  <LinkCard
-    title="Get readable stack traces"
-    description="Upload Source Maps per Release, and understand why mapped frames are optional."
-    href="/docs/sdk/source-maps/"
-  />
-  <LinkCard
-    title="Look up a setting"
-    description="Every environment variable, the Event schema and the HTTP API."
-    href="/docs/reference/configuration/"
-  />
-  <LinkCard
-    title="Back up and restore"
-    description="Treat the control plane, the Event store and optional Artifacts as one recovery set."
-    href="/docs/self-hosting/backup-restore/"
-  />
-  <LinkCard
-    title="Check what is collected"
-    description="Collection boundaries, retention and the fields OpenRUM refuses to accept."
-    href="/docs/self-hosting/security/privacy/"
+    title="Docker (single host)"
+    description="Run the full stack on a single Linux server with Docker Compose, automatic HTTPS, and host-level backups."
+    href="/docs/self-hosting/docker-production/"
   />
 </CardGrid>
 
-## Before you expose an Instance
+Unsure which option fits best? Compare them in [Self-hosting overview](/docs/self-hosting/overview/). Already running an Instance? Jump to the [Browser SDK guide](/docs/sdk/browser/). Want to try it locally or contribute? See the [local development guide](/docs/getting-started/local-development/).
 
-OpenRUM is Alpha. Read the [threat model](/docs/self-hosting/security/threat-model/) and
-[capacity planning](/docs/self-hosting/capacity/), and verify capacity with your actual workload. Published local single-host benchmarks are not production capacity guarantees.
+## What it covers
 
-Documentation is available in English and Chinese. Use the language selector in the header to switch.
+| Capability               | What you get                                                                                                      | Read                                                 |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| Errors and investigation | JavaScript errors grouped into Issues, Source Map stack restoration, and the Session timeline around each error.  | [Investigate an issue](/docs/product/investigation/) |
+| Performance and APIs     | Core Web Vitals, route performance, and request latency and failures.                                             | [Performance](/docs/product/performance/)            |
+| Behavior analytics       | Page Views, visitors, Custom Events, funnels, paths, and retention.                                               | [Behavior analytics](/docs/product/analytics/)       |
+| Logs                     | Structured browser logs searchable by severity, user, and Session.                                                | [Logs](/docs/product/logs/)                          |
+| Dashboards and alerts    | Project dashboards and metric alerts delivered to Feishu/Lark or a Webhook.                                       | [Alerts](/docs/product/alerts/)                      |
+| Privacy by default       | No raw input values, headers, or bodies in automatic capture; headers and bodies only for APIs a project opts in. | [Privacy](/docs/self-hosting/security/privacy/)      |
+
+## What runs
+
+An Instance runs five application services: the Console web server, API, Ingest, Consumer, and Worker. They use four required dependencies: PostgreSQL for accounts, projects, and settings; ClickHouse for events and analytical queries; Kafka as the ingestion buffer; and Redis for caching and rate limits. Object storage is optional and only needed for Source Map uploads. See [Architecture](/docs/self-hosting/architecture/) for how events flow through them.
+
+<Aside type="caution" title="Alpha stage">
+  OpenRUM is currently in Alpha. Expect schema and API changes before the first stable release.
+  Before exposing an Instance to production traffic, review the
+  [threat model](/docs/self-hosting/security/threat-model/) and
+  [capacity planning](/docs/self-hosting/capacity/), and complete backup and access checks.
+  Published single-host benchmarks are not production capacity guarantees.
+</Aside>

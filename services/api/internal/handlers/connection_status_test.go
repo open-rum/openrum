@@ -99,3 +99,39 @@ func connectionStatusTestRouter(handler *ConnectionStatusHandler, userID uuid.UU
 	router.Handle("GET /api/v1/projects/{projectId}/connection-status", httpx.RequireSession(authenticator)(http.HandlerFunc(handler.Get)))
 	return router
 }
+
+func TestConnectionStatusTracksSDKHistoryIndependentlyOfRecentEvents(t *testing.T) {
+	at := time.Now().UTC().Add(-90 * 24 * time.Hour)
+	cases := []struct {
+		name      string
+		keys      []metadata.ProjectKey
+		status    ingest.ConnectionStatus
+		connected bool
+	}{
+		{name: "new project with unused key", keys: []metadata.ProjectKey{{}}, connected: false},
+		{name: "recent SDK request", status: ingest.ConnectionStatus{LastSDKSeenAt: &at}, connected: true},
+		{name: "expired Redis history", keys: []metadata.ProjectKey{{LastUsedAt: &at}}, connected: true},
+		{name: "rotated key retains history", keys: []metadata.ProjectKey{{}, {LastUsedAt: &at, RevokedAt: &at}}, connected: true},
+		{name: "synthetic events are not SDK integration", keys: []metadata.ProjectKey{{}}, status: ingest.ConnectionStatus{LastEventReceivedAt: &at, LastEventQueryableAt: &at}, connected: false},
+	}
+	for _, test := range cases {
+		t.Run(test.name, func(t *testing.T) {
+			handler := NewConnectionStatusHandler(fakeConnectionKeys{keys: test.keys}, fakeConnectionReader{status: test.status}, zerolog.Nop())
+			router := connectionStatusTestRouter(handler, uuid.New())
+			request := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/api/v1/projects/"+uuid.NewString()+"/connection-status", nil)
+			request.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "valid"})
+			response := httptest.NewRecorder()
+			router.ServeHTTP(response, request)
+			if response.Code != http.StatusOK {
+				t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+			}
+			var payload connectionStatusResponse
+			if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
+				t.Fatal(err)
+			}
+			if payload.SDKConnected != test.connected {
+				t.Fatalf("sdkConnected=%v want=%v", payload.SDKConnected, test.connected)
+			}
+		})
+	}
+}

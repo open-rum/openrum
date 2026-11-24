@@ -1,6 +1,6 @@
 import { CheckIcon, ChevronDownIcon, DicesIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import { DaisyDropdown } from "@/components/daisy/DaisyDropdown";
-import { DAISY_THEMES } from "@/components/daisy/daisyTheme";
+import { DAISY_THEMES, themeLabel } from "@/components/daisy/daisyTheme";
 import { ThemeSwatch } from "@/components/daisy/ThemeSwatch";
 import { HoldButton } from "@/components/ui/hold-button";
 import { MAX_CUSTOM_THEMES } from "./customThemes";
@@ -26,7 +26,7 @@ export function ThemeController() {
   } = useTheme();
   const label = previewing
     ? "随机配色（未保存）"
-    : (customThemes.find((item) => item.id === theme)?.name ?? theme);
+    : (customThemes.find((item) => item.id === theme)?.name ?? themeLabel(theme));
   const full = customThemes.length >= MAX_CUSTOM_THEMES;
 
   const choose = (value: Theme, name: string, close: () => void) => (
@@ -135,7 +135,7 @@ export function ThemeController() {
           ) : null}
           <li className="menu-title">daisyUI 主题</li>
           {DAISY_THEMES.map((value) => (
-            <li key={value}>{choose(value, value, close)}</li>
+            <li key={value}>{choose(value, themeLabel(value), close)}</li>
           ))}
         </>
       )}

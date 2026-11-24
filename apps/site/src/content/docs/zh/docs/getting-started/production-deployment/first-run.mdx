@@ -15,10 +15,10 @@ import { Steps, CardGrid, LinkCard } from "@astrojs/starlight/components";
    打开 `https://rum.example.com/setup`，依次填写：
 
    1. 组织名称。
-   2. 你的名称和工作邮箱。
+   2. 管理员姓名和工作邮箱。
    3. 密码（至少 8 个字符，须同时包含大写字母、小写字母和符号）与确认密码。
-   4. 凭据配置步骤保存的 Bootstrap Token。
-   5. 点击“创建实例并进入控制台”。
+   4. 凭据配置步骤保存的 Bootstrap Token（仅在服务端配置了 `BOOTSTRAP_TOKEN` 时显示）。
+   5. 点击“创建实例并继续”，进入可选系统配置向导（对象存储、邮件服务、认证与访问、数据生命周期），按需配置或直接跳过进入控制台。
 
    生产 Helm 部署不导入本地演示账号。首次初始化完成后，该入口关闭；以后使用创建的账号登录。如果提示已初始化，使用现有管理员账号，不要重复初始化。
 
@@ -26,7 +26,7 @@ import { Steps, CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 1. ## 接入第一个真实项目
 
-   按[创建第一个项目](/zh/docs/getting-started/create-first-project/)选择开发平台、配置应用 Origin 与 `production` 环境，从“接入”页复制 DSN 并初始化 SDK。
+   在控制台创建项目、选择开发平台、配置应用 Origin 与 `production` 环境，从“接入指引”页复制 DSN，并按 [Browser SDK 指南](/zh/docs/sdk/browser/)初始化 SDK。
 
    发布应用后访问一个页面、触发一个测试事件。在控制台选择同一项目、`production` 和“最近 15 分钟”，确认事件与会话可见。
 

@@ -84,14 +84,22 @@ const stageLabels: Record<NonNullable<EmailDeliveryResult["stage"]>, string> = {
 };
 
 export function EmailServicePage() {
-  const queryClient = useQueryClient();
-  const statusQuery = useQuery(emailStatusQueryOptions());
-
   return (
     <AdminPageLayout
       title="邮件服务"
       description="实例用来发送邮件的 SMTP 服务器。告警邮件、成员邀请等功能都会使用它；不配置也不影响核心监控。"
     >
+      <EmailServiceSection />
+    </AdminPageLayout>
+  );
+}
+
+export function EmailServiceSection() {
+  const queryClient = useQueryClient();
+  const statusQuery = useQuery(emailStatusQueryOptions());
+
+  return (
+    <>
       {statusQuery.isLoading ? <AsyncLoading /> : null}
       {statusQuery.error ? (
         <AsyncError
@@ -107,7 +115,7 @@ export function EmailServicePage() {
           onChanged={() => void queryClient.invalidateQueries({ queryKey: ["admin", "email"] })}
         />
       ) : null}
-    </AdminPageLayout>
+    </>
   );
 }
 

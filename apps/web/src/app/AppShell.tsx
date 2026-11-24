@@ -8,6 +8,7 @@ export function AppShell({
   floatingTools,
   sidebarCollapsed = false,
   contentKey,
+  content,
 }: {
   navigation: ReactNode;
   statusBar: ReactNode;
@@ -16,6 +17,7 @@ export function AppShell({
   sidebarCollapsed?: boolean;
   /** A project switch resets local page drafts and selections to the new project's data. */
   contentKey?: string;
+  content?: ReactNode;
 }) {
   return (
     <div
@@ -32,7 +34,7 @@ export function AppShell({
       <main className="app-main" id="main-content" tabIndex={-1}>
         {statusBar}
         {banner ? <div className="app-global-banner">{banner}</div> : null}
-        <Outlet key={contentKey} />
+        {content ?? <Outlet key={contentKey} />}
       </main>
       {floatingTools}
     </div>
