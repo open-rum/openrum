@@ -25,9 +25,79 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  quality:
+  # Determine which subsystems changed on pull requests so unrelated checks can be skipped.
+  # Pushes to main, release workflow_call invocations and manual runs always execute everything.
+  changes:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 5
+    outputs:
+      go: ${{ steps.filter.outputs.go }}
+      go_deps: ${{ steps.filter.outputs.go_deps }}
+      web: ${{ steps.filter.outputs.web }}
+      packages: ${{ steps.filter.outputs.packages }}
+      site: ${{ steps.filter.outputs.site }}
+    steps:
+      - name: Check out repository for PR diff
+        if: github.event_name == 'pull_request'
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Classify changed paths
+        id: filter
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if [ "$EVENT_NAME" != "pull_request" ]; then
+            {
+              echo "go=true"
+              echo "go_deps=true"
+              echo "web=true"
+              echo "packages=true"
+              echo "site=true"
+            } >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          changed=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA" || true)
+          if [ -z "$changed" ]; then
+            {
+              echo "go=true"
+              echo "go_deps=true"
+              echo "web=true"
+              echo "packages=true"
+              echo "site=true"
+            } >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "Changed files:"
+          echo "$changed"
+
+          match_any() {
+            printf '%s\n' "$changed" | grep -Eq "$1" && echo "true" || echo "false"
+          }
+
+          go_changed=$(match_any '^(services/|internal/|cmd/|migrations/|packages/protocol/|deploy/compose/|Dockerfile$|go\.mod$|go\.sum$|go\.work$|go\.work\.sum$|scripts/test-integration\.sh$|\.github/workflows/ci\.yml$)')
+          go_deps_changed=$(match_any '^(go\.mod$|go\.sum$|go\.work$|go\.work\.sum$|Dockerfile$|\.github/workflows/ci\.yml$)')
+          web_changed=$(match_any '^(apps/web/|packages/design-tokens/|packages/ui/|packages/protocol/|packages/browser-sdk/|tests/perf/|scripts/check-console-size\.mjs$|package\.json$|pnpm-lock\.yaml$|\.github/workflows/ci\.yml$)')
+          packages_changed=$(match_any '^(packages/|examples/|scripts/check-sdk-size\.mjs$|scripts/release/|services/api/internal/handlers/browser_sdk\.go$|deploy/helm/openrum/Chart\.yaml$|deploy/helm/openrum/values\.yaml$|package\.json$|pnpm-lock\.yaml$|\.github/workflows/ci\.yml$)')
+          site_changed=$(match_any '^(apps/site/|packages/design-tokens/|packages/ui/|docs/|scripts/docs/|scripts/site/|netlify\.toml$|README\.md$|README\.zh-CN\.md$|packages/[^/]+/README\.md$|examples/react-vite/README\.md$|cspell\.json$|deploy/helm/openrum/values\.yaml$|internal/config/|packages/browser-sdk/src/client\.ts$|packages/cli/|package\.json$|pnpm-lock\.yaml$|\.github/workflows/ci\.yml$)')
+
+          {
+            echo "go=$go_changed"
+            echo "go_deps=$go_deps_changed"
+            echo "web=$web_changed"
+            echo "packages=$packages_changed"
+            echo "site=$site_changed"
+          } >> "$GITHUB_OUTPUT"
+
+  # Fast baseline checks that run on every PR and push.
+  repo-checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
@@ -39,57 +109,196 @@ jobs:
           cache: true
           require-lockfile: true
 
+      - name: Check Prettier formatting
+        run: pnpm run format:check:prettier
+
+      - name: Verify generated reference docs
+        run: pnpm run docs:check
+
+      - name: Test release metadata validation
+        run: node --test scripts/release/check-version.test.mjs scripts/release/check-package-version.test.mjs scripts/release/release-tools.test.mjs
+
+  go:
+    needs: changes
+    if: needs.changes.outputs.go == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
       - name: Set up Go
         uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
           cache-dependency-path: go.sum
 
-      - name: Check formatting
-        run: pnpm run format:check
-
-      - name: Lint TypeScript and vet Go
-        run: pnpm run lint
+      - name: Check Go formatting
+        run: node scripts/check-go-format.mjs
 
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v9
         with:
           version: v2.12.2
 
-      - name: Build all packages and services
-        run: pnpm run build
+      - name: Build Go services
+        run: go build ./...
 
-      - name: Type-check workspaces
-        run: pnpm run typecheck
-
-      - name: Run unit and protocol fixture tests
-        run: pnpm run test
+      - name: Run Go unit tests
+        run: go test ./...
 
       - name: Scan Go dependencies for known vulnerabilities
+        if: needs.changes.outputs.go_deps == 'true'
         run: go run golang.org/x/vuln/cmd/govulncheck@v1.7.0 ./...
+
+  web-build:
+    needs: changes
+    if: needs.changes.outputs.web == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up pnpm and Node.js
+        uses: pnpm/setup@v2
+        with:
+          runtime: node@24
+          cache: true
+          require-lockfile: true
+
+      - name: Lint Console
+        run: pnpm --filter @openrum/web lint
+
+      - name: Type-check Console
+        run: pnpm --filter @openrum/web typecheck
+
+      - name: Build Console and workspace dependencies
+        run: pnpm --filter @openrum/web... build
+
+      - name: Run Console worker tests
+        run: pnpm --filter @openrum/web test:sites
+
+      - name: Enforce Console initial-load budget
+        run: pnpm run console:size
+
+  web-test:
+    needs: changes
+    if: needs.changes.outputs.web == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up pnpm and Node.js
+        uses: pnpm/setup@v2
+        with:
+          runtime: node@24
+          cache: true
+          require-lockfile: true
+
+      - name: Run Console unit tests (shard ${{ matrix.shard }}/2)
+        run: pnpm --filter @openrum/web exec vitest run src --shard=${{ matrix.shard }}/2
+
+  packages:
+    needs: changes
+    if: needs.changes.outputs.packages == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up pnpm and Node.js
+        uses: pnpm/setup@v2
+        with:
+          runtime: node@24
+          cache: true
+          require-lockfile: true
+
+      - name: Set up Go for schema formatting
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: false
+
+      - name: Lint packages and examples
+        run: pnpm --filter './packages/*' --filter './examples/*' --if-present lint
+
+      - name: Type-check packages and examples
+        run: pnpm --filter './packages/*' --filter './examples/*' --if-present typecheck
+
+      - name: Build packages and examples
+        run: pnpm --filter './packages/*' --filter './examples/*' --if-present build
+
+      - name: Test packages and examples
+        run: pnpm --filter './packages/*' --filter './examples/*' --if-present test
 
       - name: Verify generated protocol contract
         run: |
           pnpm run protocol:check
           git diff --exit-code -- internal/event/schema_gen.go
 
-      - name: Test release metadata validation
-        run: node --test scripts/release/check-version.test.mjs scripts/release/check-package-version.test.mjs scripts/release/release-tools.test.mjs
-
-      - name: Verify generated documentation and public-site content
-        run: |
-          pnpm run docs:check
-          pnpm run site:spell
-          node scripts/site/check-built-links.mjs
-          node scripts/site/check-performance-budget.mjs
-
       - name: Enforce browser SDK size budget
         run: pnpm run sdk:size
 
-      - name: Enforce Console initial-load budget
-        run: pnpm run console:size
+  docs-site:
+    needs: changes
+    if: needs.changes.outputs.site == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      PUBLIC_SITE_URL: https://openrum.dev
+      PUBLIC_REPOSITORY_URL: https://github.com/open-rum/openrum
+      PUBLIC_OPENRUM_RELEASE: Alpha
+      PUBLIC_COMMIT_SHA: ${{ github.sha }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up pnpm and Node.js
+        uses: pnpm/setup@v2
+        with:
+          runtime: node@24
+          cache: true
+          require-lockfile: true
+
+      - name: Check docs, spelling, build, links and budgets
+        run: pnpm run site:check
+
+      - name: Run public-site content tests
+        run: pnpm --filter @openrum/site test
+
+  # Stable aggregate gate job so branch rulesets can require a single `quality` check
+  # even when path filtering skips unaffected jobs.
+  quality:
+    needs: [changes, repo-checks, go, web-build, web-test, packages, docs-site]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Verify all executed quality checks succeeded
+        env:
+          RESULTS: ${{ toJSON(needs.*.result) }}
+        run: |
+          node -e '
+            const results = JSON.parse(process.env.RESULTS);
+            const bad = results.filter((r) => r !== "success" && r !== "skipped");
+            console.log("Job results:", results);
+            if (bad.length > 0) {
+              console.error("One or more required quality jobs did not succeed:", bad);
+              process.exit(1);
+            }
+          '
 
   integration:
+    needs: changes
+    if: needs.changes.outputs.go == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:

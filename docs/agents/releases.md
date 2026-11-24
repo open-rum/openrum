@@ -63,4 +63,4 @@ Always execute releases through this exact sequence:
 
 ## Public site and Netlify builds
 
-`netlify.toml` defines `build.ignore` so commits that do not touch site inputs skip Netlify deploys. Whenever a new repository path becomes an input to `pnpm site:build`, update both `.github/workflows/site.yml` and `netlify.toml` together.
+`netlify.toml` defines `build.ignore` so commits that do not touch site inputs skip Netlify deploys. Whenever a new repository path becomes an input to `pnpm site:build`, update both `.github/workflows/ci.yml` (`site` filter) and `netlify.toml` together.
