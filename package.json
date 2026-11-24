@@ -35,6 +35,8 @@
     "protocol:check": "pnpm --filter @openrum/protocol generate && pnpm --filter @openrum/protocol test",
     "sdk:size": "node scripts/check-sdk-size.mjs",
     "console:size": "node --test tests/perf/budgets.test.mjs && node scripts/check-console-size.mjs",
+    "release:status": "node scripts/release/status.mjs",
+    "release:bump": "node scripts/release/bump.mjs",
     "check": "pnpm run format:check && pnpm run lint && pnpm run typecheck && pnpm run test && pnpm run protocol:check && pnpm run build && pnpm run sdk:size && pnpm run console:size",
     "workspace:list": "pnpm -r list --depth -1"
   },

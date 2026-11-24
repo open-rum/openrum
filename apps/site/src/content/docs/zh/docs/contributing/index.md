@@ -38,7 +38,17 @@ GitHub CI 默认不运行浏览器 E2E。跨页面流程的改动可能仍需要
 
 ## 提交 Pull Request
 
-使用清晰的分支名称和仓库的 Pull Request 模板，关联对应 Issue，并说明：
+使用清晰的分支名称、仓库的 Pull Request 模板，以及符合 [Conventional Commits](https://www.conventionalcommits.org/) 的 Pull Request 标题（`<type>(<scope>): <简短摘要>`），例如 `feat(console): ...`、`fix(browser): ...`、`docs(site): ...` 或 `chore(ci): ...`。破坏性变更请使用 `!` 或在正文中附上 `BREAKING CHANGE:`。`scope` 建议直接对应发布物，方便生成变更日志和发布自动化识别影响面：
+
+| Scope                                           | 受影响的发布物                                                 |
+| ----------------------------------------------- | -------------------------------------------------------------- |
+| `api`, `ingest`, `console`, `helm`, `migrations` | 产品容器镜像与 Helm Chart（`vX.Y.Z`）                          |
+| `browser`, `protocol`                           | `@openrum/browser`（`browser-vX.Y.Z`）                         |
+| `sourcemap`                                     | `@openrum/sourcemap`（`sourcemap-vX.Y.Z`）                     |
+| `cli`                                           | `@openrum/cli`（`cli-vX.Y.Z`）                                 |
+| `site`, `docs`                                  | 仅公开文档站点（不触发发包，优先使用 `docs:` 或 `chore:`）     |
+
+开发分支内可自由提交中间记录，合入 `main` 时优先使用 **Squash and merge**，使每个 Pull Request 以一条清晰规范的 Commit 进入主干。在描述中关联对应 Issue，并说明：
 
 - 问题是什么，用户最终会看到什么变化；
 - 主要实现及 API、SDK、Schema 或配置变化；
@@ -52,4 +62,4 @@ GitHub CI 默认不运行浏览器 E2E。跨页面流程的改动可能仍需要
 
 合并到 `main` 会触发仓库 CI。涉及公开站点的改动还会运行独立的站点检查；文档网站由 Netlify 从其连接的分支另行构建和发布。这些系统彼此独立，站点部署成功不代表仓库全部检查通过。
 
-合并代码**不会**自动发布新的应用镜像或 Helm Chart、创建产品 Release，也不会升级任何人的 OpenRUM 实例。维护者通过带版本标签的发布工作流准备正式版本；运维人员在确认备份和 Migration 兼容后，自行决定何时安装或升级 Chart。普通 Pull Request 不应推送发布标签、发布包或部署到共享环境。
+合并代码**不会**自动发布新的应用镜像、Helm Chart 或 npm 包，也不会创建产品 Release 或升级任何人的 OpenRUM 实例。OpenRUM 对产品（`vX.Y.Z`）、`@openrum/browser`（`browser-vX.Y.Z`）、`@openrum/sourcemap`（`sourcemap-vX.Y.Z`）和 `@openrum/cli`（`cli-vX.Y.Z`）实行独立版本管理，维护者仅针对有实际改动的包，通过专门的发布准备 Pull Request 和带版本标签的发布工作流执行发版；运维人员在确认备份和 Migration 兼容后，自行决定何时安装或升级 Chart。普通 Pull Request 不应修改发布版本号、推送发布标签、发布包或部署到共享环境。

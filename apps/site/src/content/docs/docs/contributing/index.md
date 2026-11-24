@@ -38,7 +38,17 @@ Browser E2E is opt-in in GitHub CI. A change to a cross-page journey may still n
 
 ## Open a pull request
 
-Use a descriptive branch and the repository pull request template. Link the related Issue and explain:
+Use a descriptive branch, the repository pull request template and a [Conventional Commits](https://www.conventionalcommits.org/) pull request title (`<type>(<scope>): <short summary>`), such as `feat(console): ...`, `fix(browser): ...`, `docs(site): ...` or `chore(ci): ...`. Mark breaking changes with `!` or a `BREAKING CHANGE:` footer. Scopes align with release targets so changelogs and release automation stay accurate:
+
+| Scope                                           | Affected release target                                                |
+| ----------------------------------------------- | ---------------------------------------------------------------------- |
+| `api`, `ingest`, `console`, `helm`, `migrations` | Product container image and Helm Chart (`vX.Y.Z`)                      |
+| `browser`, `protocol`                           | `@openrum/browser` (`browser-vX.Y.Z`)                                  |
+| `sourcemap`                                     | `@openrum/sourcemap` (`sourcemap-vX.Y.Z`)                              |
+| `cli`                                           | `@openrum/cli` (`cli-vX.Y.Z`)                                          |
+| `site`, `docs`                                  | Public documentation site only (no package release; prefer `docs:`/`chore:`) |
+
+Work-in-progress commits on a branch are fine; maintainers prefer **Squash and merge** so each pull request lands on `main` as one clean commit. Link the related Issue and explain:
 
 - the problem and user-visible result;
 - the main implementation and any API, SDK, schema or configuration change;
@@ -52,4 +62,4 @@ Keep the pull request reviewable and respond to feedback with concrete changes o
 
 Merging into `main` starts the repository CI checks. Public-site changes also run the dedicated site checks, while the documentation website is built and published separately by Netlify from its connected branch. These systems run independently; a successful site deploy is not proof that all repository checks passed.
 
-Merging code does **not** publish a new application image or Helm Chart, create a product release, or upgrade anyone's OpenRUM instance. Maintainers prepare versioned releases through the tagged release workflow. Operators choose when to install or upgrade a released Chart, with backups and migration compatibility checked separately. Contributors should not push release tags, publish packages or deploy to a shared environment as part of an ordinary pull request.
+Merging code does **not** publish a new application image or Helm Chart, create a product release, publish an npm package or upgrade anyone's OpenRUM instance. OpenRUM versions the product (`vX.Y.Z`), `@openrum/browser` (`browser-vX.Y.Z`), `@openrum/sourcemap` (`sourcemap-vX.Y.Z`) and `@openrum/cli` (`cli-vX.Y.Z`) independently so maintainers only release packages with actual changes through a dedicated release-preparation pull request and tagged release workflow. Operators choose when to install or upgrade a released Chart, with backups and migration compatibility checked separately. Contributors should not bump release versions, push release tags, publish packages or deploy to a shared environment as part of an ordinary pull request.
