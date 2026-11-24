@@ -6,10 +6,7 @@ the console's bottom-right floating flask icon **造数据** (a quick-entry Dial
 any Console page), the legacy `/projects/{id}/dev-data` route, and over the API at
 `POST /api/v1/projects/{id}/dev-data`.
 
-This is separate from the [demo data generator](demo-data.md). The demo
-generator seeds one large fixed dataset, on demand through `openrum seed`, by
-writing ClickHouse directly. This one produces small datasets repeatedly while you work, and sends
-them through the real ingest endpoint.
+It produces small datasets repeatedly while you work, and sends them through the real ingest endpoint.
 
 ## Why it posts to ingest instead of writing ClickHouse
 
@@ -22,8 +19,6 @@ That uses the Project's default client DSN and a few seconds of consumer lag. In
 generated here cannot disagree with production data about the shape of a row. A
 generator that wrote ClickHouse directly could produce combinations the pipeline
 never emits, and a query validated against those would be wrong in production.
-The demo generator does write directly, which is why it can fabricate a country
-distribution the live pipeline could not produce before geo resolution existed.
 
 ## Availability
 
@@ -49,24 +44,27 @@ belonging to the requested Project. A stopped Project cannot generate data.
 
 ## Quick workflow
 
-1. Open **造数据** using the bottom-right floating flask icon without leaving the current page.
-2. Confirm the Project, write Environment and data window. The current analysis
-   range and specific Environment are selected by default; “all environments”
-   falls back to the Project's default Environment for writes.
-3. Choose a preset and session count: 300 for trends, 1,000+ for realistic
-   volume, up to 5,000. Large runs are synchronous and can take time.
-   Optionally list business user IDs (one per line or comma separated) and the
-   signed-in share; signed-in visitors keep one of those IDs across sessions, so
-   sessions, errors and logs can be found by `user.id`. Leaving the list empty
-   generates `cust_10001`-style IDs. The SDK and protocol carry a user ID only;
-   there is no user name field.
-4. Generate. The form locks during delivery to prevent duplicate submissions.
-5. Inspect accepted/rejected/failed/unsent counts. The Console checks a unique
-   session sample every two seconds for up to roughly 30 seconds, then refreshes
-   Project queries once the sample is queryable. This proves sample availability,
-   not that every event was stored. Use **检查入库并刷新** to check again.
-6. **按生成范围查看大盘** opens the exact returned time range and Environment.
-   Other per-page filters are not automatically cleared on the underlying page.
+1. Open **添加测试数据** using the bottom-right flask button, or the development
+   notice on the first-time SDK setup screen. The accessible flask label remains **造数据**.
+2. Review the Project and Environment summary. The current page recommends a
+   relevant preset (Logs, Performance, APIs or Issues); the comprehensive storefront
+   preset remains available. Choose a size and time window. Invalid global ranges
+   block submission and offer an explicit switch to the latest hour.
+3. **高级设置** holds Environment, custom session count (1–5,000), business user IDs,
+   signed-in share and scenario JSON. Empty user IDs generate `cust_10001`-style IDs.
+   JSON syntax is checked before submission; the server owns scenario validation.
+4. Generate. The footer stays visible while settings scroll. Generation and delivery
+   share one synchronous request; the UI does not invent per-batch progress. Closing
+   the dialog keeps the job alive in the current app, and the flask shows activity.
+   Reloading or leaving the app does not preserve the client-side job state.
+5. After acceptance, the Console checks a unique session sample every two seconds
+   for up to roughly 30 seconds. Success proves sample availability, not that every
+   event was stored. Partial failures expose diagnostics; an unconfirmed sample offers
+   **重新检查样本**, which does not resend data.
+6. The result links back to the source feature's list using the generated time range
+   and Environment, without stale page filters. **查看 SDK 接入指引** is available in
+   the setup and result footer; the existing Project settings entry also remains.
+   Development generation still counts toward the existing SDK connection status.
 
 ### Localhost filtering pitfall
 

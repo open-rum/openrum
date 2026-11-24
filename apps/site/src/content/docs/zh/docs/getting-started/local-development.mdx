@@ -83,26 +83,15 @@ web         host       running  http://127.0.0.1:4173
 
 有服务没就绪时，最后一行会列出阻塞项，例如 `not ready yet: …`。
 
-## 演示数据与登录
+## 初始化与登录
 
-```sh
-pnpm openrum seed
-```
+启动后访问 `http://127.0.0.1:4173`。实例默认为空，首次访问会进入初始化页面，由你注册并创建首个管理员账号，完成后即可登录使用。
 
-它会加载一份可重复的电商数据集：一个演示 Owner、一个 Organization、一个 Project，以及跨 14 天的约 30,000 个 Session。这一步可选，重复执行也安全；如果这个实例的 Owner 是你自己创建的，它什么也不会做。启动时不会自动生成数据，所以不执行它的话，首次访问会打开初始化页面，你在那里创建自己的 Owner。
-
-打开 `http://127.0.0.1:4173` 并登录：
-
-```text title="本地演示账号" frame="none"
-Email: demo@openrum.local
-Password: OpenRUM-demo-2026!
-```
-
-这些凭据和 DSN 只是本地示例，不要在 Compose 环境之外复用。保持访问来源一致，因为在 `localhost`、`127.0.0.1` 或不同端口之间切换，可能无法通过同源检查。
+保持访问来源与 `PUBLIC_BASE_URL` 一致，因为在 `localhost`、`127.0.0.1` 或不同端口之间切换，可能无法通过同源检查。如需快速填充本地图表用于调试，登录后创建项目，再使用控制台右下角的悬浮烧瓶按钮（**造数据**）按需生成测试流量。
 
 ## 连接示例应用
 
-按[创建第一个项目](/zh/docs/getting-started/create-first-project/)创建一个 React 项目，添加 `development` 环境，并从接入页复制它的 DSN。然后在仓库根目录执行：
+在控制台创建一个 React 项目，配置 `development` 环境并从接入页复制它的 DSN。然后在仓库根目录执行：
 
 ```sh
 cp examples/react-vite/.env.example examples/react-vite/.env.local
@@ -148,7 +137,7 @@ pnpm openrum restart api
 
 <Aside type="caution" title="reset 会删除所有本地数据库">
   `pnpm openrum reset` 会删除本地所有 PostgreSQL、ClickHouse、Kafka 和 Redis 的卷，执行前会先请你确认；
-  加 `--yes` 可以跳过确认。下次启动会应用迁移并从空数据开始，需要演示数据时再执行 `pnpm openrum seed`。
+  加 `--yes` 可以跳过确认。下次启动会重新应用迁移并从空数据开始，访问控制台时需要重新完成初始化。
 </Aside>
 
 ## openrum 命令
@@ -162,7 +151,6 @@ pnpm openrum restart api
 | `pnpm openrum status`         | 查看哪些在运行，哪些还没就绪                   |
 | `pnpm openrum logs [service]` | 跟随日志；宿主机服务读取它自己的日志文件       |
 | `pnpm openrum restart <name>` | 重启一个服务并等它恢复                         |
-| `pnpm openrum seed`           | 向运行中的服务加载演示账号和数据集             |
 | `pnpm openrum stop`           | 停止全部服务，保留容器及其数据                 |
 | `pnpm openrum down`           | 删除容器，保留卷                               |
 | `pnpm openrum reset`          | 删除容器并删除所有本地数据库，执行前会确认     |
@@ -247,7 +235,7 @@ pnpm site:dev
 pnpm site:check
 ```
 
-修改公开站点或文档之后、请求评审之前运行 `site:check`。它会检查生成的参考文档、拼写、演示证据、静态构建、链接和站点性能预算。中英文页面要一起修改。
+修改公开站点或文档之后、请求评审之前运行 `site:check`。它会检查生成的参考文档、拼写、静态构建、链接和站点性能预算。中英文页面要一起修改。
 
 ## 故障排查
 

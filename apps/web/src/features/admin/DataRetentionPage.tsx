@@ -7,6 +7,7 @@ import {
   LockKeyholeIcon,
   TriangleAlertIcon,
 } from "lucide-react";
+import { toast } from "sonner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AsyncError, AsyncLoading } from "@/components/ui/AsyncState";
 import { Badge } from "@/components/ui/badge";
@@ -178,73 +179,19 @@ export function DataRetentionPage() {
       {configuration.data ? (
         <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_420px]">
           <div className="space-y-5">
-            <Card>
-              <CardHeader className="border-b">
-                <CardTitle>Instance 默认策略</CardTitle>
-                <CardDescription>
-                  Deployment 锁定的字段需修改环境变量；其余字段保存后只影响新数据。
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="pt-5">
-                <FieldGroup>
-                  {retentionKeys.map((key) => {
-                    const definition = definitions[key];
-                    const setting = settings.get(key);
-                    const Icon = definition.icon;
-                    return (
-                      <Field
-                        key={key}
-                        orientation="responsive"
-                        data-disabled={setting?.locked || undefined}
-                      >
-                        <div className="flex min-w-56 items-start gap-3">
-                          <span className="rounded-field border bg-muted p-2">
-                            <Icon className="size-4" />
-                          </span>
-                          <div>
-                            <FieldLabel htmlFor={key}>{definition.label}</FieldLabel>
-                            <FieldDescription>{definition.description}</FieldDescription>
-                          </div>
-                        </div>
-                        <div className="ml-auto flex items-center gap-2">
-                          <Input
-                            id={key}
-                            className="w-28"
-                            type="number"
-                            min={definition.min}
-                            max={definition.max}
-                            value={values[key]}
-                            disabled={setting?.locked}
-                            aria-invalid={
-                              values[key] < definition.min || values[key] > definition.max
-                            }
-                            onChange={(event) =>
-                              setDrafts((current) => ({
-                                ...current,
-                                [key]: Number(event.target.value),
-                              }))
-                            }
-                          />
-                          <span className="text-sm text-muted-foreground">天</span>
-                          <SourceBadge setting={setting} />
-                        </div>
-                      </Field>
-                    );
-                  })}
-                </FieldGroup>
-                <div className="mt-6 flex items-center justify-between gap-4 border-t pt-4">
-                  <p className="text-xs text-muted-foreground">
-                    缩短保留期不会自动删除历史数据，需先生成影响预览。
-                  </p>
-                  <Button
-                    onClick={() => setSaveDialogOpen(true)}
-                    disabled={save.isPending || hasInvalidValue || !hasChanges}
-                  >
-                    {save.isPending ? "保存中…" : "保存默认策略"}
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+            <RetentionDefaultPolicyCard
+              settings={settings}
+              values={values}
+              saving={save.isPending}
+              disabled={save.isPending || hasInvalidValue || !hasChanges}
+              onChange={(key, value) =>
+                setDrafts((current) => ({
+                  ...current,
+                  [key]: value,
+                }))
+              }
+              onSave={() => setSaveDialogOpen(true)}
+            />
 
             <Card>
               <CardHeader className="border-b">
@@ -323,6 +270,172 @@ export function DataRetentionPage() {
         confirmLabel="验证并保存"
       />
     </AdminPageLayout>
+  );
+}
+
+export function RetentionDefaultPolicySection() {
+  const queryClient = useQueryClient();
+  const configuration = useQuery(adminConfigurationQueryOptions());
+  const settings = useMemo(
+    () =>
+      new Map(
+        configuration.data?.settings
+          .filter((item) => item.namespace === "retention")
+          .map((item) => [item.key, item]),
+      ),
+    [configuration.data],
+  );
+  const [drafts, setDrafts] = useState<Partial<Record<RetentionKey, number>>>({});
+  const values = Object.fromEntries(
+    retentionKeys.map((key) => [
+      key,
+      drafts[key] ??
+        settings.get(key)?.effectiveValue ??
+        (key === "rawDays" ? 14 : key === "aggregateDays" ? 90 : 0),
+    ]),
+  ) as Record<RetentionKey, number>;
+  const [saveDialogOpen, setSaveDialogOpen] = useState(false);
+
+  const hasInvalidValue = retentionKeys.some(
+    (key) => values[key] < definitions[key].min || values[key] > definitions[key].max,
+  );
+  const hasChanges = retentionKeys.some((key) => {
+    const setting = settings.get(key);
+    return setting && !setting.locked && setting.effectiveValue !== values[key];
+  });
+
+  const save = useMutation({
+    mutationFn: async () => {
+      for (const key of retentionKeys) {
+        const setting = settings.get(key);
+        if (setting && !setting.locked && setting.effectiveValue !== values[key]) {
+          await updateAdminSetting({
+            namespace: "retention",
+            key,
+            value: values[key],
+            expectedVersion: setting.version,
+          });
+        }
+      }
+    },
+    onSuccess: async () => {
+      setDrafts({});
+      toast.success("默认数据保留策略已保存");
+      await queryClient.invalidateQueries({ queryKey: ["admin", "configuration"] });
+    },
+  });
+
+  return (
+    <>
+      {configuration.isLoading ? <AsyncLoading /> : null}
+      {configuration.error ? (
+        <AsyncError
+          error={configuration.error}
+          title="无法读取数据生命周期配置"
+          remediation="检查实例管理员权限和数据库连接。"
+          onRetry={() => void configuration.refetch()}
+        />
+      ) : null}
+      {configuration.data ? (
+        <RetentionDefaultPolicyCard
+          settings={settings}
+          values={values}
+          saving={save.isPending}
+          disabled={save.isPending || hasInvalidValue || !hasChanges}
+          onChange={(key, value) =>
+            setDrafts((current) => ({
+              ...current,
+              [key]: value,
+            }))
+          }
+          onSave={() => setSaveDialogOpen(true)}
+        />
+      ) : null}
+      <ReauthenticationDialog
+        open={saveDialogOpen}
+        onOpenChange={setSaveDialogOpen}
+        onConfirmed={() => save.mutateAsync()}
+        title="确认修改数据生命周期"
+        description="该修改影响整个 Instance 的新数据。请重新验证 Instance Owner 身份。"
+        confirmLabel="验证并保存"
+      />
+    </>
+  );
+}
+
+function RetentionDefaultPolicyCard({
+  settings,
+  values,
+  saving,
+  disabled,
+  onChange,
+  onSave,
+}: {
+  settings: Map<string, AdminSetting>;
+  values: Record<RetentionKey, number>;
+  saving: boolean;
+  disabled: boolean;
+  onChange: (key: RetentionKey, value: number) => void;
+  onSave: () => void;
+}) {
+  return (
+    <Card>
+      <CardHeader className="border-b">
+        <CardTitle>Instance 默认策略</CardTitle>
+        <CardDescription>
+          Deployment 锁定的字段需修改环境变量；其余字段保存后只影响新数据。
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="pt-5">
+        <FieldGroup>
+          {retentionKeys.map((key) => {
+            const definition = definitions[key];
+            const setting = settings.get(key);
+            const Icon = definition.icon;
+            return (
+              <Field
+                key={key}
+                orientation="responsive"
+                data-disabled={setting?.locked || undefined}
+              >
+                <div className="flex min-w-56 items-start gap-3">
+                  <span className="rounded-field border bg-muted p-2">
+                    <Icon className="size-4" />
+                  </span>
+                  <div>
+                    <FieldLabel htmlFor={key}>{definition.label}</FieldLabel>
+                    <FieldDescription>{definition.description}</FieldDescription>
+                  </div>
+                </div>
+                <div className="ml-auto flex items-center gap-2">
+                  <Input
+                    id={key}
+                    className="w-28"
+                    type="number"
+                    min={definition.min}
+                    max={definition.max}
+                    value={values[key]}
+                    disabled={setting?.locked}
+                    aria-invalid={values[key] < definition.min || values[key] > definition.max}
+                    onChange={(event) => onChange(key, Number(event.target.value))}
+                  />
+                  <span className="text-sm text-muted-foreground">天</span>
+                  <SourceBadge setting={setting} />
+                </div>
+              </Field>
+            );
+          })}
+        </FieldGroup>
+        <div className="mt-6 flex items-center justify-between gap-4 border-t pt-4">
+          <p className="text-xs text-muted-foreground">
+            缩短保留期不会自动删除历史数据，后续可在系统设置中预览并清理。
+          </p>
+          <Button onClick={onSave} disabled={disabled}>
+            {saving ? "保存中…" : "保存默认策略"}
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 

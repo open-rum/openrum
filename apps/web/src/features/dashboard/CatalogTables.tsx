@@ -26,7 +26,12 @@ function ChangeBadge({
   // The arrow and the signed text carry the direction, so colour is never the only signal.
   return (
     <span
-      className={cn("dashboard-comparison badge badge-sm badge-soft", toneBadge[tone])}
+      className={cn(
+        "dashboard-comparison",
+        change === null
+          ? "text-xs text-base-content/70"
+          : ["badge badge-sm badge-soft", toneBadge[tone]],
+      )}
       aria-label={change === null ? "无对比" : `较上一周期 ${label}`}
     >
       {change !== null && change > 0 ? (

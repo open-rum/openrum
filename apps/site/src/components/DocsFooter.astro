@@ -3,17 +3,42 @@ import DefaultFooter from "@astrojs/starlight/components/Footer.astro";
 
 const release = import.meta.env.PUBLIC_OPENRUM_RELEASE || "Alpha";
 const commit = import.meta.env.PUBLIC_COMMIT_SHA || "local";
+const zh = Astro.url.pathname.startsWith("/zh/");
+const homeHref = zh ? "/zh/" : "/";
 ---
 
 <DefaultFooter />
-<p class="docs-build" data-openrum-build>
-  Release {release} · commit {commit.slice(0, 8)}
-</p>
+<div class="docs-footer-meta">
+  <p class="docs-build" data-openrum-build>
+    Release {release} · commit {commit.slice(0, 8)}
+  </p>
+  <a class="docs-home-link" href={homeHref}>
+    {zh ? "返回 OpenRUM 官网" : "Back to OpenRUM home"}
+  </a>
+</div>
 
 <style>
-  .docs-build {
-    margin: 1.5rem 0 0;
+  .docs-footer-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem 1.5rem;
+    margin-top: 1.5rem;
     color: var(--ds-text-muted);
     font-size: var(--text-caption);
+  }
+  .docs-build {
+    margin: 0;
+  }
+  .docs-home-link {
+    color: var(--ds-text-muted);
+    text-decoration: none;
+    transition: color 0.15s;
+  }
+  .docs-home-link:hover {
+    color: var(--ds-text);
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
   }
 </style>

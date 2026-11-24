@@ -25,6 +25,7 @@ type ConnectionStatusHandler struct {
 
 type connectionStatusResponse struct {
 	KeyConfigured        bool    `json:"keyConfigured"`
+	SDKConnected         bool    `json:"sdkConnected"`
 	LastSDKSeenAt        *string `json:"lastSdkSeenAt"`
 	LastEventReceivedAt  *string `json:"lastEventReceivedAt"`
 	LastEventQueryableAt *string `json:"lastEventQueryableAt"`
@@ -57,14 +58,20 @@ func (handler *ConnectionStatusHandler) Get(writer http.ResponseWriter, request 
 		return
 	}
 	keyConfigured := false
+	// Key usage survives the Redis status TTL and key rotation/revocation.
+	// Synthetic Console test events do not authenticate with a project key.
+	sdkConnected := status.LastSDKSeenAt != nil
 	for _, key := range keys {
+		if key.LastUsedAt != nil {
+			sdkConnected = true
+		}
 		if key.RevokedAt == nil {
 			keyConfigured = true
-			break
 		}
 	}
 	response := connectionStatusResponse{
 		KeyConfigured:        keyConfigured,
+		SDKConnected:         sdkConnected,
 		LastSDKSeenAt:        formatConnectionTime(status.LastSDKSeenAt),
 		LastEventReceivedAt:  formatConnectionTime(status.LastEventReceivedAt),
 		LastEventQueryableAt: formatConnectionTime(status.LastEventQueryableAt),

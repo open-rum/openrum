@@ -32,7 +32,7 @@ export function ConnectionHealth({ status }: { status: ConnectionStatus }) {
                 {status.lastRejectAt ? formatTime(status.lastRejectAt) : "时间未知"}
               </p>
               <p className="mt-1">{guidance?.action ?? "请检查 SDK 配置与事件内容后刷新状态。"}</p>
-              <p className="mt-1">拒收记录不代表全部事件失败；下方接入进度仅表示已验证过的阶段。</p>
+              <p className="mt-1">拒收记录不代表全部事件失败。</p>
             </div>
           </div>
         ) : (

@@ -10,6 +10,26 @@ export const passwordRuleHint = "至少 8 个字符，须同时包含大写字�
 /** For an input's `pattern`, so the browser stops a weak password before it is sent. */
 export const passwordPattern = String.raw`(?=.*\p{Ll})(?=.*\p{Lu})(?=.*[\p{P}\p{S}]).{8,}`;
 
+export type PasswordRuleCheck = {
+  id: "length" | "upper" | "lower" | "symbol";
+  label: string;
+  met: boolean;
+};
+
+/** Per-requirement status for live feedback while typing a new password. */
+export function passwordRuleChecks(password: string): PasswordRuleCheck[] {
+  return [
+    {
+      id: "length",
+      label: `至少 ${PASSWORD_MIN_LENGTH} 位`,
+      met: [...password].length >= PASSWORD_MIN_LENGTH,
+    },
+    { id: "upper", label: "大写字母", met: /\p{Lu}/u.test(password) },
+    { id: "lower", label: "小写字母", met: /\p{Ll}/u.test(password) },
+    { id: "symbol", label: "符号", met: /[\p{P}\p{S}]/u.test(password) },
+  ];
+}
+
 /** What a password still lacks, in plain words. Empty means it follows the rule. */
 export function passwordProblems(password: string): string[] {
   const problems: string[] = [];

@@ -14,10 +14,12 @@ export function ProjectPlatformSelector({
   value,
   onValueChange,
   disabled,
+  description = "用于生成对应框架的接入步骤和项目图标。",
 }: {
   value: SDKPlatform;
   onValueChange: (value: SDKPlatform) => void;
   disabled?: boolean;
+  description?: string;
 }) {
   const id = useId();
   return (
@@ -40,7 +42,7 @@ export function ProjectPlatformSelector({
           ))}
         </SelectContent>
       </Select>
-      <FieldDescription>用于生成对应框架的接入步骤和项目图标。</FieldDescription>
+      <FieldDescription>{description}</FieldDescription>
     </Field>
   );
 }

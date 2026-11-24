@@ -9,6 +9,44 @@
   themes: all;
 }
 
+/* Public-site amber and dark surfaces, expressed as a native Console theme. */
+@plugin "daisyui/theme" {
+  name: "amber-dark";
+  default: false;
+  prefersdark: false;
+  color-scheme: dark;
+
+  --color-base-100: #141416;
+  --color-base-200: #0b0b0c;
+  --color-base-300: #2a2a2e;
+  --color-base-content: #f4f1ea;
+  --color-primary: #ffb020;
+  --color-primary-content: #241800;
+  --color-secondary: #b8e954;
+  --color-secondary-content: #172100;
+  --color-accent: #ff2e88;
+  --color-accent-content: #2b0014;
+  --color-neutral: #1b1b1e;
+  --color-neutral-content: #f4f1ea;
+  --color-info: #38bdf8;
+  --color-info-content: #04253a;
+  --color-success: #6ee7b7;
+  --color-success-content: #082f24;
+  --color-warning: #fbbf24;
+  --color-warning-content: #241800;
+  --color-error: #f87171;
+  --color-error-content: #450a0a;
+
+  --radius-selector: 1rem;
+  --radius-field: 2rem;
+  --radius-box: 0.75rem;
+  --size-selector: 0.25rem;
+  --size-field: 0.25rem;
+  --border: 1px;
+  --depth: 0;
+  --noise: 0;
+}
+
 @custom-variant dark (&:is(.dark *));
 
 :root {
@@ -7255,6 +7293,35 @@ body {
 }
 .dashboard-module.card-sm {
   --card-spacing: var(--card-padding-sm);
+}
+/* Stretch only dashboard renderers: shared charts on other pages retain their layout. */
+.dashboard-module:not(.card-sm) .dashboard-module-content > div {
+  flex: 1;
+}
+.dashboard-module .dashboard-donut,
+.dashboard-module .dashboard-ranking {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+}
+.dashboard-module .dashboard-donut-layout {
+  flex: 1;
+}
+.dashboard-module .dashboard-donut > p:last-child,
+.dashboard-module .dashboard-ranking > p:last-child,
+.dashboard-module .dashboard-catalog-table > p:last-child {
+  flex: 0 0 auto;
+  margin-top: auto;
+  padding-top: 12px;
+  line-height: 20px;
+}
+.dashboard-module .dashboard-ranking-name,
+.dashboard-module .dashboard-ranking-value {
+  font-size: 13px;
+  line-height: 20px;
+}
+.dashboard-module .dashboard-ranking-row {
+  padding-block: 12px;
 }
 /* Expand and settings float over the card's bottom-right in a frosted capsule, so the
    chart underneath stays legible. Hidden until hover or keyboard focus on pointer

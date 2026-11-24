@@ -8,7 +8,7 @@ Every stored event carries an `ingest_flags` array. A flag records something the
 
 | Flag | Set when | Effect on aggregates |
 | --- | --- | --- |
-| `synthetic` | The event came from seeded demo or development data rather than a real browser. | Excluded. Every aggregate view filters these out. |
+| `synthetic` | The event came from test events or development data rather than a real browser. | Excluded. Every aggregate view filters these out. |
 | `clock_adjusted` | The reported timestamp was before the year 2000 or more than 24 hours after ingest received it, so the ingest time was used instead. | None. |
 | `pii_scrubbed` | Redaction changed at least one field — a user identifier, a title, an attribute, an error message or a breadcrumb. | None. |
 | `bot` | The user agent identified a crawler or a headless browser. | None by default. A project can choose to drop these; see [Inbound filters](/docs/product/inbound-filters/). |

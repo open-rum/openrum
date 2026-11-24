@@ -38,10 +38,20 @@ export function StatRenderer({ widget, data }: ModuleRenderProps) {
     metric && ["LCP", "INP", "CLS", "FCP", "TTFB"].includes(metric)
       ? performanceRating(data.value, metric as "LCP" | "INP" | "CLS" | "FCP" | "TTFB")
       : undefined;
+  const formatted = formatMetric(data.value, data.unit);
+  const suffix =
+    data.value !== null && (data.unit === "ms" || data.unit === "percent")
+      ? (formatted.match(/(ms|s|%)$/)?.[0] ?? "")
+      : "";
   const summary = (
-    <div className="relative z-10 flex min-w-0 flex-col gap-3">
+    <div className="relative z-10 flex min-h-20 min-w-0 flex-col items-start gap-2">
       <strong className="text-3xl font-semibold tracking-tight tabular-nums">
-        {formatMetric(data.value, data.unit)}
+        {suffix ? formatted.slice(0, -suffix.length) : formatted}
+        {suffix ? (
+          <span className="ml-1 text-sm font-medium tracking-normal text-base-content/70">
+            {suffix}
+          </span>
+        ) : null}
       </strong>
       {rating ? (
         <span className={`badge badge-sm badge-soft ${ratingBadge[rating]}`}>
@@ -63,7 +73,7 @@ export function StatRenderer({ widget, data }: ModuleRenderProps) {
     <>
       <div
         data-stat-appearance={appearance}
-        className="grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,0.8fr)] items-center gap-3"
+        className="grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,0.8fr)] items-start gap-3"
       >
         {summary}
         <StatTrend data={data.trend} appearance={appearance} />

@@ -26,7 +26,3 @@ The Issue list is built for triage. It opens on the Issues that still need handl
 | Grouped errors | Issues | Separates one-off noise from recurring production issues |
 | Failed API Request | API / Session | Explains blocked user journeys |
 | Mapped stack frame | Issue / Release | Speeds authored-source diagnosis when available |
-
-## Demo walkthrough
-
-After starting local development and running `pnpm openrum seed`, use the seeded ecommerce path: product behavior → checkout Session → `v1:demo-checkout` Issue → failed `POST /api/orders`.

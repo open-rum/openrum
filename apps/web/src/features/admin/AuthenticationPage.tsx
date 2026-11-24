@@ -77,6 +77,17 @@ function fromProvider(provider: AdminAuthProvider): Draft {
 }
 
 export function AuthenticationPage() {
+  return (
+    <AdminPageLayout
+      title="认证与访问"
+      description="管理控制台登录方式。只有 Instance Owner 可以修改；本地 Owner 登录始终保留。"
+    >
+      <AuthenticationSection />
+    </AdminPageLayout>
+  );
+}
+
+export function AuthenticationSection() {
   const queryClient = useQueryClient();
   const query = useQuery({
     queryKey: ["admin", "authentication"],
@@ -131,10 +142,7 @@ export function AuthenticationPage() {
   };
 
   return (
-    <AdminPageLayout
-      title="认证与访问"
-      description="管理控制台登录方式。只有 Instance Owner 可以修改；本地 Owner 登录始终保留。"
-    >
+    <>
       {query.data && !query.data.managedSecretsAvailable ? (
         <Alert className="mb-5">
           <AlertTitle>需要启用加密托管</AlertTitle>
@@ -387,7 +395,7 @@ export function AuthenticationPage() {
           setAction(null);
         }}
       />
-    </AdminPageLayout>
+    </>
   );
 }
 

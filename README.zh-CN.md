@@ -11,7 +11,7 @@
 
 <p align="center">
   <a href="https://openrum.netlify.app/zh/">官网</a> ·
-  <a href="https://openrum.netlify.app/zh/docs/introduction/">文档</a> ·
+  <a href="https://openrum.netlify.app/zh/docs/">文档</a> ·
   <a href="#快速启动">快速启动</a> ·
   <a href="https://github.com/open-rum/openrum/issues">反馈问题</a>
 </p>
@@ -60,20 +60,7 @@ docker compose --env-file deploy/compose/.env.example \
   -f deploy/compose/docker-compose.yml ps
 ```
 
-然后加载演示数据：覆盖 **14 天、约 30,000 个会话**的电商数据集。这一步可选，重复执行也是安全的：
-
-```sh
-docker compose --profile seed --env-file deploy/compose/.env.example \
-  -f deploy/compose/docker-compose.yml run --rm --no-deps demo-seed
-```
-
-如果本地克隆并安装了 Go，也可以执行 `pnpm openrum up` 再执行 `pnpm openrum seed`。打开 **[http://127.0.0.1:4173](http://127.0.0.1:4173)**，使用以下账号登录：
-
-| 邮箱                 | 密码                 |
-| -------------------- | -------------------- |
-| `demo@openrum.local` | `OpenRUM-demo-2026!` |
-
-通过演示数据体验仪表盘、错误、性能和会话排查。跳过加载步骤则得到一个空实例，首次访问时创建你自己的所有者账号。对象存储是可选依赖，需要上传 Source Map 产物时再配置。
+如果本地克隆并安装了 Go，也可以直接执行 `pnpm openrum up`。打开 **[http://127.0.0.1:4173](http://127.0.0.1:4173)** 完成首次初始化，创建你自己的管理员账号后登录使用。对象存储是可选依赖，需要上传 Source Map 产物时再配置。
 
 停止服务并保留数据：
 
@@ -89,7 +76,7 @@ docker compose --env-file deploy/compose/.env.example \
 在控制台创建项目，将被监控网站的 Origin 加入允许列表，并复制客户端 DSN。对于本地测试页面，可以直接加载当前实例提供的浏览器 SDK：
 
 ```html
-<script src="http://127.0.0.1:4173/api/v1/sdk/browser/0.1.2/openrum.min.js"></script>
+<script src="http://127.0.0.1:4173/api/v1/sdk/browser/0.1.3/openrum.min.js"></script>
 <script>
   OpenRUM.init({
     dsn: "PASTE_YOUR_PROJECT_DSN",
@@ -98,13 +85,13 @@ docker compose --env-file deploy/compose/.env.example \
 </script>
 ```
 
-将 DSN 替换为项目提供的值。接入线上网站时，请使用你自己的实例 HTTPS SDK 地址。[创建第一个项目](https://openrum.netlify.app/zh/docs/getting-started/create-first-project/)和[浏览器 SDK 指南](https://openrum.netlify.app/zh/docs/sdk/browser/)介绍了异步加载、框架接入与验证步骤；可运行的 React + Vite 示例位于 [examples/react-vite](examples/react-vite)。
+将 DSN 替换为项目提供的值。接入线上网站时，请使用你自己的实例 HTTPS SDK 地址。[浏览器 SDK 指南](https://openrum.netlify.app/zh/docs/sdk/browser/)介绍了异步加载、框架接入与验证步骤；可运行的 React + Vite 示例位于 [examples/react-vite](examples/react-vite)。
 
 ## 文档导航
 
 | 你想做什么          | 对应文档                                                                                                                                                                              |
 | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 选择安装方式        | [开始使用](https://openrum.netlify.app/zh/docs/introduction/)                                                                                                           |
+| 选择安装方式        | [开始使用](https://openrum.netlify.app/zh/docs/)                                                                                                           |
 | 接入前端项目        | [浏览器 SDK](https://openrum.netlify.app/zh/docs/sdk/browser/) · [Next.js](https://openrum.netlify.app/zh/docs/sdk/browser/nextjs/) · [Astro](https://openrum.netlify.app/zh/docs/sdk/browser/astro/) |
 | 配置登录            | [邮箱、Google、GitHub、LDAP 与 OIDC（仓库指南）](apps/site/src/content/docs/zh/docs/getting-started/sign-in/index.mdx)                                                                |
 | 部署与维护实例      | [自托管概览](https://openrum.netlify.app/zh/docs/self-hosting/overview/) · [备份与恢复](https://openrum.netlify.app/zh/docs/self-hosting/backup-restore/)                             |

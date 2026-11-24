@@ -52,6 +52,15 @@ describe("ThemeProvider", () => {
     expect(renderWith("system", true)).toBe("light/light/light");
   });
 
+  it("restores the amber theme as dark and can switch back to a light theme", () => {
+    expect(renderWith("amber-dark")).toBe("amber-dark/amber-dark/dark");
+    expect(document.documentElement.classList.contains("dark")).toBe(true);
+    expect(document.documentElement.style.colorScheme).toBe("dark");
+    act(() => api!.setTheme("light"));
+    expect(document.documentElement.classList.contains("dark")).toBe(false);
+    expect(window.localStorage.getItem("openrum-theme")).toBe("light");
+  });
+
   it("restores a stored daisyUI theme and ignores unknown values", () => {
     expect(renderWith("nord")).toBe("nord/nord/light");
     cleanup();

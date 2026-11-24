@@ -1,7 +1,7 @@
 ---
 title: CLI
 description: The openrum command from @openrum/cli, its commands, options, environment variables and exit codes.
-appliesTo: "@openrum/cli 0.1.0"
+appliesTo: "@openrum/cli 0.1.3"
 ---
 
 `@openrum/cli` installs the `openrum` command. It uploads Source Maps from your own build, and inside a checkout of the OpenRUM repository it is also the front door to the local development stack. It needs Node.js 20 or later.
@@ -24,7 +24,7 @@ openrum <command> [options]
 | `openrum sourcemaps upload` | Upload hidden Source Maps from a build to an OpenRUM Release |
 | `openrum help` | Print the command list |
 | `openrum --version` | Print the package version (`-v` and `version` do the same) |
-| `openrum dev`, `up`, `status`, `logs`, `restart`, `seed`, `stop`, `down`, `reset` | Manage the local development stack, only inside a checkout of the repository |
+| `openrum dev`, `up`, `status`, `logs`, `restart`, `stop`, `down`, `reset` | Manage the local development stack, only inside a checkout of the repository |
 
 ## `openrum sourcemaps upload`
 
@@ -59,7 +59,7 @@ The earlier Console-session variables `OPENRUM_SESSION` and `OPENRUM_CSRF_TOKEN`
 
 ## Local development stack
 
-`dev`, `up`, `status`, `logs`, `restart`, `seed`, `stop`, `down` and `reset` are implemented by the Go tool in `cmd/openrum` of the OpenRUM repository. Inside a checkout, `openrum <command>` finds the repository root and runs `go run ./cmd/openrum <command>` there, so it needs Go, Docker with Compose v2 and, for `dev`, pnpm. Anywhere else it says that these commands only work inside a checkout and exits with status `1`. The commands themselves are described in [Local development](/docs/getting-started/local-development/#the-openrum-command).
+`dev`, `up`, `status`, `logs`, `restart`, `stop`, `down` and `reset` are implemented by the Go tool in `cmd/openrum` of the OpenRUM repository. Inside a checkout, `openrum <command>` finds the repository root and runs `go run ./cmd/openrum <command>` there, so it needs Go, Docker with Compose v2 and, for `dev`, pnpm. Anywhere else it says that these commands only work inside a checkout and exits with status `1`. The commands themselves are described in [Local development](/docs/getting-started/local-development/#the-openrum-command).
 
 ## Exit codes
 

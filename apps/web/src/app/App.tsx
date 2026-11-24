@@ -12,10 +12,10 @@ import {
   WarningCircle,
   UsersThree,
 } from "@phosphor-icons/react";
-import { lazy, Suspense, useEffect, useState, type ReactElement } from "react";
+import { lazy, Suspense, useCallback, useEffect, useState, type ReactElement } from "react";
 import { LogsIcon, ChartColumnIcon } from "lucide-react";
 import { useMutation, useQuery, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
-import { Link, useParams, useRouterState } from "@tanstack/react-router";
+import { Link, Outlet, useParams, useRouterState } from "@tanstack/react-router";
 import { AccountMenu } from "@/components/account/AccountMenu";
 import { BrandMark } from "@/components/brand/BrandMark";
 import { environmentLabel } from "@/lib/projects/environments";
@@ -30,7 +30,7 @@ import {
   isAnalysisRoute,
   useAnalysisContextState,
 } from "@/features/filters/AnalysisContextBar";
-import { listOrganizations, listProjects } from "@/lib/api/projects";
+import { listOrganizations, listProjects, type Project } from "@/lib/api/projects";
 import { storagePressureQueryOptions } from "@/lib/api/storagePressure";
 import { getConnectionStatus } from "@/lib/api/client";
 import { logout, sessionQueryOptions } from "@/lib/auth/session";
@@ -39,6 +39,10 @@ import { AppShell } from "./AppShell";
 import { AppStatusBar } from "./AppStatusBar";
 import { StoragePressureBanner } from "./StoragePressureBanner";
 import { isPipelineDelayed } from "./pipelineStatus";
+import { isSdkDataRoute } from "@/features/onboarding/sdkDataRoute";
+import { DevDataDialogContext, type DevDataDialogRequest } from "@/features/devdata/devDataDialog";
+
+const ProjectSdkGate = lazy(() => import("@/features/onboarding/ProjectSdkGate"));
 
 const SIDEBAR_STORAGE_KEY = "openrum-sidebar-collapsed";
 const DevDataQuickEntry = import.meta.env.DEV
@@ -115,6 +119,12 @@ const primaryNavigation = [
 ] as const;
 
 export function App() {
+  const [devDataRequest, setDevDataRequest] = useState<DevDataDialogRequest>();
+  const openDevData = useCallback((project: Project) => {
+    if (import.meta.env.DEV) {
+      setDevDataRequest((current) => ({ project, sequence: (current?.sequence ?? 0) + 1 }));
+    }
+  }, []);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(
     () =>
       !isSecondaryNavigationPath(window.location.pathname) &&
@@ -142,7 +152,7 @@ export function App() {
     queryFn: ({ signal }) => getConnectionStatus(routeProjectId!, signal),
     enabled: Boolean(routeProjectId),
     staleTime: 30_000,
-    refetchInterval: 30_000,
+    refetchInterval: (query) => (query.state.data?.sdkConnected === false ? 3_000 : 30_000),
   });
   const storagePressureQuery = useQuery(storagePressureQueryOptions());
   const analysisContext = useAnalysisContextState(project, isAnalysisRoute(pathname));
@@ -177,224 +187,241 @@ export function App() {
   });
 
   return (
-    <AnalysisContextProvider value={analysisContext}>
-      <AppShell
-        contentKey={routeProjectId}
-        sidebarCollapsed={sidebarCollapsed}
-        banner={
-          <StoragePressureBanner
-            pressure={storagePressureQuery.data}
-            canRecover={user.instanceRole === "instance_owner"}
-          />
-        }
-        floatingTools={
-          DevDataQuickEntry ? (
-            <Suspense fallback={null}>
-              <DevDataQuickEntry projects={projects} project={project} />
-            </Suspense>
-          ) : undefined
-        }
-        statusBar={
-          <AppStatusBar
-            dataDelayed={isPipelineDelayed(connectionStatusQuery.data)}
-            context={
-              analysisContext && isAnalysisRoute(pathname) ? (
-                <>
-                  <AnalysisTimeFilter />
-                  <AnalysisEnvironmentFilter />
-                </>
-              ) : undefined
-            }
-            navigationToggle={
-              <Button
-                className="app-status-bar__sidebar-toggle"
-                type="button"
-                variant="ghost"
-                size="icon"
-                aria-controls="app-sidebar"
-                aria-expanded={!sidebarCollapsed}
-                aria-label={sidebarCollapsed ? "展开侧边栏" : "收起侧边栏"}
-                title={`${sidebarCollapsed ? "展开" : "收起"}侧边栏（⌘/Ctrl+B）`}
-                onClick={() => setSidebarCollapsed((collapsed) => !collapsed)}
-              >
-                <SidebarSimple weight="regular" />
-              </Button>
-            }
-          />
-        }
-        navigation={
-          <TooltipProvider>
-            <div className="sidebar__brand-row">
-              {routeProjectId && project ? (
-                <>
-                  <Link to="/projects" className="shrink-0 pl-3" aria-label="OpenRUM 项目列表">
-                    <BrandMark size="lockup" />
-                  </Link>
-                  <ProjectSwitcher
-                    organization={organization}
-                    projects={projects}
-                    project={project}
-                    loading={organizationsQuery.isLoading || projectsQuery.isLoading}
-                    currentEnvironment={analysisContext?.environment}
-                    onEnvironmentChange={
-                      analysisContext
-                        ? (environment) => analysisContext.update({ environment })
-                        : undefined
-                    }
-                  >
-                    <button
-                      type="button"
-                      className="brand btn btn-ghost justify-start text-left"
-                      aria-label={`切换项目，当前为 ${project.name}，环境 ${currentEnvironment}`}
-                    >
-                      <span className="brand__identity">
-                        <strong>{project.name}</strong>
-                        <small>{currentEnvironment}</small>
-                      </span>
-                      <CaretUpDown className="brand__switcher-icon" aria-hidden="true" />
-                    </button>
-                  </ProjectSwitcher>
-                </>
-              ) : (
-                <Link className="brand" to="/projects" aria-label="OpenRUM 项目列表">
-                  <BrandMark size="lockup" />
-                  <span className="brand__identity brand__identity--product">
-                    <strong>OpenRUM</strong>
-                  </span>
-                </Link>
-              )}
-            </div>
-
-            <div
-              className="sidebar-nav-switcher"
-              data-level={settingsActive ? "settings" : "primary"}
-            >
-              <div className="sidebar-nav-switcher__track">
-                <div
-                  className="sidebar-nav-switcher__panel"
-                  aria-hidden={settingsActive}
-                  inert={settingsActive ? true : undefined}
+    <DevDataDialogContext.Provider value={import.meta.env.DEV ? openDevData : undefined}>
+      <AnalysisContextProvider value={analysisContext}>
+        <AppShell
+          contentKey={routeProjectId}
+          content={
+            routeProjectId && isSdkDataRoute(pathname) ? (
+              <Suspense fallback={null}>
+                <ProjectSdkGate
+                  key={routeProjectId}
+                  projectId={routeProjectId}
+                  connection={connectionStatusQuery}
                 >
-                  <nav className="sidebar__nav" aria-label="主导航">
-                    {primaryNavigation.map((item) => {
-                      const { label, icon: Icon, to } = item;
-                      const sharedAnalysisSearch =
-                        "preserveAnalysisContext" in item &&
-                        item.preserveAnalysisContext &&
+                  <Outlet key={routeProjectId} />
+                </ProjectSdkGate>
+              </Suspense>
+            ) : undefined
+          }
+          sidebarCollapsed={sidebarCollapsed}
+          banner={
+            <StoragePressureBanner
+              pressure={storagePressureQuery.data}
+              canRecover={user.instanceRole === "instance_owner"}
+            />
+          }
+          floatingTools={
+            DevDataQuickEntry ? (
+              <Suspense fallback={null}>
+                <DevDataQuickEntry projects={projects} project={project} request={devDataRequest} />
+              </Suspense>
+            ) : undefined
+          }
+          statusBar={
+            <AppStatusBar
+              dataDelayed={isPipelineDelayed(connectionStatusQuery.data)}
+              context={
+                analysisContext &&
+                isAnalysisRoute(pathname) &&
+                connectionStatusQuery.data?.sdkConnected !== false ? (
+                  <>
+                    <AnalysisTimeFilter />
+                    <AnalysisEnvironmentFilter />
+                  </>
+                ) : undefined
+              }
+              navigationToggle={
+                <Button
+                  className="app-status-bar__sidebar-toggle"
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  aria-controls="app-sidebar"
+                  aria-expanded={!sidebarCollapsed}
+                  aria-label={sidebarCollapsed ? "展开侧边栏" : "收起侧边栏"}
+                  title={`${sidebarCollapsed ? "展开" : "收起"}侧边栏（⌘/Ctrl+B）`}
+                  onClick={() => setSidebarCollapsed((collapsed) => !collapsed)}
+                >
+                  <SidebarSimple weight="regular" />
+                </Button>
+              }
+            />
+          }
+          navigation={
+            <TooltipProvider>
+              <div className="sidebar__brand-row">
+                {routeProjectId && project ? (
+                  <>
+                    <Link to="/projects" className="shrink-0 pl-3" aria-label="OpenRUM 项目列表">
+                      <BrandMark size="lockup" />
+                    </Link>
+                    <ProjectSwitcher
+                      organization={organization}
+                      projects={projects}
+                      project={project}
+                      loading={organizationsQuery.isLoading || projectsQuery.isLoading}
+                      currentEnvironment={analysisContext?.environment}
+                      onEnvironmentChange={
                         analysisContext
-                          ? {
-                              from: analysisContext.from.toISOString(),
-                              to: analysisContext.to.toISOString(),
-                              timePreset: analysisContext.timePreset,
-                              environment: analysisContext.environment,
-                            }
-                          : undefined;
-                      return (
-                        <SidebarTooltip key={to} label={label} enabled={sidebarCollapsed}>
-                          {project ? (
-                            <Link
-                              className="nav-item"
-                              to={to}
-                              params={{ projectId: project.id }}
-                              search={sharedAnalysisSearch}
-                              activeProps={{ className: "is-active" }}
-                              aria-label={label}
-                            >
-                              <Icon size={17} />
-                              <span>{label}</span>
-                            </Link>
-                          ) : (
-                            <Link className="nav-item" to="/projects/new" aria-label={label}>
-                              <Icon size={17} />
-                              <span>{label}</span>
-                            </Link>
-                          )}
-                        </SidebarTooltip>
-                      );
-                    })}
-                  </nav>
-                </div>
+                          ? (environment) => analysisContext.update({ environment })
+                          : undefined
+                      }
+                    >
+                      <button
+                        type="button"
+                        className="brand btn btn-ghost justify-start text-left"
+                        aria-label={`切换项目，当前为 ${project.name}，环境 ${currentEnvironment}`}
+                      >
+                        <span className="brand__identity">
+                          <strong>{project.name}</strong>
+                          <small>{currentEnvironment}</small>
+                        </span>
+                        <CaretUpDown className="brand__switcher-icon" aria-hidden="true" />
+                      </button>
+                    </ProjectSwitcher>
+                  </>
+                ) : (
+                  <Link className="brand" to="/projects" aria-label="OpenRUM 项目列表">
+                    <BrandMark size="lockup" />
+                    <span className="brand__identity brand__identity--product">
+                      <strong>OpenRUM</strong>
+                    </span>
+                  </Link>
+                )}
+              </div>
 
-                <div
-                  className="sidebar-nav-switcher__panel sidebar-nav-switcher__panel--settings"
-                  aria-hidden={!settingsActive}
-                  inert={!settingsActive ? true : undefined}
-                >
-                  <SettingsNav
-                    organizationName={organization?.name}
-                    project={project}
-                    showInstance={Boolean(user.instanceRole)}
-                    instanceOwner={user.instanceRole === "instance_owner"}
+              <div
+                className="sidebar-nav-switcher"
+                data-level={settingsActive ? "settings" : "primary"}
+              >
+                <div className="sidebar-nav-switcher__track">
+                  <div
+                    className="sidebar-nav-switcher__panel"
+                    aria-hidden={settingsActive}
+                    inert={settingsActive ? true : undefined}
+                  >
+                    <nav className="sidebar__nav" aria-label="主导航">
+                      {primaryNavigation.map((item) => {
+                        const { label, icon: Icon, to } = item;
+                        const sharedAnalysisSearch =
+                          "preserveAnalysisContext" in item &&
+                          item.preserveAnalysisContext &&
+                          analysisContext
+                            ? {
+                                from: analysisContext.from.toISOString(),
+                                to: analysisContext.to.toISOString(),
+                                timePreset: analysisContext.timePreset,
+                                environment: analysisContext.environment,
+                              }
+                            : undefined;
+                        return (
+                          <SidebarTooltip key={to} label={label} enabled={sidebarCollapsed}>
+                            {project ? (
+                              <Link
+                                className="nav-item"
+                                to={to}
+                                params={{ projectId: project.id }}
+                                search={sharedAnalysisSearch}
+                                activeProps={{ className: "is-active" }}
+                                aria-label={label}
+                              >
+                                <Icon size={17} />
+                                <span>{label}</span>
+                              </Link>
+                            ) : (
+                              <Link className="nav-item" to="/projects/new" aria-label={label}>
+                                <Icon size={17} />
+                                <span>{label}</span>
+                              </Link>
+                            )}
+                          </SidebarTooltip>
+                        );
+                      })}
+                    </nav>
+                  </div>
+
+                  <div
+                    className="sidebar-nav-switcher__panel sidebar-nav-switcher__panel--settings"
+                    aria-hidden={!settingsActive}
+                    inert={!settingsActive ? true : undefined}
+                  >
+                    <SettingsNav
+                      organizationName={organization?.name}
+                      project={project}
+                      showInstance={Boolean(user.instanceRole)}
+                      instanceOwner={user.instanceRole === "instance_owner"}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="sidebar__footer">
+                <nav className="sidebar__utility-nav" aria-label="设置与快捷入口">
+                  <SidebarTooltip label="组织用量" enabled={sidebarCollapsed}>
+                    <Link
+                      className="nav-item nav-item--utility"
+                      to="/usage"
+                      activeProps={{ className: "is-active" }}
+                      aria-label="组织用量"
+                    >
+                      <ChartColumnIcon size={17} />
+                      <span>组织用量</span>
+                    </Link>
+                  </SidebarTooltip>
+                  <SidebarTooltip label="设置" enabled={sidebarCollapsed}>
+                    {project ? (
+                      <Link
+                        className="nav-item nav-item--utility"
+                        to="/settings/project/$projectId/general"
+                        params={{ projectId: project.id }}
+                        aria-label="设置"
+                      >
+                        <Sliders size={17} />
+                        <span>设置</span>
+                        <CaretRight
+                          className="nav-item__next"
+                          size={14}
+                          weight="bold"
+                          aria-hidden="true"
+                        />
+                      </Link>
+                    ) : (
+                      <Link
+                        className="nav-item nav-item--utility"
+                        to="/settings/account"
+                        aria-label="设置"
+                      >
+                        <Sliders size={17} />
+                        <span>设置</span>
+                        <CaretRight
+                          className="nav-item__next"
+                          size={14}
+                          weight="bold"
+                          aria-hidden="true"
+                        />
+                      </Link>
+                    )}
+                  </SidebarTooltip>
+                </nav>
+                <div className="account-panel">
+                  <AccountMenu
+                    userId={user.userId}
+                    displayName={user.displayName}
+                    avatar={user.avatar}
+                    email={user.email}
+                    signingOut={signOut.isPending}
+                    onSignOut={() => signOut.mutate()}
+                    showInstanceSettings={Boolean(user.instanceRole)}
                   />
                 </div>
+                {signOut.error ? <p className="sidebar__error">退出失败，请重试。</p> : null}
               </div>
-            </div>
-
-            <div className="sidebar__footer">
-              <nav className="sidebar__utility-nav" aria-label="设置与快捷入口">
-                <SidebarTooltip label="组织用量" enabled={sidebarCollapsed}>
-                  <Link
-                    className="nav-item nav-item--utility"
-                    to="/usage"
-                    activeProps={{ className: "is-active" }}
-                    aria-label="组织用量"
-                  >
-                    <ChartColumnIcon size={17} />
-                    <span>组织用量</span>
-                  </Link>
-                </SidebarTooltip>
-                <SidebarTooltip label="设置" enabled={sidebarCollapsed}>
-                  {project ? (
-                    <Link
-                      className="nav-item nav-item--utility"
-                      to="/settings/project/$projectId/general"
-                      params={{ projectId: project.id }}
-                      aria-label="设置"
-                    >
-                      <Sliders size={17} />
-                      <span>设置</span>
-                      <CaretRight
-                        className="nav-item__next"
-                        size={14}
-                        weight="bold"
-                        aria-hidden="true"
-                      />
-                    </Link>
-                  ) : (
-                    <Link
-                      className="nav-item nav-item--utility"
-                      to="/settings/account"
-                      aria-label="设置"
-                    >
-                      <Sliders size={17} />
-                      <span>设置</span>
-                      <CaretRight
-                        className="nav-item__next"
-                        size={14}
-                        weight="bold"
-                        aria-hidden="true"
-                      />
-                    </Link>
-                  )}
-                </SidebarTooltip>
-              </nav>
-              <div className="account-panel">
-                <AccountMenu
-                  userId={user.userId}
-                  displayName={user.displayName}
-                  avatar={user.avatar}
-                  email={user.email}
-                  signingOut={signOut.isPending}
-                  onSignOut={() => signOut.mutate()}
-                  showInstanceSettings={Boolean(user.instanceRole)}
-                />
-              </div>
-              {signOut.error ? <p className="sidebar__error">退出失败，请重试。</p> : null}
-            </div>
-          </TooltipProvider>
-        }
-      />
-    </AnalysisContextProvider>
+            </TooltipProvider>
+          }
+        />
+      </AnalysisContextProvider>
+    </DevDataDialogContext.Provider>
   );
 }
 

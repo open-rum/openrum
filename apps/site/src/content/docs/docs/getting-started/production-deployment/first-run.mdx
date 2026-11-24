@@ -15,10 +15,10 @@ Complete [Install services](/docs/getting-started/production-deployment/install/
    Open `https://rum.example.com/setup` and fill in:
 
    1. Organization name.
-   2. Your display name and work email.
+   2. Administrator display name and work email.
    3. A password of at least 8 characters including an upper-case letter, a lower-case letter and a symbol, and its confirmation.
-   4. The Bootstrap Token saved in the credentials step.
-   5. Submit the initialization form.
+   4. The Bootstrap Token saved in the credentials step (shown only when `BOOTSTRAP_TOKEN` is configured on the server).
+   5. Submit the initialization form, then configure optional instance settings (object storage, email service, authentication and data retention) or skip directly to the Console.
 
    Helm production deployment does not seed local demo accounts. This entry closes after initialization; use the created account for subsequent logins. If the Instance is already initialized, sign in with an existing administrator account.
 
@@ -26,7 +26,7 @@ Complete [Install services](/docs/getting-started/production-deployment/install/
 
 1. ## Connect the first real Project
 
-   Follow [Create your first project](/docs/getting-started/create-first-project/): select the SDK platform, configure the application origin and `production` Environment, copy the onboarding DSN and initialize the SDK.
+   Create a Project in the Console, select the SDK platform, configure the application origin and `production` Environment, copy the onboarding DSN, and follow the [Browser SDK guide](/docs/sdk/browser/) to initialize the SDK.
 
    After deploying the application, visit a page and send a test Event. Select the same Project, `production` and the last 15 minutes in the Console, then find the Event and its Session.
 

@@ -80,7 +80,6 @@ jobs:
         run: |
           pnpm run docs:check
           pnpm run site:spell
-          pnpm run site:verify-demo
           node scripts/site/check-built-links.mjs
           node scripts/site/check-performance-budget.mjs
 

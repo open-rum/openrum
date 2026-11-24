@@ -25,7 +25,7 @@ OpenRUM 采用"一个镜像、多个进程"的布局：五个应用服务构建�
 | Consumer | `/app/consumer` | `8082` | 读取 Kafka，做规范化与清洗、过滤、指纹计算，并把 Event 写入 ClickHouse |
 | Worker | `/app/worker` | `8083` | 后台任务：堆栈映射、告警评估、数据生命周期、紧急清理、Project 删除 |
 
-每个 Go 服务还在自己的端口上提供 `GET /health/live`、`GET /health/ready` 和 `GET /metrics`，Console Web 服务也提供这两个健康检查路径。同一个镜像里还有两个运行完就退出、不对外服务的命令：`/app/migrate` 执行数据库迁移，`/app/demo` 在你执行 `openrum seed` 时写入演示数据。
+每个 Go 服务还在自己的端口上提供 `GET /health/live`、`GET /health/ready` 和 `GET /metrics`，Console Web 服务也提供这两个健康检查路径。同一个镜像里还有一个运行完就退出、不对外服务的命令：`/app/migrate` 用于执行数据库迁移。
 
 <Aside type="note" title="启动时从不执行表结构变更">
   应用服务启动时只检查表结构版本是否兼容。迁移作为单独的任务，在部署服务之前执行一次。见[升级](/zh/docs/self-hosting/upgrades/)。
@@ -47,7 +47,7 @@ OpenRUM 采用"一个镜像、多个进程"的布局：五个应用服务构建�
 
 | 形态 | 位置 | 说明 |
 | --- | --- | --- |
-| 本地开发 | `deploy/compose/docker-compose.yml` | 在一台机器上跑整套服务，由 `openrum` 命令使用，演示数据可选。不用于生产 |
+| 本地开发 | `deploy/compose/docker-compose.yml` | 在一台机器上跑整套服务，由 `openrum` 命令使用。不用于生产 |
 | 单机生产 | `deploy/compose/production.compose.yml` | 同样的服务，前面加一层 Caddy，终止 TLS 并路由 `/api/*`、`/ingest/*` 和其余请求 |
 | Kubernetes | `deploy/helm/openrum` | Helm chart，包含 Deployment、Service、Ingress、自动伸缩、中断预算、迁移 Job 和 Prometheus 规则 |
 
@@ -116,7 +116,7 @@ OpenRUM 采用"一个镜像、多个进程"的布局：五个应用服务构建�
 
 | 目录 | 内容 |
 | --- | --- |
-| `services/api`、`services/ingest`、`services/consumer`、`services/worker` | 四个 Go 服务。`services/api` 里还有 `migrate` 和 `demo` 命令 |
+| `services/api`、`services/ingest`、`services/consumer`、`services/worker` | 四个 Go 服务。`services/api` 里还有 `migrate` 命令 |
 | `internal/` | 共享的 Go 包：`auth`、`metadata`（PostgreSQL）、`query`（ClickHouse）、`ingest`、`event`、`fingerprint`、`privacy`、`processing`、`filter`、`sourcemap`、`notify`、`storagepressure`、`observability`、`config` 等 |
 | `migrations/` | PostgreSQL 与 ClickHouse 的表结构迁移，会被嵌入 `migrate` 命令 |
 | `apps/web` | Console（React） |

@@ -13,7 +13,10 @@ export type SessionUser = {
   avatar?: string;
 };
 
-export type SetupStatus = { initialized: boolean };
+export type SetupStatus = {
+  initialized: boolean;
+  bootstrapTokenRequired?: boolean;
+};
 
 type ErrorEnvelope = {
   error?: { code?: string; message?: string; requestId?: string };
@@ -83,6 +86,15 @@ export function getSetupStatus(signal?: AbortSignal) {
   );
 }
 
+export function setupStatusQueryOptions() {
+  return queryOptions({
+    queryKey: ["auth", "setup-status"] as const,
+    queryFn: ({ signal }) => getSetupStatus(signal),
+    retry: false,
+    staleTime: 10_000,
+  });
+}
+
 export function login(input: { email: string; password: string }) {
   return apiFetch<SessionUser>(
     "/api/v1/auth/login",
@@ -149,6 +161,7 @@ export function safeReturnTo(value: string | null | undefined, fallback = "/") {
     if (
       target.pathname === "/login" ||
       target.pathname === "/setup" ||
+      target.pathname.startsWith("/setup/") ||
       target.pathname === "/awaiting-access"
     )
       return fallback;

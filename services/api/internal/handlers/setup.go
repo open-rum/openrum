@@ -27,6 +27,11 @@ type bootstrapRequest struct {
 	OrganizationName string `json:"organizationName"`
 }
 
+type setupStatusResponse struct {
+	Initialized            bool `json:"initialized"`
+	BootstrapTokenRequired bool `json:"bootstrapTokenRequired"`
+}
+
 func NewSetupHandler(bootstrapper *auth.Bootstrapper, logger zerolog.Logger, secureCookie bool) *SetupHandler {
 	return &SetupHandler{bootstrapper: bootstrapper, logger: logger, secureCookie: secureCookie}
 }
@@ -37,7 +42,10 @@ func (handler *SetupHandler) Status(writer http.ResponseWriter, request *http.Re
 		handler.internalError(writer, request, err)
 		return
 	}
-	writeJSON(writer, http.StatusOK, map[string]bool{"initialized": initialized})
+	writeJSON(writer, http.StatusOK, setupStatusResponse{
+		Initialized:            initialized,
+		BootstrapTokenRequired: !initialized && handler.bootstrapper.RequiresBootstrapToken(),
+	})
 }
 
 func (handler *SetupHandler) Bootstrap(writer http.ResponseWriter, request *http.Request) {
@@ -64,7 +72,7 @@ func (handler *SetupHandler) Bootstrap(writer http.ResponseWriter, request *http
 		var validationError *auth.ValidationError
 		switch {
 		case errors.As(err, &validationError):
-			httpx.WriteError(writer, request, http.StatusBadRequest, "VALIDATION_ERROR", "Invalid bootstrap input.")
+			httpx.WriteError(writer, request, http.StatusBadRequest, "VALIDATION_ERROR", bootstrapValidationMessage(validationError.Field))
 		case errors.Is(err, auth.ErrInvalidBootstrapToken):
 			httpx.WriteError(writer, request, http.StatusForbidden, "BOOTSTRAP_TOKEN_INVALID", "Bootstrap is not authorized.")
 		case errors.Is(err, auth.ErrAlreadyInitialized):
@@ -79,6 +87,21 @@ func (handler *SetupHandler) Bootstrap(writer http.ResponseWriter, request *http
 		"userId":         result.UserID.String(),
 		"organizationId": result.OrganizationID.String(),
 	})
+}
+
+func bootstrapValidationMessage(field string) string {
+	switch field {
+	case "email":
+		return "Invalid email address."
+	case "displayName":
+		return "Invalid display name."
+	case "password":
+		return "Password does not meet requirements."
+	case "organizationName":
+		return "Invalid organization name."
+	default:
+		return "Invalid bootstrap input."
+	}
 }
 
 func (handler *SetupHandler) internalError(writer http.ResponseWriter, request *http.Request, err error) {

@@ -121,4 +121,4 @@ For the IP guard, Redis fallback, response headers, sizing formula and troublesh
 - Configure object storage only when Source Map upload is required.
 - Create one Source Map upload token per CI pipeline and revoke tokens that are no longer used.
 
-Related: [Create your first project](/docs/getting-started/create-first-project/), [Data lifecycle](/docs/self-hosting/data-lifecycle/), [Privacy](/docs/self-hosting/security/privacy/).
+Related: [Browser SDK](/docs/sdk/browser/), [Data lifecycle](/docs/self-hosting/data-lifecycle/), [Privacy](/docs/self-hosting/security/privacy/).

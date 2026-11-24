@@ -24,6 +24,10 @@ export default defineConfig({
     "/zh/docs/getting-started/local-development/cli":
       "/zh/docs/getting-started/local-development/#openrum-命令",
     "/zh/docs/contributing/local-development": "/zh/docs/getting-started/local-development/",
+    "/docs/getting-started/create-first-project": "/docs/sdk/browser/",
+    "/zh/docs/getting-started/create-first-project": "/zh/docs/sdk/browser/",
+    "/docs/introduction": "/docs/",
+    "/zh/docs/introduction": "/zh/docs/",
   },
   site,
   output: "static",
@@ -61,7 +65,7 @@ export default defineConfig({
           label: "Get started",
           translations: { zh: "快速开始", "zh-CN": "快速开始" },
           items: [
-            { slug: "docs/introduction" },
+            { slug: "docs" },
             {
               label: "Self-hosting",
               translations: { zh: "自部署", "zh-CN": "自部署" },
@@ -175,7 +179,6 @@ export default defineConfig({
           label: "SDK",
           translations: { zh: "SDK", "zh-CN": "SDK" },
           items: [
-            { slug: "docs/getting-started/create-first-project" },
             {
               label: "Browser SDK",
               translations: { zh: "Browser SDK", "zh-CN": "Browser SDK" },

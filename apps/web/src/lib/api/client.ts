@@ -92,6 +92,8 @@ export type OverviewResponse = z.infer<typeof overviewResponseSchema>;
 
 export const connectionStatusSchema = z.object({
   keyConfigured: z.boolean(),
+  // Older API deployments omit this field; unknown must not mean never connected.
+  sdkConnected: z.boolean().optional(),
   lastSdkSeenAt: isoTimeSchema.nullable(),
   lastEventReceivedAt: isoTimeSchema.nullable(),
   lastEventQueryableAt: isoTimeSchema.nullable(),

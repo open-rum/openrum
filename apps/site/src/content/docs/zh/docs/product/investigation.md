@@ -17,7 +17,3 @@ OpenRUM 将行为分析与错误监控放在同一条调查路径中，避免在
 ## 在 Issue 列表中分诊
 
 Issue 列表为分诊设计，默认只显示待处理的 Issue（搜索框里的 `is:unresolved`），其中包含**已回归**的：已标记解决、之后又再次出现的 Issue。状态和负责人和其他条件一样写在搜索框里：`is:regressed`、`is:resolved`、`is:ignored`、`is:new`（首次发生在所选时间范围内）、`is:unassigned`、`assigned:me`。删掉 `is:unresolved` 就能看到全部 Issue。每行的**负责人**列可以直接更换负责人；用复选框选中多行后，可批量标记解决、忽略、重新打开或分配负责人；Viewer 角色可以查看列表，但不能修改。
-
-## Demo 路径
-
-启动本地开发环境并执行 `pnpm openrum seed` 后，可按电商 Demo 路径验证：商品行为 → checkout 会话 → `v1:demo-checkout` Issue → 失败的 `POST /api/orders`。

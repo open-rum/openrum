@@ -83,26 +83,15 @@ web         host       running  http://127.0.0.1:4173
 
 When something is not ready, a final line lists what is blocking, for example `not ready yet: …`.
 
-## Demo data and sign-in
+## First-time setup and sign-in
 
-```sh
-pnpm openrum seed
-```
+Once the stack is up, open `http://127.0.0.1:4173`. A fresh Instance starts empty, so the first visit opens the setup page where you register the initial owner account and sign in.
 
-This loads a repeatable ecommerce dataset: a demo owner, an Organization, a Project and about 30,000 Sessions across 14 days. It is optional and safe to run again, and it does nothing on an Instance whose owner you created yourself. Nothing seeds on start, so without it the first visit opens the setup page, where you create your own owner.
-
-Open `http://127.0.0.1:4173` and sign in:
-
-```text title="Local demo account" frame="none"
-Email: demo@openrum.local
-Password: OpenRUM-demo-2026!
-```
-
-These credentials and DSNs are local examples; do not reuse them outside the Compose environment. Keep the origin consistent, because switching between `localhost`, `127.0.0.1` or ports can fail same-origin checks.
+Keep the browser origin consistent with `PUBLIC_BASE_URL`, because switching between `localhost`, `127.0.0.1` or ports can fail same-origin checks. After signing in and creating a Project, you can either connect an app or use the floating flask button (**造数据**) in the bottom-right corner of the local Console to generate synthetic test traffic on demand.
 
 ## Connect the example app
 
-Follow [Create your first project](/docs/getting-started/create-first-project/) to create a React Project, add the `development` Environment and copy its DSN from onboarding. Then, from the repository root:
+Create a React Project in the Console, configure the `development` Environment and copy its DSN from onboarding. Then, from the repository root:
 
 ```sh
 cp examples/react-vite/.env.example examples/react-vite/.env.local
@@ -149,7 +138,7 @@ The last three commands differ in how much they keep:
 <Aside type="caution" title="reset deletes every local database">
   `pnpm openrum reset` removes all local PostgreSQL, ClickHouse, Kafka and Redis volumes and asks
   for confirmation first; pass `--yes` to skip the prompt. The next start applies migrations and
-  begins empty, so run `pnpm openrum seed` to load the demo dataset again.
+  begins empty, so the first visit opens the setup page again.
 </Aside>
 
 ## The openrum command
@@ -163,7 +152,6 @@ The last three commands differ in how much they keep:
 | `pnpm openrum status`         | What is running, and what is not ready yet                              |
 | `pnpm openrum logs [service]` | Follow logs; a host service tails its own file                          |
 | `pnpm openrum restart <name>` | Restart one service and wait for it to come back                        |
-| `pnpm openrum seed`           | Load the demo account and dataset into a running stack                  |
 | `pnpm openrum stop`           | Stop everything, keeping the containers and their data                  |
 | `pnpm openrum down`           | Remove the containers, keeping the volumes                              |
 | `pnpm openrum reset`          | Remove the containers and delete every local database, after confirming |
@@ -248,7 +236,7 @@ pnpm site:dev
 pnpm site:check
 ```
 
-Run `site:check` before requesting review for public-site or documentation changes. It checks generated references, spelling, Demo evidence, the static build, links and the site performance budget. English and Simplified Chinese pages change together.
+Run `site:check` before requesting review for public-site or documentation changes. It checks generated references, spelling, the static build, links and the site performance budget. English and Simplified Chinese pages change together.
 
 ## Troubleshooting
 

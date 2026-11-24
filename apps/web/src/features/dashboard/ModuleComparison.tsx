@@ -26,7 +26,12 @@ export function ModuleComparison({
     : `相比上一周期 ${comparison.label}；上一周期 ${previous}`;
   const badge = (
     <span
-      className={cn("dashboard-comparison badge badge-sm badge-soft", toneBadge[comparison.tone])}
+      className={cn(
+        "dashboard-comparison",
+        comparison.label === "无对比"
+          ? "text-xs leading-5 text-base-content/70"
+          : ["badge badge-sm badge-soft", toneBadge[comparison.tone]],
+      )}
       aria-label={description}
       tabIndex={variant === "corner" ? 0 : undefined}
     >

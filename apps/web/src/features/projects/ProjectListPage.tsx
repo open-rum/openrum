@@ -1,12 +1,11 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { Clock3Icon, FolderKanbanIcon, PlusIcon, SettingsIcon } from "lucide-react";
+import { Clock3Icon, PlusIcon, SettingsIcon } from "lucide-react";
 import { AsyncError } from "@/components/ui/AsyncState";
 import { ConsolePage, ConsolePageHeader } from "@/components/layout/ConsolePage";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { EmptyState } from "@/components/ui/EmptyState";
 import {
   Select,
   SelectContent,
@@ -36,6 +35,7 @@ import {
 import { rememberProject } from "@/lib/projects/currentProject";
 import { cn } from "@/lib/utils";
 import { ProjectPlatformIcon, getProjectPlatform } from "./projectPlatforms";
+import { ProjectEmptyState } from "./ProjectEmptyState";
 
 const DAY = 24 * 60 * 60 * 1000;
 const compactNumber = new Intl.NumberFormat("zh-CN", {
@@ -61,6 +61,12 @@ export function ProjectListPage() {
     enabled: Boolean(organizationId),
   });
   const projects = projectsQuery.data?.projects ?? [];
+  const isEmpty =
+    !organizationsQuery.isLoading &&
+    !projectsQuery.isLoading &&
+    !organizationsQuery.error &&
+    !projectsQuery.error &&
+    projects.length === 0;
 
   return (
     <ConsolePage width="wide">
@@ -90,7 +96,7 @@ export function ProjectListPage() {
                 <PlusIcon data-icon="inline-start" />
                 创建项目
               </Button>
-            ) : (
+            ) : isEmpty && organization ? null : (
               <Button asChild>
                 <Link to="/projects/new">
                   <PlusIcon data-icon="inline-start" />
@@ -116,32 +122,19 @@ export function ProjectListPage() {
           }}
         />
       ) : null}
-      {!organizationsQuery.isLoading &&
-      !projectsQuery.isLoading &&
-      !organizationsQuery.error &&
-      !projectsQuery.error &&
-      projects.length === 0 ? (
-        <div className="border border-base-300 bg-card">
-          <EmptyState
-            icon={FolderKanbanIcon}
-            title="还没有项目"
-            description={
-              organization && !canManageProjects(organization.role)
-                ? "当前角色不能创建项目，请联系组织 Owner 或 Admin。"
-                : "创建第一个项目后，我们会继续引导你安装 SDK 并验证第一条事件。"
-            }
-          />
+      {isEmpty ? (
+        <ProjectEmptyState
+          restricted={Boolean(organization && !canManageProjects(organization.role))}
+        >
           {organization && canManageProjects(organization.role) ? (
-            <div className="flex justify-center pb-8">
-              <Button asChild>
-                <Link to="/projects/new">
-                  <PlusIcon data-icon="inline-start" />
-                  创建第一个项目
-                </Link>
-              </Button>
-            </div>
+            <Button asChild>
+              <Link to="/projects/new">
+                <PlusIcon data-icon="inline-start" />
+                创建项目
+              </Link>
+            </Button>
           ) : null}
-        </div>
+        </ProjectEmptyState>
       ) : null}
       {projects.length ? (
         <div className="overflow-x-auto rounded-box border bg-card" aria-label="项目列表">

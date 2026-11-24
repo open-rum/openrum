@@ -1,7 +1,7 @@
 ---
 title: 命令行
 description: "@openrum/cli 提供的 openrum 命令：命令、选项、环境变量和退出码。"
-appliesTo: "@openrum/cli 0.1.0"
+appliesTo: "@openrum/cli 0.1.3"
 ---
 
 `@openrum/cli` 会安装 `openrum` 命令。它用来上传你自己构建产物中的 Source Map；在 OpenRUM 仓库的检出目录里，它也是本地开发栈工具的入口。需要 Node.js 20 或更高版本。
@@ -24,7 +24,7 @@ openrum <command> [options]
 | `openrum sourcemaps upload` | 把构建产物中的隐藏 Source Map 上传到 OpenRUM 的 Release |
 | `openrum help` | 打印命令列表 |
 | `openrum --version` | 打印包版本（`-v` 和 `version` 效果相同） |
-| `openrum dev`、`up`、`status`、`logs`、`restart`、`seed`、`stop`、`down`、`reset` | 管理本地开发栈，只能在仓库的检出目录里使用 |
+| `openrum dev`、`up`、`status`、`logs`、`restart`、`stop`、`down`、`reset` | 管理本地开发栈，只能在仓库的检出目录里使用 |
 
 ## `openrum sourcemaps upload`
 
@@ -59,7 +59,7 @@ pnpm exec openrum sourcemaps upload --out-dir dist --url-prefix static/app/
 
 ## 本地开发栈
 
-`dev`、`up`、`status`、`logs`、`restart`、`seed`、`stop`、`down` 和 `reset` 由 OpenRUM 仓库 `cmd/openrum` 里的 Go 工具实现。在检出目录里，`openrum <command>` 会找到仓库根目录，并在那里运行 `go run ./cmd/openrum <command>`，所以需要安装 Go、带 Compose v2 的 Docker，`dev` 还需要 pnpm。在其他地方，它会说明这些命令只能在检出目录里使用，并以状态码 `1` 退出。命令本身的说明见[本地开发](/zh/docs/getting-started/local-development/#openrum-命令)。
+`dev`、`up`、`status`、`logs`、`restart`、`stop`、`down` 和 `reset` 由 OpenRUM 仓库 `cmd/openrum` 里的 Go 工具实现。在检出目录里，`openrum <command>` 会找到仓库根目录，并在那里运行 `go run ./cmd/openrum <command>`，所以需要安装 Go、带 Compose v2 的 Docker，`dev` 还需要 pnpm。在其他地方，它会说明这些命令只能在检出目录里使用，并以状态码 `1` 退出。命令本身的说明见[本地开发](/zh/docs/getting-started/local-development/#openrum-命令)。
 
 ## 退出码
 
