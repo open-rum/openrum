@@ -16,6 +16,22 @@ The Chart and release workflow are pinned to `ghcr.io/open-rum`. Before tagging,
 
 ## Prepare a version
 
+Before deciding which packages to release, inspect unreleased changes since each target's latest Git tag:
+
+```sh
+pnpm release:status
+```
+
+Then bump only the targets that changed (or pass `--all <version>` for a milestone release):
+
+```sh
+pnpm release:bump --product 0.1.4 --browser 0.1.4
+# or preview first:
+pnpm release:bump --all patch --dry-run
+```
+
+`pnpm release:bump` updates manifests, code constants and bilingual documentation for the selected targets, regenerates reference docs (`pnpm docs:generate`), runs the version check scripts, and prints the exact tag commands to run after merging.
+
 Make one release-preparation PR that updates `deploy/helm/openrum/Chart.yaml` (`version` and `appVersion`), `deploy/helm/openrum/values.yaml` (`image.tag`), the public Chinese and English documentation, and any release notes. The product version uses `vX.Y.Z` Git tags; the Chart and image omit the leading `v`. The Browser SDK has its own version and is published by a separate workflow; see [Publish the browser SDK](#publish-the-browser-sdk).
 
 ### Where each version number lives
