@@ -12,6 +12,6 @@ pnpm site:build
 
 The output is `apps/site/dist/`. Preview it locally with `pnpm --filter @openrum/site preview`. Upload the contents of `dist/` to a static-site host; no Docker image or application service is needed for the site. Configure hashed `/_astro/` assets for long-lived immutable caching and HTML for short-lived revalidation.
 
-The `Public site` GitHub workflow retains every PR and main-branch build as a static artifact. A product release attaches a matching versioned static-site archive built from the tagged commit. Connect either artifact to the chosen static-site hosting/CD system; neither workflow currently deploys `openrum.dev`. DNS/TLS and the first external walkthrough remain manual release gates because this repository cannot verify them without the real host and tester.
+The `docs-site` job in `.github/workflows/ci.yml` builds and validates the public site on site-affecting PRs and on `main`. A product release attaches a matching versioned static-site archive built from the tagged commit. Connect either artifact to the chosen static-site hosting/CD system; neither workflow currently deploys `openrum.dev`. DNS/TLS and the first external walkthrough remain manual release gates because this repository cannot verify them without the real host and tester.
 
 Optional dogfooding must use a dedicated Project, document the captured fields, respect Do Not Track/local consent policy, and avoid advertising or third-party trackers. It is off by default.
