@@ -1,9 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useSearch } from "@tanstack/react-router";
-import { ArrowLeftIcon, ArrowRightIcon } from "lucide-react";
+import { ArrowLeftIcon, ArrowRightIcon, InfoIcon } from "lucide-react";
 import { BrandMark } from "@/components/brand/BrandMark";
 import { ConsolePageTabs } from "@/components/layout/ConsolePage";
 import { ThemeController } from "@/components/theme/ThemeController";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -21,14 +22,15 @@ import { getRegistrationStatus, registrationStatusQueryKey } from "@/lib/auth/re
 
 const optionalSetupSteps = [
   {
+    id: "email",
+    label: "邮件服务",
+    description:
+      "配置 SMTP 服务器后，可使用找回密码、邀请成员、注册验证和邮件通知等功能。若部署环境变量已配置，本步会自动跳过。",
+  },
+  {
     id: "storage",
     label: "对象存储",
     description: "用于存放 Source Map 构建产物以还原压缩后的堆栈，所有项目共用。",
-  },
-  {
-    id: "email",
-    label: "邮件服务",
-    description: "配置 SMTP 服务器后，可使用邮箱邀请成员、注册验证和邮件通知等功能。",
   },
   {
     id: "auth",
@@ -51,12 +53,38 @@ function isOptionalSetupStep(value: unknown): value is OptionalSetupStep {
 export function SetupOptionalPage() {
   const navigate = useNavigate();
   const search = useSearch({ from: "/setup/optional" });
-  const activeStep: OptionalSetupStep = search.step ?? "storage";
-  const currentIndex = optionalSetupSteps.findIndex((step) => step.id === activeStep);
-  const currentStep = optionalSetupSteps[currentIndex] ?? optionalSetupSteps[0];
-  const isFirst = currentIndex <= 0;
-  const isLast = currentIndex >= optionalSetupSteps.length - 1;
 
+  const goToStep = (step: OptionalSetupStep) => {
+    void navigate({
+      to: "/setup/optional",
+      search: { step },
+      replace: true,
+    });
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const enterConsole = () => {
+    void navigate({ to: "/", replace: true });
+  };
+
+  return (
+    <SetupOptionalView
+      explicitStep={search.step}
+      onSelectStep={goToStep}
+      onEnterConsole={enterConsole}
+    />
+  );
+}
+
+export function SetupOptionalView({
+  explicitStep,
+  onSelectStep,
+  onEnterConsole,
+}: {
+  explicitStep?: OptionalSetupStep;
+  onSelectStep: (step: OptionalSetupStep) => void;
+  onEnterConsole: () => void;
+}) {
   // Read live status for every optional step so tab badges reflect both deployment
   // environment variables and changes saved during the wizard.
   const storageQuery = useQuery(objectStorageStatusQueryOptions());
@@ -72,9 +100,20 @@ export function SetupOptionalPage() {
   });
   const configurationQuery = useQuery(adminConfigurationQueryOptions());
 
+  // Prioritize email setup first so password recovery works right away; when SMTP is
+  // already configured via deployment environment variables, advance to the next step
+  // automatically unless the administrator explicitly selected a step.
+  const emailPreconfigured = emailQuery.data?.configured === true;
+  const activeStep: OptionalSetupStep = explicitStep ?? (emailPreconfigured ? "storage" : "email");
+  const skippedEmailAutomatically = !explicitStep && emailPreconfigured;
+  const currentIndex = optionalSetupSteps.findIndex((step) => step.id === activeStep);
+  const currentStep = optionalSetupSteps[currentIndex] ?? optionalSetupSteps[0];
+  const isFirst = currentIndex <= 0;
+  const isLast = currentIndex >= optionalSetupSteps.length - 1;
+
   const stepStatus: Record<OptionalSetupStep, { done: boolean; badge?: string }> = {
-    storage: storageQuery.data?.configured ? { done: true, badge: "已启用" } : { done: false },
     email: emailQuery.data?.configured ? { done: true, badge: "已启用" } : { done: false },
+    storage: storageQuery.data?.configured ? { done: true, badge: "已启用" } : { done: false },
     auth:
       (authQuery.data?.providers.some((provider) => provider.enabled) ?? false) ||
       Boolean(registrationQuery.data?.open)
@@ -85,19 +124,6 @@ export function SetupOptionalPage() {
     )
       ? { done: true, badge: "已调整" }
       : { done: false },
-  };
-
-  const goToStep = (step: OptionalSetupStep) => {
-    void navigate({
-      to: "/setup/optional",
-      search: { step },
-      replace: true,
-    });
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  };
-
-  const enterConsole = () => {
-    void navigate({ to: "/", replace: true });
   };
 
   return (
@@ -118,10 +144,10 @@ export function SetupOptionalPage() {
               可选系统配置
             </h1>
             <p className="text-sm leading-6 text-base-content/70">
-              以下配置均为可选项，不配置也可直接开始监控。您可以按需设置，或随时跳过进入控制台。
+              以下配置均为可选项，不配置也可直接开始监控。建议优先完成邮件服务以便后续通过邮箱找回密码，也可随时跳过进入控制台。
             </p>
           </div>
-          <Button type="button" variant="outline" onClick={enterConsole}>
+          <Button type="button" variant="outline" onClick={onEnterConsole}>
             全部跳过，进入控制台
           </Button>
         </header>
@@ -129,7 +155,7 @@ export function SetupOptionalPage() {
         <Tabs
           value={activeStep}
           onValueChange={(value) => {
-            if (isOptionalSetupStep(value)) goToStep(value);
+            if (isOptionalSetupStep(value)) onSelectStep(value);
           }}
           className="gap-6"
         >
@@ -156,13 +182,23 @@ export function SetupOptionalPage() {
             </TabsList>
           </ConsolePageTabs>
 
+          {skippedEmailAutomatically ? (
+            <Alert variant="info" role="status">
+              <InfoIcon aria-hidden="true" />
+              <AlertDescription>
+                邮件服务已通过环境变量启用，已自动跳过并进入下一项配置。您可随时点击上方「1.
+                邮件服务」查看当前状态或发送测试邮件。
+              </AlertDescription>
+            </Alert>
+          ) : null}
+
           <p className="text-sm text-base-content/70">{currentStep.description}</p>
 
-          <TabsContent value="storage">
-            <ObjectStorageSection />
-          </TabsContent>
           <TabsContent value="email">
             <EmailServiceSection />
+          </TabsContent>
+          <TabsContent value="storage">
+            <ObjectStorageSection />
           </TabsContent>
           <TabsContent value="auth">
             <AuthenticationSection />
@@ -179,7 +215,7 @@ export function SetupOptionalPage() {
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => goToStep(optionalSetupSteps[currentIndex - 1].id)}
+                  onClick={() => onSelectStep(optionalSetupSteps[currentIndex - 1].id)}
                 >
                   <ArrowLeftIcon data-icon="inline-start" aria-hidden="true" />
                   上一步
@@ -193,20 +229,20 @@ export function SetupOptionalPage() {
             <div className="flex flex-wrap items-center gap-2">
               {!isLast ? (
                 <>
-                  <Button type="button" variant="ghost" onClick={enterConsole}>
+                  <Button type="button" variant="ghost" onClick={onEnterConsole}>
                     全部跳过
                   </Button>
                   <Button
                     type="button"
                     variant="outline"
-                    onClick={() => goToStep(optionalSetupSteps[currentIndex + 1].id)}
+                    onClick={() => onSelectStep(optionalSetupSteps[currentIndex + 1].id)}
                   >
                     {stepStatus[activeStep].done ? "下一步" : "跳过此步"}
                     <ArrowRightIcon data-icon="inline-end" aria-hidden="true" />
                   </Button>
                 </>
               ) : (
-                <Button type="button" onClick={enterConsole}>
+                <Button type="button" onClick={onEnterConsole}>
                   完成并进入控制台
                   <ArrowRightIcon data-icon="inline-end" aria-hidden="true" />
                 </Button>

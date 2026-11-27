@@ -93,6 +93,22 @@ Instance Owner 可以在**系统设置 → 认证与访问 → 开放注册**让
 
 将要持有 Instance Owner 或 Instance Admin 角色的人必须有 OpenRUM 密码，因为敏感的 Instance 操作会再次要求输入。请在授予角色之前让他设置好。这个密码也用于[角色与权限](/zh/docs/product/roles-permissions/#instance-角色)里说的五分钟重新验证。
 
+### 找回忘记的密码
+
+- **通过邮箱自助重置。** 在登录页点击**忘记密码？**（`/forgot-password`）并输入账号邮箱。实例已配置[邮件服务](/zh/docs/self-hosting/email/)时，OpenRUM 会向该邮箱发送一次性重置链接，有效期 1 小时。设置新密码后，该账号在其他设备上的登录会话会立即失效。为避免泄露已注册邮箱，提交表单后始终返回相同提示。
+- **运维应急重置命令。** 如果实例尚未配置邮件服务（或管理员本人忘记密码无法登录），拥有部署访问权限的运维人员可在运行环境中直接重置任意账号的密码。命令会以不回显的方式提示输入并确认新密码（也支持 `--password-stdin` 从标准输入读取），并立即吊销该用户所有现有会话：
+
+```sh
+# Docker Compose / 容器环境
+docker compose exec api /app/api reset-password --email you@company.com
+
+# Kubernetes
+kubectl exec -it deploy/openrum-api -- /app/api reset-password --email you@company.com
+
+# 本地源码栈
+pnpm openrum reset-password --email you@company.com
+```
+
 ## 故障排查
 
 | 现象 | 可能原因 |

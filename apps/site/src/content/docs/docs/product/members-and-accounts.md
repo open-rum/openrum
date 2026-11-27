@@ -93,6 +93,22 @@ Generated avatars come from the public DiceBear service, so showing one makes th
 
 A person who will hold an Instance Owner or Instance Admin role must have an OpenRUM password, because sensitive Instance actions ask for it again. Ask them to set it before the role is granted. The same password is used for the five-minute re-verification described in [Roles and permissions](/docs/product/roles-permissions/#instance-roles).
 
+### Resetting a forgotten password
+
+- **Self-service by email.** On the sign-in page, select **Forgot password?** (`/forgot-password`) and enter your account email. When the Instance has a [mail server](/docs/self-hosting/email/), OpenRUM sends a one-time reset link that works for 1 hour. Setting a new password immediately signs out all existing sessions for that account. To avoid leaking which addresses are registered, the form always gives the same confirmation message.
+- **Operator recovery command.** If no mail server is configured (or the administrator is locked out), an operator with deployment access can reset any account password directly in PostgreSQL. The command prompts for the new password without echoing it (or reads it with `--password-stdin`) and revokes all active sessions for that user:
+
+```sh
+# Docker Compose / container deployment
+docker compose exec api /app/api reset-password --email you@company.com
+
+# Kubernetes
+kubectl exec -it deploy/openrum-api -- /app/api reset-password --email you@company.com
+
+# Local source checkout
+pnpm openrum reset-password --email you@company.com
+```
+
 ## Troubleshooting
 
 | Symptom | Likely cause |

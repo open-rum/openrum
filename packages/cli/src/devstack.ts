@@ -13,6 +13,7 @@ export const devStackCommands = [
   "stop",
   "down",
   "reset",
+  "reset-password",
 ] as const;
 
 const composeFile = join("deploy", "compose", "docker-compose.yml");

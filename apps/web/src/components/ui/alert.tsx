@@ -11,6 +11,7 @@ const alertVariants = cva(
       variant: {
         default: "",
         info: "alert-info alert-soft",
+        success: "alert-success alert-soft",
         warning: "alert-warning alert-soft",
         destructive: "alert-error alert-soft",
       },

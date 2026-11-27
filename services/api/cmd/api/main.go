@@ -31,6 +31,13 @@ import (
 )
 
 func main() {
+	if len(os.Args) > 1 && os.Args[1] == "reset-password" {
+		if err := runResetPasswordCommand(context.Background(), os.Args[2:]); err != nil {
+			fmt.Fprintf(os.Stderr, "openrum api reset-password: %v\n", err)
+			os.Exit(1)
+		}
+		return
+	}
 	if err := service.MainWithRoutes(config.ServiceAPI, registerRoutes); err != nil {
 		log.Fatal(err)
 	}
@@ -212,6 +219,9 @@ func registerRoutes(ctx context.Context, router *httpx.Router, configuration con
 	registrationRepository := metadata.NewRegistrationRepository(database)
 	registrationHandler := handlers.NewRegistrationHandler(registrationRepository, sessionManager, mailService,
 		instanceMemberRepository, redisClient, configuration.PublicBaseURL, secureCookie, logger)
+	passwordResetRepository := metadata.NewPasswordResetRepository(database)
+	passwordResetHandler := handlers.NewPasswordResetHandler(passwordResetRepository, mailService,
+		redisClient, configuration.PublicBaseURL, logger)
 	externalAuthHandler := handlers.NewExternalAuthHandler(auth.NewExternalStore(database, authKeyring), sessionManager,
 		redisClient, failureLimiter, instanceMemberRepository, configuration.PublicBaseURL, secureCookie, logger)
 	externalAuthHandler.EnableRegistration(registrationRepository)
@@ -247,6 +257,9 @@ func registerRoutes(ctx context.Context, router *httpx.Router, configuration con
 	router.HandleFunc("POST /api/v1/auth/register", registrationHandler.Register)
 	router.HandleFunc("POST /api/v1/auth/register/resend", registrationHandler.Resend)
 	router.HandleFunc("POST /api/v1/auth/register/verify", registrationHandler.Verify)
+	router.HandleFunc("GET /api/v1/auth/password-reset/status", passwordResetHandler.Status)
+	router.HandleFunc("POST /api/v1/auth/password-reset/request", passwordResetHandler.Request)
+	router.HandleFunc("POST /api/v1/auth/password-reset/confirm", passwordResetHandler.Confirm)
 	router.HandleFunc("GET /api/v1/auth/register/external", externalAuthHandler.Profile)
 	router.HandleFunc("POST /api/v1/auth/register/external", externalAuthHandler.CompleteProfile)
 	router.HandleFunc("GET /api/v1/invitations/{token}", invitationHandler.Preview)

@@ -36,14 +36,19 @@ afterEach(() => {
 });
 afterAll(() => server.close());
 
-function renderLogin(externalError?: "cancelled" | "expired") {
+function renderLogin(externalError?: "cancelled" | "expired", reset?: boolean) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
   return render(
     <QueryClientProvider client={client}>
       <ThemeProvider>
-        <LoginPage returnTo="/projects/example" expired externalError={externalError} />
+        <LoginPage
+          returnTo="/projects/example"
+          expired
+          reset={reset}
+          externalError={externalError}
+        />
       </ThemeProvider>
     </QueryClientProvider>,
   );
@@ -70,6 +75,17 @@ describe("login methods", () => {
     expect(view.queryByRole("button", { name: "使用 GitHub 登录" })).toBeNull();
     expect(view.getByRole("form", { name: "登录 OpenRUM" })).toBeTruthy();
     expect(view.getByText("登录已过期，请重新登录。完成后会返回刚才的页面。")).toBeTruthy();
+    expect(view.getByRole("link", { name: "忘记密码？" }).getAttribute("href")).toBe(
+      "/forgot-password",
+    );
+  });
+
+  it("shows confirmation banner after a password reset completes", async () => {
+    server.use(
+      http.get("/api/v1/auth/methods", () => HttpResponse.json({ local: true, providers: [] })),
+    );
+    const view = renderLogin(undefined, true);
+    expect(await view.findByText("密码已重置，请使用新密码登录。")).toBeTruthy();
   });
 
   it("shows the LDAP form, submits the safe return address and explains rejected credentials", async () => {
