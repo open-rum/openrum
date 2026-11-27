@@ -173,7 +173,7 @@ func readPasswordFromTerminal(ctx context.Context, in io.Reader, out io.Writer, 
 		if info, err := ttyFile.Stat(); err == nil && info.Mode()&os.ModeCharDevice != 0 {
 			if setTerminalEcho(ctx, ttyFile, false) == nil {
 				defer func() {
-					_ = setTerminalEcho(context.Background(), ttyFile, true)
+					_ = setTerminalEcho(context.WithoutCancel(ctx), ttyFile, true)
 					_, _ = fmt.Fprintln(out)
 				}()
 			}
