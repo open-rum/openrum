@@ -73,6 +73,8 @@ func run(command string, arguments []string) error {
 			return errors.New("usage: openrum restart <service>")
 		}
 		return stack.restart(arguments[0])
+	case "reset-password":
+		return stack.resetPassword(arguments)
 	default:
 		usage()
 		return fmt.Errorf("unknown command %q", command)
@@ -425,6 +427,21 @@ func interactive() bool {
 	return information.Mode()&os.ModeCharDevice != 0
 }
 
+func (stack stack) resetPassword(arguments []string) error {
+	hostEnv, err := stack.environment.HostEnvironment()
+	if err != nil {
+		return err
+	}
+	commandArgs := append([]string{"run", "./services/api/cmd/api", "reset-password"}, arguments...)
+	command := exec.CommandContext(context.Background(), "go", commandArgs...)
+	command.Dir = stack.root
+	command.Env = append(os.Environ(), hostEnv...)
+	command.Stdin = os.Stdin
+	command.Stdout = os.Stdout
+	command.Stderr = os.Stderr
+	return command.Run()
+}
+
 func usage() {
 	fmt.Print(`openrum manages a local OpenRUM stack.
 
@@ -436,6 +453,7 @@ func usage() {
   openrum stop             stop everything, keeping the containers and their data
   openrum down             remove the containers, keeping the volumes
   openrum reset [--yes]    remove the containers and delete every local database
+  openrum reset-password   reset an account password directly in PostgreSQL
 
 The two modes share one console port, so only one of them runs at a time.
 Ports and credentials come from deploy/compose/.env, falling back to the

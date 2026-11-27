@@ -18,7 +18,7 @@ Complete [Install services](/docs/getting-started/production-deployment/install/
    2. Administrator display name and work email.
    3. A password of at least 8 characters including an upper-case letter, a lower-case letter and a symbol, and its confirmation.
    4. The Bootstrap Token saved in the credentials step (shown only when `BOOTSTRAP_TOKEN` is configured on the server).
-   5. Submit the initialization form, then configure optional instance settings (object storage, email service, authentication and data retention) or skip directly to the Console.
+   5. Submit the initialization form, then configure optional instance settings (email service, object storage, authentication and data retention) or skip directly to the Console. Email service comes first so you can recover forgotten passwords later; if SMTP is already configured in environment variables or Helm values, the wizard skips that step automatically.
 
    Helm production deployment does not seed local demo accounts. This entry closes after initialization; use the created account for subsequent logins. If the Instance is already initialized, sign in with an existing administrator account.
 

@@ -21,7 +21,7 @@ import { AuthFrame } from "@/features/auth/AuthFrame";
 import type { OptionalSetupStep } from "@/features/auth/SetupOptionalPage";
 import { Button } from "@/components/ui/button";
 
-const optionalStepIds = new Set<string>(["storage", "email", "auth", "retention"]);
+const optionalStepIds = new Set<string>(["email", "storage", "auth", "retention"]);
 import { App } from "./App";
 import { PlannedPage } from "./PlannedPage";
 import { RouteLoading } from "./RouteLoading";
@@ -39,6 +39,14 @@ const RegisterPage = lazyRouteComponent(
 const VerifyEmailPage = lazyRouteComponent(
   () => import("@/features/auth/VerifyEmailPage"),
   "VerifyEmailPage",
+);
+const ForgotPasswordPage = lazyRouteComponent(
+  () => import("@/features/auth/ForgotPasswordPage"),
+  "ForgotPasswordPage",
+);
+const ResetPasswordRoutePage = lazyRouteComponent(
+  () => import("@/features/auth/ResetPasswordPage"),
+  "ResetPasswordRoutePage",
 );
 const CompleteRegistrationPage = lazyRouteComponent(
   () => import("@/features/auth/CompleteRegistrationPage"),
@@ -263,9 +271,10 @@ const loginRoute = createRoute({
   path: "/login",
   validateSearch: (
     search: Record<string, unknown>,
-  ): { returnTo?: string; expired?: boolean; error?: string } => ({
+  ): { returnTo?: string; expired?: boolean; reset?: boolean; error?: string } => ({
     returnTo: typeof search.returnTo === "string" ? search.returnTo : undefined,
     expired: search.expired === true || search.expired === "1" ? true : undefined,
+    reset: search.reset === true || search.reset === "1" ? true : undefined,
     error:
       search.error === "external" || search.error === "cancelled" || search.error === "expired"
         ? search.error
@@ -322,6 +331,23 @@ const verifyEmailRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/verify-email/$token",
   component: VerifyEmailPage,
+});
+
+const forgotPasswordRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/forgot-password",
+  beforeLoad: async ({ context }) => {
+    const status = await context.queryClient.fetchQuery(setupStatusQueryOptions());
+    if (!status.initialized) throw redirect({ to: "/setup" });
+    await leaveWhenSignedIn(context);
+  },
+  component: ForgotPasswordPage,
+});
+
+const resetPasswordRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/reset-password/$token",
+  component: ResetPasswordRoutePage,
 });
 
 const inviteRoute = createRoute({
@@ -940,6 +966,8 @@ const routeTree = rootRoute.addChildren([
   registerRoute,
   completeRegistrationRoute,
   verifyEmailRoute,
+  forgotPasswordRoute,
+  resetPasswordRoute,
   inviteRoute,
   awaitingAccessRoute,
   protectedRoute.addChildren([

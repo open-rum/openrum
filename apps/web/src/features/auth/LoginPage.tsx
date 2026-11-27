@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSearch } from "@tanstack/react-router";
-import { CircleAlertIcon, ClockAlertIcon } from "lucide-react";
+import { CheckCircle2Icon, CircleAlertIcon, ClockAlertIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { FieldGroup } from "@/components/ui/field";
@@ -18,6 +18,7 @@ import { ProviderIcon } from "./ProviderIcon";
 type LoginPageProps = {
   returnTo?: string;
   expired?: boolean;
+  reset?: boolean;
   externalError?: "external" | "cancelled" | "expired";
 };
 
@@ -27,12 +28,13 @@ export function LoginRoutePage() {
     <LoginPage
       returnTo={search.returnTo}
       expired={search.expired}
+      reset={search.reset}
       externalError={search.error as LoginPageProps["externalError"]}
     />
   );
 }
 
-export function LoginPage({ returnTo, expired, externalError }: LoginPageProps) {
+export function LoginPage({ returnTo, expired, reset, externalError }: LoginPageProps) {
   const queryClient = useQueryClient();
   const methods = useQuery({
     queryKey: ["auth", "methods"],
@@ -84,6 +86,12 @@ export function LoginPage({ returnTo, expired, externalError }: LoginPageProps) 
         <p>登录监控控制台</p>
       </div>
 
+      {reset ? (
+        <Alert variant="success" className="mb-5" role="status">
+          <CheckCircle2Icon aria-hidden="true" />
+          <AlertDescription>密码已重置，请使用新密码登录。</AlertDescription>
+        </Alert>
+      ) : null}
       {expired ? (
         // An expired session is the reason the person is here, so it gets the warning tone
         // rather than the near-invisible default card.
@@ -223,6 +231,14 @@ export function LoginPage({ returnTo, expired, externalError }: LoginPageProps) 
             aria-invalid={invalidCredentials || undefined}
             aria-describedby={authenticate.error ? "login-error" : undefined}
           />
+          <div className="-mt-1 flex justify-end">
+            <a
+              className="text-sm text-base-content/70 underline underline-offset-2 hover:text-base-content"
+              href="/forgot-password"
+            >
+              忘记密码？
+            </a>
+          </div>
 
           {authenticate.error ? (
             <Alert variant="destructive" id="login-error">
