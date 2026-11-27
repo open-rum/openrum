@@ -44,10 +44,10 @@ func runResetPasswordWithIO(ctx context.Context, args []string, postgresDSN stri
 	flags.BoolVar(&passwordStdin, "password-stdin", false, "Read the new password from standard input instead of prompting")
 	flags.BoolVar(&listAdmins, "list-admins", false, "List instance owner and admin email addresses without changing any password")
 	flags.Usage = func() {
-		fmt.Fprintf(stdio.stderr, "Usage: api reset-password --email <address> [--password-stdin]\n")
-		fmt.Fprintf(stdio.stderr, "       api reset-password --list-admins\n\n")
-		fmt.Fprintf(stdio.stderr, "Resets a user's password directly in PostgreSQL and revokes every active session.\n")
-		fmt.Fprintf(stdio.stderr, "Requires POSTGRES_DSN in the environment.\n\n")
+		_, _ = fmt.Fprintf(stdio.stderr, "Usage: api reset-password --email <address> [--password-stdin]\n")
+		_, _ = fmt.Fprintf(stdio.stderr, "       api reset-password --list-admins\n\n")
+		_, _ = fmt.Fprintf(stdio.stderr, "Resets a user's password directly in PostgreSQL and revokes every active session.\n")
+		_, _ = fmt.Fprintf(stdio.stderr, "Requires POSTGRES_DSN in the environment.\n\n")
 		flags.PrintDefaults()
 	}
 
@@ -79,11 +79,11 @@ func runResetPasswordWithIO(ctx context.Context, args []string, postgresDSN stri
 			return fmt.Errorf("list admins: %w", err)
 		}
 		if len(admins) == 0 {
-			fmt.Fprintln(stdio.stdout, "No instance administrators found.")
+			_, _ = fmt.Fprintln(stdio.stdout, "No instance administrators found.")
 			return nil
 		}
 		for _, admin := range admins {
-			fmt.Fprintf(stdio.stdout, "%s\t%s\t%s\t%s\n", admin.Email, admin.Role, admin.Status, admin.DisplayName)
+			_, _ = fmt.Fprintf(stdio.stdout, "%s\t%s\t%s\t%s\n", admin.Email, admin.Role, admin.Status, admin.DisplayName)
 		}
 		return nil
 	}
@@ -93,7 +93,7 @@ func runResetPasswordWithIO(ctx context.Context, args []string, postgresDSN stri
 		return errors.New("--email is required (use --list-admins to look up administrator emails)")
 	}
 
-	password, err := readResetPassword(passwordStdin, stdio)
+	password, err := readResetPassword(ctx, passwordStdin, stdio)
 	if err != nil {
 		return err
 	}
@@ -127,11 +127,11 @@ func runResetPasswordWithIO(ctx context.Context, args []string, postgresDSN stri
 		return fmt.Errorf("reset password: %w", err)
 	}
 
-	fmt.Fprintf(stdio.stdout, "Password updated for %s. All active sessions have been revoked.\n", email)
+	_, _ = fmt.Fprintf(stdio.stdout, "Password updated for %s. All active sessions have been revoked.\n", email)
 	return nil
 }
 
-func readResetPassword(fromStdin bool, stdio resetPasswordIO) (string, error) {
+func readResetPassword(ctx context.Context, fromStdin bool, stdio resetPasswordIO) (string, error) {
 	if fromStdin {
 		reader := bufio.NewReader(stdio.stdin)
 		line, err := reader.ReadString('\n')
@@ -148,7 +148,7 @@ func readResetPassword(fromStdin bool, stdio resetPasswordIO) (string, error) {
 	promptSecret := stdio.readSecret
 	if promptSecret == nil {
 		promptSecret = func(prompt string) (string, error) {
-			return readPasswordFromTerminal(stdio.stdin, stdio.stderr, prompt)
+			return readPasswordFromTerminal(ctx, stdio.stdin, stdio.stderr, prompt)
 		}
 	}
 
@@ -166,17 +166,15 @@ func readResetPassword(fromStdin bool, stdio resetPasswordIO) (string, error) {
 	return first, nil
 }
 
-func readPasswordFromTerminal(in io.Reader, out io.Writer, prompt string) (string, error) {
-	fmt.Fprint(out, prompt)
+func readPasswordFromTerminal(ctx context.Context, in io.Reader, out io.Writer, prompt string) (string, error) {
+	_, _ = fmt.Fprint(out, prompt)
 	ttyFile, isFile := in.(*os.File)
-	echoDisabled := false
 	if isFile {
 		if info, err := ttyFile.Stat(); err == nil && info.Mode()&os.ModeCharDevice != 0 {
-			if setTerminalEcho(ttyFile, false) == nil {
-				echoDisabled = true
+			if setTerminalEcho(ctx, ttyFile, false) == nil {
 				defer func() {
-					_ = setTerminalEcho(ttyFile, true)
-					fmt.Fprintln(out)
+					_ = setTerminalEcho(context.Background(), ttyFile, true)
+					_, _ = fmt.Fprintln(out)
 				}()
 			}
 		}
@@ -187,18 +185,15 @@ func readPasswordFromTerminal(in io.Reader, out io.Writer, prompt string) (strin
 	if err != nil && !errors.Is(err, io.EOF) {
 		return "", fmt.Errorf("read password: %w", err)
 	}
-	if !echoDisabled && isFile {
-		// Nothing extra to print when echo remained enabled.
-	}
 	return strings.TrimRight(line, "\r\n"), nil
 }
 
-func setTerminalEcho(tty *os.File, enabled bool) error {
+func setTerminalEcho(ctx context.Context, tty *os.File, enabled bool) error {
 	arg := "-echo"
 	if enabled {
 		arg = "echo"
 	}
-	cmd := exec.Command("stty", arg)
+	cmd := exec.CommandContext(ctx, "stty", arg)
 	cmd.Stdin = tty
 	return cmd.Run()
 }

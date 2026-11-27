@@ -76,7 +76,7 @@ func TestPasswordResetStatusReflectsMailConfiguration(t *testing.T) {
 	for _, configured := range []bool{false, true} {
 		router := newTestPasswordResetRouter(&fakePasswordResetStore{}, &fakePasswordResetMail{configured: configured})
 		recorder := httptest.NewRecorder()
-		request := httptest.NewRequest(http.MethodGet, "/api/v1/auth/password-reset/status", nil)
+		request := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/api/v1/auth/password-reset/status", nil)
 		router.ServeHTTP(recorder, request)
 
 		if recorder.Code != http.StatusOK {
@@ -98,7 +98,7 @@ func TestPasswordResetRequestValidationAndMailAvailability(t *testing.T) {
 	t.Run("invalid email returns 400", func(t *testing.T) {
 		router := newTestPasswordResetRouter(&fakePasswordResetStore{}, &fakePasswordResetMail{configured: true})
 		recorder := httptest.NewRecorder()
-		request := httptest.NewRequest(http.MethodPost, "/api/v1/auth/password-reset/request", strings.NewReader(`{"email":"not-an-email"}`))
+		request := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/api/v1/auth/password-reset/request", strings.NewReader(`{"email":"not-an-email"}`))
 		request.Header.Set("Content-Type", "application/json")
 		router.ServeHTTP(recorder, request)
 
@@ -110,7 +110,7 @@ func TestPasswordResetRequestValidationAndMailAvailability(t *testing.T) {
 	t.Run("unconfigured SMTP returns 503 EMAIL_UNAVAILABLE", func(t *testing.T) {
 		router := newTestPasswordResetRouter(&fakePasswordResetStore{}, &fakePasswordResetMail{configured: false})
 		recorder := httptest.NewRecorder()
-		request := httptest.NewRequest(http.MethodPost, "/api/v1/auth/password-reset/request", strings.NewReader(`{"email":"owner@example.com"}`))
+		request := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/api/v1/auth/password-reset/request", strings.NewReader(`{"email":"owner@example.com"}`))
 		request.Header.Set("Content-Type", "application/json")
 		router.ServeHTTP(recorder, request)
 
@@ -128,7 +128,7 @@ func TestPasswordResetRequestValidationAndMailAvailability(t *testing.T) {
 		router := newTestPasswordResetRouter(store, mail)
 
 		recorder := httptest.NewRecorder()
-		request := httptest.NewRequest(http.MethodPost, "/api/v1/auth/password-reset/request", strings.NewReader(`{"email":"Owner@Example.com"}`))
+		request := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/api/v1/auth/password-reset/request", strings.NewReader(`{"email":"Owner@Example.com"}`))
 		request.Header.Set("Content-Type", "application/json")
 		router.ServeHTTP(recorder, request)
 
@@ -155,7 +155,7 @@ func TestPasswordResetRequestValidationAndMailAvailability(t *testing.T) {
 		router := newTestPasswordResetRouter(store, mail)
 
 		recorder := httptest.NewRecorder()
-		request := httptest.NewRequest(http.MethodPost, "/api/v1/auth/password-reset/request", strings.NewReader(`{"email":"nobody@example.com"}`))
+		request := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/api/v1/auth/password-reset/request", strings.NewReader(`{"email":"nobody@example.com"}`))
 		request.Header.Set("Content-Type", "application/json")
 		router.ServeHTTP(recorder, request)
 
@@ -173,7 +173,7 @@ func TestPasswordResetRequestValidationAndMailAvailability(t *testing.T) {
 		router := newTestPasswordResetRouter(store, mail)
 
 		recorder := httptest.NewRecorder()
-		request := httptest.NewRequest(http.MethodPost, "/api/v1/auth/password-reset/request", strings.NewReader(`{"email":"owner@example.com"}`))
+		request := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/api/v1/auth/password-reset/request", strings.NewReader(`{"email":"owner@example.com"}`))
 		request.Header.Set("Content-Type", "application/json")
 		router.ServeHTTP(recorder, request)
 
@@ -187,7 +187,7 @@ func TestPasswordResetConfirm(t *testing.T) {
 	t.Run("weak password returns 400", func(t *testing.T) {
 		router := newTestPasswordResetRouter(&fakePasswordResetStore{}, &fakePasswordResetMail{configured: true})
 		recorder := httptest.NewRecorder()
-		request := httptest.NewRequest(http.MethodPost, "/api/v1/auth/password-reset/confirm", strings.NewReader(`{"token":"orpr_abc","password":"short"}`))
+		request := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/api/v1/auth/password-reset/confirm", strings.NewReader(`{"token":"orpr_abc","password":"short"}`))
 		request.Header.Set("Content-Type", "application/json")
 		router.ServeHTTP(recorder, request)
 
@@ -200,7 +200,7 @@ func TestPasswordResetConfirm(t *testing.T) {
 		store := &fakePasswordResetStore{confirmErr: metadata.ErrPasswordResetInvalid}
 		router := newTestPasswordResetRouter(store, &fakePasswordResetMail{configured: true})
 		recorder := httptest.NewRecorder()
-		request := httptest.NewRequest(http.MethodPost, "/api/v1/auth/password-reset/confirm", strings.NewReader(`{"token":"orpr_expired","password":"NewPassword123!"}`))
+		request := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/api/v1/auth/password-reset/confirm", strings.NewReader(`{"token":"orpr_expired","password":"NewPassword123!"}`))
 		request.Header.Set("Content-Type", "application/json")
 		router.ServeHTTP(recorder, request)
 
@@ -216,7 +216,7 @@ func TestPasswordResetConfirm(t *testing.T) {
 		store := &fakePasswordResetStore{confirmUserID: uuid.New()}
 		router := newTestPasswordResetRouter(store, &fakePasswordResetMail{configured: true})
 		recorder := httptest.NewRecorder()
-		request := httptest.NewRequest(http.MethodPost, "/api/v1/auth/password-reset/confirm", strings.NewReader(`{"token":"orpr_valid","password":"NewPassword123!"}`))
+		request := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/api/v1/auth/password-reset/confirm", strings.NewReader(`{"token":"orpr_valid","password":"NewPassword123!"}`))
 		request.Header.Set("Content-Type", "application/json")
 		router.ServeHTTP(recorder, request)
 

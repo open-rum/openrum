@@ -58,8 +58,8 @@ func TestPasswordResetFlowIntegration(t *testing.T) {
 		t.Fatal(err)
 	}
 	if _, err := database.ExecContext(ctx,
-		`INSERT INTO users (id, email, display_name, password_hash, email_verified_at)
-		 VALUES ($1, 'owner@example.com', 'Owner', $2, NOW())`,
+		`INSERT INTO users (id, email, display_name, password_hash)
+		 VALUES ($1, 'owner@example.com', 'Owner', $2)`,
 		userID, oldHash,
 	); err != nil {
 		t.Fatal(err)
@@ -89,7 +89,7 @@ func TestPasswordResetFlowIntegration(t *testing.T) {
 	router.HandleFunc("POST /api/v1/auth/password-reset/confirm", handler.Confirm)
 
 	// 1. Request reset link for existing verified account.
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/password-reset/request", strings.NewReader(`{"email":"owner@example.com"}`))
+	req := httptest.NewRequestWithContext(ctx, http.MethodPost, "/api/v1/auth/password-reset/request", strings.NewReader(`{"email":"owner@example.com"}`))
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
@@ -110,7 +110,7 @@ func TestPasswordResetFlowIntegration(t *testing.T) {
 	token := strings.Fields(rest)[0]
 
 	// 2. Immediate repeat request within cooldown should still return 202 without sending a second email.
-	req2 := httptest.NewRequest(http.MethodPost, "/api/v1/auth/password-reset/request", strings.NewReader(`{"email":"owner@example.com"}`))
+	req2 := httptest.NewRequestWithContext(ctx, http.MethodPost, "/api/v1/auth/password-reset/request", strings.NewReader(`{"email":"owner@example.com"}`))
 	req2.Header.Set("Content-Type", "application/json")
 	rec2 := httptest.NewRecorder()
 	router.ServeHTTP(rec2, req2)
@@ -126,7 +126,7 @@ func TestPasswordResetFlowIntegration(t *testing.T) {
 		"token":    token,
 		"password": "BrandNewPassword123!",
 	})
-	confirmReq := httptest.NewRequest(http.MethodPost, "/api/v1/auth/password-reset/confirm", strings.NewReader(string(confirmPayload)))
+	confirmReq := httptest.NewRequestWithContext(ctx, http.MethodPost, "/api/v1/auth/password-reset/confirm", strings.NewReader(string(confirmPayload)))
 	confirmReq.Header.Set("Content-Type", "application/json")
 	confirmRec := httptest.NewRecorder()
 	router.ServeHTTP(confirmRec, confirmReq)
@@ -135,7 +135,7 @@ func TestPasswordResetFlowIntegration(t *testing.T) {
 	}
 
 	// Reusing the same token must fail with 410.
-	reuseReq := httptest.NewRequest(http.MethodPost, "/api/v1/auth/password-reset/confirm", strings.NewReader(string(confirmPayload)))
+	reuseReq := httptest.NewRequestWithContext(ctx, http.MethodPost, "/api/v1/auth/password-reset/confirm", strings.NewReader(string(confirmPayload)))
 	reuseReq.Header.Set("Content-Type", "application/json")
 	reuseRec := httptest.NewRecorder()
 	router.ServeHTTP(reuseRec, reuseReq)
