@@ -62,4 +62,16 @@ func TestResetPasswordCommandValidation(t *testing.T) {
 			t.Fatalf("err=%v, want POSTGRES_DSN must be set", err)
 		}
 	})
+
+	t.Run("list-admins requires POSTGRES_DSN", func(t *testing.T) {
+		var stdout, stderr bytes.Buffer
+		err := runResetPasswordWithIO(context.Background(), []string{"--list-admins"}, "", resetPasswordIO{
+			stdin:  strings.NewReader(""),
+			stdout: &stdout,
+			stderr: &stderr,
+		})
+		if err == nil || !strings.Contains(err.Error(), "POSTGRES_DSN") {
+			t.Fatalf("err=%v, want POSTGRES_DSN must be set", err)
+		}
+	})
 }

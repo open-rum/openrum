@@ -68,7 +68,8 @@ kubectl exec -it deploy/openrum-api -- /app/api reset-password --email you@compa
 pnpm openrum reset-password --email you@company.com`}
           </pre>
           <p className="text-xs text-base-content/70">
-            如非实例管理员，请联系管理员协助重置密码，或先在实例设置中配置邮件服务。
+            如果忘记了管理员邮箱，可在上述命令末尾改用 <code>--list-admins</code>{" "}
+            查看当前实例管理员列表。如非实例管理员，请联系管理员协助重置密码，或先在实例设置中配置邮件服务。
           </p>
         </div>
 

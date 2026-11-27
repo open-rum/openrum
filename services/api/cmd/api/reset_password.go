@@ -39,10 +39,13 @@ func runResetPasswordWithIO(ctx context.Context, args []string, postgresDSN stri
 
 	var email string
 	var passwordStdin bool
+	var listAdmins bool
 	flags.StringVar(&email, "email", "", "Email address of the account to reset")
 	flags.BoolVar(&passwordStdin, "password-stdin", false, "Read the new password from standard input instead of prompting")
+	flags.BoolVar(&listAdmins, "list-admins", false, "List instance owner and admin email addresses without changing any password")
 	flags.Usage = func() {
-		fmt.Fprintf(stdio.stderr, "Usage: api reset-password --email <address> [--password-stdin]\n\n")
+		fmt.Fprintf(stdio.stderr, "Usage: api reset-password --email <address> [--password-stdin]\n")
+		fmt.Fprintf(stdio.stderr, "       api reset-password --list-admins\n\n")
 		fmt.Fprintf(stdio.stderr, "Resets a user's password directly in PostgreSQL and revokes every active session.\n")
 		fmt.Fprintf(stdio.stderr, "Requires POSTGRES_DSN in the environment.\n\n")
 		flags.PrintDefaults()
@@ -58,9 +61,36 @@ func runResetPasswordWithIO(ctx context.Context, args []string, postgresDSN stri
 		return fmt.Errorf("unexpected arguments: %s", strings.Join(flags.Args(), " "))
 	}
 
+	if listAdmins {
+		if strings.TrimSpace(postgresDSN) == "" {
+			return errors.New("POSTGRES_DSN must be set")
+		}
+		opCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
+		defer cancel()
+
+		database, err := metadata.OpenPostgres(opCtx, postgresDSN)
+		if err != nil {
+			return fmt.Errorf("connect postgres: %w", err)
+		}
+		defer func() { _ = database.Close() }()
+
+		admins, err := metadata.NewPasswordResetRepository(database).ListAdmins(opCtx)
+		if err != nil {
+			return fmt.Errorf("list admins: %w", err)
+		}
+		if len(admins) == 0 {
+			fmt.Fprintln(stdio.stdout, "No instance administrators found.")
+			return nil
+		}
+		for _, admin := range admins {
+			fmt.Fprintf(stdio.stdout, "%s\t%s\t%s\t%s\n", admin.Email, admin.Role, admin.Status, admin.DisplayName)
+		}
+		return nil
+	}
+
 	email = strings.ToLower(strings.TrimSpace(email))
 	if email == "" {
-		return errors.New("--email is required")
+		return errors.New("--email is required (use --list-admins to look up administrator emails)")
 	}
 
 	password, err := readResetPassword(passwordStdin, stdio)

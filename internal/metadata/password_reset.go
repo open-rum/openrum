@@ -223,3 +223,39 @@ func (repository *PasswordResetRepository) AdminResetPassword(ctx context.Contex
 	}
 	return userID, nil
 }
+
+// InstanceAdminSummary describes an instance owner or admin for operator recovery output.
+type InstanceAdminSummary struct {
+	Email       string
+	DisplayName string
+	Role        string
+	Status      string
+}
+
+// ListAdmins returns instance owners and admins ordered with owners first so an operator
+// who forgot which address was initialized can identify the account before resetting it.
+func (repository *PasswordResetRepository) ListAdmins(ctx context.Context) ([]InstanceAdminSummary, error) {
+	rows, err := repository.database.QueryContext(ctx,
+		`SELECT u.email, u.display_name, im.role, u.status
+		 FROM instance_members im
+		 JOIN users u ON u.id = im.user_id
+		 ORDER BY (im.role = 'instance_owner') DESC, u.created_at ASC, u.id ASC`,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	var admins []InstanceAdminSummary
+	for rows.Next() {
+		var item InstanceAdminSummary
+		if err := rows.Scan(&item.Email, &item.DisplayName, &item.Role, &item.Status); err != nil {
+			return nil, err
+		}
+		admins = append(admins, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return admins, nil
+}

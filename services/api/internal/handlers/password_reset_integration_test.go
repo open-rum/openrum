@@ -64,6 +64,13 @@ func TestPasswordResetFlowIntegration(t *testing.T) {
 	); err != nil {
 		t.Fatal(err)
 	}
+	if _, err := database.ExecContext(ctx,
+		`INSERT INTO instance_members (user_id, role, created_by)
+		 VALUES ($1, 'instance_owner', $1)`,
+		userID,
+	); err != nil {
+		t.Fatal(err)
+	}
 
 	sessions := auth.NewSessionManager(database)
 	sessionCredentials, err := sessions.Create(ctx, userID, "127.0.0.1", "test-agent")
@@ -164,5 +171,12 @@ func TestPasswordResetFlowIntegration(t *testing.T) {
 	}
 	if _, err := sessions.Authenticate(ctx, sessionCredentials2.Token); err == nil {
 		t.Fatalf("expected session to be revoked after AdminResetPassword")
+	}
+	admins, err := repo.ListAdmins(ctx)
+	if err != nil {
+		t.Fatalf("ListAdmins: %v", err)
+	}
+	if len(admins) != 1 || admins[0].Email != "owner@example.com" || admins[0].Role != "instance_owner" {
+		t.Fatalf("unexpected admins list: %+v", admins)
 	}
 }
